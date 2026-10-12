@@ -14,7 +14,7 @@ function boot(){
   cam.x=st.x; cam.y=st.y;
   window.__bigrig={NAV,setRoute,clearRoute,mBX,mBY,truck,input,world,cam,bigmap,openMap,closeMap,onRoadM,kingpin,traffic,toggleRefuel,fuelStationAt,refuel,get loadMs(){return world.loadMs;},spawnVehicle,toggleCouple,coupleCandidate,trailerInBay,BigRig,get fps(){return fps;},chunks:chunkCache};
   truck.fuel=260; truck.tank=400; truck.money=2500; truck.damage=0;
-  if(!loadGame()) applyModel('rigger'); uiInit(); padInstall(); mpInit();
+  if(!loadGame()) applyModel('rigger'); uiInit(); padInstall(); mpInit(); mobInit();
   Object.assign(window.__bigrig,{MP,mpHost,mpJoin,mpChatSend,startGame,getChunk,renderChunk,MAPC,drawMapDetail,pad,padUpdate,career,acceptJob,abandonJob,tryUnload,bayAlign,buyTruck,openBoard,openDealer,closeUI,fcv,addXP,saveGame,loadGame,applyModel,TRUCK_MODELS,TIERS,CARGOS,levelOf,uncouple,couple,fillBoard,jobRoute});
   world.loadMs=performance.now()-tb; world.ready=true; const ld=document.getElementById('loading'); if(ld) ld.textContent='World ready ('+(world.loadMs/1000).toFixed(1)+' s)';
   requestAnimationFrame(frame);
@@ -35,7 +35,7 @@ document.getElementById('tbtn').addEventListener('pointerdown',e=>{ e.preventDef
 if(('ontouchstart' in window)||navigator.maxTouchPoints>0) document.body.classList.add('touch');
 document.getElementById('fs').addEventListener('click',()=>{ const f=document.getElementById('frame'); if(!document.fullscreenElement) (f.requestFullscreen||f.webkitRequestFullscreen).call(f); else document.exitFullscreen(); });
 // scale the fixed 960x600 window down to fit small screens
-function fit(){ const wrap=document.getElementById('wrap'); const avail=Math.min(innerWidth-16, (innerHeight-(document.body.classList.contains('touch')?40:140))*1.6); const s=Math.min(1,avail/VW); wrap.style.setProperty('--s',s); }
+function fit(){ if(document.body.classList.contains('touch')) return; const wrap=document.getElementById('wrap'); const avail=Math.min(innerWidth-16, (innerHeight-(document.body.classList.contains('touch')?40:140))*1.6); const s=Math.min(1,avail/VW); wrap.style.setProperty('--s',s); }
 addEventListener('resize',fit); fit();
 // ---------- loop
 function frame(ts){
