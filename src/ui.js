@@ -174,7 +174,7 @@ function drawPreview(cv2,j){ const g=cv2.getContext('2d'), W=cv2.width, H=cv2.he
   if(p) for(let k=0;k<p.length;k+=8) pts.push([p[k]%MW,(p[k]/MW)|0]);
   let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9; for(const q of pts){ x0=Math.min(x0,q[0]); x1=Math.max(x1,q[0]); y0=Math.min(y0,q[1]); y1=Math.max(y1,q[1]); }
   const pad=40, sc=Math.min((W-20)/(x1-x0+pad*2),(H-20)/(y1-y0+pad*2)), cx=(x0+x1)/2, cy=(y0+y1)/2; const X=t=>W/2+(t-cx)*sc, Y=t=>H/2+(t-cy)*sc;
-  g.fillStyle='#6e8aac'; g.fillRect(0,0,W,H); g.imageSmoothingEnabled=true; g.drawImage(MINIMAP,X(0),Y(0),MW*sc,MH*sc);
+  g.fillStyle='#6e8aac'; g.fillRect(0,0,W,H); g.imageSmoothingEnabled=true; g.drawImage(MINIMAP,X(0),Y(0),MW*sc,MH*sc); if(world.v2&&g===ctx) v2MapVectors(X(0),Y(0),sc);
   g.fillStyle='rgba(8,12,20,0.18)'; g.fillRect(0,0,W,H);
   if(p){ g.lineJoin='round'; g.lineCap='round'; for(const [w,col] of [[10,'rgba(0,0,0,0.45)'],[6,'#ff3df0']]){ g.strokeStyle=col; g.lineWidth=w; g.beginPath(); for(let k=0;k<p.length;k+=3){ const i=p[k]; const px=X((i%MW)+0.5), py=Y(((i/MW)|0)+0.5); k?g.lineTo(px,py):g.moveTo(px,py); } g.stroke(); } }
   const pin=(x,y,c,t)=>{ g.fillStyle='rgba(0,0,0,.4)'; g.beginPath(); g.arc(X(x)+2,Y(y)+2,12,0,7); g.fill(); g.fillStyle=c; g.beginPath(); g.arc(X(x),Y(y),12,0,7); g.fill(); g.strokeStyle='#fff'; g.lineWidth=3; g.stroke(); g.fillStyle='#fff'; g.font='bold 13px system-ui'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(t,X(x),Y(y)+1); };

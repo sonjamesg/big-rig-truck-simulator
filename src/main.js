@@ -257,7 +257,7 @@ function drawBigMap(){
   ctx.fillStyle='rgba(6,9,15,0.92)'; ctx.fillRect(0,0,VW,VH);
   const z=bigmap.z; ctx.save(); ctx.beginPath(); ctx.rect(20,40,VW-40,VH-60); ctx.clip();
   ctx.fillStyle='#6e8aac'; ctx.fillRect(20,40,VW-40,VH-60); ctx.imageSmoothingEnabled=z<1; ctx.drawImage(MINIMAP,VW/2-bigmap.cx*z,VH/2+10-bigmap.cy*z,MW*z,MH*z);
-  bigmap.miss=z>=2.2?drawMapDetail(VW/2-bigmap.cx*z,VH/2+10-bigmap.cy*z,z,20,40,VW-20,VH-20):0;
+  bigmap.miss=z>=2.2?drawMapDetail(VW/2-bigmap.cx*z,VH/2+10-bigmap.cy*z,z,20,40,VW-20,VH-20):(v2MapVectors(VW/2-bigmap.cx*z,VH/2+10-bigmap.cy*z,z),0);
   const BX=t=>VW/2+(t-bigmap.cx)*z, BY=t=>VH/2+10+(t-bigmap.cy)*z;
   if(z>0.8) for(const v of traffic.vs){ ctx.fillStyle=v.heavy?'#ff9f1a':'#fff'; ctx.fillRect(BX(v.x/4)-1.5,BY(v.y/4)-1.5,3,3); }
   for(const t of world.trailers){ if(t.coupled) continue; if(z<0.8&&!t.target) continue; ctx.fillStyle=t.target?'#ffd600':'#4fd1ff'; ctx.fillRect(BX(t.x/4)-2,BY(t.y/4)-2,4,4); }

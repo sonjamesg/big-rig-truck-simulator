@@ -21,7 +21,7 @@ drawCurve=function(g,cv){ if(!cv.v2||cv.type==='dirt') return _drawCurveLegacy(g
   g.lineCap=capSave;
   if(cv.type==='hwy'||cv.type==='dual'||cv.type==='rural'){ v2path(g,P,i0,i1,0); g.strokeStyle=cv.type==='rural'?'#8f8a76':'#8a8c86'; g.lineWidth=W+(cv.type==='rural'?4:6); g.stroke(); }
   v2path(g,P,i0,i1,0); g.strokeStyle=g.createPattern(TEX.asph[1],'repeat'); g.lineWidth=W; g.stroke();
-  if(cv.bulb){ const e=P[n-1]; if(!CUR_CHUNK||1){ g.fillStyle=g.createPattern(TEX.asph[1],'repeat'); g.beginPath(); g.arc(e[0],e[1],2.1*TILE,0,7); g.fill(); g.strokeStyle='#77746d'; g.lineWidth=3; g.stroke(); } }
+  if(cv.bulb){ const e=P[n-1]; if(!CUR_CHUNK||1){ g.fillStyle=g.createPattern(TEX.asph[1],'repeat'); g.beginPath(); g.arc(e[0],e[1],2.1*TILE,0,7); g.fill(); g.strokeStyle='#cfcac0'; g.lineWidth=5; g.stroke(); g.strokeStyle='rgba(60,55,50,0.6)'; g.lineWidth=1.5; g.stroke(); } }
   // markings: trimmed back from junctions so nothing paints across another road
   const kk=Math.ceil((cv.w/2+1.6)/0.5), a0=Math.max(i0,cv.trimA?kk:0), a1=Math.min(i1,n-1-(cv.trimB?kk:0));
   const line=(off,col,w,dash,from,to)=>{ if((to??a1)<=(from??a0)) return; v2path(g,P,from??a0,to??a1,off); g.strokeStyle=col; g.lineWidth=w; g.lineCap='butt'; g.setLineDash(dash||[]); g.stroke(); g.setLineDash([]); };
@@ -91,3 +91,14 @@ function v2Terrain(g,cx,cy,N){ const ox=cx*N, oy=cy*N, M=N+4; const cls=new Uint
     if(foam){ g.strokeStyle=foam; g.lineWidth=4; g.lineCap='round'; g.stroke(edge); g.strokeStyle='rgba(255,255,255,0.25)'; g.lineWidth=9; g.stroke(edge); }
     else { g.strokeStyle='rgba(60,50,35,0.18)'; g.lineWidth=2; g.stroke(edge); }
     g.restore(); } }
+
+// vector roads on the minimap / world map: same polylines as the world, so the maps match the roads exactly and stay smooth at any zoom
+const V2MAPCOL={hwy:['#2a2a2e','#f0b43c'],ramp:['#2a2a2e','#e9c46a'],dual:['#2a2a2e','#f4f4f4'],city:['#3a3a3e','#fbfbfb'],town:['#3a3a3e','#fbfbfb'],rural:['#3a3a3e','#f3efe6'],res:['#55555a','#ffffff'],dirt:['#7a6a52','#c9b38c']};
+function v2MapPaths(){ if(world.v2map) return world.v2map; const byT={}; for(const cv of world.curves){ if(!cv.v2) continue; const t=cv.type; (byT[t]=byT[t]||{p:new Path2D(),w:cv.w,cv:[]}); const P=byT[t].p; cv.pts.forEach((q,i)=>i?P.lineTo(q[0],q[1]):P.moveTo(q[0],q[1])); byT[t].w=Math.max(byT[t].w,cv.w); }
+  const rb=new Path2D(); for(const r of world.rbs){ const R=(r.rin+r.rout)/2; rb.moveTo(r.cx+R,r.cy); rb.arc(r.cx,r.cy,R,0,Math.PI*2); }
+  return world.v2map={byT,rb}; }
+function v2MapVectors(ox,oy,sc){ if(!world.v2) return; const M=v2MapPaths(); ctx.save(); ctx.translate(ox,oy); ctx.scale(sc,sc); ctx.lineJoin='round'; ctx.lineCap='round';
+  const order=['dirt','res','rural','town','city','dual','ramp','hwy'], minW=1.4/sc;
+  for(const pass of [0,1]) for(const t of order){ const L=M.byT[t]; if(!L) continue; const w=Math.max(L.w,minW*(t==='hwy'?2.2:t==='res'?1:1.5)); ctx.strokeStyle=V2MAPCOL[t][pass]; ctx.lineWidth=pass?w:w+Math.max(0.6,1.2/sc); ctx.stroke(L.p);
+    if(t==='town'&&pass===1){ ctx.lineWidth=4.4; ctx.strokeStyle=V2MAPCOL.res[0]; ctx.stroke(M.rb); ctx.lineWidth=4.4-Math.max(0.6,1.2/sc); ctx.strokeStyle='#fbfbfb'; ctx.stroke(M.rb); } }
+  ctx.restore(); }

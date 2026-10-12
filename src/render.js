@@ -275,6 +275,7 @@ function makeMinimap(){
   for(const [k,n] of [[T.GRASS,'grass'],[T.WALK,'walk'],[T.WATER,'water'],[T.PGRASS,'pgrass'],[T.CONC,'conc'],[T.PLAZA,'plaza'],[T.GRAVEL,'gravel'],[T.QUAY,'quay'],[T.SAND,'sand'],[T.LOT,'asph'],[T.FIELD,'field'],[T.ISLAND,'island'],[T.ROCK,'rock'],[T.HEDGE,'grass'],[T.ROAD,'asph'],[T.TANK,'conc'],[T.PUMP,'conc']]){ const c3=avg(n); if(c3) col[k]=c3; }
   col[T.BRIDGE]=[col[T.ROAD][0]+8,col[T.ROAD][1]+8,col[T.ROAD][2]+8]; col[T.BLDG]=[178,172,164]; col[T.CONT]=[170,120,90]; const GR=col[T.GRASS];
   for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){ const i=y*MW+x; const t=G[i]; let c3=col[t]||[0,0,0];
+    if(world.v2&&(t===T.ROAD||t===T.BRIDGE)){ const u=t===T.BRIDGE?T.WATER:world.under[i]; c3=col[u]||GR; }
     if(t===T.SAND && world.des[i]) c3=DES;
     if(t===T.GRASS){ const f=world.fd[i]/255; if(f>0.6) c3=[GR[0]*0.7|0,GR[1]*0.78|0,GR[2]*0.7|0]; else if(f<0.38) c3=[GR[0]*1.12|0,GR[1]*1.06|0,GR[2]*1.05|0]; }
     if(t===T.ROCK&&0){ const e=hillElev(x,y); const b=Math.floor(e*7)%2?14:0; c3=[150+b+e*40,148+b+e*40,144+b+e*40]; }

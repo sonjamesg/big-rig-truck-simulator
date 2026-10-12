@@ -170,10 +170,19 @@ function v2Apply(objs,Rnd){ const t0=performance.now(); const water=world.water;
     world.start={x:(sd.x0+sd.w/2)*TILE,y:(sd.y0+sd.h-8)*TILE,h:0}; }
   world.startDepot=sd||{x0:Math.round(hq.x),y0:Math.round(hq.y),w:W0,h:H0};
   // no building may sit on a road / roundabout / slip: drop any footprint that touches the 1 m road mask
-  { const W=MW*M_T, onR=(x,y)=>{ x=Math.floor(x); y=Math.floor(y); if(x<0||y<0||x>=W||y>=MH*M_T) return false; const i=y*W+x; return (RM[i>>3]>>(i&7)&1)===1; }; let dropped=0;
-    for(let k=objs.length-1;k>=0;k--){ const o=objs[k]; if(o.kind==='bldg'&&!o.logo&&!o.fp) o.fp=[[o.x,o.y],[o.x+o.w,o.y],[o.x+o.w,o.y+o.h],[o.x,o.y+o.h]]; if(o.kind!=='v2b'&&!(o.kind==='bldg'&&!o.logo)) continue; const F=o.fp.map(p=>[p[0]/TILE*M_T,p[1]/TILE*M_T]); let hit=false;
-      for(let u=0;u<=1.001&&!hit;u+=0.125) for(let v=0;v<=1.001;v+=0.125){ const x=F[0][0]+(F[1][0]-F[0][0])*u+(F[3][0]-F[0][0])*v, y=F[0][1]+(F[1][1]-F[0][1])*u+(F[3][1]-F[0][1])*v; if(onR(x,y)){ hit=true; break; } }
-      if(!hit) continue; objs.splice(k,1); dropped++; const xs=F.map(p=>p[0]/M_T), ys=F.map(p=>p[1]/M_T); for(let ty=Math.floor(Math.min(...ys));ty<=Math.max(...ys);ty++) for(let tx=Math.floor(Math.min(...xs));tx<=Math.max(...xs);tx++) if(inb(tx,ty)&&G[idx(tx,ty)]===T.BLDG){ const i=idx(tx,ty); if(inPoly(o.fp.map(p=>[p[0]/TILE,p[1]/TILE]),tx+0.5,ty+0.5)) G[i]=world.under[i]||T.CONC; } }
+  { const W=MW*M_T, onR=(x,y)=>{ x=Math.floor(x); y=Math.floor(y); if(x<0||y<0||x>=W||y>=MH*M_T) return false; const i=y*W+x; return (RM[i>>3]>>(i&7)&1)===1; }; let dropped=0, shrunk=0;
+    const hits=F=>{ for(let u=0.04;u<=0.961;u+=0.0919) for(let v=0.04;v<=0.961;v+=0.0919){ const x=F[0][0]+(F[1][0]-F[0][0])*u+(F[3][0]-F[0][0])*v, y=F[0][1]+(F[1][1]-F[0][1])*u+(F[3][1]-F[0][1])*v; if(onR(x,y)) return true; } return false; };
+    for(let k=objs.length-1;k>=0;k--){ const o=objs[k]; if(o.kind==='bldg'&&!o.logo&&!o.fp) o.fp=[[o.x,o.y],[o.x+o.w,o.y],[o.x+o.w,o.y+o.h],[o.x,o.y+o.h]]; if(o.kind!=='v2b'&&!(o.kind==='bldg'&&!o.logo)) continue;
+      const toM=fp=>fp.map(p=>[p[0]/TILE*M_T,p[1]/TILE*M_T]); if(!hits(toM(o.fp))) continue; const old=o.fp; let nf=null;
+      const c=[(old[0][0]+old[2][0])/2,(old[0][1]+old[2][1])/2];
+      // try shrinking toward the centre, then sliding the shrunk footprint toward each side away from the road
+      outer: for(const sc of [0.85,0.7,0.55]) for(const sh of [[0,0],[1,0],[-1,0],[0,1],[0,-1]]){ const ex=[(old[1][0]-old[0][0])*(1-sc)/2*sh[0]+(old[3][0]-old[0][0])*(1-sc)/2*sh[1],(old[1][1]-old[0][1])*(1-sc)/2*sh[0]+(old[3][1]-old[0][1])*(1-sc)/2*sh[1]];
+        const f=old.map(p=>[c[0]+(p[0]-c[0])*sc+ex[0],c[1]+(p[1]-c[1])*sc+ex[1]]); const d=Math.min(Math.hypot(f[1][0]-f[0][0],f[1][1]-f[0][1]),Math.hypot(f[3][0]-f[0][0],f[3][1]-f[0][1])); if(d<2.2*TILE) break outer; if(!hits(toM(f))){ nf=f; break outer; } }
+      const oldT=old.map(p=>[p[0]/TILE,p[1]/TILE]), xs=oldT.map(p=>p[0]), ys=oldT.map(p=>p[1]), nT=nf&&nf.map(p=>[p[0]/TILE,p[1]/TILE]);
+      for(let ty=Math.floor(Math.min(...ys));ty<=Math.max(...ys);ty++) for(let tx=Math.floor(Math.min(...xs));tx<=Math.max(...xs);tx++) if(inb(tx,ty)&&G[idx(tx,ty)]===T.BLDG&&inPoly(oldT,tx+0.5,ty+0.5)&&!(nT&&inPoly(nT,tx+0.5,ty+0.5))){ const i=idx(tx,ty); G[i]=world.under[i]||T.CONC; }
+      if(!nf){ objs.splice(k,1); dropped++; continue; }
+      shrunk++; if(o.kind==='bldg'&&!o.wasV2){ o.kind='v2b'; o.col=o.col||'#a7a49c'; o.height=o.height||20; o.seed=o.seed||k; o.ind=true; } o.fp=nf; const fx=nf.map(p=>p[0]), fy=nf.map(p=>p[1]); o.x=Math.min(...fx); o.y=Math.min(...fy); o.w=Math.max(...fx)-o.x; o.h=Math.max(...fy)-o.y; }
+    world.v2shrunk=shrunk;
     world.v2dropped=dropped; }
   world.labels=[...L.labels.map(l=>[l[0],l[1],l[2],l[3]==='region'?1:(l[3]==='water'||l[3]==='waters')?2:undefined]), ...CITIES.map(c2=>[c2.name,c2.c[0],c2.c[1]])];
   world.v2stats={edges:edges.length,buildings:nb,blocks:g.BLK.length,junctionsInterchange:g.JN.length,rbs:world.rbs.length,ms:Math.round(performance.now()-t0)};
