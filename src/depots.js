@@ -91,7 +91,7 @@ function buildDepots(objs,R){
     for(let rad=0;rad<160;rad+=2) for(let dy=-rad;dy<=rad;dy+=2) for(let dx=-rad;dx<=rad;dx+=2){ if(Math.max(Math.abs(dx),Math.abs(dy))!==rad) continue;
       const x=tx+dx, y=ty+dy; if(x<2||y<4||x+w>MW-2||y+h>MH-2) continue;
       if(badIn(x-1,y,w+2,h+1)) continue;
-      for(let gap=1;gap<=(maxGap||8);gap++){ const j=y-1-gap; let road=0; for(let i=x+w/2-2;i<x+w/2+2;i++){ const sid=world.roadH[idx(i,j)]; if((get(i,j)===T.ROAD||get(i,j)===T.BRIDGE)&&sid>=0&&world.segs[sid].type!=='hwy'&&world.roadV[idx(i,j)]<0) road++; }
+      for(let gap=1;gap<=(maxGap||8);gap++){ const j=y-1-gap; let road=0; for(let i=x+w/2-2;i<x+w/2+2;i++){ const sid=world.roadH[idx(i,j)]; if((get(i,j)===T.ROAD||get(i,j)===T.BRIDGE)&&((sid>=0&&world.segs[sid].type!=='hwy'&&world.roadV[idx(i,j)]<0)||(sid===-3&&world.v2hw&&!world.v2hw[idx(i,j)]))) road++; }
         if(road===4){ let clear=true; for(let jj=y-gap;jj<y;jj++) for(let i=x+w/2-3;i<x+w/2+3;i++) if((!okT(get(i,jj))&&get(i,jj)!==T.WALK)||world.reserved[idx(i,jj)]) clear=false; if(clear) return [x,y,gap]; } }
     } return null; }
   const region=(x,y)=> world.regionAt(x,y);

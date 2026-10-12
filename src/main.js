@@ -135,7 +135,7 @@ function drawSTower(o){ const S=o.S, H=SUSP_K*1.08, legs=[S.a-0.9,S.a+S.w+0.9], 
     ctx.fillStyle='#5a1a10'; ctx.fillRect(c[0]-r*0.35,c[1]-r*0.35,r*0.7,r*0.7); ctx.fillStyle='#ff2b1e'; ctx.beginPath(); ctx.arc(c[0],c[1],2.2+Math.sin(timeS*3)*0.8,0,7); ctx.fill(); }
   ctx.restore(); }
 function drawOverhead(o){
-  if(o.kind==='susp') return drawSusp(o); if(o.kind==='stower') return drawSTower(o);
+  if(o.kind==='v2susp') return drawV2Susp(o); if(o.kind==='v2tower') return drawV2Tower(o); if(o.kind==='susp') return drawSusp(o); if(o.kind==='stower') return drawSTower(o);
   if(o.kind==='mast'){ const l=o.l, f=o.f, Ax=o.A[0]*TILE, Ay=o.A[1]*TILE, E0=[Ax+f[0]*0.55*TILE,Ay+f[1]*0.55*TILE], onArm=(lat)=>{ const u=lat/o.pLat, lon=0.55+(o.pLon-0.55)*u; return [E0[0]+(l[0]*lat-f[0]*lon)*TILE,E0[1]+(l[1]*lat-f[1]*lon)*TILE]; }, P=onArm(o.pLat), tip=onArm(-0.15);
     const sh=10; ctx.lineCap='round';
     // shadow (sun from the north-west)

@@ -433,6 +433,7 @@ function genWorld(){
           for(let p=S.r0;p<S.r1;p+=8){ const q=P(p+4,S.a+S.w/2); world.overhead.push({kind:'susp',S,p0:p,p1:Math.min(S.r1,p+8),x:q[0],y:q[1]}); }
           for(const tu of [S.t0,S.t1]){ const q=P(tu,S.a+S.w/2); world.overhead.unshift({kind:'stower',S,u:tu,x:q[0],y:q[1]}); } }
         r0=-1; } } }
+  if(typeof v2Apply==='function'&&world.V2!==false) v2Apply(objs,R);
   (world.tm=world.tm||[]).push(['if(typeof buildMarki',performance.now()-t0|0]);
   if(typeof buildMarkings==='function') buildMarkings(objs);
   (world.tm=world.tm||[]).push(['if(typeof buildDepot',performance.now()-t0|0]);
@@ -454,7 +455,7 @@ function genWorld(){
     else if(o.kind==='fountain'){ x0=o.x-60; y0=o.y-60; x1=o.x+60; y1=o.y+60; }
     else if(o.kind==='pump'||o.kind==='pallets'||o.kind==='drive'){ x0=o.x; y0=o.y-TILE; x1=o.x+TILE*2+12; y1=o.y+TILE*2+12; }
     else { const s=(o.height||0)*0.6+4; x0=o.x; y0=o.y; x1=o.x+o.w+s; y1=o.y+o.h+s; }
-    o.z = o.kind==='curve'?-1.5 : o.kind==='kerb'||o.kind==='rb'||o.kind==='field'||o.kind==='runway'?-1 : o.kind==='appr'||o.kind==='boxj'||o.kind==='ldrop'?-0.5 : o.kind==='lot'||o.kind==='pond'||o.kind==='paint'||o.kind==='bay'||o.kind==='drive'?0 : o.kind==='tree'?3 : o.kind==='awning'?2.5 : 2;
+    o.z = o.kind==='v2pave'?-2 : o.kind==='curve'?-1.5 : o.kind==='v2rb'?-1.4 : o.kind==='v2park'?-1 : o.kind==='kerb'||o.kind==='rb'||o.kind==='field'||o.kind==='runway'?-1 : o.kind==='appr'||o.kind==='boxj'||o.kind==='ldrop'?-0.5 : o.kind==='lot'||o.kind==='pond'||o.kind==='paint'||o.kind==='bay'||o.kind==='drive'?0 : o.kind==='tree'?3 : o.kind==='awning'?2.5 : 2;
     for(let cy=Math.floor(y0/CHUNK);cy<=Math.floor(y1/CHUNK);cy++) for(let cx=Math.floor(x0/CHUNK);cx<=Math.floor(x1/CHUNK);cx++){
       const k=cx+','+cy; if(!world.chunkObjs.has(k)) world.chunkObjs.set(k,[]); world.chunkObjs.get(k).push(o);
     }
