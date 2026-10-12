@@ -91,7 +91,7 @@ function v2Apply(objs,Rnd){ const t0=performance.now(); const water=world.water;
   world.segs=[]; world.curves=[]; world.rbs=[]; world.junctions=[]; world.corners=[]; world.overhead=[]; world.susp=[]; world.districts=[]; world.airports=[]; world.cities=[];
   const keep=objs.filter(o=>o.kind==='tree'&&!o.inCity||o.kind==='rock'||o.kind==='cactus'||o.kind==='scrub'); objs.length=0; for(const o of keep) objs.push(o);
   // 2. graph
-  const g=v2Graph(); world.v2=g;
+  const g=v2Graph(); world.v2=g; world.v2poi=L.poi;
   { const E2=[]; for(const e of g.E){ if(e.type!=='res'){ E2.push(e); continue; } let run=[]; const flush=()=>{ if(run.length>=3) E2.push(Object.assign({},e,{pts:run,bulb:e.bulb&&run[run.length-1]===e.pts[e.pts.length-1]})); run=[]; };
       for(const q of e.pts){ const tx=Math.floor(q[0]),ty=Math.floor(q[1]); let wet=!inb(tx,ty); for(let dy=-2;dy<=2&&!wet;dy++) for(let dx=-2;dx<=2;dx++) if(inb(tx+dx,ty+dy)&&(water[idx(tx+dx,ty+dy)]||G[idx(tx+dx,ty+dy)]===T.WATER)){ wet=true; break; } if(wet) flush(); else run.push(q); } flush(); } g.E=E2; } const edges=[]; const PL=planarise(g.E,g.RBS); g.P=PL.P; g.N=PL.N; g.E=PL.P.filter(p=>!p.dead);
   const order={dirt:0,res:1,rural:2,town:3,city:4,dual:5,ramp:6,hwy:7};
@@ -133,11 +133,11 @@ function v2Apply(objs,Rnd){ const t0=performance.now(); const water=world.water;
       const gu=nx>1?0.06:0, gv=ny>1?0.06:0, u0=p/nx+(p?gu:0), u1=(p+1)/nx-(p<nx-1?gu:0), v0=q2/ny+(q2?gv:0), v1=(q2+1)/ny-(q2<ny-1?gv:0);
       const fp=[L2(u0,v0),L2(u1,v0),L2(u1,v1),L2(u0,v1)]; const bb=solidQuad(fp,T.BLDG); if(!bb[4]) continue;
       const pal=ROOF[b.kind]||ROOF.mid, h=b.kind==='down'?30+vrnd(nb,3,1)*70:b.kind==='ind'?18:12+vrnd(nb,5,2)*10;
-      objs.push({kind:'v2b',fp:fp.map(p2=>[p2[0]*TILE,p2[1]*TILE]),col:pal[Math.floor(vrnd(nb,1,b.ci)*pal.length)],height:h,ind:b.kind==='ind',x:bb[0]*TILE,y:bb[1]*TILE,w:(bb[2]-bb[0])*TILE,h:(bb[3]-bb[1])*TILE,seed:nb}); nb++; } }
+      objs.push({kind:'v2b',fp:fp.map(p2=>[p2[0]*TILE,p2[1]*TILE]),col:pal[Math.floor(vrnd(nb,1,b.ci)*pal.length)],height:h*(b.kind==='down'?1:0.8+vrnd(nb,8,3)*0.5),dk:b.kind,ind:b.kind==='ind',x:bb[0]*TILE,y:bb[1]*TILE,w:(bb[2]-bb[0])*TILE,h:(bb[3]-bb[1])*TILE,seed:nb}); nb++; } }
   let nh=0; for(const cv of edges){ if(cv.cls!=='cul'&&cv.cls!=='sub') continue; const P=cv.pts; for(let i=4;i<P.length-4;i+=7){ const a=P[i-1],b=P[i+1],l=Math.hypot(b[0]-a[0],b[1]-a[1])||1,tx=(b[0]-a[0])/l,ty=(b[1]-a[1])/l;
       for(const sd of [-1,1]){ const cx=P[i][0]-ty*sd*3.4, cy=P[i][1]+tx*sd*3.4, q=[[-1.3,-1.1],[1.3,-1.1],[1.3,1.1],[-1.3,1.1]].map(([u,v])=>[cx+tx*u-ty*v*sd,cy+ty*u+tx*v*sd]);
         let ok=true; for(const p of q){ const t2=get(Math.floor(p[0]),Math.floor(p[1])); if(t2===T.ROAD||t2===T.BRIDGE||t2===T.WATER||t2===T.BLDG) ok=false; } if(!ok) continue;
-        const bb=solidQuad(q,T.BLDG); if(!bb[4]) continue; objs.push({kind:'v2b',fp:q.map(p2=>[p2[0]*TILE,p2[1]*TILE]),col:['#b0624e','#c98d5f','#8f5446','#a3a39b','#d6b37c'][nh%5],height:9,house:true,x:bb[0]*TILE,y:bb[1]*TILE,w:(bb[2]-bb[0])*TILE,h:(bb[3]-bb[1])*TILE,seed:nh}); nh++; } } }
+        const bb=solidQuad(q,T.BLDG); if(!bb[4]) continue; objs.push({kind:'v2b',fp:q.map(p2=>[p2[0]*TILE,p2[1]*TILE]),col:['#b0624e','#c98d5f','#8f5446','#a3a39b','#d6b37c'][nh%5],height:8+(nh%3),house:true,dk:'house',face:[ty*sd,-tx*sd],x:bb[0]*TILE,y:bb[1]*TILE,w:(bb[2]-bb[0])*TILE,h:(bb[3]-bb[1])*TILE,seed:nh}); nh++; } } }
   for(const p of g.PARKS){ const [n,x,y,rx,ry,a]=p; const P=[]; for(let k=0;k<32;k++){ const t=k/32*Math.PI*2; P.push(R2([Math.cos(t)*rx,Math.sin(t)*ry],[x,y],a)); } objs.push({kind:'v2park',q:P,x:(x-rx-ry)*TILE,y:(y-rx-ry)*TILE,w:2*(rx+ry)*TILE,h:2*(rx+ry)*TILE});
     for(let ty=Math.floor(y-Math.max(rx,ry));ty<=y+Math.max(rx,ry);ty++) for(let tx=Math.floor(x-Math.max(rx,ry));tx<=x+Math.max(rx,ry);tx++){ if(!inb(tx,ty)) continue; const i=idx(tx,ty); if(G[i]===T.ROAD||G[i]===T.BRIDGE) continue; if(inPoly(P,tx+0.5,ty+0.5)){ if(objs.length&&G[i]===T.BLDG) continue; G[i]=T.PGRASS; if(vrnd(tx,ty,9)<0.05) objs.push({kind:'tree',x:tx*TILE,y:ty*TILE,r:10+vrnd(ty,tx,4)*7,seed:(tx*7919+ty)|0}); } } }
   // 4. landmarks: airports + docks surfaces
@@ -149,6 +149,21 @@ function v2Apply(objs,Rnd){ const t0=performance.now(); const water=world.water;
     const keep2=[]; for(const o of objs){ if(o.kind!=='tree'&&o.kind!=='rock'&&o.kind!=='scrub'&&o.kind!=='cactus'){ keep2.push(o); continue; } const tx=Math.floor(o.x/TILE),ty=Math.floor(o.y/TILE); if(!inb(tx,ty)) continue; const t=get(tx,ty);
       if(t===T.PGRASS){ keep2.push(o); continue; } if(t!==T.GRASS&&t!==T.SAND&&t!==T.ROCK) continue; if(inCity[idx(tx,ty)]) continue; let near=false; for(let dy=-2;dy<=2&&!near;dy++) for(let dx=-2;dx<=2;dx++){ const t2=get(tx+dx,ty+dy); if(t2===T.ROAD||t2===T.BRIDGE||t2===T.BLDG){ near=true; break; } } if(!near) keep2.push(o); }
     objs.length=0; for(const o of keep2) objs.push(o); }
+  // ---- trees: layered forests (pine on hills, broadleaf in lowland), scattered trees, hedgerows, street trees
+  { const t0f=performance.now(); const CG=20, nz=(x,y,k)=>{ const gx=x/CG, gy=y/CG, ix=Math.floor(gx), iy=Math.floor(gy), fx=gx-ix, fy=gy-iy, s2=t=>t*t*(3-2*t), a=vrnd(ix,iy,k), b=vrnd(ix+1,iy,k), c=vrnd(ix,iy+1,k), d=vrnd(ix+1,iy+1,k), u=s2(fx), v=s2(fy); return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v; };
+    const clear=(tx,ty,r)=>{ for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){ const t2=get(tx+dx,ty+dy); if(t2!==T.GRASS&&t2!==T.ROCK&&t2!==T.SAND&&t2!==T.FIELD) return false; } return true; };
+    const rockNear=new Uint8Array((MW>>3)*(MH>>3)); for(let ty=0;ty<MH;ty+=4) for(let tx=0;tx<MW;tx+=4) if(G[idx(tx,ty)]===T.ROCK){ const cx=tx>>3, cy=ty>>3; for(let dy=-2;dy<=2;dy++) for(let dx=-2;dx<=2;dx++){ const X=cx+dx,Y=cy+dy; if(X>=0&&Y>=0&&X<MW>>3&&Y<MH>>3) rockNear[Y*(MW>>3)+X]=1; } }
+    let nf=0; for(let ty=2;ty<MH-2;ty+=1.7) for(let tx=2;tx<MW-2;tx+=1.7){ const jx=tx+vrnd(tx*3|0,ty*3|0,21)*1.1, jy=ty+vrnd(ty*3|0,tx*3|0,22)*1.1, ix=jx|0, iy=jy|0;
+      const t2=G[idx(ix,iy)]; if(t2!==T.GRASS&&t2!==T.ROCK) continue; const f=nz(jx,jy,31)*0.75+nz(jx*3,jy*3,32)*0.25, hill=rockNear[(iy>>3)*(MW>>3)+(ix>>3)];
+      const thr=hill?0.5:0.6; if(f<thr) { if(vrnd(ix,iy,23)>0.9965&&t2===T.GRASS&&clear(ix,iy,2)){ objs.push({kind:'tree',x:jx*TILE,y:jy*TILE,r:11+vrnd(iy,ix,24)*9,seed:(ix*7919+iy*31)|0,sp:vrnd(ix,iy,25)<0.2?3:0}); nf++; } continue; }
+      const edge=(f-thr)/0.08; if(edge<1&&vrnd(ix,iy,26)>edge) continue; if(t2===T.ROCK&&vrnd(ix,iy,27)<0.6) continue; if(!clear(ix,iy,2)) continue;
+      const pine=hill||vrnd(ix>>4,iy>>4,28)<0.15; objs.push({kind:'tree',x:jx*TILE,y:jy*TILE,r:(pine?11:13)+vrnd(iy,ix,29)*(pine?8:11)*(0.6+edge*0.4>1?1:0.6+edge*0.4),seed:(ix*7919+iy*31+nf)|0,sp:pine?1:(vrnd(ix,iy,30)<0.12?3:0)}); nf++; }
+    // street trees on city/town pavements, hedgerows along rural roads
+    let ns=0, nh2=0; for(const cv of edges){ const P=cv.pts; const street=cv.type==='city'||cv.type==='town'&&cv.cls!=='link', hedge=cv.type==='rural'&&nz(P[0][0],P[0][1],33)>0.45; if(!street&&!hedge) continue; const step=street?10:2;
+      for(let i=step;i<P.length-step;i+=step){ const a=P[i-1],b=P[i+1],l=Math.hypot(b[0]-a[0],b[1]-a[1])||1,nx=-(b[1]-a[1])/l,ny=(b[0]-a[0])/l; for(const sd of [-1,1]){ const off=cv.w/2+(street?0.75:1.6), x=P[i][0]+nx*off*sd, y=P[i][1]+ny*off*sd, tx=x|0, ty=y|0; if(!inb(tx,ty)) continue; const t2=G[idx(tx,ty)];
+          if(street){ if(t2===T.ROAD||t2===T.BRIDGE||t2===T.BLDG||t2===T.WATER) continue; if(world.rm){ const W=MW*M_T, mx=(x*M_T)|0, my=(y*M_T)|0; let hit=false; for(const [dx,dy] of [[0,0],[2,0],[-2,0],[0,2],[0,-2]]){ const k=(my+dy)*W+mx+dx; if(world.rm[k>>3]>>(k&7)&1) hit=true; } if(hit) continue; } objs.push({kind:'tree',x:x*TILE,y:y*TILE,r:8+vrnd(tx,ty,34)*3,seed:(tx*131+ty)|0,sp:0}); ns++; }
+          else { if(t2!==T.GRASS&&t2!==T.FIELD) continue; objs.push({kind:'tree',x:x*TILE,y:y*TILE,r:6+vrnd(tx,ty,35)*2.5,seed:(tx*173+ty)|0,sp:3}); nh2++; } } } }
+    world.v2trees={forest:nf,street:ns,hedge:nh2,ms:Math.round(performance.now()-t0f)}; }
   if(world.dam){ const d=world.dam; objs.push({kind:'dam',x:d.x0*TILE,y:(d.y-1)*TILE,w:(d.x1-d.x0)*TILE,h:5*TILE,d}); }
   // suspension bridges on long motorway sea crossings (curved deck)
   world.v2susp=[]; for(const cv of edges){ if(cv.type!=='hwy') continue; const P=cv.pts; let a=-1; for(let i=0;i<=P.length;i++){ const wet=i<P.length&&world.water[idx(Math.floor(P[i][0]),Math.floor(P[i][1]))]; if(wet&&a<0) a=i; if(!wet&&a>=0){ const len=(i-a)*0.5; if(len>=45){ const S={cv,i0:Math.max(0,a-10),i1:Math.min(P.length-1,i+10)}; S.t0=Math.round(S.i0+(S.i1-S.i0)*0.2); S.t1=Math.round(S.i0+(S.i1-S.i0)*0.8); world.v2susp.push(S);

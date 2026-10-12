@@ -54,3 +54,9 @@ function drawPOIs(px,py,big){
   for(const d of world.dealers||[]) icon(px(d.entrance.x),py(d.entrance.y),'#8e44ad','$');
   ctx.textBaseline='alphabetic';
 }
+// ---- repair garages: pull into a marked bay, stop, press R to repair (paid per % damage)
+function garageBayAt(){ const s=truck, f=fwd(s.h), cx=s.x+f[0]*1.9, cy=s.y+f[1]*1.9; for(const g of world.garages||[]){ if(!g.bays||Math.abs(g.x-cx)>60||Math.abs(g.y-cy)>60) continue; for(const b of g.bays) if(cx>=b.x0&&cx<=b.x1&&cy>=b.y0-1&&cy<=b.y1+2) return g; } return null; }
+function tryRepair(){ const s=truck, g=garageBayAt(); if(!g){ flash('Pull into a marked REPAIR bay at a garage to repair'); return; } if(Math.abs(s.v)>0.3){ flash('Stop in the bay first'); return; }
+  if(s.damage<0.5){ flash(`${g.name}: no damage to repair`); return; } const pct=Math.min(s.damage,Math.floor(s.money/g.ratePerPct)); if(pct<=0){ flash('Not enough cash for repairs'); return; }
+  const cost=pct*g.ratePerPct; s.damage-=pct; s.money-=cost; clunk(0.4); flash(`${g.name}: repaired ${pct.toFixed(0)}% for \u00a3${cost.toFixed(2)}`); BigRig.emit('repair',{garage:g.id,pct,cost}); }
+addEventListener('keydown',e=>{ if(e.code==='KeyR'&&started&&!e.repeat){ tryRepair(); e.preventDefault(); } });

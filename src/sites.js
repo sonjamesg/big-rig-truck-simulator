@@ -47,7 +47,7 @@ function buildCareerSites(K){
     const shows=[]; for(let k=0;k<3;k++){ const o={kind:'showtruck',x:(x+2.5+k*4.2)*TILE,y:(y+12.5)*TILE,w:3*TILE,h:6*TILE,ang:-0.35+k*0.35,model:k+1}; objs.push(o); shows.push(o); }
     objs.push({kind:'bunting',x:(x+0.5)*TILE,y:(y+0.4)*TILE,w:(w-1)*TILE,h:12});
     const d={id:'T'+(world.dealers.length+1),name,x:M(x+w/2),y:M(y+h/2),entrance:{x:M(x+w/2),y:M(y-gap)},pad,region:region(x,y)}; world.dealers.push(d); return d; }
-  for(const [n,tx,ty] of [['Big Rig Trucks Albion',520,560],['Sandreach Truck Centre',1500,600],['Highmoor Commercials',1480,1330]]){ const s=find(tx,ty,26,18); if(s) dealer(n,s[0],s[1],s[2]); else console.warn('no dealer spot',n); }
+  for(const [n,tx,ty] of world.v2poi?world.v2poi.filter(p=>p.kind==='dealer').map(p=>[p.name,p.x,p.y]):[['Big Rig Trucks Albion',520,560],['Sandreach Truck Centre',1500,600],['Highmoor Commercials',1480,1330]]){ const s=find(tx,ty,26,18); if(s) dealer(n,s[0],s[1],s[2]); else console.warn('no dealer spot',n); }
 }
 // ---------- static art for the chunk cache
 const pill=(g,x,y,w,h,r)=>{ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); };
