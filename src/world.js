@@ -54,6 +54,7 @@ function genWorld(){
   for(let y=Math.floor(cE(1150))-10;y<MH;y++){ const xc=riverX(y), hw=4+2*Math.sin(y/50); for(let x=Math.floor(xc-hw);x<=xc+hw;x++) water[idx(x,y)]=1; }
   const lake=(cx,cy,rx,ry)=>{ for(let y=Math.max(0,cy-ry-4);y<Math.min(MH,cy+ry+4);y++) for(let x=Math.max(0,cx-rx-4);x<Math.min(MW,cx+rx+4);x++){ const dx=(x-cx)/rx, dy=(y-cy)/ry, n=0.12*Math.sin(x/5)+0.1*Math.cos(y/4); if(dx*dx+dy*dy<1+n) water[idx(x,y)]=1; } };
   lake(470,700,30,20); lake(1600,1270,40,24); lake(1250,1650,30,18); lake(800,1500,18,30); lake(1330,600,14,10); lake(560,1420,16,12);
+  for(let y=1500;y<1586;y++) for(let x=1110;x<1240;x++){ const dx=(x-riverX(1545))/(48+6*Math.sin(y/9)), dy=(y-1545)/40; if(dx*dx+dy*dy<1) water[idx(x,y)]=1; }   // Moor Reservoir (dammed)
   // keep land under cities / airports, then cut dock basins
   for(const [x0,y0,x1,y1] of [[145,135,720,655],[1060,150,1830,515],[1395,1375,1800,1884],[995,1785,1385,1905],[240,775,355,885],[235,1095,300,1162]]) for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++) water[idx(x,y)]=0;
   for(let k=0;k<4;k++) for(let y=175+k*68;y<189+k*68;y++) for(let x=575;x<800;x++) water[idx(x,y)]=1;                // Port Albion docks
@@ -120,6 +121,24 @@ function genWorld(){
   function link(type,w,sa,ea,sb,eb,wps,h,name){ const S=segEnd(sa,ea),E=segEnd(sb,eb),dA=segOut(sa,ea),dB=segOut(sb,eb); h=h||8;
     const ctrl=[S,[S[0]+dA[0]*h,S[1]+dA[1]*h],...(wps||[]),[E[0]+dB[0]*h,E[1]+dB[1]*h],E];
     pending.push(()=>{ let pts=spline(ctrl,0.5); pts=pts.filter((p,i)=> i===0||i===pts.length-1 || (((p[0]-S[0])*dA[0]+(p[1]-S[1])*dA[1])>0.2 && ((p[0]-E[0])*dB[0]+(p[1]-E[1])*dB[1])>0.2)); curve(type,w,pts,{seg:sa.id,end:ea},{seg:sb.id,end:eb},name); }); }
+  // v12: winding road between two stub segments — waypoints wander off the straight line; amplitude backs off until the spline crosses nothing
+  // centripetal Catmull-Rom (no cusps/loops); first & last points are phantoms that fix the end tangents
+  function crSpline(C,step){ const out=[]; for(let i=1;i<C.length-2;i++){ const P0=C[i-1],P1=C[i],P2=C[i+1],P3=C[i+2]; const tj=(a,b)=>Math.pow(Math.hypot(b[0]-a[0],b[1]-a[1])||1e-4,0.5);
+      const t0=0,t1=tj(P0,P1),t2=t1+tj(P1,P2),t3=t2+tj(P2,P3); const n=Math.max(1,Math.ceil(Math.hypot(P2[0]-P1[0],P2[1]-P1[1])/step));
+      for(let k=0;k<n;k++){ const t=t1+(t2-t1)*k/n; const L=(A,B,ta,tb)=>[0,1].map(j=>(tb-t)/(tb-ta)*A[j]+(t-ta)/(tb-ta)*B[j]);
+        const A1=L(P0,P1,t0,t1),A2=L(P1,P2,t1,t2),A3=L(P2,P3,t2,t3),B1=L(A1,A2,t0,t2),B2=L(A2,A3,t1,t3); out.push(L(B1,B2,t1,t2)); } }
+    out.push(C[C.length-2].slice()); return out; }
+  function dryHit(pts,w,S,E){ const hw=w/2; for(const [px,py] of pts){ if(Math.hypot(px-S[0],py-S[1])<w+3||Math.hypot(px-E[0],py-E[1])<w+3) continue;
+      for(let ty=Math.floor(py-hw-1);ty<=py+hw+1;ty++) for(let tx=Math.floor(px-hw-1);tx<=px+hw+1;tx++){ if(!inb(tx,ty)) return true; if(Math.hypot(tx+0.5-px,ty+0.5-py)>hw+1.2) continue; const i=idx(tx,ty); if(world.roadH[i]!==-1||world.roadV[i]!==-1) return true; } } return false; }
+  function windLink(type,w,sa,ea,sb,eb,wps,amp,name,seed){ const S=segEnd(sa,ea),E=segEnd(sb,eb),dA=segOut(sa,ea),dB=segOut(sb,eb); const h=10, rr=mulberry(seed||7);
+    const base=wps&&wps.length?wps:(()=>{ const L=Math.hypot(E[0]-S[0],E[1]-S[1]), n=Math.max(1,Math.round(L/70)), o=[]; for(let k=1;k<n;k++){ const t=k/n; o.push([S[0]+(E[0]-S[0])*t,S[1]+(E[1]-S[1])*t]); } return o; })();
+    const nx=-(E[1]-S[1]), ny=E[0]-S[0], nl=Math.hypot(nx,ny)||1; const offs=base.map((p,k)=>(k%2?1:-1)*(0.6+0.4*rr()));
+    amp=Math.min(amp,18); pending.push(()=>{ for(const a of [amp,amp*0.6,amp*0.3,0]){ const ctrl=[S,[S[0]+dA[0]*h,S[1]+dA[1]*h],...base.map((p,k)=>[p[0]+nx/nl*offs[k]*a,p[1]+ny/nl*offs[k]*a]),[E[0]+dB[0]*h,E[1]+dB[1]*h],E];
+        const pts=crSpline([[S[0]-dA[0]*h,S[1]-dA[1]*h],...ctrl,[E[0]-dB[0]*h,E[1]-dB[1]*h]],0.5);
+        if(a>0&&dryHit(pts,w,S,E)) continue; const cv=curve(type,w,pts,{seg:sa.id,end:ea},{seg:sb.id,end:eb},name); cv.amp=a; return; } }); }
+  // straight stub + far stub + winding link: replaces a straight connector road('h'|'v',a,b0,b1)
+  function wind(dir,a,b0,b1,w,type,amp,name,stubType){ const L=6; const s0=road(dir,a,b0,b0+L-1,w,stubType||type), s1=road(dir,a,b1-L+1,b1,w,stubType||type); s0.name=s1.name=name;
+    windLink(type,w,s0,1,s1,0,null,amp,name,(a*131+b0*7)|0); return [s0,s1]; }
   const rbAt=new Map(); const rbNode=(x,y)=>{ const k=x+','+y; if(!rbAt.has(k)) rbAt.set(k,roundabout(x,y,5,10)); return rbAt.get(k); };
   const RW=4, MWD=6, RBT=11;
   // motorway from axis-aligned waypoints [x,y,'rb'?] with large-radius curved bends
@@ -137,7 +156,8 @@ function genWorld(){
       const eIn=lin.s>0?1:0, eOut=lout.s>0?0:1, S=segEnd(lin.sg,eIn), E=segEnd(lout.sg,eOut), dA=segOut(lin.sg,eIn), dB=segOut(lout.sg,eOut), k=0.552*lin.t1;
       pending.push(()=>curve(type,w,bez(S,[S[0]+dA[0]*k,S[1]+dA[1]*k],[E[0]+dB[0]*k,E[1]+dB[1]*k],E,0.5),{seg:lin.sg.id,end:eIn},{seg:lout.sg.id,end:eOut},name)); }
     return legs.map(l=>l.sg); }
-  const grid=(x0,y0,nx,ny,p)=>{ const xs=[],ys=[]; for(let k=0;k<nx;k++) xs.push(x0+k*p); for(let k=0;k<ny;k++) ys.push(y0+k*p); return {xs,ys,X1:xs[nx-1]+RW-1,Y1:ys[ny-1]+RW-1}; };
+  const jit=(n,p)=>{ const j=[0]; for(let k=1;k<n-1;k++) j.push(Math.round((R()-0.5)*p*0.36)); j.push(0); return j; };
+  const grid=(x0,y0,nx,ny,p)=>{ const xs=[],ys=[], jx=jit(nx,p), jy=jit(ny,p); for(let k=0;k<nx;k++) xs.push(x0+k*p+jx[k]); for(let k=0;k<ny;k++) ys.push(y0+k*p+jy[k]); return {xs,ys,X1:xs[nx-1]+RW-1,Y1:ys[ny-1]+RW-1}; };
   function gridRoads(g,type,walk){ if(walk) fill(g.xs[0]-1,g.ys[0]-1,g.X1-g.xs[0]+3,g.Y1-g.ys[0]+3,T.WALK); g.rows=[]; g.cols=[];
     for(const y of g.ys) g.rows.push(road('h',y,g.xs[0],g.X1,RW,type)); for(const x of g.xs) g.cols.push(road('v',x,g.ys[0],g.Y1,RW,type)); }
   // --- cities (corners of the landmasses) & towns
@@ -164,12 +184,12 @@ function genWorld(){
   road('v',KB.xs[0],KB.Y1+1,1941,RW,'city');
   road('h',1378,1360+RBT,KB.xs[2]+RW-1,RW,'dual'); for(const k of [0,2]) road('v',KB.xs[k],1382,KB.ys[0]-1,RW,'city');
   const rbN=road('v',1359,1300,1380-RBT-1,2,'rural');
-  road('h',1784,903,KB.xs[0]-1,RW,'city');                                             // Kingsbridge Airport road (over the River Moor)
-  road('h',MF.ys[2],103,MF.xs[0]-1,RW,'town'); road('v',MF.xs[1],MF.Y1+1,976,RW,'town');
+  wind('h',1784,903,KB.xs[0]-1,RW,'city',30,'Airport Way');                     // curved bridge over the River Moor                                             // Kingsbridge Airport road (over the River Moor)
+  wind('h',MF.ys[2],103,MF.xs[0]-1,RW,'town',14,'Millford Road'); wind('v',MF.xs[1],MF.Y1+1,976,RW,'town',10,'Millford South Road');
   road('v',AB.xs[2],983,AB.ys[0]-1,2,'rural');
-  road('h',DW.ys[2],DW.X1+1,1246,RW,'town');
-  road('v',CM.xs[1],CM.Y1+1,716,RW,'town');
-  road('v',RH.xs[2],1063,RH.ys[0]-1,RW,'town'); road('v',RH.xs[2],RH.Y1+1,1376,RW,'town');
+  wind('h',DW.ys[2],DW.X1+1,1246,RW,'town',22,'Dustwater Road');
+  wind('v',CM.xs[1],CM.Y1+1,716,RW,'town',8,'Coppermine Road');
+  wind('v',RH.xs[2],1063,RH.ys[0]-1,RW,'town',10,'Redhill Road'); wind('v',RH.xs[2],RH.Y1+1,1376,RW,'town',26,'Redhill South Road');
   // winding country roads
   const wwA=road('h',MF.ys[1]+1,MF.X1+1,MF.X1+8,2,'lane'), wwB=road('h',900,500,540,2,'lane');
   link('lane',2,wwA,1,wwB,0,[[420,770],[470,850]],8,'Wendwood Lane');
@@ -181,6 +201,21 @@ function genWorld(){
   const fwS=road('v',FW.xs[1]+1,FW.Y1+1,FW.Y1+18,2,'rural'); link('rural',2,fwS,1,rbN,0,[[1480,1262],[1400,1252]],10,'Fenwick Road');
   const rhE=road('h',RH.ys[2]+1,RH.X1+1,RH.X1+8,2,'rural'), fwW=road('h',FW.ys[2]+1,FW.xs[0]-10,FW.xs[0]-1,2,'rural');
   link('rural',2,rhE,1,fwW,0,[[1200,1232],[1350,1150]],10,'Moor Lane');
+  // v12: Sound Coast Road — hugs the west shore of Albion Sound from the airport road down to Wendwood
+  { const ap=world.segs.find(s=>s.dir==='h'&&s.a===460&&s.b1===600); const cst=[]; for(let y=520;y<=860;y+=34) cst.push([Math.min(cW(y)-cWh(y)-16,y<700?700:9999),y]); cst.push([600,880]);
+    windLink('rural',2,ap,1,wwB,1,cst,0,'Sound Coast Road'); }
+  // v12: Greyfell Pass — hairpin switchbacks from the summit down the south face to the M1
+  { const pB=road('v',430,1925,1941,2,'rural'); pB.name='Greyfell Pass';
+    windLink('rural',2,mS,1,pB,0,[[350,1612],[392,1640],[346,1676],[404,1710],[352,1748],[414,1786],[362,1826],[420,1872]],0,'Greyfell Pass'); }
+  // v12: Moor Dam road — M3 → over the dam (Moor Reservoir behind it) → Kingsbridge
+  { const dy=1589, dA=road('h',dy,903,912,2,'rural'), dam=road('h',dy,Math.floor(riverX(dy))-22,Math.floor(riverX(dy))+22,2,'rural'), dB=road('h',dy,KB.xs[0]-12,KB.xs[0]-1,2,'rural');
+    dam.name='Moor Dam'; dam.dam=true; world.dam={x0:dam.b0,x1:dam.b1+1,y:dy};
+    windLink('rural',2,dA,1,dam,0,null,24,'Dam Road',11); windLink('rural',2,dam,1,dB,0,null,30,'Dam Road',12); }
+  // v12: dirt tracks — desert quarry off Dustwater, forest track in Highmoor
+  { const q0=road('v',DW.xs[3],DW.Y1+1,DW.Y1+6,2,'dirt'), q1=road('h',600,1150,1157,2,'dirt'); q0.name=q1.name='Quarry Track'; world.quarry={x:1158,y:600};
+    windLink('dirt',2,q0,1,q1,0,[[DW.xs[3]+40,560],[1110,585]],0,'Quarry Track');
+    const f0=road('h',FW.ys[3]+1,FW.X1+1,FW.X1+6,2,'dirt'), f1=road('v',1790,1290,1297,2,'dirt'); f0.name=f1.name='Fen Forest Track';
+    windLink('dirt',2,f0,1,f1,0,[[1700,FW.ys[3]+30],[1760,1230]],0,'Fen Forest Track'); }
   world.cities={C1,SV,KB,MF,DW,CM,RH,FW,AB};
   (world.tm=world.tm||[]).push(['for(const f of pendi',performance.now()-t0|0]);
   for(const f of pending) f();
@@ -317,6 +352,9 @@ function genWorld(){
   airport('Albion Airport',160,470,640,660,[[190,488,400],[190,620,400]],[220,520,60]);
   airport('Sandvale Intl',1070,160,1445,340,[[1090,180,330],[1090,300,330]],[1110,215,80]);
   airport('Kingsbridge Field',1195,1792,1385,1905,[[1205,1860,175]],[1210,1812,40]);
+  if(world.quarry){ const {x,y}=world.quarry; for(let j=y-10;j<y+12;j++) for(let i=x;i<x+26;i++){ const t=get(i,j); if(t!==T.ROAD&&t!==T.WATER&&t!==T.BRIDGE) set(i,j,T.GRAVEL); }
+    for(let k=0;k<14;k++) objs.push({kind:'rock',x:(x+3+R()*22)*TILE,y:(y-9+R()*20)*TILE,r:14+R()*24,seed:(R()*1e9)|0,desert:true}); building(x+18,y-9,6,4,'warehouse',16,{logo:'QUARRY'}); }
+  if(world.dam){ const d=world.dam; objs.push({kind:'dam',x:d.x0*TILE,y:(d.y-1)*TILE,w:(d.x1-d.x0)*TILE,h:5*TILE,d}); }
   (world.tm=world.tm||[]).push(['// ---- farmland',performance.now()-t0|0]);
   // ---- farmland with hedgerows, pasture with livestock
   const crops=['wheat','green','plough','rape','pasture','wheat','pasture','green'];
@@ -387,6 +425,14 @@ function genWorld(){
       let pLat=hw+0.8, pLon=off; if(c){ const q=(c.R-0.9)/Math.SQRT2; pLat=hw+c.R-q; pLon=c.R-q; }
       const n=Math.max(1,Math.round(hw*M_T/3.6)), A=[E[0]-f[0]*off,E[1]-f[1]*off];
       world.overhead.push({kind:'mast',J,f,l,A,pLat,pLon,hw,n,ns:f[0]===0,x:A[0]*TILE,y:A[1]*TILE}); } }
+  // v12: Golden-Gate-style suspension bridges on the long motorway sea crossings (other bridges keep girder / curved-viaduct styles)
+  world.susp=[]; for(const sg of world.segs){ if(sg.type!=='hwy') continue; const c=sg.a+(sg.w>>1); let r0=-1;
+    for(let u=sg.b0;u<=sg.b1+1;u++){ const t=u<=sg.b1?(sg.dir==='h'?get(u,c):get(c,u)):-1; if(t===T.BRIDGE){ if(r0<0) r0=u; } else if(r0>=0){ const L=u-r0;
+        if(L>=40){ const S={sg,r0:r0-6,r1:u+6,dir:sg.dir,a:sg.a,w:sg.w}; S.L=S.r1-S.r0; S.t0=S.r0+S.L*0.2; S.t1=S.r1-S.L*0.2; world.susp.push(S);
+          const P=(uu,v)=>sg.dir==='h'?[uu*TILE,v*TILE]:[v*TILE,uu*TILE];
+          for(let p=S.r0;p<S.r1;p+=8){ const q=P(p+4,S.a+S.w/2); world.overhead.push({kind:'susp',S,p0:p,p1:Math.min(S.r1,p+8),x:q[0],y:q[1]}); }
+          for(const tu of [S.t0,S.t1]){ const q=P(tu,S.a+S.w/2); world.overhead.unshift({kind:'stower',S,u:tu,x:q[0],y:q[1]}); } }
+        r0=-1; } } }
   (world.tm=world.tm||[]).push(['if(typeof buildMarki',performance.now()-t0|0]);
   if(typeof buildMarkings==='function') buildMarkings(objs);
   (world.tm=world.tm||[]).push(['if(typeof buildDepot',performance.now()-t0|0]);
@@ -395,7 +441,7 @@ function genWorld(){
   world.labels=[['WESTMERE',330,1000,1],['THE SANDREACH',1200,450,1],['HIGHMOOR',1350,1250,1],['ALBION SOUND',cW(700),700,2],['SANDREACH STRAIT',1500,cE(1500),2],['GREYFELL INLET',560,1272,2],['OUTER SEA',1024,25,2],['OUTER SEA',1024,2028,2],
     ['PORT ALBION',300,290],['SANDVALE',1640,340],['KINGSBRIDGE',1580,1590],['Millford',300,830],['Dustwater',1035,455],['Coppermine',1635,625],['Redhill',1025,1195],['Fenwick',1535,1155],['Ashby',270,1130],['Wendwood',520,890],
     ['Mount Greyfell',MTN.x,MTN.y-40],['River Moor',riverX(1500)+30,1500],['Albion Airport',400,560],['Sandvale Intl',1260,250],['Kingsbridge Field',1290,1830],['Albion Docks',600,300],['Kingsbridge Harbour',1600,1905],
-    ['M1',1000,94],['M1',1951,1300],['M1',94,1500],['M1',1400,1951],['M2',900,1054],['M2',1600,714],['M3',906,1650]];
+    ['M1',1000,94],['M1',1951,1300],['M1',94,1500],['M1',1400,1951],['M2',900,1054],['M2',1600,714],['M3',906,1650],['Moor Reservoir',1172,1540,2],['Greyfell Pass',395,1740],['Sound Coast Road',690,600],['Quarry',1170,590]];
   (world.tm=world.tm||[]).push(['// spatial index',performance.now()-t0|0]);
   // spatial index of ground objects per chunk
   world.chunkObjs=new Map();

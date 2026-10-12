@@ -241,6 +241,8 @@ function drawCurve(g,cv){
         curvePath(g,P,s,b,0); g.strokeStyle='#a4a8ad'; g.lineWidth=W+16; g.stroke();
         for(const sd of [-1,1]){ curvePath(g,P,s,b,sd*(W/2+5)); g.strokeStyle='#dfe2e6'; g.lineWidth=4; g.stroke(); curvePath(g,P,s,b,sd*(W/2+5)); g.strokeStyle='#6d7178'; g.lineWidth=4; g.setLineDash([2,10]); g.stroke(); g.setLineDash([]); }
         a=-1; } } }
+  if(cv.type==='dirt'){ curvePath(g,P,i0,i1,0); g.strokeStyle='#8a7350'; g.lineWidth=W+6; g.stroke(); curvePath(g,P,i0,i1,0); g.strokeStyle='#a68b60'; g.lineWidth=W; g.stroke();
+    for(const sd of [-1,1]){ curvePath(g,P,i0,i1,sd*W*0.22); g.strokeStyle='rgba(90,70,45,0.45)'; g.lineWidth=5; g.stroke(); } curvePath(g,P,i0,i1,0); g.strokeStyle='rgba(150,170,90,0.35)'; g.lineWidth=3; g.stroke(); g.restore(); return; }
   if(cv.type==='hwy'||cv.type==='dual'){ curvePath(g,P,i0,i1,0); g.strokeStyle='#8a8c86'; g.lineWidth=W+5; g.stroke(); }
   curvePath(g,P,i0,i1,0); g.strokeStyle=g.createPattern(TEX.asph[1],'repeat'); g.lineWidth=W; g.stroke();
   const line=(off,col,w,dash)=>{ curvePath(g,P,i0,i1,off); g.strokeStyle=col; g.lineWidth=w; g.setLineDash(dash||[]); g.stroke(); g.setLineDash([]); };

@@ -1,8 +1,8 @@
 'use strict';
 // ===================== SAT NAV: A* over the road tiles, route guidance =====================
 const NAV={route:null,reroutes:0,offT:0,lastCalc:-9,hover:null};
-const NAV_COST={hwy:0.55,dual:0.7,rural:0.9,city:1.0,town:1.0,res:1.7,lane:3.2};      // lorry-legal: narrow lanes / estates heavily penalised
-const NAV_SPEED={hwy:25,dual:20,rural:15,city:11,town:11,res:8,lane:7};
+const NAV_COST={hwy:0.55,dual:0.7,rural:0.9,city:1.0,town:1.0,res:1.7,lane:3.2,dirt:2.6};      // lorry-legal: narrow lanes / estates heavily penalised
+const NAV_SPEED={hwy:25,dual:20,rural:15,city:11,town:11,res:8,lane:7,dirt:7};
 let navClosed=null, navG=null, navStamp=null, navFrom=null, navGen=1;
 function navTileInfo(i){ const h=world.roadH[i], v=world.roadV[i]; if(h===-1&&v===-1) return null;
   if(h===-2) return ['rb',0.8,8]; if(h===-3) return ['curve',0.7,20]; const s=world.segs[h>=0?h:v]; return [s.type,NAV_COST[s.type]||1,NAV_SPEED[s.type]||11]; }

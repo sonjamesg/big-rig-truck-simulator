@@ -31,6 +31,7 @@ function thump(str){ const ctx=audio.ctx; if(!ctx) return; noiseBurst(0.35,180,1
 function updateAudio(s,inp,time){
   const ctx=audio.ctx; if(!ctx) return; const t=ctx.currentTime;
   const load=s.throttle, rpm=s.rpm;
+  if(typeof BREAKDOWN!=='undefined'&&BREAKDOWN.active){ audio.eng.gain.setTargetAtTime(0,t,0.25); audio.rum.gain.setTargetAtTime(0,t,0.25); audio.turboG.gain.setTargetAtTime(0,t,0.2); if(s.rpm!==undefined) s.rpm=Math.max(0,s.rpm*0.97); return; }
   if(audio.engSrc) audio.engSrc.playbackRate.setTargetAtTime(0.78*rpm/IDLE*0.72+0.22,t,0.05);
   audio.eng.gain.setTargetAtTime(0.32+0.38*load+0.1*(rpm-IDLE)/1600,t,0.08);
   audio.engLP.frequency.setTargetAtTime(900+load*2200+rpm*0.6,t,0.1);

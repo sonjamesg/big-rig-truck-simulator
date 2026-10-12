@@ -7,15 +7,15 @@ const VTYPES={
   lorry:{L:6.2,W:2.5,heavy:true,acc:0.75}
 };
 const CAR_COLS=['#c0392b','#ecf0f1','#2c3e50','#2980b9','#7f8c8d','#16a085','#f1c40f','#8e44ad','#d35400','#1e1e1e','#bdc3c7','#27ae60','#6d1a1a','#34495e'];
-const MIX={city:{hatch:14,sedan:16,estate:6,sports:3,suv:8,taxi:12,van:12,bus:9,box:8,lorry:4},
+const MIX={dirt:{van:3,suv:4,box:1,lorry:2},city:{hatch:14,sedan:16,estate:6,sports:3,suv:8,taxi:12,van:12,bus:9,box:8,lorry:4},
   town:{hatch:16,sedan:16,estate:8,sports:3,suv:9,taxi:5,van:13,bus:6,box:8,lorry:5},
   hwy:{hatch:8,sedan:16,estate:8,sports:5,suv:10,van:12,box:12,lorry:26,bus:2},
   res:{hatch:26,sedan:22,estate:14,suv:14,sports:3,van:12,taxi:6},
   dual:{hatch:10,sedan:18,estate:10,sports:4,suv:12,van:12,box:10,lorry:18,bus:3},
   lane:{hatch:20,estate:16,suv:18,van:12,sedan:8},
   rural:{hatch:16,sedan:14,estate:12,suv:14,van:14,lorry:14,box:8}};
-const SPEED={city:13,town:12,res:9,rural:17,hwy:27,dual:22,lane:10};
-const AREAW={city:1.0,town:0.95,hwy:1.1,res:0.4,rural:0.22,dual:0.7,lane:0.1};
+const SPEED={dirt:8,city:13,town:12,res:9,rural:17,hwy:27,dual:22,lane:10};
+const AREAW={dirt:0.05,city:1.0,town:0.95,hwy:1.1,res:0.4,rural:0.22,dual:0.7,lane:0.1};
 const traffic={vs:[],peds:[],parked:[],parkedIdx:new Map(),nextId:1,hash:new Map(),target:0,spawned:0,despawned:0,arts:{},lastTarget:-9};
 function pickW(o,r){ let t=0; for(const k in o) t+=o[k]; let x=r*t; for(const k in o){ x-=o[k]; if(x<=0) return k; } return Object.keys(o)[0]; }
 const ang=(dx,dy)=>Math.atan2(dx,-dy); // heading for direction vector (0 = north)
@@ -172,7 +172,7 @@ function planPiece(v,r){
     let p=lanePt(sg,d,P.lane,lineA); pathLine(v,p[0],p[1]); const dStop=pathEnd(v);
     p=lanePt(sg,d,P.lane,stop); pathLine(v,p[0],p[1]);
     if(traffic.log) traffic.log.push({J:J.id,key:sg.id+':'+d,lane:P.lane,move:ch[0],allowed:lanes?lanes[P.lane]:'*',veh:v.id});
-    const mk={kind:J.lights?'light':(ap&&ap.gw)?'gw':'major',d:dStop,J,ns:sg.dir==='v',axis:sg.dir,move:ch[0]};
+    const mk={kind:J.lights?'light':(ap&&ap.gw)?'gw':'major',d:dStop,J,ns:sg.dir==='v',axis:sg.dir,move:ch[0],key:sg.id+':'+d};
     if(ch[0]==='S'){ const q=lanePt(sg,d,P.lane,exitA); pathLine(v,q[0],q[1]); mk.dEnd=pathEnd(v); v.mk.push(mk); P.pos=exitA; return true; }
     const C2=ch[1], cd=ch[2], nl=nLanes(C2), lane= ch[0]==='L'?0:Math.min(nl-1,P.lane);
     const ex= cd>0?o.ce:o.cs, q=lanePt(C2,cd,lane,ex);
@@ -400,7 +400,10 @@ function stepVeh(v,dt,pbs){
     else if(m.kind==='light'||m.kind==='gw'||m.kind==='rb'){
       const gap=m.d-front-0.8; if(gap<-0.5||m.go) continue; if(gap>70) continue;
       let stop=false;
-      if(m.kind==='light'){ const ls=lightState(m.J,m.ns); if(ls==='r') stop=true; else if(ls==='a') stop= gap> v.v*v.v/(2*3.5)+1; if(!stop&&m.J.box&&m.move!=='R'&&gap<12&&boxBlocked(v,m)) stop=true; if(!stop&&gap<3) m.go=true; }
+      if(m.kind==='light'){ const ls=sigState(m.J,m.key,m.move); if(ls==='r'||ls==='ra') stop=true; else if(ls==='a') stop= gap> v.v*v.v/(2*3.5)+1;
+        if(!stop&&gap<12&&boxBlocked(v,m)) stop=true;            // never enter unless the exit is clear
+        if(!stop&&gap<6&&jBusy(v,m.J)) stop=true;                 // give way to anything still crossing the junction
+        if(!stop&&gap<3){ m.go=true; m.goT=timeS; if(traffic.goLog) traffic.goLog.push({J:m.J.id,key:m.key,mv:m.move,t:timeS,st:ls,veh:v.id}); } }
       else if(m.kind==='gw'){ if(gap<18){ if(!giveWayBusy(v,m.J)||v.stopT>10) { if(gap<2.5) m.go=true; } else stop=true; } }
       else { if(gap<14){ let busy=false; for(const o of traffic.vs){ if(o===v||o.ring!==m.rb) continue; const a=Math.atan2(o.y-m.rb.cy*M_T,o.x-m.rb.cx*M_T); const df=mod2pi(m.ang-a); if(df<1.5&&df>0.05){ busy=true; break; } }
           if(!busy||v.stopT>5) m.go=true; else stop=true; } }

@@ -1,6 +1,13 @@
 'use strict';
 // ===================== v7 SITES: shopping malls / supermarkets (delivery docks), truck dealerships, forecourt art + visitor cars =====================
 const OBJX={};
+OBJX.dam=function(g,o){ const y=o.y+TILE*2, x0=o.x-TILE, x1=o.x+o.w+TILE; g.save();
+  g.fillStyle='rgba(10,20,30,0.35)'; g.fillRect(x0+10,y+TILE*1.2,x1-x0,TILE*1.6);
+  const gr=g.createLinearGradient(0,y+TILE,0,y+TILE*2.6); gr.addColorStop(0,'#c9c6bc'); gr.addColorStop(1,'#8d8a80'); g.fillStyle=gr; g.fillRect(x0,y+TILE,x1-x0,TILE*1.6);
+  g.fillStyle='#e6e3da'; g.fillRect(x0,y+TILE-4,x1-x0,6); g.fillRect(x0,y-TILE*1.05,x1-x0,6);
+  for(let x=x0+40;x<x1-40;x+=90){ g.fillStyle='rgba(220,240,255,0.75)'; g.fillRect(x,y+TILE*1.3,26,TILE*1.3); g.fillStyle='rgba(255,255,255,0.9)'; g.fillRect(x-4,y+TILE*2.5,34,8); }
+  g.restore(); };
+
 function buildCareerSites(K){
   const {findSpot,access,clearObjs,region,R,objs,okT}=K, M=v=>v*M_T; const t0=performance.now();
   world.malls=[]; world.dealers=[];

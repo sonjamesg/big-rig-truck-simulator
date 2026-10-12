@@ -15,7 +15,7 @@ function boot(){
   window.__bigrig={NAV,setRoute,clearRoute,mBX,mBY,truck,input,world,cam,bigmap,openMap,closeMap,onRoadM,kingpin,traffic,toggleRefuel,fuelStationAt,refuel,get loadMs(){return world.loadMs;},spawnVehicle,toggleCouple,coupleCandidate,trailerInBay,BigRig,get fps(){return fps;},chunks:chunkCache};
   truck.fuel=260; truck.tank=400; truck.money=2500; truck.damage=0;
   if(!loadGame()) applyModel('rigger'); uiInit(); padInstall(); mpInit(); mobInit();
-  Object.assign(window.__bigrig,{MP,mpHost,mpJoin,mpChatSend,startGame,getChunk,renderChunk,MAPC,drawMapDetail,pad,padUpdate,career,acceptJob,abandonJob,tryUnload,bayAlign,buyTruck,openBoard,openDealer,closeUI,fcv,addXP,saveGame,loadGame,applyModel,TRUCK_MODELS,TIERS,CARGOS,levelOf,uncouple,couple,fillBoard,jobRoute});
+  Object.assign(window.__bigrig,{BREAKDOWN,MP,mpHost,mpJoin,mpChatSend,startGame,getChunk,renderChunk,MAPC,drawMapDetail,pad,padUpdate,career,acceptJob,abandonJob,tryUnload,bayAlign,buyTruck,openBoard,openDealer,closeUI,fcv,addXP,saveGame,loadGame,applyModel,TRUCK_MODELS,TIERS,CARGOS,levelOf,uncouple,couple,fillBoard,jobRoute});
   world.loadMs=performance.now()-tb; world.ready=true; const ld=document.getElementById('loading'); if(ld) ld.textContent='World ready ('+(world.loadMs/1000).toFixed(1)+' s)';
   requestAnimationFrame(frame);
 }
@@ -44,7 +44,7 @@ function frame(ts){
   padUpdate(dt); updateMP(dt); const paused=uiBlocking();
   if(started&&!paused){
     acc+=dt; const H=1/120; const inp=input;
-    while(acc>=H){ stepTruck(truck,inp,H); acc-=H; }
+    while(acc>=H){ stepTruck(truck,BREAKDOWN.active?BD_IN:inp,H); acc-=H; }
     // air brake hiss on release after a firm stop / handbrake
     const braking=truck.brake>0; if(braking) wasBraking+=dt; else { if(wasBraking>0.6 && Math.abs(truck.v)<6) airHiss(); wasBraking=0; }
     if(truck.bump>0.01 && !truck._bumped){ thump(truck.bump); cam.shake=truck.bump*10; truck._bumped=true; } if(truck.bump<=0.01) truck._bumped=false;
@@ -54,6 +54,7 @@ function frame(ts){
   { const z=cam.z; updateAmbient(dt,[cam.x-VW/2/z,cam.y-VH/2/z,cam.x+VW/2/z,cam.y+VH/2/z]); }
   if(started&&!paused) updateNav(dt);
   if(truck.bump>0.05&&!truck._dmg){ truck.damage=Math.min(100,truck.damage+truck.bump*6); truck._dmg=true; } if(truck.bump<=0.01) truck._dmg=false;
+  updateBreakdown(dt);
   // camera: look-ahead + zoom-out with speed
   const f=fwd(truck.h), sp=Math.abs(truck.v);
   const kp=kingpin(truck); const mid=[(truck.x-f[0]*1.9)*PPM, (truck.y-f[1]*1.9)*PPM];
@@ -82,7 +83,7 @@ function draw(){
   drawCareerWorld(vx0,vy0,vx1,vy1);
   drawParkedTrailers(vx0,vy0,vx1,vy1);
   drawTraffic(vx0,vy0,vx1,vy1);
-  drawRemotePlayers(vx0,vy0,vx1,vy1);
+  drawRemotePlayers(vx0,vy0,vx1,vy1); drawBreakdown();
   drawLorry();
   for(const o of world.overhead) if(o.x>vx0-400&&o.x<vx1+400&&o.y>vy0-400&&o.y<vy1+400) drawOverhead(o);
   drawAmbientHigh(VR);
@@ -106,9 +107,36 @@ function drawLorry(){
   // headlight beams at night? (daytime build) - small DRL dots
   ctx.fillStyle='rgba(255,250,220,0.9)'; for(const sd of [-1,1]){ const hx=(s.x+f[0]*5.0+r[0]*sd*1.0)*PPM, hy=(s.y+f[1]*5.0+r[1]*sd*1.0)*PPM; ctx.fillRect(hx-1.5,hy-1.5,3,3); }
 }
-function lightState(J,ns){ const t=(timeS+J.phase)%16; if(ns) return t<6?'g':t<8?'a':'r'; return t<8?'r':t<14?'g':'a'; }
+// v12 suspension bridge: cable height profile (0 deck .. 1 tower top), sun from the NW so shadows fall to the SE
+function suspH(S,u){ if(u<=S.t0) return Math.max(0,(u-S.r0)/(S.t0-S.r0)); if(u>=S.t1) return Math.max(0,(S.r1-u)/(S.r1-S.t1)); const m=(S.t0+S.t1)/2, k=(u-m)/((S.t1-S.t0)/2); return 0.12+0.88*k*k; }
+const SUSP_K=150, SUSP_COL='#c4402b';
+function suspP(S,u,v){ return S.dir==='h'?[u*TILE,v*TILE]:[v*TILE,u*TILE]; }
+function drawSusp(o){ const S=o.S, e0=S.a-0.35, e1=S.a+S.w+0.35;
+  ctx.save(); ctx.lineCap='round';
+  // shadows of cables + hangers on the water/deck
+  for(const e of [e0,e1]){ ctx.strokeStyle='rgba(0,10,20,0.28)'; ctx.lineWidth=3; ctx.beginPath(); for(let u=o.p0;u<=o.p1;u+=0.5){ const h=suspH(S,u)*SUSP_K, p=suspP(S,u,e); u===o.p0?ctx.moveTo(p[0]+h,p[1]+h):ctx.lineTo(p[0]+h,p[1]+h); } ctx.stroke();
+    ctx.lineWidth=1; ctx.strokeStyle='rgba(0,10,20,0.16)'; ctx.beginPath(); for(let u=Math.ceil(o.p0);u<o.p1;u++){ const h=suspH(S,u)*SUSP_K, p=suspP(S,u,e); ctx.moveTo(p[0],p[1]); ctx.lineTo(p[0]+h,p[1]+h); } ctx.stroke(); }
+  // railings
+  for(const e of [S.a-0.1,S.a+S.w+0.1]){ const a=suspP(S,o.p0,e), b=suspP(S,o.p1,e); ctx.strokeStyle='#e9e4da'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); }
+  // hangers (seen almost end-on: short ticks), main cables, lamp posts
+  for(const e of [e0,e1]){ ctx.strokeStyle=SUSP_COL; ctx.lineWidth=1.5; ctx.beginPath(); for(let u=Math.ceil(o.p0);u<o.p1;u++){ const h=suspH(S,u), p=suspP(S,u,e), dl=(S.dir==='h'?[0,1]:[1,0]).map(x=>x*h*3*(e===e0?-1:1)); ctx.moveTo(p[0],p[1]); ctx.lineTo(p[0]+dl[0],p[1]+dl[1]); } ctx.stroke();
+    const a=suspP(S,o.p0,e), b=suspP(S,o.p1,e); ctx.strokeStyle='#7d2416'; ctx.lineWidth=5.5; ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); ctx.strokeStyle='#e0603f'; ctx.lineWidth=2.5; ctx.stroke();
+    for(let u=Math.ceil(o.p0/6)*6;u<o.p1;u+=6){ const p=suspP(S,u,e===e0?S.a+0.25:S.a+S.w-0.25); ctx.fillStyle='rgba(255,240,180,0.25)'; ctx.beginPath(); ctx.arc(p[0],p[1],7,0,7); ctx.fill(); ctx.fillStyle='#2b2f35'; ctx.beginPath(); ctx.arc(p[0],p[1],2.6,0,7); ctx.fill(); ctx.fillStyle='#fff6c8'; ctx.beginPath(); ctx.arc(p[0],p[1],1.3,0,7); ctx.fill(); } }
+  ctx.restore(); }
+function drawSTower(o){ const S=o.S, H=SUSP_K*1.08, legs=[S.a-0.9,S.a+S.w+0.9], hw=0.75;
+  ctx.save();
+  // long tower shadow
+  ctx.fillStyle='rgba(0,10,20,0.32)'; for(const v of legs){ const c=suspP(S,o.u,v), r=hw*TILE; ctx.beginPath(); ctx.moveTo(c[0]-r,c[1]-r); ctx.lineTo(c[0]+r,c[1]-r); ctx.lineTo(c[0]+r+H,c[1]-r+H); ctx.lineTo(c[0]+r+H,c[1]+r+H); ctx.lineTo(c[0]-r+H,c[1]+r+H); ctx.lineTo(c[0]-r,c[1]+r); ctx.closePath(); ctx.fill(); }
+  { const a=suspP(S,o.u,legs[0]), b=suspP(S,o.u,legs[1]); ctx.strokeStyle='rgba(0,10,20,0.25)'; ctx.lineWidth=9; for(const f of [0.55,0.8,1]){ ctx.beginPath(); ctx.moveTo(a[0]+H*f,a[1]+H*f); ctx.lineTo(b[0]+H*f,b[1]+H*f); ctx.stroke(); } }
+  // portal: two legs and cross beams above the deck
+  const a=suspP(S,o.u,legs[0]), b=suspP(S,o.u,legs[1]); ctx.lineCap='butt';
+  for(const [w,col] of [[13,'#7d2416'],[9,SUSP_COL]]){ ctx.strokeStyle=col; ctx.lineWidth=w; for(const d of [-0.35,0.35]){ const a2=suspP(S,o.u+d,legs[0]), b2=suspP(S,o.u+d,legs[1]); if(d<0){ ctx.beginPath(); ctx.moveTo(a2[0],a2[1]); ctx.lineTo(b2[0],b2[1]); ctx.stroke(); } } }
+  for(const c of [a,b]){ const r=hw*TILE; const g=ctx.createLinearGradient(c[0]-r,c[1]-r,c[0]+r,c[1]+r); g.addColorStop(0,'#ef6a48'); g.addColorStop(1,'#8e2a1a'); ctx.fillStyle=g; ctx.fillRect(c[0]-r,c[1]-r,2*r,2*r);
+    ctx.fillStyle='#5a1a10'; ctx.fillRect(c[0]-r*0.35,c[1]-r*0.35,r*0.7,r*0.7); ctx.fillStyle='#ff2b1e'; ctx.beginPath(); ctx.arc(c[0],c[1],2.2+Math.sin(timeS*3)*0.8,0,7); ctx.fill(); }
+  ctx.restore(); }
 function drawOverhead(o){
-  if(o.kind==='mast'){ const st=lightState(o.J,o.ns), l=o.l, f=o.f, Ax=o.A[0]*TILE, Ay=o.A[1]*TILE, E0=[Ax+f[0]*0.55*TILE,Ay+f[1]*0.55*TILE], onArm=(lat)=>{ const u=lat/o.pLat, lon=0.55+(o.pLon-0.55)*u; return [E0[0]+(l[0]*lat-f[0]*lon)*TILE,E0[1]+(l[1]*lat-f[1]*lon)*TILE]; }, P=onArm(o.pLat), tip=onArm(-0.15);
+  if(o.kind==='susp') return drawSusp(o); if(o.kind==='stower') return drawSTower(o);
+  if(o.kind==='mast'){ const l=o.l, f=o.f, Ax=o.A[0]*TILE, Ay=o.A[1]*TILE, E0=[Ax+f[0]*0.55*TILE,Ay+f[1]*0.55*TILE], onArm=(lat)=>{ const u=lat/o.pLat, lon=0.55+(o.pLon-0.55)*u; return [E0[0]+(l[0]*lat-f[0]*lon)*TILE,E0[1]+(l[1]*lat-f[1]*lon)*TILE]; }, P=onArm(o.pLat), tip=onArm(-0.15);
     const sh=10; ctx.lineCap='round';
     // shadow (sun from the north-west)
     ctx.strokeStyle='rgba(0,0,0,0.28)'; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(P[0]+4,P[1]+4); ctx.lineTo(tip[0]+sh,tip[1]+sh); ctx.stroke();
@@ -117,10 +145,19 @@ function drawOverhead(o){
     ctx.strokeStyle='#5d636c'; ctx.lineWidth=4.5; ctx.beginPath(); ctx.moveTo(P[0],P[1]); ctx.lineTo(tip[0],tip[1]); ctx.stroke(); ctx.strokeStyle='#8a9099'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(P[0],P[1]); ctx.lineTo(tip[0],tip[1]); ctx.stroke();
     ctx.fillStyle='#3a3f46'; ctx.beginPath(); ctx.arc(P[0],P[1],6.5,0,7); ctx.fill(); ctx.fillStyle='#6b717a'; ctx.beginPath(); ctx.arc(P[0]-1.5,P[1]-1.5,3,0,7); ctx.fill(); ctx.lineCap='butt';
     // heads: one per inbound lane, lenses face oncoming traffic (red farthest from driver)
-    const cols={r:'#ff3b30',a:'#ffb020',g:'#36e05a'}, dim=['#3a1210','#3a2a10','#10240f'], lit=[st==='r',st==='a',st==='g'];
-    for(let i=0;i<o.n;i++){ const d=(i+0.5)*o.hw/o.n, q=onArm(d), hx=q[0], hy=q[1]; ctx.save(); ctx.translate(hx,hy); ctx.rotate(Math.atan2(f[1],f[0]));   // +x = travel direction
+    // v12: one head per lane; each shows its own movements (green disc for ahead, green arrows for turn stages, red+amber before green)
+    const key=(f[0]?o.J.hs:o.J.vs)+':'+(f[0]||f[1]), ap=o.J.appr&&o.J.appr[key], nl=ap&&ap.lanes?ap.lanes.length:o.n;
+    for(let i=0;i<o.n;i++){ const d=(i+0.5)*o.hw/o.n, q=onArm(d), hx=q[0], hy=q[1]; const lane=Math.max(0,Math.min(nl-1,o.n-1-i)), mvs=(ap&&ap.lanes&&ap.lanes[lane])||'S';
+      const ss={}; let anyG=false, anyA=false, anyRA=false; for(const m of mvs){ const s=sigState(o.J,key,m); ss[m]=s; if(s==='g') anyG=true; else if(s==='a') anyA=true; else if(s==='ra') anyRA=true; }
+      const red=!anyG&&!anyA, amb=anyA||(!anyG&&anyRA);
+      ctx.save(); ctx.translate(hx,hy); ctx.rotate(Math.atan2(f[1],f[0]));   // +x = travel direction, -y = left
       ctx.fillStyle='#e8b923'; ctx.fillRect(-15,-7,30,14); ctx.fillStyle='#17191c'; ctx.fillRect(-13,-5,26,10);
-      for(let k=0;k<3;k++){ const xx=8-k*8; ctx.fillStyle=lit[k]?cols[st]:dim[k]; ctx.beginPath(); ctx.arc(xx,0,3.3,0,7); ctx.fill(); if(lit[k]){ ctx.fillStyle=cols[st]+'50'; ctx.beginPath(); ctx.arc(xx,0,7.5,0,7); ctx.fill(); } }
+      const lamp=(xx,on,col,dimc)=>{ ctx.fillStyle=on?col:dimc; ctx.beginPath(); ctx.arc(xx,0,3.3,0,7); ctx.fill(); if(on){ ctx.fillStyle=col+'50'; ctx.beginPath(); ctx.arc(xx,0,7.5,0,7); ctx.fill(); } };
+      lamp(8,red,'#ff3b30','#3a1210'); lamp(0,amb,'#ffb020','#3a2a10');
+      if(anyG&&ss.S==='g'&&mvs.length===1) lamp(-8,true,'#36e05a','#10240f');
+      else { ctx.fillStyle='#10240f'; ctx.beginPath(); ctx.arc(-8,0,3.3,0,7); ctx.fill();
+        if(anyG){ ctx.fillStyle='#36e05a50'; ctx.beginPath(); ctx.arc(-8,0,7.5,0,7); ctx.fill(); ctx.strokeStyle='#5dff7a'; ctx.lineWidth=1.6; ctx.lineCap='round';
+          for(const m of mvs){ if(ss[m]!=='g') continue; ctx.save(); ctx.translate(-8,0); ctx.rotate(m==='S'?0:m==='L'?-Math.PI/2:Math.PI/2); ctx.beginPath(); ctx.moveTo(-3,0); ctx.lineTo(3,0); ctx.moveTo(0.6,-2.2); ctx.lineTo(3,0); ctx.lineTo(0.6,2.2); ctx.stroke(); ctx.restore(); } } }
       ctx.restore(); }
     return; }
   if(o.kind==='light'){ const c=o.c, ns=(c.dx===c.dy); const st=lightState(o.J,ns);
@@ -226,6 +263,8 @@ function drawBigMap(){
   drawPOIs(m=>BX(m/4),m=>BY(m/4),z>0.6);
   mpDrawMap(m=>BX(m/4),m=>BY(m/4),true);
   if(z>1.2) for(const dp of world.depots){ ctx.fillStyle='#8fc8ff'; ctx.font='bold 11px system-ui,sans-serif'; ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.textAlign='left'; const X=BX(dp.entrance.x/4)+9, Y=BY(dp.entrance.y/4)+4; ctx.strokeText(dp.name,X,Y); ctx.fillText(dp.name,X,Y); }
+  for(const S of world.susp||[]){ const p=(u,v)=>S.dir==='h'?[BX(u),BY(v)]:[BX(v),BY(u)], c=S.a+S.w/2, a=p(S.r0,c), b=p(S.r1,c); ctx.save(); ctx.strokeStyle='#e0603f'; ctx.lineWidth=Math.max(2,z*2.5); ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
+    for(const t of [S.t0,S.t1]){ const q=p(t,c); ctx.fillStyle='#c4402b'; ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.fillRect(q[0]-4,q[1]-4,8,8); ctx.strokeRect(q[0]-4,q[1]-4,8,8); } ctx.restore(); }
   ctx.textAlign='center'; ctx.textBaseline='middle';
   for(const [n,lx2,ly2,kind] of world.labels){ const X=BX(lx2), Y=BY(ly2);
     const big=kind===1, wat=kind===2, city=!kind&&n===n.toUpperCase(), town=!kind&&!city;

@@ -131,6 +131,7 @@ function genWorld(){
   for(let y=Math.floor(cE(1150))-10;y<MH;y++){ const xc=riverX(y), hw=4+2*Math.sin(y/50); for(let x=Math.floor(xc-hw);x<=xc+hw;x++) water[idx(x,y)]=1; }
   const lake=(cx,cy,rx,ry)=>{ for(let y=Math.max(0,cy-ry-4);y<Math.min(MH,cy+ry+4);y++) for(let x=Math.max(0,cx-rx-4);x<Math.min(MW,cx+rx+4);x++){ const dx=(x-cx)/rx, dy=(y-cy)/ry, n=0.12*Math.sin(x/5)+0.1*Math.cos(y/4); if(dx*dx+dy*dy<1+n) water[idx(x,y)]=1; } };
   lake(470,700,30,20); lake(1600,1270,40,24); lake(1250,1650,30,18); lake(800,1500,18,30); lake(1330,600,14,10); lake(560,1420,16,12);
+  for(let y=1500;y<1586;y++) for(let x=1110;x<1240;x++){ const dx=(x-riverX(1545))/(48+6*Math.sin(y/9)), dy=(y-1545)/40; if(dx*dx+dy*dy<1) water[idx(x,y)]=1; }   // Moor Reservoir (dammed)
   // keep land under cities / airports, then cut dock basins
   for(const [x0,y0,x1,y1] of [[145,135,720,655],[1060,150,1830,515],[1395,1375,1800,1884],[995,1785,1385,1905],[240,775,355,885],[235,1095,300,1162]]) for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++) water[idx(x,y)]=0;
   for(let k=0;k<4;k++) for(let y=175+k*68;y<189+k*68;y++) for(let x=575;x<800;x++) water[idx(x,y)]=1;                // Port Albion docks
@@ -197,6 +198,24 @@ function genWorld(){
   function link(type,w,sa,ea,sb,eb,wps,h,name){ const S=segEnd(sa,ea),E=segEnd(sb,eb),dA=segOut(sa,ea),dB=segOut(sb,eb); h=h||8;
     const ctrl=[S,[S[0]+dA[0]*h,S[1]+dA[1]*h],...(wps||[]),[E[0]+dB[0]*h,E[1]+dB[1]*h],E];
     pending.push(()=>{ let pts=spline(ctrl,0.5); pts=pts.filter((p,i)=> i===0||i===pts.length-1 || (((p[0]-S[0])*dA[0]+(p[1]-S[1])*dA[1])>0.2 && ((p[0]-E[0])*dB[0]+(p[1]-E[1])*dB[1])>0.2)); curve(type,w,pts,{seg:sa.id,end:ea},{seg:sb.id,end:eb},name); }); }
+  // v12: winding road between two stub segments — waypoints wander off the straight line; amplitude backs off until the spline crosses nothing
+  // centripetal Catmull-Rom (no cusps/loops); first & last points are phantoms that fix the end tangents
+  function crSpline(C,step){ const out=[]; for(let i=1;i<C.length-2;i++){ const P0=C[i-1],P1=C[i],P2=C[i+1],P3=C[i+2]; const tj=(a,b)=>Math.pow(Math.hypot(b[0]-a[0],b[1]-a[1])||1e-4,0.5);
+      const t0=0,t1=tj(P0,P1),t2=t1+tj(P1,P2),t3=t2+tj(P2,P3); const n=Math.max(1,Math.ceil(Math.hypot(P2[0]-P1[0],P2[1]-P1[1])/step));
+      for(let k=0;k<n;k++){ const t=t1+(t2-t1)*k/n; const L=(A,B,ta,tb)=>[0,1].map(j=>(tb-t)/(tb-ta)*A[j]+(t-ta)/(tb-ta)*B[j]);
+        const A1=L(P0,P1,t0,t1),A2=L(P1,P2,t1,t2),A3=L(P2,P3,t2,t3),B1=L(A1,A2,t0,t2),B2=L(A2,A3,t1,t3); out.push(L(B1,B2,t1,t2)); } }
+    out.push(C[C.length-2].slice()); return out; }
+  function dryHit(pts,w,S,E){ const hw=w/2; for(const [px,py] of pts){ if(Math.hypot(px-S[0],py-S[1])<w+3||Math.hypot(px-E[0],py-E[1])<w+3) continue;
+      for(let ty=Math.floor(py-hw-1);ty<=py+hw+1;ty++) for(let tx=Math.floor(px-hw-1);tx<=px+hw+1;tx++){ if(!inb(tx,ty)) return true; if(Math.hypot(tx+0.5-px,ty+0.5-py)>hw+1.2) continue; const i=idx(tx,ty); if(world.roadH[i]!==-1||world.roadV[i]!==-1) return true; } } return false; }
+  function windLink(type,w,sa,ea,sb,eb,wps,amp,name,seed){ const S=segEnd(sa,ea),E=segEnd(sb,eb),dA=segOut(sa,ea),dB=segOut(sb,eb); const h=10, rr=mulberry(seed||7);
+    const base=wps&&wps.length?wps:(()=>{ const L=Math.hypot(E[0]-S[0],E[1]-S[1]), n=Math.max(1,Math.round(L/70)), o=[]; for(let k=1;k<n;k++){ const t=k/n; o.push([S[0]+(E[0]-S[0])*t,S[1]+(E[1]-S[1])*t]); } return o; })();
+    const nx=-(E[1]-S[1]), ny=E[0]-S[0], nl=Math.hypot(nx,ny)||1; const offs=base.map((p,k)=>(k%2?1:-1)*(0.6+0.4*rr()));
+    amp=Math.min(amp,18); pending.push(()=>{ for(const a of [amp,amp*0.6,amp*0.3,0]){ const ctrl=[S,[S[0]+dA[0]*h,S[1]+dA[1]*h],...base.map((p,k)=>[p[0]+nx/nl*offs[k]*a,p[1]+ny/nl*offs[k]*a]),[E[0]+dB[0]*h,E[1]+dB[1]*h],E];
+        const pts=crSpline([[S[0]-dA[0]*h,S[1]-dA[1]*h],...ctrl,[E[0]-dB[0]*h,E[1]-dB[1]*h]],0.5);
+        if(a>0&&dryHit(pts,w,S,E)) continue; const cv=curve(type,w,pts,{seg:sa.id,end:ea},{seg:sb.id,end:eb},name); cv.amp=a; return; } }); }
+  // straight stub + far stub + winding link: replaces a straight connector road('h'|'v',a,b0,b1)
+  function wind(dir,a,b0,b1,w,type,amp,name,stubType){ const L=6; const s0=road(dir,a,b0,b0+L-1,w,stubType||type), s1=road(dir,a,b1-L+1,b1,w,stubType||type); s0.name=s1.name=name;
+    windLink(type,w,s0,1,s1,0,null,amp,name,(a*131+b0*7)|0); return [s0,s1]; }
   const rbAt=new Map(); const rbNode=(x,y)=>{ const k=x+','+y; if(!rbAt.has(k)) rbAt.set(k,roundabout(x,y,5,10)); return rbAt.get(k); };
   const RW=4, MWD=6, RBT=11;
   // motorway from axis-aligned waypoints [x,y,'rb'?] with large-radius curved bends
@@ -214,7 +233,8 @@ function genWorld(){
       const eIn=lin.s>0?1:0, eOut=lout.s>0?0:1, S=segEnd(lin.sg,eIn), E=segEnd(lout.sg,eOut), dA=segOut(lin.sg,eIn), dB=segOut(lout.sg,eOut), k=0.552*lin.t1;
       pending.push(()=>curve(type,w,bez(S,[S[0]+dA[0]*k,S[1]+dA[1]*k],[E[0]+dB[0]*k,E[1]+dB[1]*k],E,0.5),{seg:lin.sg.id,end:eIn},{seg:lout.sg.id,end:eOut},name)); }
     return legs.map(l=>l.sg); }
-  const grid=(x0,y0,nx,ny,p)=>{ const xs=[],ys=[]; for(let k=0;k<nx;k++) xs.push(x0+k*p); for(let k=0;k<ny;k++) ys.push(y0+k*p); return {xs,ys,X1:xs[nx-1]+RW-1,Y1:ys[ny-1]+RW-1}; };
+  const jit=(n,p)=>{ const j=[0]; for(let k=1;k<n-1;k++) j.push(Math.round((R()-0.5)*p*0.36)); j.push(0); return j; };
+  const grid=(x0,y0,nx,ny,p)=>{ const xs=[],ys=[], jx=jit(nx,p), jy=jit(ny,p); for(let k=0;k<nx;k++) xs.push(x0+k*p+jx[k]); for(let k=0;k<ny;k++) ys.push(y0+k*p+jy[k]); return {xs,ys,X1:xs[nx-1]+RW-1,Y1:ys[ny-1]+RW-1}; };
   function gridRoads(g,type,walk){ if(walk) fill(g.xs[0]-1,g.ys[0]-1,g.X1-g.xs[0]+3,g.Y1-g.ys[0]+3,T.WALK); g.rows=[]; g.cols=[];
     for(const y of g.ys) g.rows.push(road('h',y,g.xs[0],g.X1,RW,type)); for(const x of g.xs) g.cols.push(road('v',x,g.ys[0],g.Y1,RW,type)); }
   // --- cities (corners of the landmasses) & towns
@@ -241,12 +261,12 @@ function genWorld(){
   road('v',KB.xs[0],KB.Y1+1,1941,RW,'city');
   road('h',1378,1360+RBT,KB.xs[2]+RW-1,RW,'dual'); for(const k of [0,2]) road('v',KB.xs[k],1382,KB.ys[0]-1,RW,'city');
   const rbN=road('v',1359,1300,1380-RBT-1,2,'rural');
-  road('h',1784,903,KB.xs[0]-1,RW,'city');                                             // Kingsbridge Airport road (over the River Moor)
-  road('h',MF.ys[2],103,MF.xs[0]-1,RW,'town'); road('v',MF.xs[1],MF.Y1+1,976,RW,'town');
+  wind('h',1784,903,KB.xs[0]-1,RW,'city',30,'Airport Way');                     // curved bridge over the River Moor                                             // Kingsbridge Airport road (over the River Moor)
+  wind('h',MF.ys[2],103,MF.xs[0]-1,RW,'town',14,'Millford Road'); wind('v',MF.xs[1],MF.Y1+1,976,RW,'town',10,'Millford South Road');
   road('v',AB.xs[2],983,AB.ys[0]-1,2,'rural');
-  road('h',DW.ys[2],DW.X1+1,1246,RW,'town');
-  road('v',CM.xs[1],CM.Y1+1,716,RW,'town');
-  road('v',RH.xs[2],1063,RH.ys[0]-1,RW,'town'); road('v',RH.xs[2],RH.Y1+1,1376,RW,'town');
+  wind('h',DW.ys[2],DW.X1+1,1246,RW,'town',22,'Dustwater Road');
+  wind('v',CM.xs[1],CM.Y1+1,716,RW,'town',8,'Coppermine Road');
+  wind('v',RH.xs[2],1063,RH.ys[0]-1,RW,'town',10,'Redhill Road'); wind('v',RH.xs[2],RH.Y1+1,1376,RW,'town',26,'Redhill South Road');
   // winding country roads
   const wwA=road('h',MF.ys[1]+1,MF.X1+1,MF.X1+8,2,'lane'), wwB=road('h',900,500,540,2,'lane');
   link('lane',2,wwA,1,wwB,0,[[420,770],[470,850]],8,'Wendwood Lane');
@@ -258,6 +278,21 @@ function genWorld(){
   const fwS=road('v',FW.xs[1]+1,FW.Y1+1,FW.Y1+18,2,'rural'); link('rural',2,fwS,1,rbN,0,[[1480,1262],[1400,1252]],10,'Fenwick Road');
   const rhE=road('h',RH.ys[2]+1,RH.X1+1,RH.X1+8,2,'rural'), fwW=road('h',FW.ys[2]+1,FW.xs[0]-10,FW.xs[0]-1,2,'rural');
   link('rural',2,rhE,1,fwW,0,[[1200,1232],[1350,1150]],10,'Moor Lane');
+  // v12: Sound Coast Road — hugs the west shore of Albion Sound from the airport road down to Wendwood
+  { const ap=world.segs.find(s=>s.dir==='h'&&s.a===460&&s.b1===600); const cst=[]; for(let y=520;y<=860;y+=34) cst.push([Math.min(cW(y)-cWh(y)-16,y<700?700:9999),y]); cst.push([600,880]);
+    windLink('rural',2,ap,1,wwB,1,cst,0,'Sound Coast Road'); }
+  // v12: Greyfell Pass — hairpin switchbacks from the summit down the south face to the M1
+  { const pB=road('v',430,1925,1941,2,'rural'); pB.name='Greyfell Pass';
+    windLink('rural',2,mS,1,pB,0,[[350,1612],[392,1640],[346,1676],[404,1710],[352,1748],[414,1786],[362,1826],[420,1872]],0,'Greyfell Pass'); }
+  // v12: Moor Dam road — M3 → over the dam (Moor Reservoir behind it) → Kingsbridge
+  { const dy=1589, dA=road('h',dy,903,912,2,'rural'), dam=road('h',dy,Math.floor(riverX(dy))-22,Math.floor(riverX(dy))+22,2,'rural'), dB=road('h',dy,KB.xs[0]-12,KB.xs[0]-1,2,'rural');
+    dam.name='Moor Dam'; dam.dam=true; world.dam={x0:dam.b0,x1:dam.b1+1,y:dy};
+    windLink('rural',2,dA,1,dam,0,null,24,'Dam Road',11); windLink('rural',2,dam,1,dB,0,null,30,'Dam Road',12); }
+  // v12: dirt tracks — desert quarry off Dustwater, forest track in Highmoor
+  { const q0=road('v',DW.xs[3],DW.Y1+1,DW.Y1+6,2,'dirt'), q1=road('h',600,1150,1157,2,'dirt'); q0.name=q1.name='Quarry Track'; world.quarry={x:1158,y:600};
+    windLink('dirt',2,q0,1,q1,0,[[DW.xs[3]+40,560],[1110,585]],0,'Quarry Track');
+    const f0=road('h',FW.ys[3]+1,FW.X1+1,FW.X1+6,2,'dirt'), f1=road('v',1790,1290,1297,2,'dirt'); f0.name=f1.name='Fen Forest Track';
+    windLink('dirt',2,f0,1,f1,0,[[1700,FW.ys[3]+30],[1760,1230]],0,'Fen Forest Track'); }
   world.cities={C1,SV,KB,MF,DW,CM,RH,FW,AB};
   (world.tm=world.tm||[]).push(['for(const f of pendi',performance.now()-t0|0]);
   for(const f of pending) f();
@@ -394,6 +429,9 @@ function genWorld(){
   airport('Albion Airport',160,470,640,660,[[190,488,400],[190,620,400]],[220,520,60]);
   airport('Sandvale Intl',1070,160,1445,340,[[1090,180,330],[1090,300,330]],[1110,215,80]);
   airport('Kingsbridge Field',1195,1792,1385,1905,[[1205,1860,175]],[1210,1812,40]);
+  if(world.quarry){ const {x,y}=world.quarry; for(let j=y-10;j<y+12;j++) for(let i=x;i<x+26;i++){ const t=get(i,j); if(t!==T.ROAD&&t!==T.WATER&&t!==T.BRIDGE) set(i,j,T.GRAVEL); }
+    for(let k=0;k<14;k++) objs.push({kind:'rock',x:(x+3+R()*22)*TILE,y:(y-9+R()*20)*TILE,r:14+R()*24,seed:(R()*1e9)|0,desert:true}); building(x+18,y-9,6,4,'warehouse',16,{logo:'QUARRY'}); }
+  if(world.dam){ const d=world.dam; objs.push({kind:'dam',x:d.x0*TILE,y:(d.y-1)*TILE,w:(d.x1-d.x0)*TILE,h:5*TILE,d}); }
   (world.tm=world.tm||[]).push(['// ---- farmland',performance.now()-t0|0]);
   // ---- farmland with hedgerows, pasture with livestock
   const crops=['wheat','green','plough','rape','pasture','wheat','pasture','green'];
@@ -464,6 +502,14 @@ function genWorld(){
       let pLat=hw+0.8, pLon=off; if(c){ const q=(c.R-0.9)/Math.SQRT2; pLat=hw+c.R-q; pLon=c.R-q; }
       const n=Math.max(1,Math.round(hw*M_T/3.6)), A=[E[0]-f[0]*off,E[1]-f[1]*off];
       world.overhead.push({kind:'mast',J,f,l,A,pLat,pLon,hw,n,ns:f[0]===0,x:A[0]*TILE,y:A[1]*TILE}); } }
+  // v12: Golden-Gate-style suspension bridges on the long motorway sea crossings (other bridges keep girder / curved-viaduct styles)
+  world.susp=[]; for(const sg of world.segs){ if(sg.type!=='hwy') continue; const c=sg.a+(sg.w>>1); let r0=-1;
+    for(let u=sg.b0;u<=sg.b1+1;u++){ const t=u<=sg.b1?(sg.dir==='h'?get(u,c):get(c,u)):-1; if(t===T.BRIDGE){ if(r0<0) r0=u; } else if(r0>=0){ const L=u-r0;
+        if(L>=40){ const S={sg,r0:r0-6,r1:u+6,dir:sg.dir,a:sg.a,w:sg.w}; S.L=S.r1-S.r0; S.t0=S.r0+S.L*0.2; S.t1=S.r1-S.L*0.2; world.susp.push(S);
+          const P=(uu,v)=>sg.dir==='h'?[uu*TILE,v*TILE]:[v*TILE,uu*TILE];
+          for(let p=S.r0;p<S.r1;p+=8){ const q=P(p+4,S.a+S.w/2); world.overhead.push({kind:'susp',S,p0:p,p1:Math.min(S.r1,p+8),x:q[0],y:q[1]}); }
+          for(const tu of [S.t0,S.t1]){ const q=P(tu,S.a+S.w/2); world.overhead.unshift({kind:'stower',S,u:tu,x:q[0],y:q[1]}); } }
+        r0=-1; } } }
   (world.tm=world.tm||[]).push(['if(typeof buildMarki',performance.now()-t0|0]);
   if(typeof buildMarkings==='function') buildMarkings(objs);
   (world.tm=world.tm||[]).push(['if(typeof buildDepot',performance.now()-t0|0]);
@@ -472,7 +518,7 @@ function genWorld(){
   world.labels=[['WESTMERE',330,1000,1],['THE SANDREACH',1200,450,1],['HIGHMOOR',1350,1250,1],['ALBION SOUND',cW(700),700,2],['SANDREACH STRAIT',1500,cE(1500),2],['GREYFELL INLET',560,1272,2],['OUTER SEA',1024,25,2],['OUTER SEA',1024,2028,2],
     ['PORT ALBION',300,290],['SANDVALE',1640,340],['KINGSBRIDGE',1580,1590],['Millford',300,830],['Dustwater',1035,455],['Coppermine',1635,625],['Redhill',1025,1195],['Fenwick',1535,1155],['Ashby',270,1130],['Wendwood',520,890],
     ['Mount Greyfell',MTN.x,MTN.y-40],['River Moor',riverX(1500)+30,1500],['Albion Airport',400,560],['Sandvale Intl',1260,250],['Kingsbridge Field',1290,1830],['Albion Docks',600,300],['Kingsbridge Harbour',1600,1905],
-    ['M1',1000,94],['M1',1951,1300],['M1',94,1500],['M1',1400,1951],['M2',900,1054],['M2',1600,714],['M3',906,1650]];
+    ['M1',1000,94],['M1',1951,1300],['M1',94,1500],['M1',1400,1951],['M2',900,1054],['M2',1600,714],['M3',906,1650],['Moor Reservoir',1172,1540,2],['Greyfell Pass',395,1740],['Sound Coast Road',690,600],['Quarry',1170,590]];
   (world.tm=world.tm||[]).push(['// spatial index',performance.now()-t0|0]);
   // spatial index of ground objects per chunk
   world.chunkObjs=new Map();
@@ -742,6 +788,8 @@ function drawCurve(g,cv){
         curvePath(g,P,s,b,0); g.strokeStyle='#a4a8ad'; g.lineWidth=W+16; g.stroke();
         for(const sd of [-1,1]){ curvePath(g,P,s,b,sd*(W/2+5)); g.strokeStyle='#dfe2e6'; g.lineWidth=4; g.stroke(); curvePath(g,P,s,b,sd*(W/2+5)); g.strokeStyle='#6d7178'; g.lineWidth=4; g.setLineDash([2,10]); g.stroke(); g.setLineDash([]); }
         a=-1; } } }
+  if(cv.type==='dirt'){ curvePath(g,P,i0,i1,0); g.strokeStyle='#8a7350'; g.lineWidth=W+6; g.stroke(); curvePath(g,P,i0,i1,0); g.strokeStyle='#a68b60'; g.lineWidth=W; g.stroke();
+    for(const sd of [-1,1]){ curvePath(g,P,i0,i1,sd*W*0.22); g.strokeStyle='rgba(90,70,45,0.45)'; g.lineWidth=5; g.stroke(); } curvePath(g,P,i0,i1,0); g.strokeStyle='rgba(150,170,90,0.35)'; g.lineWidth=3; g.stroke(); g.restore(); return; }
   if(cv.type==='hwy'||cv.type==='dual'){ curvePath(g,P,i0,i1,0); g.strokeStyle='#8a8c86'; g.lineWidth=W+5; g.stroke(); }
   curvePath(g,P,i0,i1,0); g.strokeStyle=g.createPattern(TEX.asph[1],'repeat'); g.lineWidth=W; g.stroke();
   const line=(off,col,w,dash)=>{ curvePath(g,P,i0,i1,off); g.strokeStyle=col; g.lineWidth=w; g.setLineDash(dash||[]); g.stroke(); g.setLineDash([]); };
@@ -970,6 +1018,7 @@ function thump(str){ const ctx=audio.ctx; if(!ctx) return; noiseBurst(0.35,180,1
 function updateAudio(s,inp,time){
   const ctx=audio.ctx; if(!ctx) return; const t=ctx.currentTime;
   const load=s.throttle, rpm=s.rpm;
+  if(typeof BREAKDOWN!=='undefined'&&BREAKDOWN.active){ audio.eng.gain.setTargetAtTime(0,t,0.25); audio.rum.gain.setTargetAtTime(0,t,0.25); audio.turboG.gain.setTargetAtTime(0,t,0.2); if(s.rpm!==undefined) s.rpm=Math.max(0,s.rpm*0.97); return; }
   if(audio.engSrc) audio.engSrc.playbackRate.setTargetAtTime(0.78*rpm/IDLE*0.72+0.22,t,0.05);
   audio.eng.gain.setTargetAtTime(0.32+0.38*load+0.1*(rpm-IDLE)/1600,t,0.08);
   audio.engLP.frequency.setTargetAtTime(900+load*2200+rpm*0.6,t,0.1);
@@ -990,15 +1039,15 @@ const VTYPES={
   lorry:{L:6.2,W:2.5,heavy:true,acc:0.75}
 };
 const CAR_COLS=['#c0392b','#ecf0f1','#2c3e50','#2980b9','#7f8c8d','#16a085','#f1c40f','#8e44ad','#d35400','#1e1e1e','#bdc3c7','#27ae60','#6d1a1a','#34495e'];
-const MIX={city:{hatch:14,sedan:16,estate:6,sports:3,suv:8,taxi:12,van:12,bus:9,box:8,lorry:4},
+const MIX={dirt:{van:3,suv:4,box:1,lorry:2},city:{hatch:14,sedan:16,estate:6,sports:3,suv:8,taxi:12,van:12,bus:9,box:8,lorry:4},
   town:{hatch:16,sedan:16,estate:8,sports:3,suv:9,taxi:5,van:13,bus:6,box:8,lorry:5},
   hwy:{hatch:8,sedan:16,estate:8,sports:5,suv:10,van:12,box:12,lorry:26,bus:2},
   res:{hatch:26,sedan:22,estate:14,suv:14,sports:3,van:12,taxi:6},
   dual:{hatch:10,sedan:18,estate:10,sports:4,suv:12,van:12,box:10,lorry:18,bus:3},
   lane:{hatch:20,estate:16,suv:18,van:12,sedan:8},
   rural:{hatch:16,sedan:14,estate:12,suv:14,van:14,lorry:14,box:8}};
-const SPEED={city:13,town:12,res:9,rural:17,hwy:27,dual:22,lane:10};
-const AREAW={city:1.0,town:0.95,hwy:1.1,res:0.4,rural:0.22,dual:0.7,lane:0.1};
+const SPEED={dirt:8,city:13,town:12,res:9,rural:17,hwy:27,dual:22,lane:10};
+const AREAW={dirt:0.05,city:1.0,town:0.95,hwy:1.1,res:0.4,rural:0.22,dual:0.7,lane:0.1};
 const traffic={vs:[],peds:[],parked:[],parkedIdx:new Map(),nextId:1,hash:new Map(),target:0,spawned:0,despawned:0,arts:{},lastTarget:-9};
 function pickW(o,r){ let t=0; for(const k in o) t+=o[k]; let x=r*t; for(const k in o){ x-=o[k]; if(x<=0) return k; } return Object.keys(o)[0]; }
 const ang=(dx,dy)=>Math.atan2(dx,-dy); // heading for direction vector (0 = north)
@@ -1155,7 +1204,7 @@ function planPiece(v,r){
     let p=lanePt(sg,d,P.lane,lineA); pathLine(v,p[0],p[1]); const dStop=pathEnd(v);
     p=lanePt(sg,d,P.lane,stop); pathLine(v,p[0],p[1]);
     if(traffic.log) traffic.log.push({J:J.id,key:sg.id+':'+d,lane:P.lane,move:ch[0],allowed:lanes?lanes[P.lane]:'*',veh:v.id});
-    const mk={kind:J.lights?'light':(ap&&ap.gw)?'gw':'major',d:dStop,J,ns:sg.dir==='v',axis:sg.dir,move:ch[0]};
+    const mk={kind:J.lights?'light':(ap&&ap.gw)?'gw':'major',d:dStop,J,ns:sg.dir==='v',axis:sg.dir,move:ch[0],key:sg.id+':'+d};
     if(ch[0]==='S'){ const q=lanePt(sg,d,P.lane,exitA); pathLine(v,q[0],q[1]); mk.dEnd=pathEnd(v); v.mk.push(mk); P.pos=exitA; return true; }
     const C2=ch[1], cd=ch[2], nl=nLanes(C2), lane= ch[0]==='L'?0:Math.min(nl-1,P.lane);
     const ex= cd>0?o.ce:o.cs, q=lanePt(C2,cd,lane,ex);
@@ -1383,7 +1432,10 @@ function stepVeh(v,dt,pbs){
     else if(m.kind==='light'||m.kind==='gw'||m.kind==='rb'){
       const gap=m.d-front-0.8; if(gap<-0.5||m.go) continue; if(gap>70) continue;
       let stop=false;
-      if(m.kind==='light'){ const ls=lightState(m.J,m.ns); if(ls==='r') stop=true; else if(ls==='a') stop= gap> v.v*v.v/(2*3.5)+1; if(!stop&&m.J.box&&m.move!=='R'&&gap<12&&boxBlocked(v,m)) stop=true; if(!stop&&gap<3) m.go=true; }
+      if(m.kind==='light'){ const ls=sigState(m.J,m.key,m.move); if(ls==='r'||ls==='ra') stop=true; else if(ls==='a') stop= gap> v.v*v.v/(2*3.5)+1;
+        if(!stop&&gap<12&&boxBlocked(v,m)) stop=true;            // never enter unless the exit is clear
+        if(!stop&&gap<6&&jBusy(v,m.J)) stop=true;                 // give way to anything still crossing the junction
+        if(!stop&&gap<3){ m.go=true; m.goT=timeS; if(traffic.goLog) traffic.goLog.push({J:m.J.id,key:m.key,mv:m.move,t:timeS,st:ls,veh:v.id}); } }
       else if(m.kind==='gw'){ if(gap<18){ if(!giveWayBusy(v,m.J)||v.stopT>10) { if(gap<2.5) m.go=true; } else stop=true; } }
       else { if(gap<14){ let busy=false; for(const o of traffic.vs){ if(o===v||o.ring!==m.rb) continue; const a=Math.atan2(o.y-m.rb.cy*M_T,o.x-m.rb.cx*M_T); const df=mod2pi(m.ang-a); if(df<1.5&&df>0.05){ busy=true; break; } }
           if(!busy||v.stopT>5) m.go=true; else stop=true; } }
@@ -1601,6 +1653,43 @@ function drawLaneDrop(g,o){ // UK lane-drop: bold broken line, merge arrows, hat
     for(const k of [4.5,9.5]){ if(k+1>L) continue; const cR=row+0.5; const p0=P(E-d*k,cR), p1=P(E-d*(k-1.0),cR), p2=P(E-d*(k-2.0),cR+sgn*0.45);
       g.beginPath(); g.moveTo(p0[0],p0[1]); g.lineTo(p1[0],p1[1]); g.lineTo(p2[0],p2[1]); g.stroke(); arrowHead(g,p2[0],p2[1],p2[0]-p1[0],p2[1]-p1[1]); }
     g.restore(); } }
+
+'use strict';
+// ===================== v12 SIGNAL PHASING (UK, drive on the left) =====================
+// Each movement (approach key + L/S/R) gets a conflict-free stage. Stages are built greedily from the actual
+// vehicle paths: two movements may only share a stage if their swept paths never come within SIG_CLEAR metres.
+// Cycle per stage: green → amber (3 s) → all-red (2 s, the last 1.5 s shows red+amber to the next stage).
+const SIG_CLEAR=2.6, SIG_AMBER=3, SIG_ALLRED=2, SIG_RA=1.5;
+function sigMovePaths(J,key,mv){ const [sid,ds]=key.split(':'), sg=world.segs[+sid], d=+ds, o=jOptions(J,sg,d), ap=J.appr&&J.appr[key], nl=nLanes(sg), out=[];
+  for(let l=0;l<nl;l++){ if(ap&&ap.lanes&&!(ap.lanes[l]&&ap.lanes[l].indexOf(mv)>=0)) continue; const p=lanePt(sg,d,l,o.stop), pts=[];
+    if(mv==='S'){ const q=lanePt(sg,d,l,o.exitA); for(let k=0;k<=12;k++) pts.push([p[0]+(q[0]-p[0])*k/12,p[1]+(q[1]-p[1])*k/12]); }
+    else { const ch=o.opts.find(c=>c[0]===mv); if(!ch) continue; const C2=ch[1], cd=ch[2], l2=mv==='L'?0:Math.min(nLanes(C2)-1,l), ex=cd>0?o.ce:o.cs, q=lanePt(C2,cd,l2,ex), c=sg.dir==='h'?[q[0],p[1]]:[p[0],q[1]];
+      for(let k=0;k<=16;k++){ const t=k/16,u=1-t; pts.push([u*u*p[0]+2*u*t*c[0]+t*t*q[0],u*u*p[1]+2*u*t*c[1]+t*t*q[1]]); } }
+    out.push(pts); }
+  return out; }
+function sigConflict(J,a,b){ if(a.key===b.key) return false; for(const P of a.paths) for(const Q of b.paths) for(const p of P) for(const q of Q) if(Math.abs(p[0]-q[0])<SIG_CLEAR&&Math.abs(p[1]-q[1])<SIG_CLEAR&&Math.hypot(p[0]-q[0],p[1]-q[1])<SIG_CLEAR) return true; return false; }
+function buildSig(J){ const mvs=[]; const keys=Object.keys(J.appr||{});
+  const axisOf=k=>world.segs[+k.split(':')[0]].dir; const ax0=hash2(J.x,J.y)<0.5?'v':'h';
+  for(const ax of [ax0,ax0==='v'?'h':'v']) for(const pass of ['SL','R']) for(const k of keys){ if(axisOf(k)!==ax) continue; const o=jOptions(J,world.segs[+k.split(':')[0]],+k.split(':')[1]);
+    for(const c of o.opts){ const m=c[0]; if((pass==='SL')!==(m!=='R')) continue; const paths=sigMovePaths(J,k,m); if(paths.length) mvs.push({key:k,mv:m,ax,paths,id:k+'|'+m}); } }
+  const stages=[]; for(const m of mvs){ let st=stages.find(s=>s.ax===m.ax&&s.mv.every(o=>!sigConflict(J,o,m))); if(!st){ st={ax:m.ax,mv:[]}; stages.push(st); } st.mv.push(m); }
+  let t=0; for(const s of stages){ s.g=s.mv.some(m=>m.mv==='S')?9:s.mv.some(m=>m.mv==='L')?7:4; s.t0=t; t+=s.g+SIG_AMBER+SIG_ALLRED; s.set=new Set(s.mv.map(m=>m.id)); }
+  const of=new Map(); stages.forEach((s,i)=>s.mv.forEach(m=>of.set(m.id,i)));
+  return {stages,T:t,of,mvs}; }
+function sigOf(J){ return J.sig||(J.sig=buildSig(J)); }
+function sigState(J,key,mv){ const S=sigOf(J); const i=S.of.get(key+'|'+mv); if(i===undefined) return 'r';
+  const t=((timeS+J.phase*3)%S.T+S.T)%S.T; let cur=S.stages.length-1; for(let k=0;k<S.stages.length;k++) if(t>=S.stages[k].t0) cur=k;
+  const st=S.stages[cur], u=t-st.t0;
+  if(i===cur){ return u<st.g?'g':u<st.g+SIG_AMBER?'a':'r'; }
+  if(i===(cur+1)%S.stages.length && u>=st.g+SIG_AMBER+SIG_ALLRED-SIG_RA) return 'ra';
+  return 'r'; }
+// legacy (corner pole lights): any movement on that axis
+function lightState(J,ns){ const S=sigOf(J); let best='r'; for(const m of S.mvs){ if((m.ax==='v')!==ns) continue; const s=sigState(J,m.key,m.mv); if(s==='g') return 'g'; if(s==='a') best='a'; else if(s==='ra'&&best==='r') best='ra'; } return best; }
+// vehicles (AI or the player) already inside the junction on a crossing heading
+function jBusy(v,J){ const x0=J.x*M_T-1, y0=J.y*M_T-1, x1=(J.x+J.w)*M_T+1, y1=(J.y+J.h)*M_T+1, fv=fwd(v.h||0);
+  const chk=(x,y,h)=>{ if(x<x0||x>x1||y<y0||y>y1) return false; const f=fwd(h); return Math.abs(f[0]*fv[0]+f[1]*fv[1])<0.8; };
+  for(const o of traffic.vs){ if(o!==v&&chk(o.x,o.y,o.h||0)) return true; }
+  if(chk(truck.x,truck.y,truck.h)) return true; if(truck.trl&&chk(truck.trl.x,truck.trl.y,truck.trl.th||0)) return true; return false; }
 
 'use strict';
 // ===================== DEPOTS, TRAILERS, COUPLING & EVENT HOOKS =====================
@@ -1898,6 +1987,13 @@ function drawPOIs(px,py,big){
 'use strict';
 // ===================== v7 SITES: shopping malls / supermarkets (delivery docks), truck dealerships, forecourt art + visitor cars =====================
 const OBJX={};
+OBJX.dam=function(g,o){ const y=o.y+TILE*2, x0=o.x-TILE, x1=o.x+o.w+TILE; g.save();
+  g.fillStyle='rgba(10,20,30,0.35)'; g.fillRect(x0+10,y+TILE*1.2,x1-x0,TILE*1.6);
+  const gr=g.createLinearGradient(0,y+TILE,0,y+TILE*2.6); gr.addColorStop(0,'#c9c6bc'); gr.addColorStop(1,'#8d8a80'); g.fillStyle=gr; g.fillRect(x0,y+TILE,x1-x0,TILE*1.6);
+  g.fillStyle='#e6e3da'; g.fillRect(x0,y+TILE-4,x1-x0,6); g.fillRect(x0,y-TILE*1.05,x1-x0,6);
+  for(let x=x0+40;x<x1-40;x+=90){ g.fillStyle='rgba(220,240,255,0.75)'; g.fillRect(x,y+TILE*1.3,26,TILE*1.3); g.fillStyle='rgba(255,255,255,0.9)'; g.fillRect(x-4,y+TILE*2.5,34,8); }
+  g.restore(); };
+
 function buildCareerSites(K){
   const {findSpot,access,clearObjs,region,R,objs,okT}=K, M=v=>v*M_T; const t0=performance.now();
   world.malls=[]; world.dealers=[];
@@ -2533,8 +2629,8 @@ function drawAmbientHigh(v){ const t=timeS;
 'use strict';
 // ===================== SAT NAV: A* over the road tiles, route guidance =====================
 const NAV={route:null,reroutes:0,offT:0,lastCalc:-9,hover:null};
-const NAV_COST={hwy:0.55,dual:0.7,rural:0.9,city:1.0,town:1.0,res:1.7,lane:3.2};      // lorry-legal: narrow lanes / estates heavily penalised
-const NAV_SPEED={hwy:25,dual:20,rural:15,city:11,town:11,res:8,lane:7};
+const NAV_COST={hwy:0.55,dual:0.7,rural:0.9,city:1.0,town:1.0,res:1.7,lane:3.2,dirt:2.6};      // lorry-legal: narrow lanes / estates heavily penalised
+const NAV_SPEED={hwy:25,dual:20,rural:15,city:11,town:11,res:8,lane:7,dirt:7};
 let navClosed=null, navG=null, navStamp=null, navFrom=null, navGen=1;
 function navTileInfo(i){ const h=world.roadH[i], v=world.roadV[i]; if(h===-1&&v===-1) return null;
   if(h===-2) return ['rb',0.8,8]; if(h===-3) return ['curve',0.7,20]; const s=world.segs[h>=0?h:v]; return [s.type,NAV_COST[s.type]||1,NAV_SPEED[s.type]||11]; }
@@ -2951,6 +3047,43 @@ function mobContext(){ if(!MOB.on) return; const a=career.active; const s=truck;
   const cb=document.getElementById('mCouple'); if(cb) cb.querySelector('small').textContent=s.trl?'UNCOUPLE':'COUPLE'; }
 
 'use strict';
+// ===================== v12 BREAKDOWN at 100% damage =====================
+// Data-driven: options are records {id,label,sub(),enabled(),run()}. A later "call roadside repair" option
+// (orange recovery truck drives in, patches to roadworthy for a fee, mission continues) only needs
+// BREAKDOWN.addOption({...}) — the panel, gamepad/touch focus and state machine pick it up automatically.
+const BD_IN={up:false,down:false,left:false,right:false,hand:true,horn:false,padSteer:0};
+const BREAKDOWN={active:false,t:0,at:null,smoke:null,options:[],fee:()=>Math.min(Math.max(0,truck.money),250),
+  addOption(o){ this.options.push(o); this.options.sort((a,b)=>(a.order||0)-(b.order||0)); if(this.active) bdPanel(); },
+  removeOption(id){ this.options=this.options.filter(o=>o.id!==id); } };
+function bdNearestService(){ let best=null,bd=1e18; const t=truck; for(const g of world.garages||[]){ const d=(g.x-t.x)**2+(g.y-t.y)**2; if(d<bd){ bd=d; best={x:g.x,y:g.y,name:g.name}; } }
+  for(const dp of world.depots||[]){ const e=dp.entrance; const d=(e.x-t.x)**2+(e.y-t.y)**2; if(d<bd){ bd=d; best={x:e.x,y:e.y,name:dp.name}; } } return best; }
+function bdFailMission(){ const a=career.active; if(!a) return null; const tr=a.trailer, name=a.job.cargo&&a.job.cargo.name;
+  if(truck.trl===tr) uncouple(); const b=a.pickBay; if(b&&!b.trailer){ tr.x=b.kx; tr.y=b.ky; tr.th=b.th; tr.bay=b; b.trailer=tr; tr.coupled=false; }   // trailer returned to its depot
+  else { const i=world.trailers.indexOf(tr); if(i>=0) world.trailers.splice(i,1); }
+  abandonJob(true); BigRig.emit('missionFailed',{reason:'breakdown',cargo:name}); return name; }
+BREAKDOWN.addOption({id:'respawn',order:100,label:'RESPAWN',sub:()=>{ const s=bdNearestService(); return 'Tow to '+(s?s.name:'nearest garage')+' \u2022 \u00a3'+BREAKDOWN.fee()+' \u2022 damage reset'+(career.active?' \u2022 mission FAILED':''); },
+  enabled:()=>true, run(){ const s=bdNearestService(), fee=BREAKDOWN.fee(); const lost=bdFailMission(); if(truck.trl) uncouple();
+    if(s){ truck.x=s.x; truck.y=s.y+6; } truck.v=0; truck.damage=0; truck.money-=fee; bdEnd();
+    flash('Recovered to '+(s?s.name:'garage')+' \u2022 \u00a3'+fee+(lost?' \u2022 job failed':'')); BigRig.emit('respawn',{at:s,fee}); saveGame&&saveGame(); } });
+function bdStart(){ if(BREAKDOWN.active) return; BREAKDOWN.active=true; BREAKDOWN.t=0; BREAKDOWN.at={x:truck.x,y:truck.y};
+  BREAKDOWN.smoke={x:0,y:0,s:1.2,bd:1}; world.smokers.push(BREAKDOWN.smoke); try{ thump(1); }catch(e){}
+  BigRig.emit('breakdown',{x:truck.x,y:truck.y,mission:!!career.active}); bdPanel(); }
+function bdEnd(){ BREAKDOWN.active=false; const i=world.smokers.indexOf(BREAKDOWN.smoke); if(i>=0) world.smokers.splice(i,1); BREAKDOWN.smoke=null; const p=document.getElementById('bdPanel'); if(p) p.remove(); }
+function bdPanel(){ let p=document.getElementById('bdPanel'); if(!p){ p=document.createElement('div'); p.id='bdPanel'; document.getElementById('frame').appendChild(p); }
+  p.style.cssText='position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:30;background:rgba(20,10,8,0.92);border:2px solid #ff5a36;border-radius:14px;padding:18px 22px;color:#fff;font-family:system-ui,sans-serif;text-align:center;min-width:300px;box-shadow:0 10px 40px rgba(0,0,0,0.6)';
+  p.innerHTML='<div style="font:900 26px system-ui;letter-spacing:3px;color:#ff6a3d">\u26a0 BROKEN DOWN</div><div style="opacity:.8;margin:6px 0 14px;font-size:13px">Engine failure \u2014 damage 100%</div>'+
+    BREAKDOWN.options.filter(o=>o.enabled()).map(o=>'<button class="btn bdOpt" data-id="'+o.id+'" style="display:block;width:100%;margin:6px 0;padding:10px;font:800 16px system-ui;border-radius:10px;border:none;background:#f5b82e;color:#111;cursor:pointer">'+o.label+'<div style="font:600 11px system-ui;opacity:.75">'+o.sub()+'</div></button>').join('');
+  for(const b of p.querySelectorAll('.bdOpt')) b.onclick=()=>{ const o=BREAKDOWN.options.find(o=>o.id===b.dataset.id); if(o) o.run(); }; }
+addEventListener('keydown',e=>{ if(BREAKDOWN.active&&e.code==='Enter'){ const b=document.querySelector('#bdPanel .bdOpt'); if(b) b.click(); } });
+function updateBreakdown(dt){ if(!started) return; if(!BREAKDOWN.active&&truck.damage>=100) bdStart(); if(!BREAKDOWN.active) return; BREAKDOWN.t+=dt;
+  const f=fwd(truck.h); BREAKDOWN.smoke.x=(truck.x+f[0]*4.2)*PPM; BREAKDOWN.smoke.y=(truck.y+f[1]*4.2)*PPM; if(navigator.vibrate&&BREAKDOWN.t<0.05) try{ navigator.vibrate(200); }catch(e){} }
+function drawBreakdown(){ if(!BREAKDOWN.active||((timeS*1.6)%1)>0.55) return; const f=fwd(truck.h), r=[-f[1],f[0]]; ctx.save();
+  const pts=[[5.2,1.15],[5.2,-1.15],[-1.4,1.2],[-1.4,-1.2]]; if(truck.trl){ const t=truck.trl, tf=fwd(t.th||0), tr=[-tf[1],tf[0]]; for(const s of [1,-1]){ const x=t.x-tf[0]*11.8+tr[0]*s*1.25, y=t.y-tf[1]*11.8+tr[1]*s*1.25; ctx.fillStyle='rgba(255,170,0,0.35)'; ctx.beginPath(); ctx.arc(x*PPM,y*PPM,9,0,7); ctx.fill(); ctx.fillStyle='#ffb000'; ctx.beginPath(); ctx.arc(x*PPM,y*PPM,3,0,7); ctx.fill(); } }
+  for(const [a,b] of pts){ const x=(truck.x+f[0]*a+r[0]*b)*PPM, y=(truck.y+f[1]*a+r[1]*b)*PPM; ctx.fillStyle='rgba(255,170,0,0.35)'; ctx.beginPath(); ctx.arc(x,y,9,0,7); ctx.fill(); ctx.fillStyle='#ffb000'; ctx.beginPath(); ctx.arc(x,y,3,0,7); ctx.fill(); }
+  ctx.restore(); }
+BigRig.breakdown=BREAKDOWN;
+
+'use strict';
 // ===================== MAIN =====================
 const VW=960, VH=600;
 const cv=document.getElementById('game'), ctx=cv.getContext('2d');
@@ -2967,7 +3100,7 @@ function boot(){
   window.__bigrig={NAV,setRoute,clearRoute,mBX,mBY,truck,input,world,cam,bigmap,openMap,closeMap,onRoadM,kingpin,traffic,toggleRefuel,fuelStationAt,refuel,get loadMs(){return world.loadMs;},spawnVehicle,toggleCouple,coupleCandidate,trailerInBay,BigRig,get fps(){return fps;},chunks:chunkCache};
   truck.fuel=260; truck.tank=400; truck.money=2500; truck.damage=0;
   if(!loadGame()) applyModel('rigger'); uiInit(); padInstall(); mpInit(); mobInit();
-  Object.assign(window.__bigrig,{MP,mpHost,mpJoin,mpChatSend,startGame,getChunk,renderChunk,MAPC,drawMapDetail,pad,padUpdate,career,acceptJob,abandonJob,tryUnload,bayAlign,buyTruck,openBoard,openDealer,closeUI,fcv,addXP,saveGame,loadGame,applyModel,TRUCK_MODELS,TIERS,CARGOS,levelOf,uncouple,couple,fillBoard,jobRoute});
+  Object.assign(window.__bigrig,{BREAKDOWN,MP,mpHost,mpJoin,mpChatSend,startGame,getChunk,renderChunk,MAPC,drawMapDetail,pad,padUpdate,career,acceptJob,abandonJob,tryUnload,bayAlign,buyTruck,openBoard,openDealer,closeUI,fcv,addXP,saveGame,loadGame,applyModel,TRUCK_MODELS,TIERS,CARGOS,levelOf,uncouple,couple,fillBoard,jobRoute});
   world.loadMs=performance.now()-tb; world.ready=true; const ld=document.getElementById('loading'); if(ld) ld.textContent='World ready ('+(world.loadMs/1000).toFixed(1)+' s)';
   requestAnimationFrame(frame);
 }
@@ -2996,7 +3129,7 @@ function frame(ts){
   padUpdate(dt); updateMP(dt); const paused=uiBlocking();
   if(started&&!paused){
     acc+=dt; const H=1/120; const inp=input;
-    while(acc>=H){ stepTruck(truck,inp,H); acc-=H; }
+    while(acc>=H){ stepTruck(truck,BREAKDOWN.active?BD_IN:inp,H); acc-=H; }
     // air brake hiss on release after a firm stop / handbrake
     const braking=truck.brake>0; if(braking) wasBraking+=dt; else { if(wasBraking>0.6 && Math.abs(truck.v)<6) airHiss(); wasBraking=0; }
     if(truck.bump>0.01 && !truck._bumped){ thump(truck.bump); cam.shake=truck.bump*10; truck._bumped=true; } if(truck.bump<=0.01) truck._bumped=false;
@@ -3006,6 +3139,7 @@ function frame(ts){
   { const z=cam.z; updateAmbient(dt,[cam.x-VW/2/z,cam.y-VH/2/z,cam.x+VW/2/z,cam.y+VH/2/z]); }
   if(started&&!paused) updateNav(dt);
   if(truck.bump>0.05&&!truck._dmg){ truck.damage=Math.min(100,truck.damage+truck.bump*6); truck._dmg=true; } if(truck.bump<=0.01) truck._dmg=false;
+  updateBreakdown(dt);
   // camera: look-ahead + zoom-out with speed
   const f=fwd(truck.h), sp=Math.abs(truck.v);
   const kp=kingpin(truck); const mid=[(truck.x-f[0]*1.9)*PPM, (truck.y-f[1]*1.9)*PPM];
@@ -3034,7 +3168,7 @@ function draw(){
   drawCareerWorld(vx0,vy0,vx1,vy1);
   drawParkedTrailers(vx0,vy0,vx1,vy1);
   drawTraffic(vx0,vy0,vx1,vy1);
-  drawRemotePlayers(vx0,vy0,vx1,vy1);
+  drawRemotePlayers(vx0,vy0,vx1,vy1); drawBreakdown();
   drawLorry();
   for(const o of world.overhead) if(o.x>vx0-400&&o.x<vx1+400&&o.y>vy0-400&&o.y<vy1+400) drawOverhead(o);
   drawAmbientHigh(VR);
@@ -3058,9 +3192,36 @@ function drawLorry(){
   // headlight beams at night? (daytime build) - small DRL dots
   ctx.fillStyle='rgba(255,250,220,0.9)'; for(const sd of [-1,1]){ const hx=(s.x+f[0]*5.0+r[0]*sd*1.0)*PPM, hy=(s.y+f[1]*5.0+r[1]*sd*1.0)*PPM; ctx.fillRect(hx-1.5,hy-1.5,3,3); }
 }
-function lightState(J,ns){ const t=(timeS+J.phase)%16; if(ns) return t<6?'g':t<8?'a':'r'; return t<8?'r':t<14?'g':'a'; }
+// v12 suspension bridge: cable height profile (0 deck .. 1 tower top), sun from the NW so shadows fall to the SE
+function suspH(S,u){ if(u<=S.t0) return Math.max(0,(u-S.r0)/(S.t0-S.r0)); if(u>=S.t1) return Math.max(0,(S.r1-u)/(S.r1-S.t1)); const m=(S.t0+S.t1)/2, k=(u-m)/((S.t1-S.t0)/2); return 0.12+0.88*k*k; }
+const SUSP_K=150, SUSP_COL='#c4402b';
+function suspP(S,u,v){ return S.dir==='h'?[u*TILE,v*TILE]:[v*TILE,u*TILE]; }
+function drawSusp(o){ const S=o.S, e0=S.a-0.35, e1=S.a+S.w+0.35;
+  ctx.save(); ctx.lineCap='round';
+  // shadows of cables + hangers on the water/deck
+  for(const e of [e0,e1]){ ctx.strokeStyle='rgba(0,10,20,0.28)'; ctx.lineWidth=3; ctx.beginPath(); for(let u=o.p0;u<=o.p1;u+=0.5){ const h=suspH(S,u)*SUSP_K, p=suspP(S,u,e); u===o.p0?ctx.moveTo(p[0]+h,p[1]+h):ctx.lineTo(p[0]+h,p[1]+h); } ctx.stroke();
+    ctx.lineWidth=1; ctx.strokeStyle='rgba(0,10,20,0.16)'; ctx.beginPath(); for(let u=Math.ceil(o.p0);u<o.p1;u++){ const h=suspH(S,u)*SUSP_K, p=suspP(S,u,e); ctx.moveTo(p[0],p[1]); ctx.lineTo(p[0]+h,p[1]+h); } ctx.stroke(); }
+  // railings
+  for(const e of [S.a-0.1,S.a+S.w+0.1]){ const a=suspP(S,o.p0,e), b=suspP(S,o.p1,e); ctx.strokeStyle='#e9e4da'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); }
+  // hangers (seen almost end-on: short ticks), main cables, lamp posts
+  for(const e of [e0,e1]){ ctx.strokeStyle=SUSP_COL; ctx.lineWidth=1.5; ctx.beginPath(); for(let u=Math.ceil(o.p0);u<o.p1;u++){ const h=suspH(S,u), p=suspP(S,u,e), dl=(S.dir==='h'?[0,1]:[1,0]).map(x=>x*h*3*(e===e0?-1:1)); ctx.moveTo(p[0],p[1]); ctx.lineTo(p[0]+dl[0],p[1]+dl[1]); } ctx.stroke();
+    const a=suspP(S,o.p0,e), b=suspP(S,o.p1,e); ctx.strokeStyle='#7d2416'; ctx.lineWidth=5.5; ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); ctx.strokeStyle='#e0603f'; ctx.lineWidth=2.5; ctx.stroke();
+    for(let u=Math.ceil(o.p0/6)*6;u<o.p1;u+=6){ const p=suspP(S,u,e===e0?S.a+0.25:S.a+S.w-0.25); ctx.fillStyle='rgba(255,240,180,0.25)'; ctx.beginPath(); ctx.arc(p[0],p[1],7,0,7); ctx.fill(); ctx.fillStyle='#2b2f35'; ctx.beginPath(); ctx.arc(p[0],p[1],2.6,0,7); ctx.fill(); ctx.fillStyle='#fff6c8'; ctx.beginPath(); ctx.arc(p[0],p[1],1.3,0,7); ctx.fill(); } }
+  ctx.restore(); }
+function drawSTower(o){ const S=o.S, H=SUSP_K*1.08, legs=[S.a-0.9,S.a+S.w+0.9], hw=0.75;
+  ctx.save();
+  // long tower shadow
+  ctx.fillStyle='rgba(0,10,20,0.32)'; for(const v of legs){ const c=suspP(S,o.u,v), r=hw*TILE; ctx.beginPath(); ctx.moveTo(c[0]-r,c[1]-r); ctx.lineTo(c[0]+r,c[1]-r); ctx.lineTo(c[0]+r+H,c[1]-r+H); ctx.lineTo(c[0]+r+H,c[1]+r+H); ctx.lineTo(c[0]-r+H,c[1]+r+H); ctx.lineTo(c[0]-r,c[1]+r); ctx.closePath(); ctx.fill(); }
+  { const a=suspP(S,o.u,legs[0]), b=suspP(S,o.u,legs[1]); ctx.strokeStyle='rgba(0,10,20,0.25)'; ctx.lineWidth=9; for(const f of [0.55,0.8,1]){ ctx.beginPath(); ctx.moveTo(a[0]+H*f,a[1]+H*f); ctx.lineTo(b[0]+H*f,b[1]+H*f); ctx.stroke(); } }
+  // portal: two legs and cross beams above the deck
+  const a=suspP(S,o.u,legs[0]), b=suspP(S,o.u,legs[1]); ctx.lineCap='butt';
+  for(const [w,col] of [[13,'#7d2416'],[9,SUSP_COL]]){ ctx.strokeStyle=col; ctx.lineWidth=w; for(const d of [-0.35,0.35]){ const a2=suspP(S,o.u+d,legs[0]), b2=suspP(S,o.u+d,legs[1]); if(d<0){ ctx.beginPath(); ctx.moveTo(a2[0],a2[1]); ctx.lineTo(b2[0],b2[1]); ctx.stroke(); } } }
+  for(const c of [a,b]){ const r=hw*TILE; const g=ctx.createLinearGradient(c[0]-r,c[1]-r,c[0]+r,c[1]+r); g.addColorStop(0,'#ef6a48'); g.addColorStop(1,'#8e2a1a'); ctx.fillStyle=g; ctx.fillRect(c[0]-r,c[1]-r,2*r,2*r);
+    ctx.fillStyle='#5a1a10'; ctx.fillRect(c[0]-r*0.35,c[1]-r*0.35,r*0.7,r*0.7); ctx.fillStyle='#ff2b1e'; ctx.beginPath(); ctx.arc(c[0],c[1],2.2+Math.sin(timeS*3)*0.8,0,7); ctx.fill(); }
+  ctx.restore(); }
 function drawOverhead(o){
-  if(o.kind==='mast'){ const st=lightState(o.J,o.ns), l=o.l, f=o.f, Ax=o.A[0]*TILE, Ay=o.A[1]*TILE, E0=[Ax+f[0]*0.55*TILE,Ay+f[1]*0.55*TILE], onArm=(lat)=>{ const u=lat/o.pLat, lon=0.55+(o.pLon-0.55)*u; return [E0[0]+(l[0]*lat-f[0]*lon)*TILE,E0[1]+(l[1]*lat-f[1]*lon)*TILE]; }, P=onArm(o.pLat), tip=onArm(-0.15);
+  if(o.kind==='susp') return drawSusp(o); if(o.kind==='stower') return drawSTower(o);
+  if(o.kind==='mast'){ const l=o.l, f=o.f, Ax=o.A[0]*TILE, Ay=o.A[1]*TILE, E0=[Ax+f[0]*0.55*TILE,Ay+f[1]*0.55*TILE], onArm=(lat)=>{ const u=lat/o.pLat, lon=0.55+(o.pLon-0.55)*u; return [E0[0]+(l[0]*lat-f[0]*lon)*TILE,E0[1]+(l[1]*lat-f[1]*lon)*TILE]; }, P=onArm(o.pLat), tip=onArm(-0.15);
     const sh=10; ctx.lineCap='round';
     // shadow (sun from the north-west)
     ctx.strokeStyle='rgba(0,0,0,0.28)'; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(P[0]+4,P[1]+4); ctx.lineTo(tip[0]+sh,tip[1]+sh); ctx.stroke();
@@ -3069,10 +3230,19 @@ function drawOverhead(o){
     ctx.strokeStyle='#5d636c'; ctx.lineWidth=4.5; ctx.beginPath(); ctx.moveTo(P[0],P[1]); ctx.lineTo(tip[0],tip[1]); ctx.stroke(); ctx.strokeStyle='#8a9099'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(P[0],P[1]); ctx.lineTo(tip[0],tip[1]); ctx.stroke();
     ctx.fillStyle='#3a3f46'; ctx.beginPath(); ctx.arc(P[0],P[1],6.5,0,7); ctx.fill(); ctx.fillStyle='#6b717a'; ctx.beginPath(); ctx.arc(P[0]-1.5,P[1]-1.5,3,0,7); ctx.fill(); ctx.lineCap='butt';
     // heads: one per inbound lane, lenses face oncoming traffic (red farthest from driver)
-    const cols={r:'#ff3b30',a:'#ffb020',g:'#36e05a'}, dim=['#3a1210','#3a2a10','#10240f'], lit=[st==='r',st==='a',st==='g'];
-    for(let i=0;i<o.n;i++){ const d=(i+0.5)*o.hw/o.n, q=onArm(d), hx=q[0], hy=q[1]; ctx.save(); ctx.translate(hx,hy); ctx.rotate(Math.atan2(f[1],f[0]));   // +x = travel direction
+    // v12: one head per lane; each shows its own movements (green disc for ahead, green arrows for turn stages, red+amber before green)
+    const key=(f[0]?o.J.hs:o.J.vs)+':'+(f[0]||f[1]), ap=o.J.appr&&o.J.appr[key], nl=ap&&ap.lanes?ap.lanes.length:o.n;
+    for(let i=0;i<o.n;i++){ const d=(i+0.5)*o.hw/o.n, q=onArm(d), hx=q[0], hy=q[1]; const lane=Math.max(0,Math.min(nl-1,o.n-1-i)), mvs=(ap&&ap.lanes&&ap.lanes[lane])||'S';
+      const ss={}; let anyG=false, anyA=false, anyRA=false; for(const m of mvs){ const s=sigState(o.J,key,m); ss[m]=s; if(s==='g') anyG=true; else if(s==='a') anyA=true; else if(s==='ra') anyRA=true; }
+      const red=!anyG&&!anyA, amb=anyA||(!anyG&&anyRA);
+      ctx.save(); ctx.translate(hx,hy); ctx.rotate(Math.atan2(f[1],f[0]));   // +x = travel direction, -y = left
       ctx.fillStyle='#e8b923'; ctx.fillRect(-15,-7,30,14); ctx.fillStyle='#17191c'; ctx.fillRect(-13,-5,26,10);
-      for(let k=0;k<3;k++){ const xx=8-k*8; ctx.fillStyle=lit[k]?cols[st]:dim[k]; ctx.beginPath(); ctx.arc(xx,0,3.3,0,7); ctx.fill(); if(lit[k]){ ctx.fillStyle=cols[st]+'50'; ctx.beginPath(); ctx.arc(xx,0,7.5,0,7); ctx.fill(); } }
+      const lamp=(xx,on,col,dimc)=>{ ctx.fillStyle=on?col:dimc; ctx.beginPath(); ctx.arc(xx,0,3.3,0,7); ctx.fill(); if(on){ ctx.fillStyle=col+'50'; ctx.beginPath(); ctx.arc(xx,0,7.5,0,7); ctx.fill(); } };
+      lamp(8,red,'#ff3b30','#3a1210'); lamp(0,amb,'#ffb020','#3a2a10');
+      if(anyG&&ss.S==='g'&&mvs.length===1) lamp(-8,true,'#36e05a','#10240f');
+      else { ctx.fillStyle='#10240f'; ctx.beginPath(); ctx.arc(-8,0,3.3,0,7); ctx.fill();
+        if(anyG){ ctx.fillStyle='#36e05a50'; ctx.beginPath(); ctx.arc(-8,0,7.5,0,7); ctx.fill(); ctx.strokeStyle='#5dff7a'; ctx.lineWidth=1.6; ctx.lineCap='round';
+          for(const m of mvs){ if(ss[m]!=='g') continue; ctx.save(); ctx.translate(-8,0); ctx.rotate(m==='S'?0:m==='L'?-Math.PI/2:Math.PI/2); ctx.beginPath(); ctx.moveTo(-3,0); ctx.lineTo(3,0); ctx.moveTo(0.6,-2.2); ctx.lineTo(3,0); ctx.lineTo(0.6,2.2); ctx.stroke(); ctx.restore(); } } }
       ctx.restore(); }
     return; }
   if(o.kind==='light'){ const c=o.c, ns=(c.dx===c.dy); const st=lightState(o.J,ns);
@@ -3178,6 +3348,8 @@ function drawBigMap(){
   drawPOIs(m=>BX(m/4),m=>BY(m/4),z>0.6);
   mpDrawMap(m=>BX(m/4),m=>BY(m/4),true);
   if(z>1.2) for(const dp of world.depots){ ctx.fillStyle='#8fc8ff'; ctx.font='bold 11px system-ui,sans-serif'; ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.textAlign='left'; const X=BX(dp.entrance.x/4)+9, Y=BY(dp.entrance.y/4)+4; ctx.strokeText(dp.name,X,Y); ctx.fillText(dp.name,X,Y); }
+  for(const S of world.susp||[]){ const p=(u,v)=>S.dir==='h'?[BX(u),BY(v)]:[BX(v),BY(u)], c=S.a+S.w/2, a=p(S.r0,c), b=p(S.r1,c); ctx.save(); ctx.strokeStyle='#e0603f'; ctx.lineWidth=Math.max(2,z*2.5); ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
+    for(const t of [S.t0,S.t1]){ const q=p(t,c); ctx.fillStyle='#c4402b'; ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.fillRect(q[0]-4,q[1]-4,8,8); ctx.strokeRect(q[0]-4,q[1]-4,8,8); } ctx.restore(); }
   ctx.textAlign='center'; ctx.textBaseline='middle';
   for(const [n,lx2,ly2,kind] of world.labels){ const X=BX(lx2), Y=BY(ly2);
     const big=kind===1, wat=kind===2, city=!kind&&n===n.toUpperCase(), town=!kind&&!city;
