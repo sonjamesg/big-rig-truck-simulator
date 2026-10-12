@@ -178,6 +178,7 @@ function planPiece(v,r){
     const ex= cd>0?o.ce:o.cs, q=lanePt(C2,cd,lane,ex);
     const ctrl= sg.dir==='h'?[q[0],p[1]]:[p[0],q[1]];
     pathQuad(v,ctrl[0],ctrl[1],q[0],q[1]); mk.dEnd=pathEnd(v); mk.turn=ch[0]; v.mk.push(mk);
+    if(J.lights&&ch[0]==='R'){ const dS=mk.d, L0=mk.dEnd-dS; v.mk.push({kind:'filter',d:dS+L0*0.32,dEnd:mk.dEnd,J,key:mk.key,opp:sg.id+':'+(-d)}); }
     v.mk.push({kind:'sig',d0:dStop-38,d1:mk.dEnd,side:ch[0]==='L'?-1:1});
     v.mk.push({kind:'slow',d0:dStop,d1:mk.dEnd,v:ch[0]==='L'?5.5:6.5});
     P.seg=C2.id; P.dir=cd; P.lane=lane; P.pos=ex; return true;
@@ -397,6 +398,10 @@ function stepVeh(v,dt,pbs){
     else if(m.kind==='sig'){ if(v.s>m.d0&&v.s<m.d1) sig=m.side; }
     else if(m.kind==='ring'){ if(v.s>m.d0&&v.s<m.d1){ v.ring=m.rb; } }
     else if(m.kind==='major'){ }
+    else if(m.kind==='filter'){ const gap=m.d-front; if(gap<-1.5||m.go) { v.filtering=false; continue; } if(gap>14) continue;
+      // UK filtering right turn: pull forward into the junction, wait for a gap in oncoming traffic; when the stage ends, clear the junction
+      const st=sigState(m.J,m.key,'R'); let wait=false; if(st==='g'&&sigFilter(m.J,m.key,'R')&&sigOncoming(v,m.J,m.opp)) wait=true;
+      if(wait){ v.filtering=gap<4; acc=Math.min(acc,idmAcc(v,v0,Math.max(0.1,gap),0)); } else if(gap<2){ m.go=true; v.filtering=false; } }
     else if(m.kind==='light'||m.kind==='gw'||m.kind==='rb'){
       const gap=m.d-front-0.8; if(gap<-0.5||m.go) continue; if(gap>70) continue;
       let stop=false;
