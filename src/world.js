@@ -382,10 +382,11 @@ function genWorld(){
   for(const J of world.junctions) if(J.lights){ const C=[J.x+J.w/2,J.y+J.h/2]; const isR=t=>t===T.ROAD||t===T.BRIDGE;
     for(const f of [[0,-1],[0,1],[1,0],[-1,0]]){ const l=[f[1],-f[0]], e=f[0]?J.w/2:J.h/2, hw=f[0]?J.h/2:J.w/2, E=[C[0]-f[0]*e,C[1]-f[1]*e];
       if(!isR(get(Math.floor(E[0]+l[0]*hw*0.5-f[0]*3),Math.floor(E[1]+l[1]*hw*0.5-f[1]*3)))) continue;      // no arm on this side
-      const off=1.7, kc=[E[0]+l[0]*hw,E[1]+l[1]*hw]; const c=J.corners.find(c=>Math.abs(c.px-kc[0])<0.01&&Math.abs(c.py-kc[1])<0.01);
-      let kerb=hw; if(c&&off<c.R) kerb+=c.R-Math.sqrt(c.R*c.R-(c.R-off)*(c.R-off));
+      const off=0.55, kc=[E[0]+l[0]*hw,E[1]+l[1]*hw]; const c=J.corners.find(c=>Math.abs(c.px-kc[0])<0.01&&Math.abs(c.py-kc[1])<0.01);
+      // pole on the pavement corner (inside the kerb radius, at the diagonal), arm straight from pole to the centre line just past the stop line
+      let pLat=hw+0.8, pLon=off; if(c){ const q=(c.R-0.9)/Math.SQRT2; pLat=hw+c.R-q; pLon=c.R-q; }
       const n=Math.max(1,Math.round(hw*M_T/3.6)), A=[E[0]-f[0]*off,E[1]-f[1]*off];
-      world.overhead.push({kind:'mast',J,f,l,A,pole:kerb+0.75,hw,n,ns:f[0]===0,x:A[0]*TILE,y:A[1]*TILE}); } }
+      world.overhead.push({kind:'mast',J,f,l,A,pLat,pLon,hw,n,ns:f[0]===0,x:A[0]*TILE,y:A[1]*TILE}); } }
   (world.tm=world.tm||[]).push(['if(typeof buildMarki',performance.now()-t0|0]);
   if(typeof buildMarkings==='function') buildMarkings(objs);
   (world.tm=world.tm||[]).push(['if(typeof buildDepot',performance.now()-t0|0]);

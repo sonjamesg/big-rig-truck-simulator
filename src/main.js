@@ -108,17 +108,17 @@ function drawLorry(){
 }
 function lightState(J,ns){ const t=(timeS+J.phase)%16; if(ns) return t<6?'g':t<8?'a':'r'; return t<8?'r':t<14?'g':'a'; }
 function drawOverhead(o){
-  if(o.kind==='mast'){ const st=lightState(o.J,o.ns), l=o.l, f=o.f, Ax=o.A[0]*TILE, Ay=o.A[1]*TILE, P=[Ax+l[0]*o.pole*TILE,Ay+l[1]*o.pole*TILE], tip=[Ax-l[0]*0.15*TILE,Ay-l[1]*0.15*TILE];
+  if(o.kind==='mast'){ const st=lightState(o.J,o.ns), l=o.l, f=o.f, Ax=o.A[0]*TILE, Ay=o.A[1]*TILE, E0=[Ax+f[0]*0.55*TILE,Ay+f[1]*0.55*TILE], onArm=(lat)=>{ const u=lat/o.pLat, lon=0.55+(o.pLon-0.55)*u; return [E0[0]+(l[0]*lat-f[0]*lon)*TILE,E0[1]+(l[1]*lat-f[1]*lon)*TILE]; }, P=onArm(o.pLat), tip=onArm(-0.15);
     const sh=10; ctx.lineCap='round';
     // shadow (sun from the north-west)
     ctx.strokeStyle='rgba(0,0,0,0.28)'; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(P[0]+4,P[1]+4); ctx.lineTo(tip[0]+sh,tip[1]+sh); ctx.stroke();
-    ctx.fillStyle='rgba(0,0,0,0.28)'; for(let i=0;i<o.n;i++){ const d=(i+0.5)*o.hw/o.n, hx=Ax+l[0]*d*TILE+sh, hy=Ay+l[1]*d*TILE+sh; ctx.save(); ctx.translate(hx,hy); ctx.rotate(Math.atan2(f[1],f[0])); ctx.fillRect(-14,-6,28,12); ctx.restore(); }
+    ctx.fillStyle='rgba(0,0,0,0.28)'; for(let i=0;i<o.n;i++){ const d=(i+0.5)*o.hw/o.n, q=onArm(d), hx=q[0]+sh, hy=q[1]+sh; ctx.save(); ctx.translate(hx,hy); ctx.rotate(Math.atan2(f[1],f[0])); ctx.fillRect(-14,-6,28,12); ctx.restore(); }
     // arm + pole
     ctx.strokeStyle='#5d636c'; ctx.lineWidth=4.5; ctx.beginPath(); ctx.moveTo(P[0],P[1]); ctx.lineTo(tip[0],tip[1]); ctx.stroke(); ctx.strokeStyle='#8a9099'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(P[0],P[1]); ctx.lineTo(tip[0],tip[1]); ctx.stroke();
     ctx.fillStyle='#3a3f46'; ctx.beginPath(); ctx.arc(P[0],P[1],6.5,0,7); ctx.fill(); ctx.fillStyle='#6b717a'; ctx.beginPath(); ctx.arc(P[0]-1.5,P[1]-1.5,3,0,7); ctx.fill(); ctx.lineCap='butt';
     // heads: one per inbound lane, lenses face oncoming traffic (red farthest from driver)
     const cols={r:'#ff3b30',a:'#ffb020',g:'#36e05a'}, dim=['#3a1210','#3a2a10','#10240f'], lit=[st==='r',st==='a',st==='g'];
-    for(let i=0;i<o.n;i++){ const d=(i+0.5)*o.hw/o.n, hx=Ax+l[0]*d*TILE, hy=Ay+l[1]*d*TILE; ctx.save(); ctx.translate(hx,hy); ctx.rotate(Math.atan2(f[1],f[0]));   // +x = travel direction
+    for(let i=0;i<o.n;i++){ const d=(i+0.5)*o.hw/o.n, q=onArm(d), hx=q[0], hy=q[1]; ctx.save(); ctx.translate(hx,hy); ctx.rotate(Math.atan2(f[1],f[0]));   // +x = travel direction
       ctx.fillStyle='#e8b923'; ctx.fillRect(-15,-7,30,14); ctx.fillStyle='#17191c'; ctx.fillRect(-13,-5,26,10);
       for(let k=0;k<3;k++){ const xx=8-k*8; ctx.fillStyle=lit[k]?cols[st]:dim[k]; ctx.beginPath(); ctx.arc(xx,0,3.3,0,7); ctx.fill(); if(lit[k]){ ctx.fillStyle=cols[st]+'50'; ctx.beginPath(); ctx.arc(xx,0,7.5,0,7); ctx.fill(); } }
       ctx.restore(); }

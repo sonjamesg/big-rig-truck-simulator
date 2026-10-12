@@ -52,7 +52,7 @@ function makeTrailer(type,r,opt={}){
   const heavy=cg[1]>=20000;
   const tr={id:'TR-'+String(++trlSeq).padStart(4,'0'),type,typeName:T_.name,cargo:cg[0],cargoKg:cg[1],tareKg:T_.tare,weight:T_.tare+cg[1],
     reqLevel:T_.level+(heavy?1:0),x:0,y:0,th:0,coupled:false,target:false,bay:null,logo,col,art:null};
-  Object.assign(tr,opt); if(type!=='player') tr.art=trailerArt(type,col,logo); return tr;
+  Object.assign(tr,opt); if(type!=='player') tr.art=trailerArt(type,tr.col,tr.logo); return tr;
 }
 function trailerBox(t){ const ft=fwd(t.th); return {x:t.x-ft[0]*TRL_KP_TO_CENTRE,y:t.y-ft[1]*TRL_KP_TO_CENTRE,h:t.th,L:TRL_LEN,W:TRL_W}; }
 // ---------- world generation
