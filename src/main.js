@@ -14,8 +14,8 @@ function boot(){
   cam.x=st.x; cam.y=st.y;
   window.__bigrig={NAV,setRoute,clearRoute,mBX,mBY,truck,input,world,cam,bigmap,openMap,closeMap,onRoadM,kingpin,traffic,toggleRefuel,fuelStationAt,refuel,get loadMs(){return world.loadMs;},spawnVehicle,toggleCouple,coupleCandidate,trailerInBay,BigRig,get fps(){return fps;},chunks:chunkCache};
   truck.fuel=260; truck.tank=400; truck.money=2500; truck.damage=0;
-  if(!loadGame()) applyModel('rigger'); uiInit(); padInstall();
-  Object.assign(window.__bigrig,{getChunk,renderChunk,MAPC,drawMapDetail,pad,padUpdate,career,acceptJob,abandonJob,tryUnload,bayAlign,buyTruck,openBoard,openDealer,closeUI,fcv,addXP,saveGame,loadGame,applyModel,TRUCK_MODELS,TIERS,CARGOS,levelOf,uncouple,couple,fillBoard,jobRoute});
+  if(!loadGame()) applyModel('rigger'); uiInit(); padInstall(); mpInit();
+  Object.assign(window.__bigrig,{MP,mpHost,mpJoin,mpChatSend,startGame,getChunk,renderChunk,MAPC,drawMapDetail,pad,padUpdate,career,acceptJob,abandonJob,tryUnload,bayAlign,buyTruck,openBoard,openDealer,closeUI,fcv,addXP,saveGame,loadGame,applyModel,TRUCK_MODELS,TIERS,CARGOS,levelOf,uncouple,couple,fillBoard,jobRoute});
   world.loadMs=performance.now()-tb; world.ready=true; const ld=document.getElementById('loading'); if(ld) ld.textContent='World ready ('+(world.loadMs/1000).toFixed(1)+' s)';
   requestAnimationFrame(frame);
 }
@@ -41,7 +41,7 @@ addEventListener('resize',fit); fit();
 function frame(ts){
   const dt=Math.min(0.1,(ts-last)/1000||0.016); last=ts; timeS+=dt;
   fpsAcc+=dt; fpsN++; if(fpsAcc>0.5){ fps=fpsN/fpsAcc; fpsAcc=0; fpsN=0; }
-  padUpdate(dt); const paused=uiBlocking();
+  padUpdate(dt); updateMP(dt); const paused=uiBlocking();
   if(started&&!paused){
     acc+=dt; const H=1/120; const inp=input;
     while(acc>=H){ stepTruck(truck,inp,H); acc-=H; }
@@ -82,6 +82,7 @@ function draw(){
   drawCareerWorld(vx0,vy0,vx1,vy1);
   drawParkedTrailers(vx0,vy0,vx1,vy1);
   drawTraffic(vx0,vy0,vx1,vy1);
+  drawRemotePlayers(vx0,vy0,vx1,vy1);
   drawLorry();
   for(const o of world.overhead) if(o.x>vx0-400&&o.x<vx1+400&&o.y>vy0-400&&o.y<vy1+400) drawOverhead(o);
   drawAmbientHigh(VR);
@@ -181,6 +182,7 @@ function drawMinimap(){
   ctx.imageSmoothingEnabled=true; drawMapDetail(x-(cxT-span/2)*sc,y-(cyT-sh/2)*sc,sc,x,y,x+w,y+h);
   navLine(m=>x+(m/4-(cxT-span/2))*sc, m=>y+(m/4-(cyT-sh/2))*sc, 3, '#ff3df0');
   drawPOIs(m=>x+(m/4-(cxT-span/2))*sc, m=>y+(m/4-(cyT-sh/2))*sc, false);
+  mpDrawMap(m=>x+(m/4-(cxT-span/2))*sc, m=>y+(m/4-(cyT-sh/2))*sc, false);
   for(const t of world.trailers){ if(t.coupled) continue; const mx=x+(t.x/4-(cxT-span/2))*sc, my=y+(t.y/4-(cyT-sh/2))*sc; if(mx<x||my<y||mx>x+w||my>y+h) continue; ctx.fillStyle=t.target?'#ffd600':'#4fd1ff'; ctx.fillRect(mx-2,my-3,4,6); }
   for(const v of traffic.vs){ const mx=x+(v.x/4-(cxT-span/2))*sc, my=y+(v.y/4-(cyT-sh/2))*sc; if(mx<x||my<y||mx>x+w||my>y+h) continue; ctx.fillStyle=v.heavy?'#ff9f1a':'#ffffff'; ctx.fillRect(mx-1.5,my-1.5,3,3); }
   ctx.translate(x+w/2,y+h/2); ctx.rotate(s.h); ctx.fillStyle='#ffdd33'; ctx.strokeStyle='#000'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(0,-8); ctx.lineTo(6,7); ctx.lineTo(0,3); ctx.lineTo(-6,7); ctx.closePath(); ctx.fill(); ctx.stroke();
@@ -222,6 +224,7 @@ function drawBigMap(){
   for(const t of world.trailers){ if(t.coupled) continue; if(z<0.8&&!t.target) continue; ctx.fillStyle=t.target?'#ffd600':'#4fd1ff'; ctx.fillRect(BX(t.x/4)-2,BY(t.y/4)-2,4,4); }
   navLine(m=>BX(m/4),m=>BY(m/4),4,'#ff3df0');
   drawPOIs(m=>BX(m/4),m=>BY(m/4),z>0.6);
+  mpDrawMap(m=>BX(m/4),m=>BY(m/4),true);
   if(z>1.2) for(const dp of world.depots){ ctx.fillStyle='#8fc8ff'; ctx.font='bold 11px system-ui,sans-serif'; ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.textAlign='left'; const X=BX(dp.entrance.x/4)+9, Y=BY(dp.entrance.y/4)+4; ctx.strokeText(dp.name,X,Y); ctx.fillText(dp.name,X,Y); }
   ctx.textAlign='center'; ctx.textBaseline='middle';
   for(const [n,lx2,ly2,kind] of world.labels){ const X=BX(lx2), Y=BY(ly2);

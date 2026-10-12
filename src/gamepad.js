@@ -44,6 +44,7 @@ function padUpdate(dt){
   if(now[4]){ input.horn=true; pad.horn=true; } else if(pad.horn){ input.horn=false; pad.horn=false; }
   if(!started&&(hit(0)||hit(9)||rt>0.3)){ startGame(); return; }
   if(!started) return;
+  if(hit(12)&&MP.on) mpToggleList();
   if(hit(0)) toggleCouple(); if(hit(2)) toggleRefuel(); if(hit(3)) tryUnload();
   if(hit(8)) openMap(); if(hit(9)) openBoard(); if(hit(5)&&NAV.route){ clearRoute(); flash('Route cancelled'); }
 }
