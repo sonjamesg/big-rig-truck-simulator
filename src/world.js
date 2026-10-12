@@ -455,7 +455,7 @@ function genWorld(){
     else if(o.kind==='fountain'){ x0=o.x-60; y0=o.y-60; x1=o.x+60; y1=o.y+60; }
     else if(o.kind==='pump'||o.kind==='pallets'||o.kind==='drive'){ x0=o.x; y0=o.y-TILE; x1=o.x+TILE*2+12; y1=o.y+TILE*2+12; }
     else { const s=(o.height||0)*0.6+4; x0=o.x; y0=o.y; x1=o.x+o.w+s; y1=o.y+o.h+s; }
-    o.z = o.kind==='v2pave'?-2 : o.kind==='curve'?-1.5 : o.kind==='v2rb'?-1.4 : o.kind==='v2park'?-1 : o.kind==='kerb'||o.kind==='rb'||o.kind==='field'||o.kind==='runway'?-1 : o.kind==='appr'||o.kind==='boxj'||o.kind==='ldrop'?-0.5 : o.kind==='lot'||o.kind==='pond'||o.kind==='paint'||o.kind==='bay'||o.kind==='drive'?0 : o.kind==='tree'?3 : o.kind==='awning'?2.5 : 2;
+    o.z = o.kind==='v2dist'?-2.5 : o.kind==='v2pave'?-2 : o.kind==='curve'?(o.z2?-1.45:-1.5) : o.kind==='v2rb'?-1.4 : o.kind==='v2park'?-1 : o.kind==='kerb'||o.kind==='rb'||o.kind==='field'||o.kind==='runway'?-1 : o.kind==='appr'||o.kind==='boxj'||o.kind==='ldrop'?-0.5 : o.kind==='lot'||o.kind==='pond'||o.kind==='paint'||o.kind==='bay'||o.kind==='drive'?0 : o.kind==='tree'?3 : o.kind==='awning'?2.5 : 2;
     for(let cy=Math.floor(y0/CHUNK);cy<=Math.floor(y1/CHUNK);cy++) for(let cx=Math.floor(x0/CHUNK);cx<=Math.floor(x1/CHUNK);cx++){
       const k=cx+','+cy; if(!world.chunkObjs.has(k)) world.chunkObjs.set(k,[]); world.chunkObjs.get(k).push(o);
     }
@@ -463,6 +463,7 @@ function genWorld(){
   for(const arr of world.chunkObjs.values()) arr.sort((a,b)=>a.z-b.z);
 }
 function onRoadM(mx,my){
+  if(world.rm){ const x=Math.floor(mx), y=Math.floor(my), W=MW*M_T; if(x<0||y<0||x>=W||y>=MH*M_T) return false; const i=y*W+x; if(world.rm[i>>3]>>(i&7)&1) return true; const t=G[idx(Math.floor(x/M_T),Math.floor(y/M_T))]; return t===T.CONC; }
   const px=mx*PPM, py=my*PPM, tx=Math.floor(px/TILE), ty=Math.floor(py/TILE); if(!inb(tx,ty)) return false;
   const ci=world.cornerAt[idx(tx,ty)];
   if(ci>=0){ const c=world.corners[ci]; return Math.hypot(px/TILE-c.cx,py/TILE-c.cy)>c.R; }

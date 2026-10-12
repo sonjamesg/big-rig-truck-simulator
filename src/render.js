@@ -191,6 +191,7 @@ function renderChunk(cx,cy){
   for(let j=0;j<N;j++) for(let i=0;i<N;i++){
     const tx=cx*N+i, ty=cy*N+j, px=i*TILE, py=j*TILE; if(!inb(tx,ty)){ g.drawImage(TEX.water[0],px,py); continue; }
     const t=G[idx(tx,ty)], v=(hash2(tx,ty)*4)|0;
+    if(world.v2&&(t===T.SAND||t===T.ROCK||t===T.WATER||t===T.GRASS||((t===T.ROAD||t===T.BRIDGE||t===T.BLDG)&&world.roadH[idx(tx,ty)]!==-2))){ g.drawImage(TEX.grass[v],px,py); continue; }
     switch(t){
       case T.ROAD: case T.BRIDGE: { const rh=world.roadH[idx(tx,ty)]; if(rh===-2) g.drawImage(t===T.BRIDGE?TEX.water[v]:TEX.grass[v],px,py); else if(rh===-3){ const u=world.under[idx(tx,ty)]; g.drawImage((u===T.WATER||t===T.BRIDGE)?TEX.water[v]:u===T.SAND?TEX.sand[v]:u===T.ROCK?TEX.rock[v]:u===T.FIELD?TEX.field[v]:TEX.grass[v],px,py); } else drawRoadTile(g,tx,ty,px,py); break; }
       case T.ROCK: g.drawImage(TEX.rock[v],px,py); break;
@@ -198,7 +199,7 @@ function renderChunk(cx,cy){
       case T.WATER: g.drawImage(TEX.water[v],px,py); break;
       case T.PGRASS: case T.TREE: g.drawImage((get(tx,ty)===T.TREE && !isParkNear(tx,ty))?TEX.grass[v]:TEX.pgrass[v],px,py); break;
       case T.CONC: case T.TANK: case T.PUMP: g.drawImage(TEX.conc[v],px,py); break;
-      case T.BLDG: case T.PLAZA: g.drawImage(TEX.plaza[v],px,py); break;
+      case T.BLDG: case T.PLAZA: { const u=world.v2&&t===T.BLDG?world.under[idx(tx,ty)]:-1; g.drawImage(u===T.GRASS?TEX.grass[v]:u===T.SAND?TEX.sand[v]:TEX.plaza[v],px,py); break; }
       case T.GRAVEL: g.drawImage(TEX.gravel[v],px,py); break;
       case T.QUAY: case T.CONT: g.drawImage(TEX.quay[v],px,py); break;
       case T.SAND: g.drawImage(TEX.sand[v],px,py); break;
@@ -220,6 +221,7 @@ function renderChunk(cx,cy){
       if(W(get(tx+1,ty))){ g.fillRect(px+27,py,5,32); g.fillStyle='#6d7178'; for(let k=0;k<32;k+=8) g.fillRect(px+27,py+k,5,2); } }
     if(t===T.QUAY && get(tx,ty+1)===T.WATER){ g.fillStyle='#f2c230'; for(let k=0;k<32;k+=10) g.fillRect(px+k,py+28,6,4); g.fillStyle='#333'; g.fillRect(px+14,py+22,5,5); }
   }
+  if(world.v2&&typeof v2Terrain==='function') v2Terrain(g,cx,cy,N);
   g.save(); g.translate(-ox,-oy); CUR_CHUNK=[ox,oy,ox+CHUNK,oy+CHUNK];
   const list=world.chunkObjs.get(cx+','+cy)||[];
   for(const o of list) drawObject(g,o);

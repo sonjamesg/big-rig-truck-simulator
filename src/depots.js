@@ -80,7 +80,7 @@ function buildDepots(objs,R){
     world.depots.push(dp); return dp;
   }
   // start depot (city block, keeps its building)
-  const sd=world.startDepot; const D0=makeDepot('Big Rig Haulage HQ','HQ',1,sd.x0,sd.y0,sd.w,sd.h,{keep:true,entrance:{x:(sd.x0+sd.w)*M_T,y:(sd.y0+15)*M_T}});
+  const sd=world.startDepot; const D0=makeDepot('Big Rig Haulage HQ','HQ',1,sd.x0,sd.y0,sd.w,sd.h,{keep:true,entrance:world.v2?{x:(sd.x0+sd.w/2)*M_T,y:(sd.y0-1)*M_T}:{x:(sd.x0+sd.w)*M_T,y:(sd.y0+15)*M_T}});
   // other depots: find open grass next to a (non-motorway) road
   const okT=t=>t===T.GRASS||t===T.TREE||t===T.SAND||t===T.QUAY||t===T.FIELD||t===T.HEDGE||t===T.GRAVEL||t===T.WALK||t===T.PGRASS||t===T.ROCK||t===T.CONC;
   function findSpot(tx,ty,w,h,maxGap){
