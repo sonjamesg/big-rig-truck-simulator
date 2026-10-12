@@ -206,7 +206,7 @@ const LOCAL_Z=(VW-40)/250;   // ~1 km (250 tiles) across
 function mapClamp(){ const z=bigmap.z, hw=(VW-40)/2/z, hh=(VH-60)/2/z; bigmap.cx=MW<2*hw?MW/2:Math.max(hw,Math.min(MW-hw,bigmap.cx)); bigmap.cy=MH<2*hh?MH/2:Math.max(hh,Math.min(MH-hh,bigmap.cy)); }
 function mapCentreTruck(){ bigmap.cx=truck.x*PPM/TILE; bigmap.cy=truck.y*PPM/TILE; bigmap.anchor=null; mapClamp(); }
 function mapZoomTo(zt,mx,my){ bigmap.zt=Math.max(mapFitZ(),Math.min(14,zt)); bigmap.anchor=(mx===undefined)?[VW/2,VH/2+10]:[mx,my]; }
-function openMap(){ bigmap.open=true; bigmap.z=bigmap.zt=bigmap.saved||LOCAL_Z; mapCentreTruck(); }
+function openMap(){ if(!started) return; bigmap.open=true; bigmap.z=bigmap.zt=bigmap.saved||LOCAL_Z; mapCentreTruck(); }
 function closeMap(){ if(bigmap.open) bigmap.saved=bigmap.zt||bigmap.z; bigmap.open=false; }
 const MAPBTN=[['+',()=>mapZoomTo(bigmap.zt*1.6)],['−',()=>mapZoomTo(bigmap.zt/1.6)],['◎',mapCentreTruck],['✕',()=>closeMap()]];
 function mapBtnRect(i){ return [VW-62,58+i*48,40,40]; }

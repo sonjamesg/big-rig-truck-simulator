@@ -89,10 +89,10 @@ function mpInit(){ const st=document.createElement('style'); st.textContent=MPCS
   lb.querySelector('#lbDrive').onclick=()=>startGame();
   if(jq) mpStatus('Invite found \u2014 enter your name and press JOIN');
   // typing in inputs must not drive the truck
-  addEventListener('keydown',e=>{ const tg=e.target; if(tg&&tg.tagName==='INPUT'){ e.stopImmediatePropagation(); if(tg.id==='mpChatIn'){ if(e.key==='Enter'){ mpChatSend(tg.value); tg.value=''; tg.style.display='none'; tg.blur(); } else if(e.key==='Escape'){ tg.value=''; tg.style.display='none'; tg.blur(); } } } },true);
   addEventListener('keydown',e=>{ if(!MP.on||!started||career.uiOpen) return; if(e.code==='Tab'){ e.preventDefault(); mpToggleList(); } else if(e.code==='Enter'&&!bigmap.open){ e.preventDefault(); const ci=document.getElementById('mpChatIn'); ci.style.display='block'; for(const k in input) input[k]=false; setTimeout(()=>ci.focus(),0); } });
   const ui=document.getElementById('ui')||document.getElementById('frame'); const host=document.getElementById('frame');
   const pl=document.createElement('div'); pl.id='mplist'; host.appendChild(pl); const ch=document.createElement('div'); ch.id='mpchat'; ch.innerHTML='<div id="mpLines"></div><input id="mpChatIn" maxlength="140" placeholder="Say something\u2026 (Enter to send, Esc to cancel)">'; host.appendChild(ch);
+  { const tg=ch.querySelector('#mpChatIn'); tg.addEventListener('keydown',e=>{ if(e.key==='Enter'){ mpChatSend(tg.value); tg.value=''; tg.style.display='none'; tg.blur(); } else if(e.key==='Escape'){ tg.value=''; tg.style.display='none'; tg.blur(); } }); }
   const bd=document.createElement('div'); bd.id='mpbadge'; bd.onclick=mpToggleList; host.appendChild(bd); }
 function mpLobbyHosted(){ const b=document.getElementById('lbHostBox'); b.style.display='flex'; document.getElementById('lbCodeOut').textContent=MP.code; const base=location.href.split('?')[0].split('#')[0]; document.getElementById('lbLink').textContent=base+'?join='+MP.code; mpRender(); }
 function mpLobbyClose(){ const b=document.getElementById('lbHostBox'); if(b) b.style.display='none'; }

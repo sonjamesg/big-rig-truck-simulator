@@ -42,7 +42,7 @@ function padUpdate(dt){
   input.padSteer=Math.abs(pad.steer)<0.01?0:Math.max(-1,Math.min(1,pad.steer)); input.padThr=rt; input.padBrk=lt;
   if(now[1]){ input.hand=true; pad.hb=true; } else if(pad.hb){ input.hand=false; pad.hb=false; }
   if(now[4]){ input.horn=true; pad.horn=true; } else if(pad.horn){ input.horn=false; pad.horn=false; }
-  if(!started&&(hit(0)||hit(9)||rt>0.3)){ startGame(); return; }
+  if(!started){ if(hit(0)&&!isTyping(document.activeElement)) startGame(); return; }   // lobby: no game actions, A = play solo
   if(!started) return;
   if(hit(12)&&MP.on) mpToggleList();
   if(hit(0)) toggleCouple(); if(hit(2)) toggleRefuel(); if(hit(3)) tryUnload();

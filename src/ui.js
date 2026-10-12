@@ -116,7 +116,7 @@ function uiInit(){ if(uiRoot) return; const st=document.createElement('style'); 
   uiRoot=document.createElement('div'); uiRoot.id='ui'; document.getElementById('frame').appendChild(uiRoot);
   const hb=document.createElement('div'); hb.id='hudbtns'; hb.innerHTML='<button class="hb" id="bJobs">\u{1F4CB} JOBS <kbd>J</kbd></button><button class="hb ab" id="bAbandon" style="display:none">\u2715 ABANDON</button>'; uiRoot.appendChild(hb);
   const ab=hb.querySelector('#bAbandon'); ab.addEventListener('click',e=>{ e.stopPropagation(); if(ab.dataset.arm){ abandonJob(); delete ab.dataset.arm; ab.textContent='\u2715 ABANDON'; return; } ab.dataset.arm=1; ab.textContent='Click again to abandon'; setTimeout(()=>{ delete ab.dataset.arm; ab.textContent='\u2715 ABANDON'; },3000); });
-  hb.querySelector('#bJobs').addEventListener('click',e=>{ e.stopPropagation(); if(!started) startGame(); openBoard(); }); }
+  hb.querySelector('#bJobs').addEventListener('click',e=>{ e.stopPropagation(); if(!started) return; openBoard(); }); }
 function uiBlocking(){ return !!career.uiOpen; }
 function closeUI(){ const m=uiRoot&&uiRoot.querySelector('.mback,.celebrate'); career.uiOpen=null; for(const k in input) input[k]=false; if(m){ m.classList.remove('on'); setTimeout(()=>m.remove(),260); } }
 function openModal(kind,html,cls){ uiInit(); const old=uiRoot.querySelector('.mback,.celebrate'); if(old) old.remove(); career.uiOpen=kind; for(const k in input) input[k]=false;
@@ -133,7 +133,7 @@ function trlSVG(type,col){ const body={curtain:`<rect x="14" y="6" width="58" he
   return `<svg viewBox="0 0 80 34"><rect x="0" y="9" width="12" height="17" rx="2" fill="#d63b2f"/><rect x="2" y="11" width="6" height="6" fill="#9ec9e8"/>${body}<rect x="12" y="25" width="62" height="2" fill="#222"/>${[6,52,60,68].map(x=>`<circle cx="${x}" cy="28" r="3.3" fill="#111"/>`).join('')}</svg>`; }
 // ---------- job board
 const boardState={filter:'all',sort:'pay',sel:null};
-function openBoard(){ if(!world.malls||!world.malls.length) return; fillBoard(); const T_=tierInfo(career.tier), lv=levelOf(career.xp), a0=levelNeed(lv), a1=levelNeed(lv+1);
+function openBoard(){ if(!started) return; if(!world.malls||!world.malls.length) return; fillBoard(); const T_=tierInfo(career.tier), lv=levelOf(career.xp), a0=levelNeed(lv), a1=levelNeed(lv+1);
   const tiers=TIERS.map(t=>`<span class="chip" data-f="${t.tier}">Tier ${t.tier}</span>`).join('');
   const b=openModal('board',`<div class="mh"><div style="font-size:28px">\u{1F4CB}</div><div><h2>JOB BOARD</h2><div class="sub">Deliveries to shopping malls, retail parks &amp; supermarkets \u2022 pick up at depots, docks &amp; warehouses</div></div><div class="sp"></div>
     <div style="text-align:right;font-size:12px"><span class="tb" style="background:${T_.color}">TIER ${career.tier}</span> <b>${esc(T_.name)}</b> \u2022 Lv ${lv}<br><span class="xpb"><i style="width:${Math.min(100,(career.xp-a0)/(a1-a0)*100)}%"></i></span> <span style="opacity:.7">${career.xp} XP</span></div><button class="x">\u2715</button></div>
@@ -197,7 +197,7 @@ function celebrateTier(t){ uiInit(); if(career.uiOpen==='result'){ career.pendin
 function fanfare(){ const c=audio.ctx; if(!c||!audio.master) return; const t=c.currentTime; [523,659,784,1047].forEach((f,i)=>{ const o=c.createOscillator(), g=c.createGain(); o.type='triangle'; o.frequency.value=f; g.gain.setValueAtTime(0,t+i*0.12); g.gain.linearRampToValueAtTime(0.18,t+i*0.12+0.02); g.gain.exponentialRampToValueAtTime(0.001,t+i*0.12+(i===3?0.9:0.3)); o.connect(g); g.connect(audio.master); o.start(t+i*0.12); o.stop(t+i*0.12+1); }); }
 // ---------- dealership
 const dealerState={sel:null,col:null,dealer:null};
-function openDealer(d){ dealerState.dealer=d||dealerState.dealer; dealerState.sel=dealerState.sel||career.cur;
+function openDealer(d){ if(!started) return; dealerState.dealer=d||dealerState.dealer; dealerState.sel=dealerState.sel||career.cur;
   openModal('dealer',`<div class="mh"><div style="font-size:28px">\u{1F69B}</div><div><h2>${esc((d&&d.name)||'BIG RIG TRUCKS')}</h2><div class="sub">Showroom \u2022 buy, paint and swap your tractor unit</div></div><div class="sp"></div><div style="font-size:15px;font-weight:900;color:#7dff9a" id="cash">${money(truck.money)}</div><button class="x">\u2715</button></div>
    <div class="show"><div class="tl"></div><div class="stage"></div></div>`); renderDealer(); }
 function renderDealer(){ const b=uiRoot.querySelector('.mback'); if(!b||career.uiOpen!=='dealer') return; const tl=b.querySelector('.tl'), stg=b.querySelector('.stage'); b.querySelector('#cash').textContent=money(truck.money);
