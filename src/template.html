@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Big Rig Truck Simulator</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:radial-gradient(ellipse at top,#2b3a55 0%,#141b2a 55%,#0b0f18 100%);color:#dfe6f0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;justify-content:center;align-items:flex-start;min-height:100%;overflow-x:hidden}
+#wrap{--s:1;width:calc(984px*var(--s));margin:18px auto}
+#scaler{width:984px;transform:scale(var(--s));transform-origin:top left}
+#titlebar{display:flex;align-items:center;justify-content:space-between;background:linear-gradient(#e8a317,#c27f0b);color:#1d1406;border:3px solid #0d0f14;border-bottom:none;border-radius:14px 14px 0 0;padding:8px 16px;font-weight:900;letter-spacing:3px;font-size:20px;text-shadow:0 1px 0 rgba(255,255,255,0.35)}
+#titlebar small{font-weight:700;letter-spacing:1px;font-size:12px;opacity:.8}
+#frame{position:relative;width:984px;padding:12px;background:#1b2130;border:3px solid #0d0f14;border-radius:0 0 14px 14px;box-shadow:0 18px 50px rgba(0,0,0,0.55), inset 0 0 0 2px #2c3548}
+#frame:fullscreen{width:100vw;height:100vh;border-radius:0;display:flex;align-items:center;justify-content:center;background:#000;padding:0}
+#frame:fullscreen canvas{width:min(100vw,160vh);height:auto}
+canvas{display:block;width:960px;height:600px;border-radius:6px;background:#5d9b3a;image-rendering:auto}
+#fs{position:absolute;top:20px;right:20px;z-index:5;background:rgba(10,14,22,0.6);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer}
+#fs:hover{background:rgba(232,163,23,0.8);color:#000}
+#overlay{position:absolute;inset:12px;border-radius:6px;background:rgba(8,12,20,0.78);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;z-index:4;text-align:center}
+#overlay.hidden{display:none}
+#overlay h1{margin:0;font-size:58px;font-weight:900;letter-spacing:4px;color:#f5b82e;text-shadow:0 4px 0 #7a4f06,0 8px 20px rgba(0,0,0,0.6)}
+#overlay h2{margin:6px 0 26px;font-size:22px;letter-spacing:8px;color:#fff}
+#overlay .go{font-size:20px;padding:12px 30px;border-radius:30px;background:#e8a317;color:#1d1406;font-weight:800;animation:pulse 1.4s infinite}
+#overlay p{opacity:.75;margin-top:22px;font-size:14px}
+@keyframes pulse{50%{transform:scale(1.06)}}
+#help{margin-top:12px;display:flex;flex-wrap:wrap;gap:8px 18px;justify-content:center;font-size:13px;opacity:.85}
+#help b{display:inline-block;min-width:22px;padding:2px 6px;margin-right:4px;border-radius:5px;background:#2c3548;border:1px solid #46526b;color:#fff;font-weight:700;text-align:center}
+#credits{text-align:center;font-size:11px;opacity:.5;margin-top:8px}
+#touch{display:none}
+body.touch #touch{display:block}
+#touch .btn{position:absolute;z-index:3;width:96px;height:96px;border-radius:50%;background:rgba(255,255,255,0.16);border:2px solid rgba(255,255,255,0.4);color:#fff;font-size:30px;font-weight:800;display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none;touch-action:none}
+#touch .btn.on{background:rgba(232,163,23,0.6)}
+#touch .sm{width:70px;height:70px;font-size:16px}
+body.touch #help{display:none}
+</style></head>
+<body>
+<div id="wrap"><div id="scaler">
+ <div id="titlebar"><span>BIG RIG TRUCK SIMULATOR</span><small>MAP + DRIVING PREVIEW</small></div>
+ <div id="frame">
+  <canvas id="game" width="960" height="600"></canvas>
+  <button id="fs" title="Fullscreen">&#x26F6; Fullscreen</button>
+  <div id="overlay"><h1>BIG RIG</h1><h2>TRUCK SIMULATOR</h2><div class="go">PRESS ANY KEY / TAP TO DRIVE</div><p id="loading">Generating world…</p><p>Arrows / WASD drive &middot; Space handbrake &middot; H horn &middot; T couple &middot; F refuel &middot; M map &middot; J jobs &middot; U unload</p></div>
+  <div id="touch">
+   <div class="btn" data-k="left" style="left:28px;bottom:34px">&#9664;</div>
+   <div class="btn" data-k="right" style="left:140px;bottom:34px">&#9654;</div>
+   <div class="btn" data-k="up" style="right:236px;bottom:110px">&#9650;</div>
+   <div class="btn" data-k="down" style="right:236px;bottom:6px;height:90px;width:96px">&#9660;</div>
+   <div class="btn sm" data-k="hand" style="left:28px;bottom:150px">P</div>
+   <div class="btn sm" data-k="horn" style="left:120px;bottom:150px">&#128227;</div>
+   <div class="btn sm" id="fbtn" style="right:330px;bottom:210px;font-size:15px">F</div>
+   <div class="btn sm" id="tbtn" style="right:236px;bottom:210px;font-size:15px">T</div>
+  </div>
+ </div>
+ <div id="help"><span><b>&uarr;</b><b>W</b>accelerate</span><span><b>&darr;</b><b>S</b>brake, then reverse when stopped</span><span><b>&larr;</b><b>&rarr;</b><b>A</b><b>D</b>steer</span><span><b>Space</b>handbrake</span><span><b>H</b>horn</span><span><b>T</b>/<b>C</b>couple / uncouple</span><span><b>F</b>refuel at a pump</span><span><b>M</b>world map</span><span><b>J</b>job board</span><span><b>U</b>unload in bay</span><span><b>X</b>cancel route</span><span><b>Esc</b>close panel</span></div>
+ <div id="help" class="padhelp" style="margin-top:4px"><span style="opacity:.7">🎮 Xbox:</span><span><b>RT</b>throttle</span><span><b>LT</b>brake / reverse</span><span><b>LS</b>steer</span><span><b>Ⓐ</b>couple</span><span><b>Ⓑ</b>handbrake / back</span><span><b>Ⓧ</b>refuel</span><span><b>Ⓨ</b>unload</span><span><b>LB</b>horn</span><span><b>RB</b>cancel route</span><span><b>View</b>map</span><span><b>Menu</b>jobs</span><span><b>D-pad</b>menus</span></div>
+ <div id="credits">Engine sound: "Truck engine" by Joseph Sardin, BigSoundBank.com (CC0). All graphics procedurally generated.</div>
+</div></div>
+<script>/*SCRIPT*/</script>
+</body></html>

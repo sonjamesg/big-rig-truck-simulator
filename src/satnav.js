@@ -1,0 +1,92 @@
+'use strict';
+// ===================== SAT NAV: A* over the road tiles, route guidance =====================
+const NAV={route:null,reroutes:0,offT:0,lastCalc:-9,hover:null};
+const NAV_COST={hwy:0.55,dual:0.7,rural:0.9,city:1.0,town:1.0,res:1.7,lane:3.2};      // lorry-legal: narrow lanes / estates heavily penalised
+const NAV_SPEED={hwy:25,dual:20,rural:15,city:11,town:11,res:8,lane:7};
+let navClosed=null, navG=null, navStamp=null, navFrom=null, navGen=1;
+function navTileInfo(i){ const h=world.roadH[i], v=world.roadV[i]; if(h===-1&&v===-1) return null;
+  if(h===-2) return ['rb',0.8,8]; if(h===-3) return ['curve',0.7,20]; const s=world.segs[h>=0?h:v]; return [s.type,NAV_COST[s.type]||1,NAV_SPEED[s.type]||11]; }
+const isRoadT=i=>{ const t=G[i]; return (t===T.ROAD||t===T.BRIDGE) && !(world.roadH[i]===-1&&world.roadV[i]===-1); };
+function navSnap(tx,ty,rmax){ tx=Math.round(tx); ty=Math.round(ty); for(let r=0;r<=(rmax||60);r++) for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){ if(Math.max(Math.abs(dx),Math.abs(dy))!==r) continue; const x=tx+dx,y=ty+dy; if(inb(x,y)&&isRoadT(idx(x,y))) return [x,y]; } return null; }
+function navAStar(sx,sy,gx,gy){
+  const N=MW*MH; if(!navG){ navG=new Float32Array(N); navStamp=new Int32Array(N); navFrom=new Int32Array(N); navClosed=new Int32Array(N); }
+  const gen=++navGen, S=idx(sx,sy), Gl=idx(gx,gy); const hx=i=>(Math.abs((i%MW)-gx)+Math.abs(((i/MW)|0)-gy))*0.9;
+  let hp=[], hf=[]; const push=(i,f)=>{ hp.push(i); hf.push(f); let k=hp.length-1; while(k>0){ const p=(k-1)>>1; if(hf[p]<=hf[k]) break; {const a=hp[p];hp[p]=hp[k];hp[k]=a;const b=hf[p];hf[p]=hf[k];hf[k]=b;} k=p; } };
+  const pop=()=>{ const top=hp[0], li=hp.pop(), lf=hf.pop(); if(hp.length){ hp[0]=li; hf[0]=lf; let k=0; for(;;){ const l=2*k+1, r=l+1; let m=k; if(l<hp.length&&hf[l]<hf[m]) m=l; if(r<hp.length&&hf[r]<hf[m]) m=r; if(m===k) break; {const a=hp[m];hp[m]=hp[k];hp[k]=a;const b=hf[m];hf[m]=hf[k];hf[k]=b;} k=m; } } return top; };
+  navStamp[S]=gen; navG[S]=0; navFrom[S]=-1; push(S,hx(S)); let it=0;
+  while(hp.length){ const i=pop(); if(navClosed[i]===gen) continue; navClosed[i]=gen; if(i===Gl) break; if(++it>4000000){ NAV.lastIt=it; return null; } const gi=navG[i], ci=navTileInfo(i)[1];
+    for(const d of [1,-1,MW,-MW]){ let j=i+d, k=1; if(j<0||j>=N) continue;
+      // small gaps (roundabout aprons, junction mouths drawn as kerb/grass): hop up to 5 tiles straight across
+      if(!isRoadT(j)){ if(world.roadH[i]===-1&&world.roadV[i]===-1) continue; for(k=2;k<=6;k++){ j=i+d*k; if(j<0||j>=N||Math.abs((j%MW)-(i%MW))>6) { j=-1; break; } if(isRoadT(j)) break; } if(j<0||k>6||!isRoadT(j)) continue; const Gj=G[i+d]; if(Gj===T.WATER||Gj===T.BLDG) continue; }
+      const nc=gi+(ci+navTileInfo(j)[1])*0.5*k+(k>1?k*0.6:0);
+      if(navClosed[j]!==gen&&(navStamp[j]!==gen||nc<navG[j])){ navStamp[j]=gen; navG[j]=nc; navFrom[j]=i; push(j,nc+hx(j)); } } }
+  NAV.lastIt=it; if(navStamp[Gl]!==gen) return null; const path=[]; for(let i=Gl;i!==-1;i=navFrom[i]) path.push(i); return path.reverse(); }
+function navBuild(path,target){
+  const P=path.map(i=>[((i%MW)+0.5)*M_T,(((i/MW)|0)+0.5)*M_T]), n=P.length, cum=new Float32Array(n), eta=new Float32Array(n);
+  for(let k=1;k<n;k++){ cum[k]=cum[k-1]+Math.hypot(P[k][0]-P[k-1][0],P[k][1]-P[k-1][1]); }
+  for(let k=n-2;k>=0;k--) eta[k]=eta[k+1]+(cum[k+1]-cum[k])/((navTileInfo(path[k])||[0,0,11])[2]);
+  // turn instructions: heading change over a +/-4 tile window, local maxima only
+  const turns=[]; const W=4; let lastK=-99;
+  const hd=(a,b)=>Math.atan2(P[b][0]-P[a][0],-(P[b][1]-P[a][1]));
+  for(let k=W;k<n-W;k++){ const d=wrapA(hd(k,k+W)-hd(k-W,k)); if(Math.abs(d)<0.7) continue;
+    let mx=true; for(let q=k-3;q<=k+3;q++) if(q!==k&&q>=W&&q<n-W&&Math.abs(wrapA(hd(q,q+W)-hd(q-W,q)))>Math.abs(d)) mx=false; if(!mx||k-lastK<8) continue;
+    let rb=false; for(let q=k-6;q<=k+6;q++) if(q>=0&&q<n&&world.roadH[path[q]]===-2) rb=true;
+    if(rb&&turns.length&&turns[turns.length-1].kind==='rb'&&k-turns[turns.length-1].k<40) continue;
+    turns.push({k,kind:rb?'rb':Math.abs(d)>2.4?'u':d>0?'R':'L',ang:d}); lastK=k; }
+  turns.push({k:n-1,kind:'arrive'});
+  return {target,path,P,cum,eta,turns,idx:0,len:cum[n-1]};
+}
+function setRoute(target){
+  let tx,ty,name;
+  if(typeof target==='string'){ const d=world.depots.find(o=>o.id===target||o.code===target), f=world.fuel.find(o=>o.id===target), g=world.garages.find(o=>o.id===target); target=d||f||g; if(!target) return null; }
+  if(target.entrance){ tx=target.entrance.x/M_T; ty=target.entrance.y/M_T; name=target.name; } else { tx=target.x/M_T; ty=target.y/M_T; name=target.name||target.label||'Map point'; }
+  const tgt={x:tx*M_T,y:ty*M_T,name,ref:target};
+  const f=fwd(truck.h), st=navSnap((truck.x+f[0]*2)/M_T,(truck.y+f[1]*2)/M_T,40), en=navSnap(tx,ty,70);
+  if(!st||!en){ NAV.fail=!st?'snapStart':'snapEnd'; flash('Sat nav: no road route found'); return null; }
+  const t0=performance.now(); const p=navAStar(st[0],st[1],en[0],en[1]); if(!p){ NAV.fail='astar'; flash('Sat nav: no road route found'); NAV.route=null; return null; }
+  NAV.route=navBuild(p,tgt); NAV.route.ms=performance.now()-t0; NAV.offT=0; NAV.lastCalc=timeS;
+  BigRig.emit('route',{target:tgt,length:NAV.route.len,ms:NAV.route.ms}); return NAV.route; }
+function clearRoute(){ NAV.route=null; }
+function chime(){ const c=audio.ctx; if(!c) return; const t=c.currentTime; [[880,0],[1175,0.16],[1568,0.32]].forEach(([f,dt])=>{ const o=c.createOscillator(), g=c.createGain(); o.type='sine'; o.frequency.value=f; g.gain.setValueAtTime(0.0001,t+dt); g.gain.exponentialRampToValueAtTime(0.25,t+dt+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+dt+0.5); o.connect(g); g.connect(audio.master); o.start(t+dt); o.stop(t+dt+0.55); }); }
+function updateNav(dt){ const R=NAV.route; if(!R) return; const f=fwd(truck.h), cx=truck.x+f[0]*2, cy=truck.y+f[1]*2;
+  let best=R.idx, bd=1e9; const a=Math.max(0,R.idx-20), b=Math.min(R.P.length-1,R.idx+120); for(let k=a;k<=b;k++){ const d=Math.hypot(R.P[k][0]-cx,R.P[k][1]-cy); if(d<bd){ bd=d; best=k; } }
+  if(bd>40){ for(let k=0;k<R.P.length;k+=3){ const d=Math.hypot(R.P[k][0]-cx,R.P[k][1]-cy); if(d<bd){ bd=d; best=k; } } }
+  R.idx=Math.max(R.idx,best); R.off=bd;
+  if(Math.hypot(R.target.x-cx,R.target.y-cy)<30 || (R.len-R.cum[R.idx]<25&&bd<25)){ chime(); flash('You have arrived: '+R.target.name); BigRig.emit('routeArrived',{target:R.target}); NAV.route=null; return; }
+  if(bd>22){ NAV.offT+=dt; if(NAV.offT>1.5&&timeS-NAV.lastCalc>2){ NAV.reroutes++; const tg=R.target; const nr=setRoute(tg.ref&&tg.ref.name?tg.ref:{x:tg.x,y:tg.y,name:tg.name}); if(nr){ flash('Rerouting\u2026'); BigRig.emit('reroute',{n:NAV.reroutes}); } } } else NAV.offT=0; }
+function navLine(px,py,w,col){ const R=NAV.route; if(!R) return; ctx.save(); ctx.lineJoin='round'; ctx.lineCap='round'; ctx.strokeStyle='rgba(0,0,0,0.55)'; ctx.lineWidth=w+3; ctx.beginPath();
+  for(let k=R.idx;k<R.P.length;k+=2){ const x=px(R.P[k][0]), y=py(R.P[k][1]); k===R.idx?ctx.moveTo(x,y):ctx.lineTo(x,y); } const e=R.P[R.P.length-1]; ctx.lineTo(px(e[0]),py(e[1])); ctx.stroke(); ctx.strokeStyle=col; ctx.lineWidth=w; ctx.stroke();
+  ctx.fillStyle='#ff3df0'; ctx.strokeStyle='#000'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(px(R.target.x),py(R.target.y),6,0,7); ctx.fill(); ctx.stroke(); ctx.restore(); }
+function drawNavWorld(){ const R=NAV.route; if(!R) return; const end=Math.min(R.P.length-5,R.idx+100);
+  for(let k=R.idx+3;k<end;k+=5){ const p=R.P[k], q=R.P[k+3]; const h=Math.atan2(q[0]-p[0],-(q[1]-p[1])); const a=0.55*Math.min(1,(k-R.idx)/10);
+    ctx.save(); ctx.translate(p[0]*PPM,p[1]*PPM); ctx.rotate(h); ctx.fillStyle='rgba(90,220,255,'+a.toFixed(2)+')'; ctx.beginPath(); ctx.moveTo(0,-12); ctx.lineTo(13,4); ctx.lineTo(6,4); ctx.lineTo(0,-4); ctx.lineTo(-6,4); ctx.lineTo(-13,4); ctx.closePath(); ctx.fill(); ctx.restore(); } }
+const NAVP={x:960-252,y:56,w:236,h:96};
+function fmtD(m){ return m>=1000?(m/1000).toFixed(m>=10000?0:1)+' km':(Math.round(m/10)*10)+' m'; }
+function drawTurnIcon(kind,ang,x,y){ ctx.save(); ctx.translate(x,y); ctx.strokeStyle='#fff'; ctx.fillStyle='#fff'; ctx.lineWidth=5; ctx.lineCap='round'; ctx.lineJoin='round';
+  if(kind==='arrive'){ ctx.beginPath(); ctx.arc(0,-6,10,0,7); ctx.stroke(); ctx.beginPath(); ctx.moveTo(-6,6); ctx.lineTo(0,18); ctx.lineTo(6,6); ctx.fill(); }
+  else if(kind==='rb'){ ctx.lineWidth=4; ctx.beginPath(); ctx.arc(0,4,10,0,7); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0,22); ctx.lineTo(0,14); ctx.stroke(); const a=Math.PI/2+(ang||0)-Math.PI; ctx.beginPath(); ctx.moveTo(Math.cos(a)*10,4+Math.sin(a)*10); ctx.lineTo(Math.cos(a)*20,4+Math.sin(a)*20); ctx.stroke(); }
+  else { const s=kind==='L'?-1:1; ctx.beginPath(); ctx.moveTo(-s*4,20); ctx.lineTo(-s*4,0); if(kind==='u'){ ctx.arc(s*4,0,8,Math.PI,0,s>0); ctx.lineTo(s*12,12); } else { ctx.quadraticCurveTo(-s*4,-8,s*12,-8); } ctx.stroke();
+    ctx.beginPath(); if(kind==='u'){ ctx.moveTo(s*12,20); ctx.lineTo(s*5,10); ctx.lineTo(s*19,10); } else { ctx.moveTo(s*18,-8); ctx.lineTo(s*9,-16); ctx.lineTo(s*9,0); } ctx.closePath(); ctx.fill(); }
+  ctx.restore(); }
+function drawNavHUD(){ const R=NAV.route; if(!R) return; const {x,y,w,h}=NAVP; const nt=R.turns.find(t=>t.k>R.idx+1)||R.turns[R.turns.length-1];
+  const dTurn=Math.max(0,R.cum[nt.k]-R.cum[R.idx]), dTot=Math.max(0,R.len-R.cum[R.idx]), eta=R.eta[R.idx];
+  ctx.save(); ctx.fillStyle='rgba(10,14,22,0.85)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(x,y,w,h,12):ctx.rect(x,y,w,h); ctx.fill();
+  ctx.fillStyle='#1e88e5'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(x+8,y+8,64,64,10):ctx.rect(x+8,y+8,64,64); ctx.fill(); drawTurnIcon(nt.kind,nt.ang,x+40,y+38);
+  ctx.textAlign='left'; ctx.fillStyle='#fff'; ctx.font='bold 26px system-ui,sans-serif'; ctx.fillText(fmtD(dTurn),x+82,y+36);
+  ctx.font='12px system-ui,sans-serif'; ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.fillText({L:'Turn left',R:'Turn right',u:'U-turn',rb:'At the roundabout',arrive:'Arrive'}[nt.kind],x+82,y+56);
+  ctx.fillStyle='#7fdcff'; ctx.font='bold 12px system-ui,sans-serif'; const m=Math.max(1,Math.round(eta/60)); ctx.fillText(fmtD(dTot)+' \u2022 ETA '+m+' min',x+10,y+88);
+  ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.font='11px system-ui,sans-serif'; const nm=R.target.name.length>20?R.target.name.slice(0,19)+'\u2026':R.target.name; ctx.textAlign='right'; ctx.fillText('\u2192 '+nm,x+w-10,y+88);
+  ctx.fillStyle='rgba(255,255,255,0.12)'; ctx.fillRect(x+w-30,y+8,22,22); ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.font='bold 13px system-ui'; ctx.fillText('\u2715',x+w-19,y+23);
+  if(R.off>22){ ctx.fillStyle='#ffb020'; ctx.textAlign='left'; ctx.fillText('Off route',x+82,y+14); }
+  ctx.restore(); }
+function navPanelClick(x,y){ if(NAV.route&&x>=NAVP.x+NAVP.w-30&&x<=NAVP.x+NAVP.w-8&&y>=NAVP.y+8&&y<=NAVP.y+30){ clearRoute(); flash('Route cancelled'); return true; } return false; }
+// big-map icon hit test
+function navPOIAt(x,y,BX,BY){ let best=null,bd=11; const test=(o,mx,my,kind)=>{ const d=Math.hypot(BX(mx/M_T)-x,BY(my/M_T)-y); if(d<bd){ bd=d; best={o,kind,name:o.name}; } };
+  for(const d of world.depots) test(d,d.entrance.x,d.entrance.y,'Depot'); for(const f of world.fuel) test(f,f.x,f.y,'Fuel'); for(const g of world.garages) test(g,g.x,g.y,'Garage'); for(const m of world.malls||[]) test(m,m.entrance.x,m.entrance.y,m.kind==='mall'?'Mall':'Supermarket'); for(const d of world.dealers||[]) test(d,d.entrance.x,d.entrance.y,'Truck dealer'); return best; }
+BigRig.setRoute=setRoute; BigRig.clearRoute=clearRoute; BigRig.route=()=>NAV.route&&{target:NAV.route.target,length:NAV.route.len,remaining:NAV.route.len-NAV.route.cum[NAV.route.idx],turns:NAV.route.turns.length,reroutes:NAV.reroutes};
+BigRig._navDiag=function(target){ const N=MW*MH; const r=setRoute(target); if(r) return 'ok'; const gen=navGen; const A=i=>navStamp[i]===gen;
+  const e=target.entrance||target, E=navSnap(e.x/M_T,e.y/M_T,70); const seen=new Uint8Array(N), s0=idx(E[0],E[1]); const q=[s0]; seen[s0]=1; let n=0;
+  while(q.length){ const i=q.pop(); n++; for(const d of [1,-1,MW,-MW]){ const j=i+d; if(j>=0&&j<N&&!seen[j]&&isRoadT(j)){ seen[j]=1; q.push(j); } } }
+  let best=[99]; for(let i=0;i<N;i++) if(seen[i]&&i%2===0){ const x=i%MW,y=(i/MW)|0; for(let dy=-25;dy<=25;dy++)for(let dx=-25;dx<=25;dx++){ const j=i+dx+dy*MW; if(j>=0&&j<N&&A(j)){ const dd=Math.hypot(dx,dy); if(dd<best[0]) best=[dd,x,y,x+dx,y+dy]; } } }
+  if(best.length>1){ const L=[]; const m=Math.ceil(best[0]); for(let k=0;k<=m;k++){ const x=Math.round(best[1]+(best[3]-best[1])*k/m), y=Math.round(best[2]+(best[4]-best[2])*k/m); L.push(G[idx(x,y)]+'/'+world.roadH[idx(x,y)]+'/'+world.roadV[idx(x,y)]); } best.push(L); }
+  return {endN:n,gap:best}; };
