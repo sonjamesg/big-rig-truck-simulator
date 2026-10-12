@@ -422,7 +422,7 @@ function genWorld(){
       if(!isR(get(Math.floor(E[0]+l[0]*hw*0.5-f[0]*3),Math.floor(E[1]+l[1]*hw*0.5-f[1]*3)))) continue;      // no arm on this side
       const off=0.55, kc=[E[0]+l[0]*hw,E[1]+l[1]*hw]; const c=J.corners.find(c=>Math.abs(c.px-kc[0])<0.01&&Math.abs(c.py-kc[1])<0.01);
       // pole on the pavement corner (inside the kerb radius, at the diagonal), arm straight from pole to the centre line just past the stop line
-      let pLat=hw+0.8, pLon=off; if(c){ const q=(c.R-0.9)/Math.SQRT2; pLat=hw+c.R-q; pLon=c.R-q; }
+      const pLat=hw+0.9, pLon=off;   // v13: straight arm, perpendicular to traffic, pole on the near-side pavement just before the stop line
       const n=Math.max(1,Math.round(hw*M_T/3.6)), A=[E[0]-f[0]*off,E[1]-f[1]*off];
       world.overhead.push({kind:'mast',J,f,l,A,pLat,pLon,hw,n,ns:f[0]===0,x:A[0]*TILE,y:A[1]*TILE}); } }
   // v12: Golden-Gate-style suspension bridges on the long motorway sea crossings (other bridges keep girder / curved-viaduct styles)

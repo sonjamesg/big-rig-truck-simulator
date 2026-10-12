@@ -154,10 +154,12 @@ function drawOverhead(o){
       ctx.fillStyle='#e8b923'; ctx.fillRect(-15,-7,30,14); ctx.fillStyle='#17191c'; ctx.fillRect(-13,-5,26,10);
       const lamp=(xx,on,col,dimc)=>{ ctx.fillStyle=on?col:dimc; ctx.beginPath(); ctx.arc(xx,0,3.3,0,7); ctx.fill(); if(on){ ctx.fillStyle=col+'50'; ctx.beginPath(); ctx.arc(xx,0,7.5,0,7); ctx.fill(); } };
       lamp(8,red,'#ff3b30','#3a1210'); lamp(0,amb,'#ffb020','#3a2a10');
-      if(anyG&&ss.S==='g'&&mvs.length===1) lamp(-8,true,'#36e05a','#10240f');
-      else { ctx.fillStyle='#10240f'; ctx.beginPath(); ctx.arc(-8,0,3.3,0,7); ctx.fill();
-        if(anyG){ ctx.fillStyle='#36e05a50'; ctx.beginPath(); ctx.arc(-8,0,7.5,0,7); ctx.fill(); ctx.strokeStyle='#5dff7a'; ctx.lineWidth=1.6; ctx.lineCap='round';
-          for(const m of mvs){ if(ss[m]!=='g') continue; ctx.save(); ctx.translate(-8,0); ctx.rotate(m==='S'?0:m==='L'?-Math.PI/2:Math.PI/2); ctx.beginPath(); ctx.moveTo(-3,0); ctx.lineTo(3,0); ctx.moveTo(0.6,-2.2); ctx.lineTo(3,0); ctx.lineTo(0.6,2.2); ctx.stroke(); ctx.restore(); } } }
+      // full green disc for ahead/left and filtering rights; green arrows only for protected (arrow / early cut-off / left filter) movements
+      let disc=false; const arrows=[]; for(const mv of mvs){ if(ss[mv]!=='g') continue; if(sigArrow(o.J,key,mv)) arrows.push(mv); else disc=true; }
+      if(disc) lamp(-8,true,'#36e05a','#10240f'); else { ctx.fillStyle='#10240f'; ctx.beginPath(); ctx.arc(-8,0,3.3,0,7); ctx.fill(); }
+      if(arrows.length){ const ax=disc?-15:-8; if(disc){ ctx.fillStyle='#e8b923'; ctx.fillRect(-23,-5,9,10); ctx.fillStyle='#17191c'; ctx.fillRect(-22,-4,7,8); }
+        ctx.fillStyle='#36e05a50'; ctx.beginPath(); ctx.arc(ax-(disc?3.5:0),0,6,0,7); ctx.fill(); ctx.strokeStyle='#5dff7a'; ctx.lineWidth=1.6; ctx.lineCap='round';
+        for(const mv of arrows){ ctx.save(); ctx.translate(ax-(disc?3.5:0),0); ctx.rotate(mv==='S'?0:mv==='L'?-Math.PI/2:Math.PI/2); ctx.beginPath(); ctx.moveTo(-3,0); ctx.lineTo(3,0); ctx.moveTo(0.6,-2.2); ctx.lineTo(3,0); ctx.lineTo(0.6,2.2); ctx.stroke(); ctx.restore(); } }
       ctx.restore(); }
     return; }
   if(o.kind==='light'){ const c=o.c, ns=(c.dx===c.dy); const st=lightState(o.J,ns);
