@@ -14,7 +14,9 @@ function dnGlow(col){ return DN.glow[col]||(DN.glow[col]=dnSprite(32,[[0,col],[0
 function dnBuild(){ if(DN.grid) return; const G=new Map(), C=DN.cell; const add=(x,y,r,k,o)=>{ const key=((x/C)|0)+','+((y/C)|0); let a=G.get(key); if(!a) G.set(key,a=[]); a.push(Object.assign({x,y,r,k},o||{})); };
   for(const sg of world.segs||[]){ if(!sg||sg.b1===undefined) continue; let n=0; for(let a=sg.b0+2;a<sg.b1-1;a+=9){ const d=(n++&1)?1:-1; try{ const p=lanePt(sg,d,0,a); const o=sg.dir==='h'?[0,d*1.2]:[-d*1.2,0]; add((p[0]+o[0]*M_T)*PPM,(p[1]+o[1]*M_T)*PPM,95,'st'); }catch(e){} } }
   let s=7; const rnd=()=>{ s=(s*16807)%2147483647; return s/2147483647; };
-  for(const o of world.objects) if(o.kind==='bldg'){ const win=[]; const nw=Math.min(14,Math.max(3,((o.w*o.h)/(32*32*2))|0)); for(let i=0;i<nw;i++) win.push([o.x+4+rnd()*(o.w-12),o.y+4+rnd()*(o.h-10),rnd()<0.5]); add(o.x+o.w/2,o.y+o.h/2,Math.max(o.w,o.h)*0.55,'b',{o,win}); }
+  for(const o of world.objects) if(o.kind==='bldg'){ const win=[];
+    if(typeof ROOF2!=='undefined'&&ROOF2[o.style]&&o.style!=='house'&&o.style!=='warehouse'){ const f=Math.min(o.h*0.32,Math.max(6,(o.height||30)*0.16)), fy=o.y+o.h-f; for(let j=3;j<f-4;j+=7) for(let k=4;k<o.w-6;k+=9) if(win.length<60) win.push([o.x+k,fy+j,rnd()<0.55]); for(let k=8;k<o.w-8;k+=12) if(win.length<80) win.push([o.x+k,o.y+5,rnd()<0.4]); }
+    else { const nw=Math.min(14,Math.max(3,((o.w*o.h)/(32*32*2))|0)); for(let i=0;i<nw;i++) win.push([o.x+4+rnd()*(o.w-12),o.y+4+rnd()*(o.h-10),rnd()<0.5]); } add(o.x+o.w/2,o.y+o.h/2,Math.max(o.w,o.h)*0.55,'b',{o,win}); }
   for(const o of world.overhead) if(o.kind==='canopy') add(o.x+o.w/2,o.y+o.h/2,Math.max(o.w,o.h)*1.1,'fl');
   for(const d of world.depots||[]){ add(d.entrance.x*PPM,d.entrance.y*PPM,160,'fl'); for(const b of d.bays||[]) add(b.kx*PPM,b.ky*PPM,90,'fl'); }
   for(const P of (typeof portList==='function'?portList():[])) if(P.slots) for(let i=0;i<P.slots.length;i+=6){ const q=PL(P,P.slots[i][0],P.slots[i][1]); add(q[0]*TILE,q[1]*TILE,190,'fl'); }
@@ -41,7 +43,7 @@ function drawNight(vx0,vy0,vx1,vy1,z){ const K=DN.dark, D=DN.dusk; if(K<0.01&&D<
   // additive colour: lamp glows, windows/neon, tail + nav lights
   ctx.globalCompositeOperation='lighter'; const gz=(col,x,y,r,a)=>{ const R=r*z; ctx.globalAlpha=a*K; ctx.drawImage(dnGlow(col),(x-vx0)*z-R,(y-vy0)*z-R,R*2,R*2); };
   let nb=0; for(const l of lights){ if(l.k==='st') gz(DN_COL.st,l.x,l.y,l.r*0.55,0.6); else if(l.k==='fl') gz(DN_COL.fl,l.x,l.y,l.r*0.5,0.45);
-    else if(l.k==='b'&&nb++<500){ const o=l.o; ctx.globalAlpha=0.75*K; const cy=o.cyber; ctx.fillStyle=cy?'#9ff':'#ffd27a'; for(const w of l.win){ if(!w[2]&&!cy) continue; ctx.fillRect((w[0]-vx0)*z,(w[1]-vy0)*z,Math.max(1.5,6*z),Math.max(1.5,4*z)); }
+    else if(l.k==='b'&&nb++<500){ const o=l.o; ctx.globalAlpha=0.75*K; const cy=o.cyber; ctx.fillStyle=cy?'#9ff':'#ffd27a'; for(const w of l.win){ if(!w[2]&&!cy) continue; ctx.fillRect((w[0]-vx0)*z,(w[1]-vy0)*z,Math.max(1.5,5*z),Math.max(1.5,4*z)); }
       if(cy){ const col=DN_NEON[(o.seed>>>3)%4]; ctx.globalAlpha=0.8*K; ctx.strokeStyle=col; ctx.lineWidth=Math.max(1.5,3*z); ctx.strokeRect((o.x-vx0)*z+2,(o.y-vy0)*z+2,o.w*z-4,o.h*z-4); gz(col,o.x+o.w/2,o.y+o.h/2,Math.max(o.w,o.h)*0.6,0.25); } } }
   for(const l of dyn) gz(l.c||DN_COL.fl,l.x,l.y,l.r*0.5,l.a||0.6);
   for(const [x,y,h,big] of veh){ if(x<vx0-200||x>vx1+200||y<vy0-200||y>vy1+200) continue; const f=fwd(h), r=[-f[1],f[0]], bk=(big?(x===truck.x*PPM?(truck.trl?15:4):9):2.2)*PPM; for(const sd of [-1,1]) gz('rgba(255,30,20,0.9)',x-f[0]*bk+r[0]*sd*1*PPM,y-f[1]*bk+r[1]*sd*1*PPM,10,0.9); for(const sd of [-1,1]) gz('rgba(255,250,220,0.9)',x+f[0]*(big?3:2.2)*PPM+r[0]*sd*0.9*PPM,y+f[1]*(big?3:2.2)*PPM+r[1]*sd*0.9*PPM,9,0.9); }

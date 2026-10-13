@@ -471,7 +471,7 @@ const PED_SOLID={cont:1,bldg:1,tank:1,silo:1,canopy:1,pump:1,stower:1,mast:1,tur
 let pedBlk=null;
 function pedMask(){ if(pedBlk) return pedBlk; 
   const blk=new Set(); const mark=(x0,y0,x1,y1)=>{ for(let y=Math.floor(y0);y<Math.ceil(y1);y++) for(let x=Math.floor(x0);x<Math.ceil(x1);x++) blk.add(x*65536+y); };
-  for(const o of world.objects){ if(!PED_SOLID[o.kind]||o.w==null||o.h==null) continue; mark(o.x/TILE-0.3,o.y/TILE-0.3,(o.x+o.w)/TILE+0.3,(o.y+o.h)/TILE+0.3); }
+  for(const o of world.objects){ if(o.kind==='tree'&&o.r){ mark(o.x/TILE-0.3,o.y/TILE-0.3,o.x/TILE+0.3,o.y/TILE+0.3); continue; } if(!PED_SOLID[o.kind]||o.w==null||o.h==null) continue; mark(o.x/TILE-0.3,o.y/TILE-0.3,(o.x+o.w)/TILE+0.3,(o.y+o.h)/TILE+0.3); }
   const P=world.port; if(P) mark(P.x0+4,P.y0-1,P.edge+3,P.y1+1); // whole yard/quay/crane rails except the gate strip
   return pedBlk=blk; }
 function pedOk(tx,ty){ return WALKABLE[get(tx,ty)]&&!pedMask().has(tx*65536+ty); }

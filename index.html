@@ -412,7 +412,7 @@ function genWorld(){
   function townBlocks(xs,ys,mode,skip){ const dtm0=mode==='dt'; if(dtm0) mode='city';
     for(let i=0;i<xs.length-1;i++) for(let j=0;j<ys.length-1;j++){ if(skip===i+','+j) continue;
       const x0=xs[i]+RW+1, y0=ys[j]+RW+1, w=xs[i+1]-x0-1, h=ys[j+1]-y0-1; if(w<4||h<4) continue; const r=R();
-      if(mode==='res'){ fill(x0,y0,w,h,T.PGRASS); for(let hx=x0;hx+4<=x0+w;hx+=5) for(const top of [true,false]){ const hh=3+(R()<0.5?1:0), yy=top?y0:y0+h-hh; if(R()<0.85){ const b=building(hx,yy,4,hh,'house',12+R()*6); if(b&&R()<0.6) objs.push({kind:'drive',x:(hx+0.3)*TILE,y:(top?yy+hh:yy-1)*TILE,seed:(R()*1e9)|0,top}); } } continue; }
+      if(mode==='res'){ fill(x0,y0,w,h,T.PGRASS); for(let hx=x0;hx+4<=x0+w;hx+=5) for(const top of [true,false]){ const hh=3+(R()<0.5?1:0), yy=top?y0:y0+h-hh; if(R()<0.85){ const b=building(hx,yy,4,hh,'house',12+R()*6); if(b){ const gy=top?yy+hh+1.2:yy-1.2; if(R()<0.6) objs.push({kind:'tree',x:(hx+1+R()*2)*TILE,y:gy*TILE,r:8+R()*5,sp:(R()*3)|0,seed:(R()*1e9)|0}); if(R()<0.5) objs.push({kind:'hedge',x:(hx+3.6)*TILE,y:(top?yy+hh+0.5:yy-0.5)*TILE,seed:(R()*1e9)|0}); } if(b&&R()<0.9) objs.push({kind:'drive',x:(hx+0.3)*TILE,y:(top?yy+hh:yy-1)*TILE,seed:(R()*1e9)|0,top}); } } continue; }
       const dtm=dtm0; const centre= dtm || (mode==='city' && i>=2&&i<=3&&j>=1&&j<=3);
       if(r<(dtm?0.05:0.1)){ park(x0,y0,w,h); continue; }
       if(r<0.18){ lot(x0+3,y0+2,w-6,h>>1); splitBuildings(x0,y0+(h>>1)+2,w,h-(h>>1)-2,['brick','office'],14,24,0.6); continue; }
@@ -424,7 +424,13 @@ function genWorld(){
   cityFill(SV,9,8); townBlocks(KB.xs,KB.ys,'dt'); const dense=(xs,ys,st,h0,h1)=>{ for(let i=0;i<xs.length-1;i++) for(let j=0;j<ys.length-1;j++){ const x0=xs[i]+RW+1,y0=ys[j]+RW+1,x1=xs[i+1]-1,y1=ys[j+1]-1;
   for(let y=y0;y+4<=y1;y+=5) for(let x=x0;x+4<=x1;x+=5){ const w=Math.min(4+(R()<0.4?1:0),x1-x),h=Math.min(4+(R()<0.4?1:0),y1-y); let ok=true; for(let q=-1;q<=h&&ok;q++) for(let k=-1;k<=w;k++){ if(!inb(x+k,y+q)){ok=false;break;} const t=G[idx(x+k,y+q)]; const edge=q<0||k<0||q===h||k===w; if(t===T.BLDG&&!edge||t===T.ROAD&&!edge||t===T.WATER||t===T.BRIDGE||t===T.BLDG){ok=false;break;} }
     if(ok){ fill(x,y,w,h,T.BLDG); objs.push({kind:'bldg',x:x*TILE,y:y*TILE,w:w*TILE,h:h*TILE,style:st[(R()*st.length)|0],height:h0+R()*(h1-h0),seed:(R()*1e9)|0}); } else if(R()<0.55){ const t=get(x+2,y+2); if(t===T.PLAZA||t===T.SAND||t===T.CONC) tree((x+2.5)*TILE,(y+2.5)*TILE,10+R()*4); } } } };
-dense(KB.xs,KB.ys,['office','glass','tower','solar','office','glass'],45,140); for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y>=KB.ys[0]*TILE&&o.y<KB.Y1*TILE) o.cyber=true; { const K=world.kbDistricts; cityFill(K.MK,2,1); for(const k of ['NG','CH','RS']) townBlocks(K[k].xs,K[k].ys,'city'); for(const k of ['NG','CH','RS']) dense(K[k].xs,K[k].ys,['office','brick','flat','glass','gravel'],22,60); townBlocks(K.RM.xs,K.RM.ys,'town'); townBlocks(K.WM.xs,K.WM.ys,'res'); townBlocks(K.OH.xs,K.OH.ys,'town'); for(let k=0;k<3;k++) ind(1772+k*18,1736,15,22); for(let k=0;k<3;k++) ind(1772+k*18,1764,15,22); } { const SH=['FRESH FISH','CHANDLERY','DOCK CAFE','TOOLS','MARINE','PARTS','KEBAB','BAIT & TACKLE']; let n=0;   // Portside shops + warehouses
+dense(KB.xs,KB.ys,['office','glass','tower','solar','office','glass'],45,140);
+  const greenUp=(xs,ys)=>{ const free=(x,y,w,h)=>{ for(let j=y;j<y+h;j++) for(let i=x;i<x+w;i++){ if(!inb(i,j)) return false; const t=G[idx(i,j)]; if(t!==T.PLAZA&&t!==T.SAND&&t!==T.CONC&&t!==T.GRASS) return false; } return true; };
+    for(let i=0;i<xs.length-1;i++) for(let j=0;j<ys.length-1;j++){ const x0=xs[i]+RW+1,y0=ys[j]+RW+1,x1=xs[i+1]-1,y1=ys[j+1]-1;
+      for(let y=y0;y+4<=y1;y+=4) for(let x=x0;x+4<=x1;x+=4){ if(!free(x,y,4,4)) continue; fill(x,y,4,4,T.PGRASS); const k=R();
+        if(k<0.3){ fill(x,y+1,4,1,T.PLAZA); fill(x+1,y,1,4,T.PLAZA); objs.push({kind:'fountain',x:(x+1.5)*TILE,y:(y+1.5)*TILE}); }
+        for(const [a,b] of [[0.6,0.6],[3.4,0.6],[0.6,3.4],[3.4,3.4]]) if(R()<0.85) objs.push({kind:'tree',x:(x+a)*TILE,y:(y+b)*TILE,r:9+R()*5,sp:(R()*3)|0,seed:(R()*1e9)|0}); } } };
+  greenUp(KB.xs,KB.ys); for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y>=KB.ys[0]*TILE&&o.y<KB.Y1*TILE) o.cyber=true; { const K=world.kbDistricts; cityFill(K.MK,2,1); for(const k of ['NG','CH','RS']) townBlocks(K[k].xs,K[k].ys,'city'); for(const k of ['NG','CH','RS']) dense(K[k].xs,K[k].ys,['office','brick','flat','glass','gravel'],22,60); for(const k of ['NG','CH','RS']) greenUp(K[k].xs,K[k].ys); townBlocks(K.RM.xs,K.RM.ys,'town'); townBlocks(K.WM.xs,K.WM.ys,'res'); townBlocks(K.OH.xs,K.OH.ys,'town'); for(let k=0;k<3;k++) ind(1772+k*18,1736,15,22); for(let k=0;k<3;k++) ind(1772+k*18,1764,15,22); } { const SH=['FRESH FISH','CHANDLERY','DOCK CAFE','TOOLS','MARINE','PARTS','KEBAB','BAIT & TACKLE']; let n=0;   // Portside shops + warehouses
   for(let y=1780;y+6<=1862;y+=7) for(let x=1690;x+7<=1850;x+=8){ let ok=true; for(let q=-1;q<=6&&ok;q++) for(let k=-1;k<=7;k++){ const t=get(x+k,y+q); if(t!==T.GRASS&&t!==T.PGRASS&&t!==T.SAND&&t!==T.CONC&&t!==T.WALK&&t!==T.PLAZA){ ok=false; break; } }
     if(ok){ const wh=R()<0.5, w=wh?7:5, h=wh?6:4; fill(x,y,w,h,T.BLDG); objs.push(Object.assign({kind:'bldg',x:x*TILE,y:y*TILE,w:w*TILE,h:h*TILE,style:wh?'warehouse':'shop',height:wh?16+R()*8:9+R()*5,seed:(R()*1e9)|0},wh?{logo:COMPANIES[(R()*COMPANIES.length)|0]}:{sign:SH[(n++)%SH.length]})); } } }
   for(const g of [MF,DW,CM,RH,FW]) townBlocks(g.xs,g.ys,'town'); townBlocks(AB.xs,AB.ys,'res');
@@ -559,6 +565,12 @@ dense(KB.xs,KB.ys,['office','glass','tower','solar','office','glass'],45,140); f
   if(typeof buildMarkings==='function') buildMarkings(objs);
   (world.tm=world.tm||[]).push(['if(typeof buildDepot',performance.now()-t0|0]);
   if(typeof buildDepots==='function') buildDepots(objs,R);
+  { const URB={[T.BLDG]:1,[T.PLAZA]:1,[T.PGRASS]:1,[T.LOT]:1,[T.PARK]:1}, D=[[1,0],[-1,0],[0,1],[0,-1]];   // street trees on the outer pavement edge + planted central reservations
+    for(let y=2;y<MH-2;y++) for(let x=2;x<MW-2;x++){ const t=G[idx(x,y)];
+      if(t===T.WALK){ for(const [dx,dy] of D){ if(G[idx(x+dx,y+dy)]!==T.ROAD||!URB[G[idx(x-dx,y-dy)]]) continue; const along=dx?y:x; if(along%4) break; const px=dy?1:0, py=dx?1:0;
+          let ok=true; for(const s of [-2,-1,1,2]) if(G[idx(x+px*s,y+py*s)]!==T.WALK||G[idx(x+px*s+dx,y+py*s+dy)]!==T.ROAD) ok=false;
+          if(ok) objs.push({kind:'tree',x:(x+0.5-dx*0.15)*TILE,y:(y+0.5-dy*0.15)*TILE,r:8+R()*3,sp:(R()*3)|0,seed:(R()*1e9)|0,street:1}); break; } }
+      else if(t===T.ISLAND&&(x+y)%3===0){ const h=G[idx(x-1,y)]===T.ISLAND&&G[idx(x+1,y)]===T.ISLAND, v=G[idx(x,y-1)]===T.ISLAND&&G[idx(x,y+1)]===T.ISLAND; if(h!==v) objs.push(R()<0.5?{kind:'hedge',x:(x+0.5)*TILE,y:(y+0.5)*TILE,seed:(R()*1e9)|0}:{kind:'tree',x:(x+0.5)*TILE,y:(y+0.5)*TILE,r:7+R()*2,sp:(R()*3)|0,seed:(R()*1e9)|0}); } } }
   (world.tm=world.tm||[]).push(['world.labels=',performance.now()-t0|0]);
   world.labels=[['WESTMERE',330,1000,1],['THE SANDREACH',1200,450,1],['HIGHMOOR',1350,1250,1],['ALBION SOUND',cW(700),700,2],['SANDREACH STRAIT',1500,cE(1500),2],['GREYFELL INLET',560,1272,2],['OUTER SEA',1024,25,2],['OUTER SEA',1024,2028,2],
     ['PORT ALBION',300,290],['SANDVALE',1640,340],['KINGSBRIDGE',1580,1590],['Millford',300,830],['Dustwater',1035,455],['Coppermine',1635,625],['Redhill',1025,1195],['Fenwick',1535,1155],['Ashby',270,1130],['Wendwood',520,890],
@@ -1648,7 +1660,7 @@ const PED_SOLID={cont:1,bldg:1,tank:1,silo:1,canopy:1,pump:1,stower:1,mast:1,tur
 let pedBlk=null;
 function pedMask(){ if(pedBlk) return pedBlk; 
   const blk=new Set(); const mark=(x0,y0,x1,y1)=>{ for(let y=Math.floor(y0);y<Math.ceil(y1);y++) for(let x=Math.floor(x0);x<Math.ceil(x1);x++) blk.add(x*65536+y); };
-  for(const o of world.objects){ if(!PED_SOLID[o.kind]||o.w==null||o.h==null) continue; mark(o.x/TILE-0.3,o.y/TILE-0.3,(o.x+o.w)/TILE+0.3,(o.y+o.h)/TILE+0.3); }
+  for(const o of world.objects){ if(o.kind==='tree'&&o.r){ mark(o.x/TILE-0.3,o.y/TILE-0.3,o.x/TILE+0.3,o.y/TILE+0.3); continue; } if(!PED_SOLID[o.kind]||o.w==null||o.h==null) continue; mark(o.x/TILE-0.3,o.y/TILE-0.3,(o.x+o.w)/TILE+0.3,(o.y+o.h)/TILE+0.3); }
   const P=world.port; if(P) mark(P.x0+4,P.y0-1,P.edge+3,P.y1+1); // whole yard/quay/crane rails except the gate strip
   return pedBlk=blk; }
 function pedOk(tx,ty){ return WALKABLE[get(tx,ty)]&&!pedMask().has(tx*65536+ty); }
@@ -3562,7 +3574,9 @@ function dnGlow(col){ return DN.glow[col]||(DN.glow[col]=dnSprite(32,[[0,col],[0
 function dnBuild(){ if(DN.grid) return; const G=new Map(), C=DN.cell; const add=(x,y,r,k,o)=>{ const key=((x/C)|0)+','+((y/C)|0); let a=G.get(key); if(!a) G.set(key,a=[]); a.push(Object.assign({x,y,r,k},o||{})); };
   for(const sg of world.segs||[]){ if(!sg||sg.b1===undefined) continue; let n=0; for(let a=sg.b0+2;a<sg.b1-1;a+=9){ const d=(n++&1)?1:-1; try{ const p=lanePt(sg,d,0,a); const o=sg.dir==='h'?[0,d*1.2]:[-d*1.2,0]; add((p[0]+o[0]*M_T)*PPM,(p[1]+o[1]*M_T)*PPM,95,'st'); }catch(e){} } }
   let s=7; const rnd=()=>{ s=(s*16807)%2147483647; return s/2147483647; };
-  for(const o of world.objects) if(o.kind==='bldg'){ const win=[]; const nw=Math.min(14,Math.max(3,((o.w*o.h)/(32*32*2))|0)); for(let i=0;i<nw;i++) win.push([o.x+4+rnd()*(o.w-12),o.y+4+rnd()*(o.h-10),rnd()<0.5]); add(o.x+o.w/2,o.y+o.h/2,Math.max(o.w,o.h)*0.55,'b',{o,win}); }
+  for(const o of world.objects) if(o.kind==='bldg'){ const win=[];
+    if(typeof ROOF2!=='undefined'&&ROOF2[o.style]&&o.style!=='house'&&o.style!=='warehouse'){ const f=Math.min(o.h*0.32,Math.max(6,(o.height||30)*0.16)), fy=o.y+o.h-f; for(let j=3;j<f-4;j+=7) for(let k=4;k<o.w-6;k+=9) if(win.length<60) win.push([o.x+k,fy+j,rnd()<0.55]); for(let k=8;k<o.w-8;k+=12) if(win.length<80) win.push([o.x+k,o.y+5,rnd()<0.4]); }
+    else { const nw=Math.min(14,Math.max(3,((o.w*o.h)/(32*32*2))|0)); for(let i=0;i<nw;i++) win.push([o.x+4+rnd()*(o.w-12),o.y+4+rnd()*(o.h-10),rnd()<0.5]); } add(o.x+o.w/2,o.y+o.h/2,Math.max(o.w,o.h)*0.55,'b',{o,win}); }
   for(const o of world.overhead) if(o.kind==='canopy') add(o.x+o.w/2,o.y+o.h/2,Math.max(o.w,o.h)*1.1,'fl');
   for(const d of world.depots||[]){ add(d.entrance.x*PPM,d.entrance.y*PPM,160,'fl'); for(const b of d.bays||[]) add(b.kx*PPM,b.ky*PPM,90,'fl'); }
   for(const P of (typeof portList==='function'?portList():[])) if(P.slots) for(let i=0;i<P.slots.length;i+=6){ const q=PL(P,P.slots[i][0],P.slots[i][1]); add(q[0]*TILE,q[1]*TILE,190,'fl'); }
@@ -3589,7 +3603,7 @@ function drawNight(vx0,vy0,vx1,vy1,z){ const K=DN.dark, D=DN.dusk; if(K<0.01&&D<
   // additive colour: lamp glows, windows/neon, tail + nav lights
   ctx.globalCompositeOperation='lighter'; const gz=(col,x,y,r,a)=>{ const R=r*z; ctx.globalAlpha=a*K; ctx.drawImage(dnGlow(col),(x-vx0)*z-R,(y-vy0)*z-R,R*2,R*2); };
   let nb=0; for(const l of lights){ if(l.k==='st') gz(DN_COL.st,l.x,l.y,l.r*0.55,0.6); else if(l.k==='fl') gz(DN_COL.fl,l.x,l.y,l.r*0.5,0.45);
-    else if(l.k==='b'&&nb++<500){ const o=l.o; ctx.globalAlpha=0.75*K; const cy=o.cyber; ctx.fillStyle=cy?'#9ff':'#ffd27a'; for(const w of l.win){ if(!w[2]&&!cy) continue; ctx.fillRect((w[0]-vx0)*z,(w[1]-vy0)*z,Math.max(1.5,6*z),Math.max(1.5,4*z)); }
+    else if(l.k==='b'&&nb++<500){ const o=l.o; ctx.globalAlpha=0.75*K; const cy=o.cyber; ctx.fillStyle=cy?'#9ff':'#ffd27a'; for(const w of l.win){ if(!w[2]&&!cy) continue; ctx.fillRect((w[0]-vx0)*z,(w[1]-vy0)*z,Math.max(1.5,5*z),Math.max(1.5,4*z)); }
       if(cy){ const col=DN_NEON[(o.seed>>>3)%4]; ctx.globalAlpha=0.8*K; ctx.strokeStyle=col; ctx.lineWidth=Math.max(1.5,3*z); ctx.strokeRect((o.x-vx0)*z+2,(o.y-vy0)*z+2,o.w*z-4,o.h*z-4); gz(col,o.x+o.w/2,o.y+o.h/2,Math.max(o.w,o.h)*0.6,0.25); } } }
   for(const l of dyn) gz(l.c||DN_COL.fl,l.x,l.y,l.r*0.5,l.a||0.6);
   for(const [x,y,h,big] of veh){ if(x<vx0-200||x>vx1+200||y<vy0-200||y>vy1+200) continue; const f=fwd(h), r=[-f[1],f[0]], bk=(big?(x===truck.x*PPM?(truck.trl?15:4):9):2.2)*PPM; for(const sd of [-1,1]) gz('rgba(255,30,20,0.9)',x-f[0]*bk+r[0]*sd*1*PPM,y-f[1]*bk+r[1]*sd*1*PPM,10,0.9); for(const sd of [-1,1]) gz('rgba(255,250,220,0.9)',x+f[0]*(big?3:2.2)*PPM+r[0]*sd*0.9*PPM,y+f[1]*(big?3:2.2)*PPM+r[1]*sd*0.9*PPM,9,0.9); }
