@@ -55,6 +55,7 @@ function shade(hex,f){ const n=parseInt(hex.slice(1),16); let r=n>>16,g=(n>>8)&2
 function drawShadowRect(g,x,y,w,h,s){ g.fillStyle='rgba(10,15,25,0.33)'; g.beginPath(); g.moveTo(x+w,y); g.lineTo(x+w+s,y+s); g.lineTo(x+w+s,y+h+s); g.lineTo(x+s,y+h+s); g.lineTo(x,y+h); g.lineTo(x+w,y+h); g.closePath(); g.fill(); }
 function acUnit(g,x,y,r){ g.fillStyle='#d6d8dc'; g.fillRect(x,y,14,12); g.fillStyle='#9ea2a8'; g.fillRect(x,y+11,14,1); g.fillRect(x+13,y,1,12); g.fillStyle='#55595f'; g.beginPath(); g.arc(x+7,y+6,4,0,7); g.fill(); g.strokeStyle='#888'; g.beginPath(); g.moveTo(x+3,y+6); g.lineTo(x+11,y+6); g.moveTo(x+7,y+2); g.lineTo(x+7,y+10); g.stroke(); g.fillStyle='rgba(0,0,0,0.25)'; g.fillRect(x+14,y+2,3,12); }
 function roof(g,o){
+  if(ROOF2[o.style]) return roof2(g,o);
   const r=mulberry(o.seed), x=o.x,y=o.y,w=o.w,h=o.h, st=o.style;
   const pal={office:['#9aa3ad','#7f8893'],glass:['#5b88a8','#3f6a8a'],gravel:['#8f8a80','#7a756c'],tower:['#b8b4ac','#8f8b84'],brick:['#a0503c','#7f3b2b'],flat:['#c5c0b5','#a39e93'],green:['#6f9a5a','#557a44'],warehouse:['#8c97a3','#6f7a86'],depot:['#d77c2b','#a85b1b'],shop:['#d8d2c4','#b0a99a'],house:['#b5523b','#8a3a28']}[st]||['#999','#777'];
   if(st==='house'){
@@ -122,7 +123,7 @@ function drawSign(g,o){ if(!o.sign) return; const big=o.style==='supermarket'; g
 function drawObject(g,o){
   if(OBJX[o.kind]) return OBJX[o.kind](g,o);
   switch(o.kind){
-  case 'bldg': if(o.style!=='stadium') drawShadowRect(g,o.x,o.y,o.w,o.h,o.height*0.55); else { g.fillStyle='rgba(10,15,25,0.3)'; g.beginPath(); g.ellipse(o.x+o.w/2+14,o.y+o.h/2+14,o.w/2,o.h/2,0,0,7); g.fill(); } roof(g,o); drawSign(g,o); break;
+  case 'bldg': if(ROOF2[o.style]){} else if(o.style!=='stadium') drawShadowRect(g,o.x,o.y,o.w,o.h,o.height*0.55); else { g.fillStyle='rgba(10,15,25,0.3)'; g.beginPath(); g.ellipse(o.x+o.w/2+14,o.y+o.h/2+14,o.w/2,o.h/2,0,0,7); g.fill(); } roof(g,o); drawSign(g,o); break;
   case 'awning': { const b=o.b, s=b.front, c=b.awning; const L= s==='n'||s==='s'? b.w : b.h; g.save();
     if(s==='n'){ g.translate(b.x,b.y-14); } else if(s==='s'){ g.translate(b.x,b.y+b.h); } else if(s==='w'){ g.translate(b.x-14,b.y); } else { g.translate(b.x+b.w,b.y); }
     const hor=(s==='n'||s==='s'); for(let k=0;k<L;k+=8){ g.fillStyle= (k/8)%2?'#f4f4f4':c; if(hor) g.fillRect(k,0,8,14); else g.fillRect(0,k,14,8); }
