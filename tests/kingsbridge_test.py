@@ -25,8 +25,12 @@ AUDIT=r"""(()=>{ const W=__bigrig.world,S=W.segs, X0=1385,Y0=1370,X1=1945,Y1=194
   for(const sg of DG){ if(!sg.js.length) fail.push('diagonal stub without junction '+sg.id); for(const J of sg.js) if(!J.lights) fail.push('diagonal junction unlit '+J.x+','+J.y);
     for(let b=sg.b0;b<=sg.b1;b++) for(let k=0;k<sg.w;k++) dset.add(sg.dir==='h'?idx(b,sg.a+k):idx(sg.a+k,b)); }
   const dcv=W.curves.filter(c=>c.name==='Northgate Diagonal'); if(dcv.length!==DG.length-1) fail.push('diagonal links '+dcv.length); for(const c of dcv){ if(!c.A||!c.B) fail.push('diagonal curve not tied '+c.id); for(const [x,y] of c.pts) dset.add(idx(Math.floor(x),Math.floor(y))); }
+  const CH=W.kbChan||[]; if(CH.length!==2) fail.push('channel diagonal stubs missing'); for(const sg of CH){ if(!sg.js.length) fail.push('channel stub without junction'); for(const J of sg.js) if(!J.lights) fail.push('channel junction unlit');
+    for(let b=sg.b0;b<=sg.b1;b++) for(let k=0;k<sg.w;k++) dset.add(sg.dir==='h'?idx(b,sg.a+k):idx(sg.a+k,b)); }
+  const ccv=W.curves.filter(c=>c.name==='Channel Diagonal'); if(ccv.length!==1||!ccv[0].A||!ccv[0].B) fail.push('channel curve not tied'); for(const c of ccv) for(const [x,y] of c.pts){ dset.add(idx(Math.floor(x),Math.floor(y))); if(G[idx(Math.floor(x),Math.floor(y))]!==T.ROAD&&G[idx(Math.floor(x),Math.floor(y))]!==T.BRIDGE) fail.push('channel tile painted over '+x+','+y); }
   window.__diag=dset; const diagJ=DG.reduce((n,sg)=>n+sg.js.length,0);
   return {diagJunctions:diagJ,junctions:kbJ.length,lit:kbJ.filter(J=>J.lights).length,tiles,unreached,fail}; })()"""
+OVL=r"""(()=>{ const vs=__bigrig.traffic.vs; let n=0; for(let i=0;i<vs.length;i++) for(let j=i+1;j<vs.length;j++){ const a=vs[i],c=vs[j]; if((a.layer|0)===(c.layer|0)&&Math.hypot(a.x-c.x,a.y-c.y)<1.2) n++; } return n; })()"""
 SAMPLE=r"""(()=>{ const out=[]; for(const v of __bigrig.traffic.vs){ const tx=v.x/M_T,ty=v.y/M_T; if(tx<1385||ty<1370) continue; out.push([v.id!==undefined?v.id:(v.__i||(v.__i=Math.random())),+v.x.toFixed(1),+v.y.toFixed(1),+(v.v||0).toFixed(2),window.__diag.has(idx(Math.floor(tx),Math.floor(ty)))?1:0]); } return out; })()"""
 async def main():
   async with async_playwright() as p:
@@ -37,17 +41,18 @@ async def main():
       await pg.goto('file://'+os.path.abspath(HTML)); await pg.wait_for_function("window.__bigrig&&__bigrig.world.ready",timeout=120000)
       await pg.keyboard.press('Enter'); await pg.wait_for_timeout(500)
       a=await pg.evaluate(AUDIT)
-      await pg.evaluate("(()=>{const VW_="+str(vw)+",t=__bigrig.truck; t.x=(VW_<500?1460:1617)*M_T; t.y=(VW_<500?1470:1600)*M_T; t.v=0; if(t.trl) t.trl=null;})()")
+      await pg.evaluate("(()=>{const VW_="+str(vw)+",t=__bigrig.truck; t.x=(VW_<500?1460:1775)*M_T; t.y=(VW_<500?1470:1775)*M_T; t.v=0; if(t.trl) t.trl=null;})()")
       # AI soak: 100 s; a vehicle that never moves more than 2 m the whole time is stuck (longest light cycle < 80 s)
-      first={}; last={}; still=0; onDiag=set()
+      first={}; last={}; still=0; ovl=0; onDiag=set()
       for k in range(50):
         await pg.wait_for_timeout(2000)
+        ovl+=await pg.evaluate(OVL)
         for vid,x,y,v,dg in await pg.evaluate(SAMPLE):
           if dg: onDiag.add(vid)
           first.setdefault(vid,(x,y,k)); last[vid]=(x,y,k)
       stuck=[vid for vid,(x,y,k) in first.items() if last[vid][2]-k>=45 and abs(last[vid][0]-x)+abs(last[vid][1]-y)<2]
-      r=dict(stuckAt=[(round(first[v][0]/4),round(first[v][1]/4)) for v in stuck],audit=a,aiOnDiagonal=len(onDiag),aiSeen=len(first),aiStuck=len(stuck),errors=errs); res[f'{vw}x{vh}']=r
-      if a['fail'] or stuck or errs: ok=False
+      r=dict(overlaps=ovl,stuckAt=[(round(first[v][0]/4),round(first[v][1]/4)) for v in stuck],audit=a,aiOnDiagonal=len(onDiag),aiSeen=len(first),aiStuck=len(stuck),errors=errs); res[f'{vw}x{vh}']=r
+      if a['fail'] or stuck or errs or ovl: ok=False
       diagSeen=globals().setdefault('DS',[0]); diagSeen[0]+=len(onDiag)
       await pg.close()
     await b.close(); print(json.dumps(res,indent=1)); ok=ok and DS[0]>0; print('PASS' if ok else 'FAIL'); sys.exit(0 if ok else 1)

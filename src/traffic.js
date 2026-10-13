@@ -434,13 +434,13 @@ function stepVeh(v,dt,pbs){
   if(typeof railStopAcc==='function'){ const ra=railStopAcc(v,v0); if(ra<acc) acc=ra; }
   v.sig=sig;
   // leader search along own path
-  let lgap=1e9, lvel=0, lplayer=false; const cands=[];
+  let lgap=1e9, lvel=0, lplayer=false, lveh=null; const cands=[];
   const kx=Math.floor(v.x/HC), ky=Math.floor(v.y/HC);
   for(let dx=-2;dx<=2;dx++) for(let dy=-2;dy<=2;dy++){ const a=traffic.hash.get((kx+dx+4096)*8192+ky+dy+4096); if(!a) continue;
     for(const b of a){ if(b.veh===v) continue; if(v.ghostT>0&&!b.player) continue; if(Math.abs(b.x-v.x)>48||Math.abs(b.y-v.y)>48) continue; if(foApart(v.layer,v.x,v.y,b.lay,b.x,b.y)) continue; cands.push(b); } }
   if(cands.length){ const half=v.W/2+0.35;
     for(let k=0;k<17;k++){ const sd=front+0.4+k*2.5; const p=pathAt(v,sd); const px=p[0]+v.offX, py=p[1]+v.offY;
-      for(const b of cands){ if(ptBoxDist(px,py,b)<half){ const g=sd-front; if(g<lgap){ lgap=g; const rel=Math.cos(b.h-v.h); lvel=Math.max(0,(b.vel||0)*rel); lplayer=!!b.player; } } }
+      for(const b of cands){ if(ptBoxDist(px,py,b)<half){ const g=sd-front; if(g<lgap){ lgap=g; const rel=Math.cos(b.h-v.h); lvel=Math.max(0,(b.vel||0)*rel); lplayer=!!b.player; lveh=b.veh||null; } } }
       if(lgap<1e8) break; } }
   if(lgap<1e8) acc=Math.min(acc,idmAcc(v,v0,lgap,lvel));
   acc=Math.min(acc,idmAcc(v,v0,1e9,0));
@@ -456,7 +456,10 @@ function stepVeh(v,dt,pbs){
   v.honkT-=dt;
   if(v.honkT<=0 && (v.shakeT>1.3 || v.blockT>1.4 || (lplayer&&lgap<5&&pv>4))){ honkAt(v.x,v.y,v.heavy); v.honkT=2.5+v.r()*3; v.honking=0.5; }
   if(v.honking>0) v.honking-=dt;
-  if(v.stopT>7 && !lplayer && lgap<6){ v.ghostT=2.5; v.stopT=0; }
+  v.lead=lgap<1e8?lveh:null;
+  // deadlock breaker: only ghost through the car ahead when the queue is genuinely locked (a loop of cars waiting on each other, or the
+  // head of the queue has been stood for over a minute) — never just because we are queued behind a red light (v24: cars were driving into each other)
+  if(v.stopT>7 && !lplayer && lgap<6 && queueLocked(v)){ v.ghostT=2.5; v.stopT=0; }
   if(v.ghostT>0) v.ghostT-=dt;
   if(v.shakeT<=0 && (v.offX||v.offY)){
     // recovery: a forward shove is simply absorbed as progress along the path (never slide back into whoever hit us);
@@ -468,6 +471,9 @@ function stepVeh(v,dt,pbs){
   if(Math.hypot(v.offX,v.offY)>3.5 && v.stopT>2){ v.ghostT=Math.max(v.ghostT,2); }
   placeVeh(v); trimPath(v);
 }
+function queueLocked(v){ const seen=new Set([v]); let c=v.lead, n=0;
+  while(c&&n<40){ if(seen.has(c)) return true; seen.add(c); if(traffic.vs.indexOf(c)<0) return true; if(!c.lead) return (c.stopT||0)>60; c=c.lead; n++; }
+  return n>=40; }
 // ---------------- parked cars ----------------
 function initParked(){
   const r=mulberry(777);

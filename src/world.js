@@ -216,7 +216,10 @@ function genWorld(){
   link('city',RW,KD.RM.cols[1],0,KD.RM.cols[3],0,[[KD.RM.xs[2]+2,1384]],8,'Royal Crescent');
   link('city',RW,KD.OH.cols[0],1,KD.OH.cols[2],1,[[KD.OH.xs[1]+2,KD.OH.Y1+22]],8,'Harbour Crescent');
   // diagonal avenues along district edges (curves; drivable + routable)
-  pending.push(()=>{ curve('city',RW,crSpline([[1716,1700],[1722,1706],[1745,1740],[1800,1800],[1840,1858],[1845,1870]],0.5),null,null,'Channel Diagonal'); });
+  { // v24 Channel Diagonal: tied at both ends — T off the K3 Portway (clear of its roundabout) and T into the coast road — so AI and sat nav use it
+    const n=road('v',1738,1683,1690,RW,'city'), e=road('v',1826,1856,1865,RW,'city'); n.name=e.name='Channel Diagonal';
+    link('city',RW,n,1,e,0,[[1752,1740],[1800,1800]],10,'Channel Diagonal'); world.kbChan=[n,e]; }
+  pending.push(()=>{ });
   world.kbDistricts=KD;
   { // v24 Northgate Diagonal: a staircase avenue across the Northgate grid. Each street it crosses is crossed mid-block on a short straight
     // stub (a real signalised crossroads), the stubs are joined by drivable curves, and both ends T into the grid — so AI and sat nav use it.
