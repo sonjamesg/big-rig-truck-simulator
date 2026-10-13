@@ -95,8 +95,8 @@ function mobLayout(){ if(!MOB.on) return; const W=innerWidth, H=innerHeight, por
     const DH=H-deckTop, u=Math.min(W/412,DH/330); const S=v=>v*u;
     const dcx=S(78), dcy=deckTop+S(98), k=S(38); place('mUp',dcx-k/2,dcy-k*1.5,k,k); place('mDown',dcx-k/2,dcy+k/2,k,k); place('mLeft',dcx-k*1.5,dcy-k/2,k,k); place('mRight',dcx+k/2,dcy-k/2,k,k); place('mCen',dcx-k/2,dcy-k/2,k,k);
     const ab=S(58); place('mB',W-S(150),dcy-ab*0.2,ab,ab); place('mA',W-S(78),dcy-ab*0.85,ab,ab);
-    const fy=deckTop+S(178), fw=Math.min(S(56),(W-40)/5-8), gap=(W-5*fw)/6; ['mCouple','mFuel','mUnload','mHand','mHorn'].forEach((id,i)=>place(id,gap+i*(fw+gap),fy,fw,fw*0.78)); ['mIndL','mHaz','mIndR'].forEach((id,i)=>place(id,gap+(i*2)*(fw+gap),fy+fw*0.84,fw,fw*0.5));
-    const py=fy+fw*1.48; place('mMap',W/2-S(86),py,S(66),S(24)); place('mJobs',W/2+S(14),py,S(66),S(24)); place('mChat',S(14),py-S(6),S(48),S(36),MP.on);
+    const fy=deckTop+S(178), fw=Math.min(S(56),(W-40)/5-8), gap=(W-5*fw)/6; ['mCouple','mFuel','mUnload','mHand','mHorn'].forEach((id,i)=>place(id,gap+i*(fw+gap),fy,fw,fw*0.78)); ['mIndL','mHaz','mIndR'].forEach((id,i)=>place(id,gap+(i*2)*(fw+gap),fy+fw*1.08,fw,fw*0.5));
+    const py=fy+fw*1.78; place('mMap',W/2-S(86),py,S(66),S(24)); place('mJobs',W/2+S(14),py,S(66),S(24)); place('mChat',S(14),py-S(6),S(48),S(36),MP.on);
     for(const id of ['mSteer','mGas','mBrk']) place(id,0,0,0,0,false);
   }
   cv.style.width=cw+'px'; cv.style.height=ch+'px'; fr.style.left=cx+'px'; fr.style.top=cy+'px'; fr.style.width=cw+'px'; fr.style.height=ch+'px';
