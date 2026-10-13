@@ -24,9 +24,11 @@ function bdEnd(){ BREAKDOWN.active=false; const i=world.smokers.indexOf(BREAKDOW
 function bdPanel(){ let p=document.getElementById('bdPanel'); if(!p){ p=document.createElement('div'); p.id='bdPanel'; document.getElementById('frame').appendChild(p); }
   p.style.cssText='position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:30;background:rgba(20,10,8,0.92);border:2px solid #ff5a36;border-radius:14px;padding:18px 22px;color:#fff;font-family:system-ui,sans-serif;text-align:center;min-width:300px;box-shadow:0 10px 40px rgba(0,0,0,0.6)';
   p.innerHTML='<div style="font:900 26px system-ui;letter-spacing:3px;color:#ff6a3d">\u26a0 BROKEN DOWN</div><div style="opacity:.8;margin:6px 0 14px;font-size:13px">Engine failure \u2014 damage 100%</div>'+
-    BREAKDOWN.options.filter(o=>o.enabled()).map(o=>'<button class="btn bdOpt" data-id="'+o.id+'" style="display:block;width:100%;margin:6px 0;padding:10px;font:800 16px system-ui;border-radius:10px;border:none;background:#f5b82e;color:#111;cursor:pointer">'+o.label+'<div style="font:600 11px system-ui;opacity:.75">'+o.sub()+'</div></button>').join('');
+    BREAKDOWN.options.filter(o=>o.enabled()).map((o,i)=>'<button class="btn bdOpt" data-id="'+o.id+'" style="display:block;width:100%;margin:6px 0;padding:10px;font:800 16px system-ui;border-radius:10px;border:none;background:#f5b82e;color:#111;cursor:pointer">'+(typeof pad!=='undefined'&&pad.active&&i===0?'\u24b6 ':'')+o.label+'<div style="font:600 11px system-ui;opacity:.75">'+o.sub()+'</div></button>').join('');
+  bdFocus(); if(!document.getElementById('pfcss')){ const st=document.createElement('style'); st.id='pfcss'; st.textContent='.bdOpt.padfocus{outline:3px solid #f5b82e;outline-offset:2px}'; document.head.appendChild(st); }
   for(const b of p.querySelectorAll('.bdOpt')) b.onclick=()=>{ const o=BREAKDOWN.options.find(o=>o.id===b.dataset.id); if(o) o.run(); }; }
-addEventListener('keydown',e=>{ if(BREAKDOWN.active&&e.code==='Enter'){ const b=document.querySelector('#bdPanel .bdOpt'); if(b) b.click(); } });
+// focus the first option so pad A / Enter / Space pick it straight away
+function bdFocus(){ setTimeout(()=>{ if(typeof padNav==='function') padNav(null); },0); }
 function updateBreakdown(dt){ if(!started) return; if(!BREAKDOWN.active&&truck.damage>=100) bdStart(); if(!BREAKDOWN.active) return; BREAKDOWN.t+=dt;
   const f=fwd(truck.h); BREAKDOWN.smoke.x=(truck.x+f[0]*4.2)*PPM; BREAKDOWN.smoke.y=(truck.y+f[1]*4.2)*PPM; if(navigator.vibrate&&BREAKDOWN.t<0.05) try{ navigator.vibrate(200); }catch(e){} }
 function drawBreakdown(){ if(!BREAKDOWN.active||((timeS*1.6)%1)>0.55) return; const f=fwd(truck.h), r=[-f[1],f[0]]; ctx.save();

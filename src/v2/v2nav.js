@@ -17,11 +17,11 @@ function v2Route(sx,sy,gx,gy,hd){ const g=world.v2, P=g.P, N=g.N; const A=v2Near
   const ea=dist[B.p.a]+part(B.p,0,B.i), eb=dist[B.p.b]+part(B.p,B.i,B.p.pts.length-1); if(Math.min(ea,eb)>=1e17) return null;
   const endNode=ea<=eb?B.p.a:B.p.b; const chain=[]; for(let n=endNode;n!==A.p.a&&n!==A.p.b&&via[n]>=0;n=from[n]) chain.push([via[n],n]); chain.reverse();
   const startNode=chain.length?(P[chain[0][0]].a===chain[0][1]?P[chain[0][0]].b:P[chain[0][0]].a):endNode;
-  const out=[]; const add=(pts)=>{ for(const q of pts){ const l=out[out.length-1]; if(!l||Math.hypot(l[0]-q[0],l[1]-q[1])>0.05) out.push(q); } };
-  add(startNode===A.p.b?S.slice(i):S.slice(0,i+1).reverse());
-  for(const [ei,n] of chain){ const p=P[ei]; add(p.b===n?p.pts:p.pts.slice().reverse()); }
-  const BP=B.p.pts; add(endNode===B.p.a?BP.slice(0,B.i+1):BP.slice(B.i).reverse());
-  return out; }
+  const out=[]; const OW=[]; let curOW=false; const add0=(pts)=>{ for(const q of pts){ const l=out[out.length-1]; if(!l||Math.hypot(l[0]-q[0],l[1]-q[1])>0.05){ out.push(q); OW.push(curOW); } } }; const add=(pts)=>add0(pts); const _unused=(pts)=>{ for(const q of pts){ const l=out[out.length-1]; if(!l||Math.hypot(l[0]-q[0],l[1]-q[1])>0.05) out.push(q); } };
+  curOW=A.p.type==='ramp'; add(startNode===A.p.b?S.slice(i):S.slice(0,i+1).reverse());
+  for(const [ei,n] of chain){ const p=P[ei]; curOW=p.type==='ramp'; add(p.b===n?p.pts:p.pts.slice().reverse()); }
+  curOW=B.p.type==='ramp'; const BP=B.p.pts; add(endNode===B.p.a?BP.slice(0,B.i+1):BP.slice(B.i).reverse());
+  out.ow=OW; return out; }
 const _setRouteLegacy=setRoute;
 setRoute=function(target){ if(!world.v2) return _setRouteLegacy(target);
   let tx,ty,name; if(typeof target==='string'){ const d=world.depots.find(o=>o.id===target||o.code===target), f=world.fuel.find(o=>o.id===target), g=world.garages.find(o=>o.id===target); target=d||f||g; if(!target) return null; }
@@ -29,12 +29,12 @@ setRoute=function(target){ if(!world.v2) return _setRouteLegacy(target);
   const tgt={x:tx*M_T,y:ty*M_T,name,ref:target}, f=fwd(truck.h), t0=performance.now();
   const pts=v2Route((truck.x+f[0]*2)/M_T,(truck.y+f[1]*2)/M_T,tx,ty,truck.h); if(!pts||pts.length<2){ NAV.fail='graph'; flash('Sat nav: no road route found'); NAV.route=null; return null; }
   // resample every 2 m (metres)
-  const Pm=[[pts[0][0]*M_T,pts[0][1]*M_T]]; for(let k=1;k<pts.length;k++){ const a=Pm[Pm.length-1], b=[pts[k][0]*M_T,pts[k][1]*M_T], d=Math.hypot(b[0]-a[0],b[1]-a[1]); if(d<2&&k<pts.length-1) continue; const n=Math.max(1,Math.floor(d/2)); for(let q=1;q<=n;q++) Pm.push([a[0]+(b[0]-a[0])*q/n,a[1]+(b[1]-a[1])*q/n]); }
+  const Pm=[[pts[0][0]*M_T,pts[0][1]*M_T]], OWm=[!!(pts.ow&&pts.ow[0])]; for(let k=1;k<pts.length;k++){ const a=Pm[Pm.length-1], b=[pts[k][0]*M_T,pts[k][1]*M_T], d=Math.hypot(b[0]-a[0],b[1]-a[1]); if(d<2&&k<pts.length-1) continue; const n=Math.max(1,Math.floor(d/2)); for(let q=1;q<=n;q++){ Pm.push([a[0]+(b[0]-a[0])*q/n,a[1]+(b[1]-a[1])*q/n]); OWm.push(!!(pts.ow&&pts.ow[k])); } }
   const n=Pm.length, cum=new Float32Array(n), eta=new Float32Array(n), path=Pm.map(p=>idx(Math.max(0,Math.min(MW-1,Math.floor(p[0]/M_T))),Math.max(0,Math.min(MH-1,Math.floor(p[1]/M_T)))));
   for(let k=1;k<n;k++) cum[k]=cum[k-1]+Math.hypot(Pm[k][0]-Pm[k-1][0],Pm[k][1]-Pm[k-1][1]); for(let k=n-2;k>=0;k--) eta[k]=eta[k+1]+(cum[k+1]-cum[k])/12;
   const turns=[]; const W=8; let lastK=-99; const hdg=(a,b)=>Math.atan2(Pm[b][0]-Pm[a][0],-(Pm[b][1]-Pm[a][1]));
   for(let k=W;k<n-W;k++){ const d=wrapA(hdg(k,k+W)-hdg(k-W,k)); if(Math.abs(d)<0.7) continue; let mx=true; for(let q=k-4;q<=k+4;q++) if(q!==k&&q>=W&&q<n-W&&Math.abs(wrapA(hdg(q,q+W)-hdg(q-W,q)))>Math.abs(d)) mx=false; if(!mx||k-lastK<12) continue;
     turns.push({k,kind:Math.abs(d)>2.4?'u':d>0?'R':'L',ang:d}); lastK=k; }
   turns.push({k:n-1,kind:'arrive'});
-  NAV.route={target:tgt,path,P:Pm,cum,eta,turns,idx:0,len:cum[n-1],ms:performance.now()-t0,v2:true}; NAV.offT=0; NAV.lastCalc=timeS;
+  NAV.route={target:tgt,path,P:Pm,cum,eta,turns,idx:0,len:cum[n-1],ms:performance.now()-t0,v2:true,oneway:OWm}; NAV.offT=0; NAV.lastCalc=timeS;
   BigRig.emit('route',{target:tgt,length:NAV.route.len,ms:NAV.route.ms}); return NAV.route; };
