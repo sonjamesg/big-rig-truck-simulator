@@ -41,6 +41,7 @@ function stepTruck(s,inp,dt){ if(typeof FX!=='undefined'&&FX.boom){ s.v=0; s.thr
   s.skid=(s.skid?brk>0.6:s.lockT>0.15)&&Math.abs(s.v)>3;
   // ----- surface
   const surf=surfaceAt(s); s.offroad=(surf===T.GRASS||surf===T.PGRASS||surf===T.SAND||surf===T.GRAVEL);
+  { const f=fwd(s.h), qx=(s.x-f[0]*2)*PPM/TILE, qy=(s.y-f[1]*2)*PPM/TILE, rb=rbAtTile(Math.floor(qx),Math.floor(qy)); if(rb) s.offroad=rbSurf(rb,qx,qy)!==1; }   // roundabout: exact flared outline
   // ----- gearbox & engine
   const dir= s.mode==='R'?-1:1, av=Math.abs(s.v);
   const ratio= s.mode==='R'? REV_RATIO : GEARS[s.gear-1];

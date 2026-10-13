@@ -40,6 +40,68 @@ function regionAt(x,y){ return x<cW(y)?'Westmere':y<cE(x)?'The Sandreach':'Highm
 function isDesert(x,y){ if(x<cW(y)+20||y>cE(x)-25+(vnoise(x,y,60)-0.5)*110) return false; return !(y>560 && x<cW(y)+150+(vnoise(x+50,y,80)-0.5)*140); }
 function forestD(x,y){ return vnoise(x,y,120)*0.6+vnoise(x+77,y+5,40)*0.4; }
 world.regionAt=regionAt; world.hills=HILLS; world.isDesert=isDesert;
+// ===================== v24 UK ROUNDABOUT GEOMETRY (clockwise, drive on the left) =====================
+// Every arm flares into the ring through two asphalt fillets (circles tangent to the road edge and the ring),
+// entry/exit AI paths are tangential Bezier curves, a kerbed splitter island sits between them and the
+// on-road test follows the exact painted outline (not the 4 m tile grid).
+const RB_RF=4.5, RB_VEH=0.55;   // fillet radius (tiles), splitter clearance from a vehicle path centre (tiles)
+function rbRingR(rb){ return rb.rin*0.42+rb.rout*0.58; }
+function rbArmGeom(rb,arm){ if(arm.g) return arm.g; const sg=world.segs[arm.seg], s=arm.side;
+  const o=sg.dir==='h'?[-s,0]:[0,-s], l=[-o[1],o[0]];   // o: outward along the arm, l: entry side (left of inbound traffic)
+  const cl=sg.a+sg.w/2, Ept=sg.dir==='h'?[s>0?sg.b1+1:sg.b0,cl]:[cl,s>0?sg.b1+1:sg.b0];
+  const dx=Ept[0]-rb.cx, dy=Ept[1]-rb.cy, uE=dx*o[0]+dy*o[1], c=dx*l[0]+dy*l[1], hw=sg.w/2;
+  const fil=[]; for(const sd of [1,-1]){ const e=c+sd*hw; let Rf=RB_RF, vf=e+sd*Rf, H=rb.rout+Rf;
+      let uf=H*H>vf*vf?Math.sqrt(H*H-vf*vf):0; if(uf>uE+1.5){ Rf=Math.max(1,Rf*0.6); vf=e+sd*Rf; H=rb.rout+Rf; uf=Math.sqrt(Math.max(0,H*H-vf*vf)); }
+      const tr=[uf*rb.rout/H, vf*rb.rout/H]; fil.push({sd,e,Rf,uf,vf,tr}); }
+  return arm.g={sg,o,l,uE,c,hw,fil}; }
+const rbW=(g,rb,u,v)=>[rb.cx+g.o[0]*u+g.l[0]*v, rb.cy+g.o[1]*u+g.l[1]*v];
+// lane centre (tiles) of lane i at the arm mouth; inbound=true for traffic heading into the ring
+function rbLanePt(rb,arm,i,inbound,back){ const g=rbArmGeom(rb,arm), sg=g.sg, d=inbound?arm.side:-arm.side;
+  const lat=(sg.dir==='h'? (d>0? sg.a+i : sg.a+sg.w-1-i) : (d<0? sg.a+i : sg.a+sg.w-1-i))+0.5; const along=(arm.side>0?sg.b1+1:sg.b0)-arm.side*(back||0);
+  return sg.dir==='h'?[along,lat]:[lat,along]; }
+function rbBez(P0,t0,P1,t1,k0,k1){ const D=Math.hypot(P1[0]-P0[0],P1[1]-P0[1]), L=D*Math.max(k0,k1), C1=[P0[0]+t0[0]*D*k0,P0[1]+t0[1]*D*k0], C2=[P1[0]-t1[0]*D*k1,P1[1]-t1[1]*D*k1], out=[];
+  const n=Math.max(8,Math.ceil(L*6)); for(let k=0;k<=n;k++){ const t=k/n,u=1-t; out.push([0,1].map(j=>u*u*u*P0[j]+3*u*u*t*C1[j]+3*u*t*t*C2[j]+t*t*t*P1[j])); } return out; }
+const RB_DIN=0.62, RB_DOUT=0.62, RB_BACK=4;
+// entry: lane mouth -> tangent onto the ring; returns {pts (tiles), phi (ring angle where it joins)}
+function rbEntry(rb,arm,lane){ const g=rbArmGeom(rb,arm), P0=rbLanePt(rb,arm,lane,true,RB_BACK), R=rbRingR(rb);
+  const phi=Math.atan2(P0[1]-rb.cy,P0[0]-rb.cx)+RB_DIN, P1=[rb.cx+Math.cos(phi)*R,rb.cy+Math.sin(phi)*R];
+  return {pts:rbBez(P0,[-g.o[0],-g.o[1]],P1,[-Math.sin(phi),Math.cos(phi)],0.28,0.45),phi}; }
+function rbExit(rb,arm,lane){ const g=rbArmGeom(rb,arm), P1=rbLanePt(rb,arm,lane,false,RB_BACK), R=rbRingR(rb);
+  const phi=Math.atan2(P1[1]-rb.cy,P1[0]-rb.cx)-RB_DOUT, P0=[rb.cx+Math.cos(phi)*R,rb.cy+Math.sin(phi)*R];
+  return {pts:rbBez(P0,[-Math.sin(phi),Math.cos(phi)],P1,g.o,0.45,0.28),phi}; }
+// kerbed splitter island between the entry and exit paths (polygon in tiles) + painted hatch nose
+function rbSplitter(rb,arm){ const g=rbArmGeom(rb,arm); if(g.split!==undefined) return g.split; const sg=g.sg, nl=Math.max(1,Math.floor(sg.w/2));
+  const paths=[]; for(let i=0;i<nl;i++){ paths.push(rbEntry(rb,arm,i).pts); paths.push(rbExit(rb,arm,i).pts); }
+  const loc=p=>{ const dx=p[0]-rb.cx, dy=p[1]-rb.cy; return [dx*g.o[0]+dy*g.o[1], dx*g.l[0]+dy*g.l[1]]; };
+  const lp=paths.map(P=>P.map(loc)); const u0=rb.rout+0.15, u1=g.uE+3; const L=[],Rr=[];
+  for(let u=u0;u<=u1+1e-6;u+=0.1){ let vp=1e9, vn=-1e9;   // nearest path centre on each side of the arm centreline at this u (vehicle footprint ~ RB_VEH)
+    for(const P of lp) for(const q of P){ if(Math.abs(q[0]-u)>RB_VEH) continue; const dv=q[1]-g.c; if(dv>0) vp=Math.min(vp,dv-Math.sqrt(Math.max(0,RB_VEH*RB_VEH-(q[0]-u)*(q[0]-u)))); else vn=Math.max(vn,dv+Math.sqrt(Math.max(0,RB_VEH*RB_VEH-(q[0]-u)*(q[0]-u)))); }
+    if(vp>50) vp=0.5; if(vn<-50) vn=-0.5; const a=Math.min(vp,2.6), b=Math.max(vn,-2.6); if(a<0.06||b>-0.06) break; L.push([u,g.c+a]); Rr.push([u,g.c+b]); }
+  if(L.length<4){ g.split=null; return null; }
+  // the base hugs the ring edge: trim points inside rout
+  const poly=[...L,...Rr.reverse()].map(([u,v])=>rbW(g,rb,u,v)); const nose=rbW(g,rb,L[L.length-1][0],g.c);
+  return g.split={poly,nose,uN:L[L.length-1][0],base:[rbW(g,rb,L[0][0],L[0][1]),rbW(g,rb,Rr[Rr.length-1][0],Rr[Rr.length-1][1])],baseV:[L[0][1],Rr[Rr.length-1][1]]}; }
+function pinPoly(P,x,y){ let c=false; for(let i=0,j=P.length-1;i<P.length;j=i++){ const a=P[i],b=P[j]; if((a[1]>y)!==(b[1]>y)&&x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0]) c=!c; } return c; }
+// exact surface of a roundabout at tile-space point: 1 asphalt, 2 central island / splitter (kerbed), 0 verge
+function rbSurf(rb,x,y){ const dx=x-rb.cx, dy=y-rb.cy, r=Math.hypot(dx,dy);
+  for(const arm of rb.arms){ const sp=rbSplitter(rb,arm); if(sp&&pinPoly(sp.poly,x,y)) return 2; }
+  if(r<=rb.rout) return r<rb.rin?2:1;
+  for(const arm of rb.arms){ const g=rbArmGeom(rb,arm), u=dx*g.o[0]+dy*g.o[1], v=dx*g.l[0]+dy*g.l[1]; if(u<=0) continue;
+    if(Math.abs(v-g.c)<=g.hw && u<=g.uE+0.05) return 1;
+    for(const f of g.fil){ const s=f.sd*(v-f.e); if(s>0&&s<=f.Rf&&u<=f.uf&&Math.hypot(u-f.uf,v-f.vf)>=f.Rf) return 1; } }
+  return 0; }
+function rbAtTile(tx,ty){ const k=world.rbMask?world.rbMask[idx(tx,ty)]:0; return k?world.rbs[k-1]:null; }
+// physics / AI / lamps: true when the point (tiles) is drivable asphalt, using the exact roundabout outline where one applies
+function onTarmacT(x,y){ const tx=Math.floor(x),ty=Math.floor(y); if(!inb(tx,ty)) return false; const rb=rbAtTile(tx,ty); if(rb) return rbSurf(rb,x,y)===1; const t=G[idx(tx,ty)]; return t===T.ROAD||t===T.BRIDGE; }
+// paint tiles to match the outline: fully-asphalt tiles become ROAD, partly-covered tiles stay verge (the object draws the smooth edge)
+function rbPaint(rb){ if(!world.rbMask) world.rbMask=new Uint8Array(MW*MH); const ext=rb.rout+RB_RF+3;
+  for(let ty=Math.floor(rb.cy-ext);ty<=rb.cy+ext;ty++) for(let tx=Math.floor(rb.cx-ext);tx<=rb.cx+ext;tx++){ if(!inb(tx,ty)) continue; const i=idx(tx,ty);
+    const own=world.roadH[i]===-2||world.roadV[i]===-2, road=G[i]===T.ROAD||G[i]===T.BRIDGE; if(road&&!own) continue;   // other carriageways keep their tiles
+    let a=0,isl=0; for(const [ox,oy] of [[0.5,0.5],[0.02,0.02],[0.98,0.02],[0.02,0.98],[0.98,0.98]]){ const s=rbSurf(rb,tx+ox,ty+oy); if(s===1) a++; else if(s===2) isl++; }
+    if(!a&&!isl&&!own) continue; world.rbMask[i]=rb.id+1;
+    if(a===5){ if(!road) G[i]=world.water&&world.water[i]?T.BRIDGE:T.ROAD; world.roadH[i]=world.roadV[i]=-2; }
+    else if(isl===5&&Math.hypot(tx+0.5-rb.cx,ty+0.5-rb.cy)<rb.rin){ G[i]=T.ISLAND; world.roadH[i]=world.roadV[i]=-1; }
+    else if(G[i]!==T.WATER){ G[i]=(world.water&&world.water[i])?T.BRIDGE:(isDesert(tx,ty)?T.SAND:T.GRASS); if(G[i]!==T.BRIDGE) world.roadH[i]=world.roadV[i]=-1; } } }
 function genWorld(){
   const t0=performance.now();
   const R = mulberry(20261012);
@@ -92,7 +154,7 @@ function genWorld(){
     for(let y=Math.floor(cy-rout-1);y<=cy+rout+1;y++) for(let x=Math.floor(cx-rout-1);x<=cx+rout+1;x++){ const d=Math.hypot(x+0.5-cx,y+0.5-cy);
       if(d<=rout+0.3 && d>=rin-0.3){ set(x,y,water[idx(x,y)]?T.BRIDGE:T.ROAD); world.roadH[idx(x,y)]=-2; world.roadV[idx(x,y)]=-2; }
       else if(d<rin-0.3) set(x,y,T.ISLAND); }
-    world.objects.push({kind:'rb',x:(cx-rout-1)*TILE,y:(cy-rout-1)*TILE,w:(2*rout+2)*TILE,h:(2*rout+2)*TILE,rb,seed:(R()*1e9)|0});
+    { const e=rout+RB_RF+5; world.objects.push({kind:'rb',x:(cx-e)*TILE,y:(cy-e)*TILE,w:2*e*TILE,h:2*e*TILE,rb,seed:(R()*1e9)|0}); }
     return rb;
   }
   // ---- smooth curved roads (motorway bends, winding country roads) joining straight segment ends
@@ -350,6 +412,7 @@ function genWorld(){
   for(const rb of world.rbs){ for(const sg of S){
     const ends= sg.dir==='h' ? [[sg.b0,sg.a+sg.w/2,-1],[sg.b1+1,sg.a+sg.w/2,1]] : [[sg.a+sg.w/2,sg.b0,-1],[sg.a+sg.w/2,sg.b1+1,1]];
     for(const [ex,ey,side] of ends){ const d=Math.hypot(ex-rb.cx,ey-rb.cy); if(d<rb.rout+2.5){ rb.arms.push({seg:sg.id,side,ang:Math.atan2(ey-rb.cy,ex-rb.cx)}); sg['rb'+(side<0?0:1)]=rb.id; } } } }
+  for(const rb of world.rbs) rbPaint(rb);
   for(const sg of S) sg.js.sort((a,b)=> sg.dir==='h'? a.x-b.x : a.y-b.y);
   (world.tm=world.tm||[]).push(['// ---------------- ',performance.now()-t0|0]);
   // ---------------- buildings & landmarks ----------------
@@ -645,6 +708,7 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
 }
 function onRoadM(mx,my){
   const px=mx*PPM, py=my*PPM, tx=Math.floor(px/TILE), ty=Math.floor(py/TILE); if(!inb(tx,ty)) return false;
+  { const rb=rbAtTile(tx,ty); if(rb) return rbSurf(rb,px/TILE,py/TILE)===1; }
   const ci=world.cornerAt[idx(tx,ty)];
   if(ci>=0){ const c=world.corners[ci]; return Math.hypot(px/TILE-c.cx,py/TILE-c.cy)>c.R; }
   const t=G[idx(tx,ty)]; return t===T.ROAD||t===T.BRIDGE;

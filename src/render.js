@@ -124,6 +124,53 @@ function drawSign(g,o){ if(!o.sign) return; const big=o.style==='supermarket'; g
   g.translate(sx,sy); if(o.front==='w') { g.translate(-o.w/2+10,0); g.rotate(-Math.PI/2); } if(o.front==='e'){ g.translate(o.w/2-10,0); g.rotate(Math.PI/2); }
   if(tw+8>(o.front==='w'||o.front==='e'?o.h:o.w)-4 && !big){ g.restore(); return; }
   g.fillStyle=big?'#c0392b':'rgba(20,24,30,0.85)'; g.fillRect(-tw/2-5,-fs/2-3,tw+10,fs+6); g.fillStyle=big?'#fff':['#f5d76e','#fff','#7fdcff','#ff8c8c'][o.seed%4]; g.textAlign='center'; g.textBaseline='middle'; g.fillText(o.sign,0,1); g.restore(); }
+// v24 UK roundabout: flared fillet entries/exits, kerbed outline, continuous edge lines, splitter islands with keep-left bollards, give-way lines
+function drawRB(g,o){ const rb=o.rb, X=rb.cx*TILE, Y=rb.cy*TILE, Ro=rb.rout*TILE, S=TILE, P=p=>[p[0]*S,p[1]*S];
+  const W=(gm,u,v)=>P(rbW(gm,rb,u,v)), ang=p=>Math.atan2(p[1]-rb.cy,p[0]-rb.cx);
+  const G2=rb.arms.map(a=>rbArmGeom(rb,a));
+  // asphalt outline as subpaths: ring disc, arm mouths, fillets
+  const shape=(withArms,op)=>{ g.beginPath(); g.arc(X,Y,Ro,0,Math.PI*2); op();
+    for(const gm of G2){ if(withArms){ const a=W(gm,0,gm.c-gm.hw), b=W(gm,gm.uE+0.6,gm.c-gm.hw), c=W(gm,gm.uE+0.6,gm.c+gm.hw), d=W(gm,0,gm.c+gm.hw); g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.lineTo(c[0],c[1]); g.lineTo(d[0],d[1]); g.closePath(); op(); }
+      for(const f of gm.fil){ const fc=W(gm,f.uf,f.vf), te=W(gm,f.uf,f.e), tr=W(gm,f.tr[0],f.tr[1]), a0=Math.atan2(te[1]-fc[1],te[0]-fc[0]), a1=Math.atan2(tr[1]-fc[1],tr[0]-fc[0]);
+        const in0=W(gm,0,f.e); g.beginPath(); g.moveTo(in0[0],in0[1]); g.lineTo(te[0],te[1]); let da=a1-a0; while(da>Math.PI) da-=2*Math.PI; while(da<-Math.PI) da+=2*Math.PI; g.arc(fc[0],fc[1],f.Rf*S,a0,a0+da,da<0); g.lineTo(X,Y); g.closePath(); op(); } } };
+  // kerb + verge shadow first, then tarmac over it: only the outer boundary keeps the kerb
+  g.save(); g.lineJoin='round'; g.strokeStyle='rgba(0,0,0,0.18)'; g.lineWidth=14; shape(false,()=>g.stroke()); g.strokeStyle='#b9b6ad'; g.lineWidth=7; shape(false,()=>g.stroke());
+  g.fillStyle=g.createPattern(TEX.asph[2],'repeat'); shape(true,()=>g.fill()); g.restore();
+  // continuous edge line: ring arcs between arms + fillet arcs (offset 0.18 tiles inside the kerb)
+  const off=0.2; g.strokeStyle='#ececec'; g.lineWidth=3; g.lineCap='butt';
+  const ends=[]; for(const gm of G2) for(const f of gm.fil){ const tr=rbW(gm,rb,f.tr[0],f.tr[1]); ends.push({a:ang(tr),gm,f}); }
+  ends.sort((p,q)=>p.a-q.a);
+  // ring arcs: from each fillet's ring tangent to the next tangent clockwise, skipping arm mouths (pairs belonging to the same arm across its mouth)
+  for(let i=0;i<ends.length;i++){ const A=ends[i], B=ends[(i+1)%ends.length]; let da=B.a-A.a; if(da<=0) da+=Math.PI*2; if(A.gm===B.gm&&da<Math.PI) continue; g.beginPath(); g.arc(X,Y,(rb.rout-off)*S,A.a,A.a+da); g.stroke(); }
+  for(const gm of G2) for(const f of gm.fil){ const fc=W(gm,f.uf,f.vf), te=W(gm,f.uf,f.e), tr=W(gm,f.tr[0],f.tr[1]), a0=Math.atan2(te[1]-fc[1],te[0]-fc[0]), a1=Math.atan2(tr[1]-fc[1],tr[0]-fc[0]);
+    let da=a1-a0; while(da>Math.PI) da-=2*Math.PI; while(da<-Math.PI) da+=2*Math.PI; g.beginPath(); g.arc(fc[0],fc[1],(f.Rf+off)*S,a0,a0+da,da<0);
+    const e2=W(gm,gm.uE+0.6,f.e-f.sd*off), e1=W(gm,f.uf,f.e-f.sd*off); g.moveTo(e1[0],e1[1]); g.lineTo(e2[0],e2[1]); g.stroke(); }
+  // inner edge line round the central island + lane divider on the circulatory carriageway
+  g.beginPath(); g.arc(X,Y,(rb.rin+off)*S,0,Math.PI*2); g.stroke();
+  g.lineWidth=2; g.setLineDash([16,16]); g.beginPath(); g.arc(X,Y,(rb.rin+rb.rout)/2*S,0,Math.PI*2); g.stroke(); g.setLineDash([]);
+  // central island: kerb, verge, trees
+  g.fillStyle='#8a877f'; g.beginPath(); g.arc(X,Y,rb.rin*S,0,7); g.fill(); g.fillStyle=g.createPattern(TEX.island[0],'repeat'); g.beginPath(); g.arc(X,Y,rb.rin*S-5,0,7); g.fill();
+  const r=mulberry(o.seed); for(let k=0;k<6;k++){ const a=r()*6.28, d=r()*rb.rin*S*0.6; drawObject(g,{kind:'tree',x:X+Math.cos(a)*d,y:Y+Math.sin(a)*d,r:9+r()*6,seed:(r()*1e9)|0}); }
+  for(let k=0;k<rb.arms.length;k++){ const arm=rb.arms[k], gm=G2[k], sp=rbSplitter(rb,arm);
+    // give-way: double dashed line across the entry mouth along the ring edge (entry side, v>c), triangle just behind it
+    const f=gm.fil.find(q=>q.sd>0), aT=ang(rbW(gm,rb,f.tr[0],f.tr[1])); const vb=sp?sp.baseV[0]:gm.c, aS=ang(rbW(gm,rb,Math.sqrt(Math.max(0,rb.rout*rb.rout-vb*vb)),vb));
+    let a0=aS, a1=aT; if(((a1-a0+Math.PI*3)%(Math.PI*2))-Math.PI<0){ const t=a0; a0=a1; a1=t; } let da=a1-a0; while(da<0) da+=Math.PI*2;
+    g.strokeStyle='#ececec'; g.lineWidth=4; g.setLineDash([12,9]); for(const rr of [rb.rout+0.12,rb.rout+0.42]){ g.beginPath(); g.arc(X,Y,rr*S,a0+0.02,a0+da-0.02); g.stroke(); } g.setLineDash([]);
+    const tri=W(gm,rb.rout+2.4,(vb+gm.c+gm.hw+1.2)/2); g.save(); g.translate(tri[0],tri[1]); g.rotate(Math.atan2(gm.o[1],gm.o[0])+Math.PI/2); g.lineWidth=3; g.beginPath(); g.moveTo(-11,-26); g.lineTo(11,-26); g.lineTo(0,26); g.closePath(); g.stroke(); g.restore();
+    if(!sp) continue;
+    // painted hatched nose ahead of the raised island
+    const n0=W(gm,sp.uN,gm.c), n1=W(gm,gm.uE+RB_BACK+2.5,gm.c), nl=W(gm,sp.uN,gm.c+0.12), nr=W(gm,sp.uN,gm.c-0.12);
+    g.fillStyle='#ececec'; g.beginPath(); g.moveTo(nl[0],nl[1]); g.lineTo(n1[0],n1[1]); g.lineTo(nr[0],nr[1]); g.closePath(); g.fill();
+    // raised splitter island: shadow, kerb, block paving / grass, keep-left bollards at both noses
+    const pp=sp.poly.map(P); const path=()=>{ g.beginPath(); g.moveTo(pp[0][0],pp[0][1]); for(const q of pp) g.lineTo(q[0],q[1]); g.closePath(); };
+    g.save(); g.translate(3,3); path(); g.fillStyle='rgba(0,0,0,0.28)'; g.fill(); g.restore();
+    path(); g.fillStyle='#c9c6bd'; g.fill(); g.lineJoin='round'; g.strokeStyle='#e8e6df'; g.lineWidth=2; g.stroke();
+    g.save(); path(); g.clip(); g.fillStyle=g.createPattern(TEX.island[0],'repeat'); g.translate(0,0); g.beginPath(); g.moveTo(pp[0][0],pp[0][1]); for(const q of pp) g.lineTo(q[0],q[1]); g.closePath(); g.lineWidth=8; g.strokeStyle='#c9c6bd'; g.fill(); g.stroke(); g.restore();
+    const bol=(p)=>{ g.fillStyle='rgba(0,0,0,0.35)'; g.beginPath(); g.arc(p[0]+3,p[1]+3,6,0,7); g.fill(); g.fillStyle='#f4f4f4'; g.beginPath(); g.arc(p[0],p[1],6,0,7); g.fill(); g.fillStyle='#1d5fbf'; g.beginPath(); g.arc(p[0],p[1],4.2,0,7); g.fill();
+      g.strokeStyle='#fff'; g.lineWidth=1.6; g.beginPath(); const dx=-gm.o[0]*2.6, dy=-gm.o[1]*2.6, lx=gm.l[0]*2.6, ly=gm.l[1]*2.6; g.moveTo(p[0]-dx-lx,p[1]-dy-ly); g.lineTo(p[0]+dx+lx,p[1]+dy+ly); g.stroke(); };
+    const nose=W(gm,sp.uN-0.35,gm.c); bol(nose);
+    const bm=W(gm,rb.rout+0.55,(sp.baseV[0]+sp.baseV[1])/2); bol(bm); }
+  g.lineWidth=1; }
 function drawObject(g,o){
   if(OBJX[o.kind]) return OBJX[o.kind](g,o);
   switch(o.kind){
@@ -140,14 +187,7 @@ function drawObject(g,o){
   case 'bale': { g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.arc(o.x+4,o.y+4,9,0,7); g.fill(); g.fillStyle='#d8b55a'; g.beginPath(); g.arc(o.x,o.y,9,0,7); g.fill(); g.strokeStyle='#a8873a'; g.beginPath(); g.arc(o.x,o.y,5,0,7); g.stroke(); break; }
   case 'silo': { g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.arc(o.x+16,o.y+16,o.r,0,7); g.fill(); const gr=g.createRadialGradient(o.x-8,o.y-8,2,o.x,o.y,o.r); gr.addColorStop(0,'#f0f0f0'); gr.addColorStop(1,'#8d9196'); g.fillStyle=gr; g.beginPath(); g.arc(o.x,o.y,o.r,0,7); g.fill(); g.fillStyle='#666'; g.beginPath(); g.arc(o.x,o.y,4,0,7); g.fill(); break; }
   case 'fountain': { const R2=o.big?44:22; g.fillStyle='#9aa3ad'; g.beginPath(); g.arc(o.x,o.y,R2+5,0,7); g.fill(); g.fillStyle='#4a90d9'; g.beginPath(); g.arc(o.x,o.y,R2,0,7); g.fill(); g.fillStyle='#c8e6ff'; g.beginPath(); g.arc(o.x,o.y,R2*0.3,0,7); g.fill(); g.strokeStyle='rgba(255,255,255,0.6)'; g.beginPath(); g.arc(o.x,o.y,R2*0.6,0,7); g.stroke(); break; }
-  case 'rb': { const rb=o.rb, X=rb.cx*TILE, Y=rb.cy*TILE; g.fillStyle=g.createPattern(TEX.asph[2],'repeat'); for(const am of rb.arms){ const sg=world.segs[am.seg]; const E=(am.side<0?sg.b0:sg.b1+1)*TILE, C=sg.dir==='h'?X:Y; const lo=Math.min(E,C), hi=Math.max(E,C); if(sg.dir==='h') g.fillRect(lo,sg.a*TILE,hi-lo,sg.w*TILE); else g.fillRect(sg.a*TILE,lo,sg.w*TILE,hi-lo); } g.beginPath(); g.arc(X,Y,rb.rout*TILE,0,7); g.fill();
-    g.strokeStyle='#ececec'; g.lineWidth=2; g.setLineDash([16,16]); g.beginPath(); g.arc(X,Y,(rb.rin+rb.rout)/2*TILE,0,7); g.stroke(); g.setLineDash([]);
-    g.strokeStyle='#ececec'; g.beginPath(); g.arc(X,Y,rb.rout*TILE-6,0,7); g.stroke();
-    g.fillStyle='#8a877f'; g.beginPath(); g.arc(X,Y,rb.rin*TILE,0,7); g.fill(); g.fillStyle=g.createPattern(TEX.island[0],'repeat'); g.beginPath(); g.arc(X,Y,rb.rin*TILE-5,0,7); g.fill();
-    const r=mulberry(o.seed); for(let k=0;k<6;k++){ const a=r()*6.28, d=r()*rb.rin*TILE*0.6; drawObject(g,{kind:'tree',x:X+Math.cos(a)*d,y:Y+Math.sin(a)*d,r:9+r()*6,seed:(r()*1e9)|0}); }
-    // give-way triangles on each arm
-    g.fillStyle='#ececec'; for(const a of rb.arms){ const px=X+Math.cos(a.ang)*(rb.rout*TILE+8), py=Y+Math.sin(a.ang)*(rb.rout*TILE+8); g.save(); g.translate(px,py); g.rotate(a.ang+Math.PI/2); for(let k=-40;k<=40;k+=10) g.fillRect(k,-2,6,4); g.restore(); }
-    g.lineWidth=1; break; }
+  case 'rb': drawRB(g,o); break;
   case 'tree': drawTree(g,o); break;
   case 'lot': { g.strokeStyle='#e6e6e0'; g.lineWidth=2; const bay=24, r=mulberry(o.seed);
     for(const row of [0,1]){ const y0=o.y+(row?o.h/2:0); for(let x=o.x+4;x<o.x+o.w-4;x+=bay){ g.beginPath(); g.moveTo(x,y0+(row?o.h/2-40:4)); g.lineTo(x,y0+(row?o.h/2-4:40)); g.stroke();

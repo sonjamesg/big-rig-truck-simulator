@@ -78,10 +78,10 @@ function drawApproach(g,o){
   }
   g.fillStyle='#ececec';
   if(o.mode==='lights') rect(a1,a1-d*0.16,rmin+0.08,rmax-0.02);                  // stop line
-  if(o.mode==='gw'||o.mode==='rb'){ for(let c=rmin+0.08;c<rmax-0.1;c+=0.5){ const c2=Math.min(rmax-0.04,c+0.3); rect(a1-d*0.04,a1-d*0.14,c,c2); rect(a1-d*0.24,a1-d*0.34,c,c2); } }
+  if(o.mode==='gw'){ for(let c=rmin+0.08;c<rmax-0.1;c+=0.5){ const c2=Math.min(rmax-0.04,c+0.3); rect(a1-d*0.04,a1-d*0.14,c,c2); rect(a1-d*0.24,a1-d*0.34,c,c2); } }
   if(L<2) return;
   for(let i=0;i<nl;i++){ const cr=laneLat(sg,d,i)+0.5;
-    if((o.mode==='gw'||o.mode==='rb') && L>=3) at(a1-d*2.0,cr,()=>{ g.strokeStyle='#ececec'; g.lineWidth=3; g.beginPath(); g.moveTo(-10,-22); g.lineTo(10,-22); g.lineTo(0,26); g.closePath(); g.stroke(); });
+    if(o.mode==='gw' && L>=3) at(a1-d*2.0,cr,()=>{ g.strokeStyle='#ececec'; g.lineWidth=3; g.beginPath(); g.moveTo(-10,-22); g.lineTo(10,-22); g.lineTo(0,26); g.closePath(); g.stroke(); });
     const p1= o.mode==='gw'||o.mode==='rb' ? 4.4 : 2.5;
     if(L>=p1+1 && (nl>1||o.lanes[0].length<3||o.mode==='rb')) at(a1-d*p1,cr,()=>drawLaneArrow(g,o.lanes[i]));
     if(L>=p1+22 && !o.slow && nl>1) at(a1-d*(p1+5.5),cr,()=>drawLaneArrow(g,o.lanes[i]));
