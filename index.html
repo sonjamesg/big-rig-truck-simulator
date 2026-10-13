@@ -191,11 +191,11 @@ function genWorld(){
     if(A) world.segs[A.seg]['cv'+A.end]={cv:cv.id,start:true};
     if(B) world.segs[B.seg]['cv'+B.end]={cv:cv.id,start:false};
     const hw=w/2; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; let wet=0;
-    for(const [px,py] of pts){ x0=Math.min(x0,px); y0=Math.min(y0,py); x1=Math.max(x1,px); y1=Math.max(y1,py);
+    for(let pi=0;pi<pts.length;pi++){ const px=pts[pi][0],py=pts[pi][1]; x0=Math.min(x0,px); y0=Math.min(y0,py); x1=Math.max(x1,px); y1=Math.max(y1,py);
       for(let ty=Math.floor(py-hw-1);ty<=py+hw+1;ty++) for(let tx=Math.floor(px-hw-1);tx<=px+hw+1;tx++){ if(!inb(tx,ty)) continue;
         if(Math.hypot(tx+0.5-px,ty+0.5-py)>hw+0.05) continue; const i=idx(tx,ty);
-        if(world.roadH[i]!==-1||world.roadV[i]!==-1){ if(world.roadH[i]>=0||world.roadV[i]>=0){ const e0=Math.hypot(px-pts[0][0],py-pts[0][1]), e1=Math.hypot(px-pts[pts.length-1][0],py-pts[pts.length-1][1]); if(Math.min(e0,e1)>w+1){ conflicts++; (world.cflog=world.cflog||[]).push([name||type,tx,ty,world.roadH[i],world.roadV[i]]); } } continue; }
-        world.under[i]=G[i]; const wt=water[i]||G[i]===T.WATER; if(wt) wet++; G[i]=wt?T.BRIDGE:T.ROAD; world.roadH[i]=-3; world.roadV[i]=-3; } }
+        if(world.roadH[i]!==-1||world.roadV[i]!==-1){ if(world.roadH[i]>=0||world.roadV[i]>=0){ const e0=Math.hypot(px-pts[0][0],py-pts[0][1]), e1=Math.hypot(px-pts[pts.length-1][0],py-pts[pts.length-1][1]); if(Math.min(e0,e1)>w+1){ conflicts++; (world.cflog=world.cflog||[]).push([name||type,tx,ty,world.roadH[i],world.roadV[i]]); (cv.cfI=cv.cfI||[]).push(pi); (cv.cfT=cv.cfT||new Set()).add(i); } } continue; }
+        (world.cvOwn||(world.cvOwn=new Int16Array(MW*MH).fill(-1)))[i]=cv.id; world.under[i]=G[i]; const wt=water[i]||G[i]===T.WATER; if(wt) wet++; G[i]=wt?T.BRIDGE:T.ROAD; world.roadH[i]=-3; world.roadV[i]=-3; } }
     cv.bridge=wet>0;
     // tightest radius -> advisory speed
     let rmin=1e9; for(let i=4;i<pts.length-4;i+=2){ const a=pts[i-4],b=pts[i],c=pts[i+4]; const A2=Math.abs((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0])); const la=Math.hypot(b[0]-a[0],b[1]-a[1]),lb=Math.hypot(c[0]-b[0],c[1]-b[1]),lc=Math.hypot(c[0]-a[0],c[1]-a[1]); if(A2>1e-6) rmin=Math.min(rmin,la*lb*lc/(2*A2)); }
@@ -332,6 +332,7 @@ function genWorld(){
   (world.tm=world.tm||[]).push(['for(const f of pendi',performance.now()-t0|0]);
   for(const f of pending) f();
   world.curveConflicts=conflicts;
+  buildFlyovers();
   (world.tm=world.tm||[]).push(['// segment continuat',performance.now()-t0|0]);
   // segment continuations (same direction, abutting) -> lane drops / gains
   for(const a of world.segs) for(const b of world.segs){ if(a===b||a.dir!==b.dir||b.b0!==a.b1+1) continue;
@@ -686,6 +687,22 @@ function onRoadM(mx,my){
   const t=G[idx(tx,ty)]; return t===T.ROAD||t===T.BRIDGE;
 }
 
+// v20: flyovers — a curved major road (motorway / dual / rural link with real ends) that crosses a straight road mid-span, with no junction,
+// is grade-separated: raised deck drawn over the lower road, traffic layers (upper never meets lower), sat nav keeps them unconnected.
+// City/town curves with no tied ends (diagonal avenues) are meant as at-grade streets and are left alone.
+function buildFlyovers(){ world.flyovers=[]; const Z=world.foZ=new Uint8Array(MW*MH), F=world.foF=new Uint8Array(MW*MH);
+  for(const cv of world.curves){ if(!cv.cfI||!cv.cfI.length) continue; if(!(cv.A&&cv.B) && (cv.type==='city'||cv.type==='town'||cv.type==='res')) continue;
+    const I=[...new Set(cv.cfI)].sort((a,b)=>a-b); const groups=[]; let g=[I[0],I[0]];
+    for(const i of I.slice(1)){ if(i-g[1]<=8) g[1]=i; else { groups.push(g); g=[i,i]; } } groups.push(g);
+    for(const [a0,b0] of groups){ const pad=Math.ceil(cv.w*2)+4, a=Math.max(0,a0-pad), b=Math.min(cv.pts.length-1,b0+pad);
+      const fo={id:world.flyovers.length,cv:cv.id,a,b,a0,b0,lower:new Set()}; world.flyovers.push(fo); (cv.fo=cv.fo||[]).push(fo);
+      const hw=cv.w/2+4; for(let k=a;k<=b;k++){ const [px,py]=cv.pts[k]; for(let ty=Math.floor(py-hw);ty<=py+hw;ty++) for(let tx=Math.floor(px-hw);tx<=px+hw;tx++){ if(!inb(tx,ty)) continue; if(Math.hypot(tx+0.5-px,ty+0.5-py)<=hw) Z[idx(tx,ty)]=fo.id+1; } } } }
+  for(const cv of world.curves) if(cv.fo&&cv.cfT) for(const i of cv.cfT){ F[i]=1; const s=world.roadH[i]>=0?world.roadH[i]:world.roadV[i]; for(const fo of cv.fo) if(Z[i]===fo.id+1) fo.lower.add(s); }
+  for(const fo of world.flyovers) fo.lower=[...fo.lower];
+}
+// layer test for any two boxes (AI or player): different layers inside the same flyover zone never interact
+function foApart(la,xa,ya,lb,xb,yb){ if((la|0)===(lb|0)||!world.foZ) return false; const za=world.foZ[idx(Math.floor(xa/M_T),Math.floor(ya/M_T))], zb=world.foZ[idx(Math.floor(xb/M_T),Math.floor(yb/M_T))]; return za>0&&za===zb; }
+
 'use strict';
 // ===================== TEXTURES & CHUNK RENDERING =====================
 function mkCanvas(w,h){ const c=document.createElement('canvas'); c.width=w; c.height=h; return c; }
@@ -944,13 +961,14 @@ function drawTaper(g,tp){ const P=tp.pts, n=P.length, T_=TILE;
       g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.lineTo(c[0]-ux*8,c[1]-uy*8); g.stroke();
       g.beginPath(); g.moveTo(c[0]+ux*4,c[1]+uy*4); g.lineTo(c[0]-ux*12-uy*7,c[1]-uy*12+ux*7); g.lineTo(c[0]-ux*12+uy*7,c[1]-uy*12-ux*7); g.closePath(); g.fill(); } }
   g.restore(); }
-function drawCurve(g,cv){
+function drawCurve(g,cv,rng){
   if(!cv.px) cv.px=cv.pts.map(p=>[p[0]*TILE,p[1]*TILE]); const P=cv.px, W=cv.w*TILE, n=P.length;
   // only the part of the curve inside this chunk (plus margin)
-  let i0=0,i1=n-1; if(CUR_CHUNK){ const [x0,y0,x1,y1]=CUR_CHUNK, m=W+60; i0=n; i1=-1; for(let i=0;i<n;i++){ const p=P[i]; if(p[0]>x0-m&&p[0]<x1+m&&p[1]>y0-m&&p[1]<y1+m){ if(i<i0) i0=i; i1=i; } } if(i1<0) return; i0=Math.max(0,i0-1); i1=Math.min(n-1,i1+1); }
+  let i0=0,i1=n-1; if(rng){ i0=rng[0]; i1=rng[1]; } else if(CUR_CHUNK){ const [x0,y0,x1,y1]=CUR_CHUNK, m=W+60; i0=n; i1=-1; for(let i=0;i<n;i++){ const p=P[i]; if(p[0]>x0-m&&p[0]<x1+m&&p[1]>y0-m&&p[1]<y1+m){ if(i<i0) i0=i; i1=i; } } if(i1<0) return; i0=Math.max(0,i0-1); i1=Math.min(n-1,i1+1); }
   g.save(); g.lineCap='butt'; g.lineJoin='round';
   const wet=i=>{ const tx=Math.floor(cv.pts[i][0]),ty=Math.floor(cv.pts[i][1]); return get(tx,ty)===T.BRIDGE; };
-  if(cv.bridge){ let a=-1; for(let i=i0;i<=i1+1;i++){ const w=i<=i1&&wet(i); if(w&&a<0) a=i; if(!w&&a>=0){ const b=Math.min(i1,i+2), s=Math.max(i0,a-2);
+  if(cv.fo&&!rng) for(const fo of cv.fo){ const a=Math.max(i0,fo.a), b=Math.min(i1,fo.b); if(a<b) foUnder(g,cv,P,a,b,fo); }
+  if(cv.bridge&&!rng){ let a=-1; for(let i=i0;i<=i1+1;i++){ const w=i<=i1&&wet(i); if(w&&a<0) a=i; if(!w&&a>=0){ const b=Math.min(i1,i+2), s=Math.max(i0,a-2);
         g.save(); g.translate(18,18); curvePath(g,P,s,b,0); g.strokeStyle='rgba(5,25,45,0.35)'; g.lineWidth=W+18; g.stroke(); g.restore();
         curvePath(g,P,s,b,0); g.strokeStyle='#a4a8ad'; g.lineWidth=W+16; g.stroke();
         for(const sd of [-1,1]){ curvePath(g,P,s,b,sd*(W/2+5)); g.strokeStyle='#dfe2e6'; g.lineWidth=4; g.stroke(); curvePath(g,P,s,b,sd*(W/2+5)); g.strokeStyle='#6d7178'; g.lineWidth=4; g.setLineDash([2,10]); g.stroke(); g.setLineDash([]); }
@@ -967,7 +985,30 @@ function drawCurve(g,cv){
   else if(cv.type==='dual'){ line(0,'#8f9188',14); line(0,'#6a8f45',9); }
   else line(0,'#ececec',2,[24,24]);
   for(let k=1;k<half;k++) for(const sd of [-1,1]) line(sd*k*TILE,'#ececec',2,[24,24]);
+  if(cv.fo) for(const fo of cv.fo){ const a=Math.max(i0,fo.a), b=Math.min(i1,fo.b); if(a<b) foParapet(g,cv,P,a,b); }
   g.restore(); }
+// v20 flyover deck: drop shadow on the lower road, concrete piers either side of it, deck slab and parapets (chunk pass);
+// the live pass (drawFlyovers) repaints the deck over lower-layer traffic so cars visibly pass underneath
+function foUnder(g,cv,P,a,b,fo){ const W=cv.w*TILE; g.save();
+  g.save(); g.translate(16,22); curvePath(g,P,a,b,0); g.strokeStyle='rgba(10,14,22,0.38)'; g.lineWidth=W+14; g.stroke(); g.restore();
+  // piers: pairs of columns at intervals, skipped where they'd stand in a lower carriageway
+  for(let k=a+2;k<=b-2;k+=6){ const p=P[k], q=P[Math.min(P.length-1,k+1)], tx=q[0]-p[0], ty=q[1]-p[1], l=Math.hypot(tx,ty)||1, nx=-ty/l, ny=tx/l;
+    for(const sd of [-1,1]){ const x=p[0]+nx*sd*(W/2+2), y=p[1]+ny*sd*(W/2+2), ti=idx(Math.floor(x/TILE),Math.floor(y/TILE)); if(world.foF&&world.foF[ti]) continue;
+      g.fillStyle='rgba(10,14,22,0.35)'; g.beginPath(); g.arc(x+20,y+28,9,0,7); g.fill(); g.fillStyle='#9ea2a6'; g.beginPath(); g.arc(x+14,y+20,8,0,7); g.fill(); g.strokeStyle='#6c7075'; g.lineWidth=2; g.stroke(); } }
+  curvePath(g,P,a,b,0); g.strokeStyle='#b7babd'; g.lineWidth=W+16; g.stroke(); g.restore(); }
+function foParapet(g,cv,P,a,b){ const W=cv.w*TILE; g.save(); g.lineCap='butt';
+  for(const sd of [-1,1]){ curvePath(g,P,a,b,sd*(W/2+5)); g.strokeStyle='#e4e6e8'; g.lineWidth=6; g.stroke(); curvePath(g,P,a,b,sd*(W/2+5)); g.strokeStyle='#5f6368'; g.lineWidth=2; g.setLineDash([3,9]); g.stroke(); g.setLineDash([]);
+    curvePath(g,P,a,b,sd*(W/2+8.5)); g.strokeStyle='rgba(30,32,36,0.55)'; g.lineWidth=1.5; g.stroke(); }
+  // expansion joints at the deck ends
+  for(const k of [a,b]){ const p=P[k], q=P[Math.min(P.length-1,k+1)], o=P[Math.max(0,k-1)], tx=q[0]-o[0], ty=q[1]-o[1], l=Math.hypot(tx,ty)||1, nx=-ty/l*(W/2+8), ny=tx/l*(W/2+8);
+    g.strokeStyle='rgba(40,40,44,0.7)'; g.lineWidth=3; g.beginPath(); g.moveTo(p[0]-nx,p[1]-ny); g.lineTo(p[0]+nx,p[1]+ny); g.stroke(); }
+  g.restore(); }
+function drawFlyovers(vx0,vy0,vx1,vy1,alpha){ if(!world.flyovers||!world.flyovers.length) return;
+  for(const fo of world.flyovers){ const cv=world.curves[fo.cv]; if(!cv.px) cv.px=cv.pts.map(p=>[p[0]*TILE,p[1]*TILE]); const P=cv.px;
+    if(!fo.bb){ let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(let k=fo.a;k<=fo.b;k++){ x0=Math.min(x0,P[k][0]); y0=Math.min(y0,P[k][1]); x1=Math.max(x1,P[k][0]); y1=Math.max(y1,P[k][1]); } fo.bb=[x0-100,y0-100,x1+100,y1+100]; }
+    const B=fo.bb; if(B[2]<vx0||B[0]>vx1||B[3]<vy0||B[1]>vy1) continue;
+    ctx.save(); if(alpha!==undefined) ctx.globalAlpha=alpha; drawCurve(ctx,cv,[fo.a,fo.b]); ctx.restore(); } }
+
 function isParkNear(tx,ty){ return get(tx+1,ty)===T.PGRASS||get(tx-1,ty)===T.PGRASS||get(tx,ty+1)===T.PGRASS||get(tx,ty-1)===T.PGRASS; }
 function getChunk(cx,cy,allowRender){
   const k=cx+','+cy; let c=chunkCache.get(k);
@@ -1609,10 +1650,12 @@ function planCurve(v,sg,d,E,cref){
   const p=lanePt(sg,d,P.lane,E); pathLine(v,p[0],p[1]);
   const dv=dirVec(sg,d), c=sg.dir==='h'?[E*M_T,(sg.a+sg.w/2)*M_T]:[(sg.a+sg.w/2)*M_T,E*M_T];
   const o=(p[0]-c[0])*(-dv[1])+(p[1]-c[1])*dv[0]; const d0=pathEnd(v), n=pts.length;
-  const tpc=cv.tap&&cv.tap[cref.start?'A':'B'], oT=tpc?Math.sign(o)*Math.min(Math.abs(o),(cv.w/2-0.5)*M_T):o; let sa=0, o2=o;
+  const foR={}; const tpc=cv.tap&&cv.tap[cref.start?'A':'B'], oT=tpc?Math.sign(o)*Math.min(Math.abs(o),(cv.w/2-0.5)*M_T):o; let sa=0, o2=o;
   if(tpc&&oT!==o) v.mk.push({kind:'sig',d0:d0-20,d1:d0+tpc.L*M_T,side:1});
   for(let i=2;i<n-1;i+=2){ const a=pts[i-1], b=pts[i+1]; let tx=b[0]-a[0], ty=b[1]-a[1]; const l=Math.hypot(tx,ty)||1; tx/=l; ty/=l; sa+=Math.hypot(pts[i][0]-pts[i-2][0],pts[i][1]-pts[i-2][1]);
-    if(tpc){ const u=Math.min(1,sa/tpc.L), e=u*u*(3-2*u); o2=o+(oT-o)*e; } pathPush(v,pts[i][0]*M_T-ty*o2, pts[i][1]*M_T+tx*o2); }
+    if(tpc){ const u=Math.min(1,sa/tpc.L), e=u*u*(3-2*u); o2=o+(oT-o)*e; } pathPush(v,pts[i][0]*M_T-ty*o2, pts[i][1]*M_T+tx*o2);
+    if(cv.fo){ const j=cref.start?i:n-1-i; for(const fo of cv.fo){ if(j>=fo.a&&j<=fo.b){ const dd=pathEnd(v); if(!foR[fo.id]) foR[fo.id]=[dd,dd]; else foR[fo.id][1]=dd; } } } }
+  for(const k in foR) v.mk.push({kind:'fo',d0:foR[k][0]-1,d1:foR[k][1]+1,fo:+k});
   const Q=world.segs[other.seg], qd=other.end===0?1:-1, qpos=other.end===0?Q.b0:Q.b1+1;
   const qv=dirVec(Q,qd), qc=Q.dir==='h'?[qpos*M_T,(Q.a+Q.w/2)*M_T]:[(Q.a+Q.w/2)*M_T,qpos*M_T];
   let best=0,bd=1e9; for(let l=0;l<nLanes(Q);l++){ const q=lanePt(Q,qd,l,qpos); const oo=(q[0]-qc[0])*(-qv[1])+(q[1]-qc[1])*qv[0]; if(Math.abs(oo-o2)<bd){ bd=Math.abs(oo-o2); best=l; } }
@@ -1707,9 +1750,12 @@ function pathAt(v,s){ const pd=v.pd; if(s<=pd[0]){ return [v.px[0],v.py[0]]; } l
   const t=Math.max(0,Math.min(1,(s-pd[i])/((pd[i+1]-pd[i])||1))); return [v.px[i]+(v.px[i+1]-v.px[i])*t, v.py[i]+(v.py[i+1]-v.py[i])*t]; }
 function trimPath(v){ if(v.i<40) return; const cut=v.i-30; v.px.splice(0,cut); v.py.splice(0,cut); v.pd.splice(0,cut); v.i-=cut; }
 // obstacle boxes: {x,y,h,L,W,vel,veh,player}
-function boxesOf(v){ const b=[{x:v.x,y:v.y,h:v.h,L:v.L,W:v.W,vel:v.v,veh:v}]; if(v.trl) b.push({x:v.trl.x,y:v.trl.y,h:v.trl.h,L:13.6,W:2.55,vel:v.v,veh:v}); return b; }
+function boxesOf(v){ const b=[{x:v.x,y:v.y,h:v.h,L:v.L,W:v.W,vel:v.v,veh:v,lay:v.layer|0}]; if(v.trl) b.push({x:v.trl.x,y:v.trl.y,h:v.trl.h,L:13.6,W:2.55,vel:v.v,veh:v,lay:v.layer|0}); return b; }
 function playerBoxes(){ const s=truck, f=fwd(s.h), k=kingpin(s), ft=fwd(s.th);
-  const out=[{x:s.x+f[0]*1.9,y:s.y+f[1]*1.9,h:s.h,L:6.2,W:CAB.w,vel:s.v,player:true}]; if(s.trl) out.push({x:k[0]-ft[0]*5.6,y:k[1]-ft[1]*5.6,h:s.th,L:13.6,W:TRL.w,vel:s.v,player:true}); return out; }
+  const L=s.foLay|0; const out=[{x:s.x+f[0]*1.9,y:s.y+f[1]*1.9,h:s.h,L:6.2,W:CAB.w,vel:s.v,player:true,lay:L}]; if(s.trl) out.push({x:k[0]-ft[0]*5.6,y:k[1]-ft[1]*5.6,h:s.th,L:13.6,W:TRL.w,vel:s.v,player:true,lay:L}); return out; }
+// v20 flyovers: the player's layer is set by the road they drove into the flyover zone from (curve deck = upper, straight road = lower)
+function foPlayerLayer(s){ if(!world.foZ) return; const tx=Math.floor(s.x/M_T), ty=Math.floor(s.y/M_T); if(!inb(tx,ty)) return; const i=idx(tx,ty);
+  if(world.foZ[i]){ s.foLay=s.foFrom==='cv'?1:0; return; } s.foLay=0; const h=world.roadH[i], vv=world.roadV[i]; if(h===-3) s.foFrom='cv'; else if(h>=0||vv>=0||h===-2) s.foFrom='seg'; }
 const HC=24; const hkey=(x,y)=>(Math.floor(x/HC)+4096)*8192+Math.floor(y/HC)+4096;
 function hashAdd(b){ const k=hkey(b.x,b.y); let a=traffic.hash.get(k); if(!a){ a=[]; traffic.hash.set(k,a); } a.push(b); }
 function ptBoxDist(px,py,b){ const f=fwd(b.h), r=rgt(b.h), dx=px-b.x, dy=py-b.y; const lf=dx*f[0]+dy*f[1], lr=dx*r[0]+dy*r[1];
@@ -1725,7 +1771,7 @@ function obbMTV(A,B){ // returns [nx,ny,depth] pushing B away from A, or null
 // called from the lorry physics (120 Hz): heavy AI vehicles behave like walls; light ones get shoved
 function trafficHitTruck(s){
   if(!traffic.vs.length && !traffic.parked.length) return false;
-  const pb=playerBoxes(); let solid=false;
+  foPlayerLayer(s); const pb=playerBoxes(); let solid=false;
   const test=(v,boxes)=>{ for(const b of boxes){ for(const p of pb){ if(Math.abs(b.x-p.x)>12||Math.abs(b.y-p.y)>12) continue; const m=obbMTV(p,b); if(!m) continue;
       if(v.heavy){ solid=true; v.hitT=timeS; return; }
       v.offX+=m[0]*(m[2]+0.05); v.offY+=m[1]*(m[2]+0.05); v.x+=m[0]*(m[2]+0.05); v.y+=m[1]*(m[2]+0.05); if(v.trl){ v.trl.x+=m[0]*(m[2]+0.05); v.trl.y+=m[1]*(m[2]+0.05); }
@@ -1733,7 +1779,7 @@ function trafficHitTruck(s){
       v.h+=(Math.random()-0.5)*0.04*Math.min(1,Math.abs(s.v)/5);
       if(!v.hitCool||timeS-v.hitCool>0.6){ v.hitCool=timeS; const imp=Math.abs(s.v); s.v*=0.85; if(imp>1.5){ s.bump=Math.min(1,imp/16); } }
       return; } } };
-  for(const v of traffic.vs){ if(Math.abs(v.x-s.x)>40||Math.abs(v.y-s.y)>40) continue; test(v,boxesOf(v)); if(solid) return true; }
+  for(const v of traffic.vs){ if(Math.abs(v.x-s.x)>40||Math.abs(v.y-s.y)>40) continue; if(foApart(v.layer,v.x,v.y,s.foLay,s.x,s.y)) continue; test(v,boxesOf(v)); if(solid) return true; }
   const k=Math.floor(s.x/64)+','+Math.floor(s.y/64);
   for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++){ const a=traffic.parkedIdx.get((Math.floor(s.x/64)+dx)+','+(Math.floor(s.y/64)+dy)); if(a) for(const v of a) test(v,[{x:v.x,y:v.y,h:v.h,L:v.L,W:v.W}]); }
   return solid;
@@ -1792,7 +1838,7 @@ function stepVeh(v,dt,pbs){
   const r=v.r; while(pathEnd(v)-v.s<90) if(!planPiece(v,r)) break;
   const sg=world.segs[v.plan.seg]; let v0=(SPEED[sg.type]||12)*v.drv; if(v.heavy) v0=Math.min(v0,v.kind==='bus'?14:22);
   const front=v.s+v.L/2;
-  let acc=1e9, sig=0; v.ring=null;
+  let acc=1e9, sig=0; v.ring=null; v.layer=0;
   for(let k=v.mk.length-1;k>=0;k--){ const m=v.mk[k];
     const end=m.d1!==undefined?m.d1:(m.dEnd!==undefined?m.dEnd:m.d);
     if(v.s-v.L/2-(v.kind==='lorry'?14:0)>end+1){ if(m.kind==='gw'&&v.jHeld===m.J) releaseJ(v); v.mk.splice(k,1); continue; }
@@ -1800,6 +1846,7 @@ function stepVeh(v,dt,pbs){
     else if(m.kind==='sig'){ if(v.s>m.d0&&v.s<m.d1) sig=m.side; }
     else if(m.kind==='ring'){ if(v.s>m.d0&&v.s<m.d1){ v.ring=m.rb; } }
     else if(m.kind==='major'){ }
+    else if(m.kind==='fo'){ if(v.s+v.L/2>m.d0&&v.s-v.L/2<m.d1) v.layer=1; }
     else if(m.kind==='filter'){ const gap=m.d-front; if(gap<-1.5||m.go) { v.filtering=false; continue; } if(gap>14) continue;
       // UK filtering right turn: pull forward into the junction, wait for a gap in oncoming traffic; when the stage ends, clear the junction
       const st=sigState(m.J,m.key,'R'); let wait=false; if(st==='g'&&sigFilter(m.J,m.key,'R')&&sigOncoming(v,m.J,m.opp)) wait=true;
@@ -1824,7 +1871,7 @@ function stepVeh(v,dt,pbs){
   let lgap=1e9, lvel=0, lplayer=false; const cands=[];
   const kx=Math.floor(v.x/HC), ky=Math.floor(v.y/HC);
   for(let dx=-2;dx<=2;dx++) for(let dy=-2;dy<=2;dy++){ const a=traffic.hash.get((kx+dx+4096)*8192+ky+dy+4096); if(!a) continue;
-    for(const b of a){ if(b.veh===v) continue; if(v.ghostT>0&&!b.player) continue; if(Math.abs(b.x-v.x)>48||Math.abs(b.y-v.y)>48) continue; cands.push(b); } }
+    for(const b of a){ if(b.veh===v) continue; if(v.ghostT>0&&!b.player) continue; if(Math.abs(b.x-v.x)>48||Math.abs(b.y-v.y)>48) continue; if(foApart(v.layer,v.x,v.y,b.lay,b.x,b.y)) continue; cands.push(b); } }
   if(cands.length){ const half=v.W/2+0.35;
     for(let k=0;k<17;k++){ const sd=front+0.4+k*2.5; const p=pathAt(v,sd); const px=p[0]+v.offX, py=p[1]+v.offY;
       for(const b of cands){ if(ptBoxDist(px,py,b)<half){ const g=sd-front; if(g<lgap){ lgap=g; const rel=Math.cos(b.h-v.h); lvel=Math.max(0,(b.vel||0)*rel); lplayer=!!b.player; } } }
@@ -1917,6 +1964,8 @@ function drawTraffic(vx0,vy0,vx1,vy1){
     ctx.fillStyle='#2b2b33'; ctx.fillRect(-2.2,-1+sw,1.6,3.2); ctx.fillRect(0.6,-1-sw,1.6,3.2);
     ctx.fillStyle=p.col; ctx.beginPath(); ctx.ellipse(0,0,3.4,2.1,0,0,7); ctx.fill();
     ctx.fillStyle=p.hair; ctx.beginPath(); ctx.arc(0,0.2,1.7,0,7); ctx.fill(); ctx.restore(); }
+  const lo=list.filter(v=>!v.layer), hi=list.filter(v=>v.layer);
+  const drawL=list=>{
   for(const v of list){ blitV(v.art.body.sh,v.x,v.y,v.h,v.L,v.W,4,4); if(v.trl) blitV(v.art.trl.sh,v.trl.x,v.trl.y,v.trl.h,13.6,2.55,6,6); }
   const blink=(timeS%0.8)<0.4;
   for(const v of list){
@@ -1928,6 +1977,8 @@ function drawTraffic(vx0,vy0,vx1,vy1){
     if(v.sig&&blink){ lampsOf(v.x,v.y,v.h,v.L,v.W,'rgba(255,170,0,0.95)',true,[v.sig],2.4); lampsOf(rx.x,rx.y,rx.h,rL,rW,'rgba(255,170,0,0.95)',false,[v.sig],2.4); }
     if(v.honking>0){ ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=1.5; const f=fwd(v.h); const X=(v.x+f[0]*(v.L/2+1))*PPM, Y=(v.y+f[1]*(v.L/2+1))*PPM; for(let k=1;k<=2;k++){ ctx.beginPath(); ctx.arc(X,Y,k*5+(1-v.honking*2)*4,v.h-Math.PI/2-0.6,v.h-Math.PI/2+0.6); ctx.stroke(); } }
   }
+  };
+  drawL(lo); if(typeof drawFlyovers==='function') drawFlyovers(vx0,vy0,vx1,vy1); if(hi.length) drawL(hi);
 }
 
 'use strict';
@@ -3089,7 +3140,7 @@ function drawAmbientHigh(v){ const t=timeS;
 const NAV={route:null,reroutes:0,offT:0,lastCalc:-9,hover:null};
 const NAV_COST={hwy:0.55,dual:0.7,rural:0.9,city:1.0,town:1.0,res:1.7,lane:3.2,dirt:2.6};      // lorry-legal: narrow lanes / estates heavily penalised
 const NAV_SPEED={hwy:25,dual:20,rural:15,city:11,town:11,res:8,lane:7,dirt:7};
-let navClosed=null, navG=null, navStamp=null, navFrom=null, navGen=1;
+let navUp=null, navClosed=null, navG=null, navStamp=null, navFrom=null, navGen=1;
 function navTileInfo(i){ const h=world.roadH[i], v=world.roadV[i]; if(h===-1&&v===-1) return null;
   if(h===-2) return ['rb',0.8,8]; if(h===-3) return ['curve',0.7,20]; const s=world.segs[h>=0?h:v]; return [s.type,NAV_COST[s.type]||1,NAV_SPEED[s.type]||11]; }
 const isRoadT=i=>{ const t=G[i]; return (t===T.ROAD||t===T.BRIDGE) && !(world.roadH[i]===-1&&world.roadV[i]===-1); };
@@ -3104,17 +3155,18 @@ function navSnapTruck(){ const t=truck, f=fwd(t.h); for(const d of [0,2,-2,4]){ 
       if(SOLID[G[i]]||d>40) continue; q.push([nx,ny,d+1]); } }
   return best; }
 function navAStar(sx,sy,gx,gy){
-  const N=MW*MH; if(!navG){ navG=new Float32Array(N); navStamp=new Int32Array(N); navFrom=new Int32Array(N); navClosed=new Int32Array(N); }
+  const N=MW*MH; if(!navG){ navG=new Float32Array(N); navStamp=new Int32Array(N); navFrom=new Int32Array(N); navClosed=new Int32Array(N); } if(!navUp) navUp=new Uint8Array(N); const FF=world.foF;
   const gen=++navGen, S=idx(sx,sy), Gl=idx(gx,gy); const hx=i=>(Math.abs((i%MW)-gx)+Math.abs(((i/MW)|0)-gy))*0.9;
   let hp=[], hf=[]; const push=(i,f)=>{ hp.push(i); hf.push(f); let k=hp.length-1; while(k>0){ const p=(k-1)>>1; if(hf[p]<=hf[k]) break; {const a=hp[p];hp[p]=hp[k];hp[k]=a;const b=hf[p];hf[p]=hf[k];hf[k]=b;} k=p; } };
   const pop=()=>{ const top=hp[0], li=hp.pop(), lf=hf.pop(); if(hp.length){ hp[0]=li; hf[0]=lf; let k=0; for(;;){ const l=2*k+1, r=l+1; let m=k; if(l<hp.length&&hf[l]<hf[m]) m=l; if(r<hp.length&&hf[r]<hf[m]) m=r; if(m===k) break; {const a=hp[m];hp[m]=hp[k];hp[k]=a;const b=hf[m];hf[m]=hf[k];hf[k]=b;} k=m; } } return top; };
-  navStamp[S]=gen; navG[S]=0; navFrom[S]=-1; push(S,hx(S)); let it=0;
+  navStamp[S]=gen; navG[S]=0; navFrom[S]=-1; navUp[S]=0; push(S,hx(S)); let it=0;
   while(hp.length){ const i=pop(); if(navClosed[i]===gen) continue; navClosed[i]=gen; if(i===Gl) break; if(++it>4000000){ NAV.lastIt=it; return null; } const gi=navG[i], ci=navTileInfo(i)[1];
     for(const d of [1,-1,MW,-MW]){ let j=i+d, k=1; if(j<0||j>=N) continue;
       // small gaps (roundabout aprons, junction mouths drawn as kerb/grass): hop up to 5 tiles straight across
       if(!isRoadT(j)){ if(world.roadH[i]===-1&&world.roadV[i]===-1) continue; for(k=2;k<=6;k++){ j=i+d*k; if(j<0||j>=N||Math.abs((j%MW)-(i%MW))>6) { j=-1; break; } if(isRoadT(j)) break; } if(j<0||k>6||!isRoadT(j)) continue; const Gj=G[i+d]; if(Gj===T.WATER||Gj===T.BLDG) continue; }
+      let up=0; if(FF&&(FF[i]||FF[j])){ const r=foNavStep(i,j,d,k,FF); if(r<0) continue; up=r; }
       const nc=gi+(ci+navTileInfo(j)[1])*0.5*k+(k>1?k*0.6:0);
-      if(navClosed[j]!==gen&&(navStamp[j]!==gen||nc<navG[j])){ navStamp[j]=gen; navG[j]=nc; navFrom[j]=i; push(j,nc+hx(j)); } } }
+      if(navClosed[j]!==gen&&(navStamp[j]!==gen||nc<navG[j])){ navStamp[j]=gen; navG[j]=nc; navFrom[j]=i; navUp[j]=up; push(j,nc+hx(j)); } } }
   NAV.lastIt=it; if(navStamp[Gl]!==gen) return null; const rp=[]; for(let i=Gl;i!==-1;i=navFrom[i]) rp.push(i); rp.reverse(); const path=[rp[0]]; for(let k=1;k<rp.length;k++){ const a=rp[k-1], b=rp[k], d=b-a, st=Math.abs(d)<MW?Math.sign(d):Math.sign(d)*MW; if(Math.abs(d)!==1&&Math.abs(d)!==MW) for(let j=a+st;j!==b;j+=st) path.push(j); path.push(b); } return path; }
 function navBuild(path,target){
   const P=path.map(i=>[((i%MW)+0.5)*M_T,(((i/MW)|0)+0.5)*M_T]), n=P.length, cum=new Float32Array(n), eta=new Float32Array(n);
@@ -3226,6 +3278,13 @@ function fastTravel(dp){ const s=truck; const why=ftBlock(dp); if(why){ flash(wh
 BigRig.fastTravel=fastTravel;
 // tooltip button hit-boxes (set when drawn)
 let FT_BTN=null, NAV_BTN=null;
+
+// v20 flyovers: tiles of the lower road under a deck (FF) carry two roads that don't connect. Returns -1 (move not allowed), 0 (lower) or 1 (on the deck).
+function foNavStep(i,j,d,k,FF){ if(k>1) return -1; const along=t=>{ const h=world.roadH[t], v=world.roadV[t]; return (h>=0&&Math.abs(d)===1)||(v>=0&&Math.abs(d)===MW); };
+  const cv=t=>world.roadH[t]===-3;
+  if(!FF[i]){ if(cv(i)) return 1; return along(j)?0:-1; }                  // entering: from the curve onto the deck, or straight along the lower road
+  if(navUp[i]){ return FF[j]?1:(cv(j)?0:-1); }                             // on the deck: stay on it until it lands back on the curve
+  if(cv(j)) return -1; return along(j)&&along(i)?0:-1; }                  // under it: straight along the lower road only
 
 'use strict';
 // ===================== v8 XBOX CONTROLLER (Gamepad API, standard mapping) — works alongside the keyboard =====================
@@ -4447,7 +4506,7 @@ function draw(){
   drawParkedTrailers(vx0,vy0,vx1,vy1);
   drawTraffic(vx0,vy0,vx1,vy1);
   drawPortLow(vx0,vy0,vx1,vy1); drawFXLow(vx0,vy0,vx1,vy1); drawRemotePlayers(vx0,vy0,vx1,vy1); drawBreakdown();
-  drawLorry(); drawRail(vx0,vy0,vx1,vy1); drawFXHigh(); drawPortHigh(vx0,vy0,vx1,vy1);
+  drawLorry(); if(!truck.foLay&&world.foZ&&world.foZ[idx(Math.floor(truck.x/M_T),Math.floor(truck.y/M_T))]) drawFlyovers(vx0,vy0,vx1,vy1,0.72); drawRail(vx0,vy0,vx1,vy1); drawFXHigh(); drawPortHigh(vx0,vy0,vx1,vy1);
   for(const o of world.overhead) if(o.x>vx0-400&&o.x<vx1+400&&o.y>vy0-400&&o.y<vy1+400) drawOverhead(o);
   drawAmbientHigh(VR); drawWeather(vx0,vy0,vx1,vy1,z); drawNight(vx0,vy0,vx1,vy1,z); drawStreetLamps(vx0,vy0,vx1,vy1);
   ctx.setTransform(1,0,0,1,0,0);
