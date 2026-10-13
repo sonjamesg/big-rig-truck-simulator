@@ -3314,7 +3314,7 @@ body.touch.portrait .modal,body.touch .modal{width:min(916px,96vw)!important;hei
 @media (max-width:760px){ #ui .grid{grid-template-columns:minmax(0,1fr)!important} #ui .bar{flex-wrap:wrap} #ui .mh .sub{display:none} #ui .detail{flex-wrap:wrap} #ui .btn.start{width:100%} #ui .show{flex-direction:column;overflow:auto} #ui .tl{width:auto;flex-direction:row;overflow-x:auto;border-right:none} #ui .ti{flex:none} .result{width:94vw!important} }
 body.touch.ovl #mob,body.touch.ovl #deck{display:none!important} body.touch.ovl #frame{z-index:40}
 body.touch.ovl #ui{inset:0!important;z-index:41}
-body.touch #ui .mback{pointer-events:auto} body.touch.ovl,body.touch.ovl #frame,body.touch.ovl #ui{touch-action:auto} body.touch.ovl #ui .mback{overscroll-behavior:contain} body.touch #ui .grid,body.touch #ui .show,body.touch #ui .tl,body.touch #ui .side{overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain} body.touch #ui .tl{touch-action:pan-x pan-y} body.touch #ui .chip{white-space:nowrap} @media (max-height:460px){ #ui .mh .sub{display:none} #ui .bar{flex-wrap:wrap;gap:6px} }
+body.touch #ui .mback{pointer-events:auto} body.touch.mapo #mob,body.touch.mapo #deck,body.touch.mapo #ui,body.touch.mapo #hudbtns{display:none!important} body.touch.mapo #frame{left:0!important;top:0!important;width:100vw!important;height:100dvh!important;z-index:60!important;border-radius:0} body.touch.mapo #game{width:100vw!important;height:100dvh!important;border-radius:0;touch-action:none} body.touch.ovl,body.touch.ovl #frame,body.touch.ovl #ui{touch-action:auto} body.touch.ovl #ui .mback{overscroll-behavior:contain} body.touch #ui .grid,body.touch #ui .show,body.touch #ui .tl,body.touch #ui .side{overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain} body.touch #ui .tl{touch-action:pan-x pan-y} body.touch #ui .chip{white-space:nowrap} @media (max-height:460px){ #ui .mh .sub{display:none} #ui .bar{flex-wrap:wrap;gap:6px} }
 @media (max-width:560px) and (orientation:portrait){ body.touch #ui .modal{width:100vw!important;height:100%!important;max-height:100dvh;border-radius:0;border:none;padding-top:env(safe-area-inset-top)}
  #ui .mh{flex-wrap:wrap;gap:6px 10px;padding:10px 12px 8px;position:relative} #ui .mh>div:first-child{font-size:22px!important} #ui .mh h2{font-size:18px;letter-spacing:1px;white-space:nowrap} #ui .mh .sp{display:none}
  #ui .mh>div[style*="text-align:right"]{order:5;flex-basis:100%;text-align:left!important;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px} #ui .mh>div[style*="text-align:right"] br{display:none} #ui .mh .xpb{width:90px}
@@ -3713,7 +3713,7 @@ function drawWeatherHUD(){ if(WX.rain<0.2&&WX.fog<0.2) return; const x=VW-126, y
 'use strict';
 // ===================== MAIN =====================
 const PORTRAIT_SQ=(('ontouchstart' in window)||navigator.maxTouchPoints>0)&&innerHeight>innerWidth;   // portrait phones: square view, HUD relatively larger
-const VW=PORTRAIT_SQ?640:960, VH=PORTRAIT_SQ?640:600; { const c=document.getElementById('game'); if(c&&PORTRAIT_SQ){ c.width=VW; c.height=VH; } }
+let VW=PORTRAIT_SQ?640:960, VH=PORTRAIT_SQ?640:600; const VW0=VW, VH0=VH; { const c=document.getElementById('game'); if(c&&PORTRAIT_SQ){ c.width=VW; c.height=VH; } }
 const cv=document.getElementById('game'), ctx=cv.getContext('2d');
 const input={up:false,down:false,left:false,right:false,hand:false,horn:false};
 const cam={x:0,y:0,z:1,shake:0};
@@ -3968,10 +3968,13 @@ const LOCAL_Z=(VW-40)/250;   // ~1 km (250 tiles) across
 function mapClamp(){ bigmap.cx=Math.max(0,Math.min(MW,bigmap.cx)); bigmap.cy=Math.max(0,Math.min(MH,bigmap.cy)); }   // v26: free pan; any point of the world can reach the screen centre (ocean beyond the edge)
 function mapCentreTruck(){ bigmap.cx=truck.x*PPM/TILE; bigmap.cy=truck.y*PPM/TILE; bigmap.anchor=null; mapClamp(); }
 function mapZoomTo(zt,mx,my){ bigmap.zt=Math.max(mapFitZ(),Math.min(14,zt)); bigmap.anchor=(mx===undefined)?[VW/2,VH/2+10]:[mx,my]; }
-function openMap(){ if(!started) return; bigmap.open=true; bigmap.z=bigmap.zt=bigmap.saved||LOCAL_Z; mapCentreTruck(); }
-function closeMap(){ NAV.sel=null; if(bigmap.open) bigmap.saved=bigmap.zt||bigmap.z; bigmap.open=false; }
+function mapFull(on){ if(!document.body.classList.contains('touch')) return; const c=document.getElementById('game'); document.body.classList.toggle('mapo',on);
+  if(on){ VW=Math.round(innerWidth*1.6); VH=Math.round(innerHeight*1.6); } else { VW=VW0; VH=VH0; } c.width=VW; c.height=VH; if(!on&&typeof mobLayout==='function') mobLayout(); }
+addEventListener('resize',()=>{ if(bigmap.open) setTimeout(()=>mapFull(true),60); });
+function openMap(){ if(!started) return; bigmap.open=true; mapFull(true); bigmap.z=bigmap.zt=bigmap.saved||LOCAL_Z; mapCentreTruck(); }
+function closeMap(){ NAV.sel=null; if(bigmap.open) bigmap.saved=bigmap.zt||bigmap.z; bigmap.open=false; mapFull(false); }
 const MAPBTN=[['+',()=>mapZoomTo(bigmap.zt*1.6)],['−',()=>mapZoomTo(bigmap.zt/1.6)],['◎',mapCentreTruck],['✕',()=>closeMap()]];
-function mapBtnRect(i){ return [VW-62,58+i*48,40,40]; }
+function mapBtnRect(i){ if(document.body.classList.contains('mapo')){ const i2=i===3?0:i+1; return [VW-96,(i===3?56:84+i2*76),76,68]; } return [VW-62,58+i*48,40,40]; }
 const mBX=t=>VW/2+(t-bigmap.cx)*bigmap.z, mBY=t=>VH/2+10+(t-bigmap.cy)*bigmap.z;
 function routeToMapPoint(x,y){ const tx=bigmap.cx+(x-VW/2)/bigmap.z, ty=bigmap.cy+(y-VH/2-10)/bigmap.z; const r=setRoute({x:tx*M_T,y:ty*M_T,name:'Map point'}); if(r) flash('Route set: '+fmtD(r.len)); }
 function drawBigMap(){
@@ -4045,6 +4048,13 @@ addEventListener('keydown',e=>{ if(!world.ready) return;
   if(e.code==='KeyJ'&&!e.repeat){ if(!started) startGame(); openBoard(); e.stopImmediatePropagation(); e.preventDefault(); }
   if(e.code==='KeyU'&&!e.repeat&&started){ tryUnload(); e.preventDefault(); } },true);
 cv.addEventListener('pointerdown',e=>{ const b=career.unloadBtn; if(!b||bigmap.open) return; const [x,y]=canvasPos(e); if(x>=b[0]&&x<=b[0]+b[2]&&y>=b[1]&&y<=b[1]+b[3]&&career.active&&career.active.phase==='deliver') tryUnload(); });
+
+// v27: two-finger pinch zoom (centred on midpoint) + pan on the world map
+{ const P=new Map(); let pin=null;
+  cv.addEventListener('pointerdown',e=>{ if(!bigmap.open||e.pointerType!=='touch') return; P.set(e.pointerId,canvasPos(e)); if(P.size===2){ bigmap.drag=null; downAt=null; if(bigmap.lp){ clearTimeout(bigmap.lp); bigmap.lp=null; } const [a,b]=[...P.values()]; const mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2; pin={d:Math.hypot(a[0]-b[0],a[1]-b[1])||1,z:bigmap.z,wx:bigmap.cx+(mx-VW/2)/bigmap.z,wy:bigmap.cy+(my-VH/2-10)/bigmap.z}; } });
+  cv.addEventListener('pointermove',e=>{ if(!P.has(e.pointerId)) return; P.set(e.pointerId,canvasPos(e)); if(pin&&P.size>=2){ const [a,b]=[...P.values()]; const mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2, d=Math.hypot(a[0]-b[0],a[1]-b[1]);
+      const z=Math.max(mapFitZ(),Math.min(14,pin.z*d/pin.d)); bigmap.z=bigmap.zt=z; bigmap.anchor=null; bigmap.cx=pin.wx-(mx-VW/2)/z; bigmap.cy=pin.wy-(my-VH/2-10)/z; mapClamp(); bigmap.drag=null; } });
+  const up=e=>{ P.delete(e.pointerId); if(P.size<2&&pin){ pin=null; bigmap.drag=null; downAt=null; } }; cv.addEventListener('pointerup',up); cv.addEventListener('pointercancel',up); }
 
 </script>
 </body></html>
