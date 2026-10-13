@@ -122,6 +122,68 @@ function regionAt(x,y){ return x<cW(y)?'Westmere':y<cE(x)?'The Sandreach':'Highm
 function isDesert(x,y){ if(x<cW(y)+20||y>cE(x)-25+(vnoise(x,y,60)-0.5)*110) return false; return !(y>560 && x<cW(y)+150+(vnoise(x+50,y,80)-0.5)*140); }
 function forestD(x,y){ return vnoise(x,y,120)*0.6+vnoise(x+77,y+5,40)*0.4; }
 world.regionAt=regionAt; world.hills=HILLS; world.isDesert=isDesert;
+// ===================== v24 UK ROUNDABOUT GEOMETRY (clockwise, drive on the left) =====================
+// Every arm flares into the ring through two asphalt fillets (circles tangent to the road edge and the ring),
+// entry/exit AI paths are tangential Bezier curves, a kerbed splitter island sits between them and the
+// on-road test follows the exact painted outline (not the 4 m tile grid).
+const RB_RF=4.5, RB_VEH=0.55;   // fillet radius (tiles), splitter clearance from a vehicle path centre (tiles)
+function rbRingR(rb){ return rb.rin*0.42+rb.rout*0.58; }
+function rbArmGeom(rb,arm){ if(arm.g) return arm.g; const sg=world.segs[arm.seg], s=arm.side;
+  const o=sg.dir==='h'?[-s,0]:[0,-s], l=[-o[1],o[0]];   // o: outward along the arm, l: entry side (left of inbound traffic)
+  const cl=sg.a+sg.w/2, Ept=sg.dir==='h'?[s>0?sg.b1+1:sg.b0,cl]:[cl,s>0?sg.b1+1:sg.b0];
+  const dx=Ept[0]-rb.cx, dy=Ept[1]-rb.cy, uE=dx*o[0]+dy*o[1], c=dx*l[0]+dy*l[1], hw=sg.w/2;
+  const fil=[]; for(const sd of [1,-1]){ const e=c+sd*hw; let Rf=RB_RF, vf=e+sd*Rf, H=rb.rout+Rf;
+      let uf=H*H>vf*vf?Math.sqrt(H*H-vf*vf):0; if(uf>uE+1.5){ Rf=Math.max(1,Rf*0.6); vf=e+sd*Rf; H=rb.rout+Rf; uf=Math.sqrt(Math.max(0,H*H-vf*vf)); }
+      const tr=[uf*rb.rout/H, vf*rb.rout/H]; fil.push({sd,e,Rf,uf,vf,tr}); }
+  return arm.g={sg,o,l,uE,c,hw,fil}; }
+const rbW=(g,rb,u,v)=>[rb.cx+g.o[0]*u+g.l[0]*v, rb.cy+g.o[1]*u+g.l[1]*v];
+// lane centre (tiles) of lane i at the arm mouth; inbound=true for traffic heading into the ring
+function rbLanePt(rb,arm,i,inbound,back){ const g=rbArmGeom(rb,arm), sg=g.sg, d=inbound?arm.side:-arm.side;
+  const lat=(sg.dir==='h'? (d>0? sg.a+i : sg.a+sg.w-1-i) : (d<0? sg.a+i : sg.a+sg.w-1-i))+0.5; const along=(arm.side>0?sg.b1+1:sg.b0)-arm.side*(back||0);
+  return sg.dir==='h'?[along,lat]:[lat,along]; }
+function rbBez(P0,t0,P1,t1,k0,k1){ const D=Math.hypot(P1[0]-P0[0],P1[1]-P0[1]), L=D*Math.max(k0,k1), C1=[P0[0]+t0[0]*D*k0,P0[1]+t0[1]*D*k0], C2=[P1[0]-t1[0]*D*k1,P1[1]-t1[1]*D*k1], out=[];
+  const n=Math.max(8,Math.ceil(L*6)); for(let k=0;k<=n;k++){ const t=k/n,u=1-t; out.push([0,1].map(j=>u*u*u*P0[j]+3*u*u*t*C1[j]+3*u*t*t*C2[j]+t*t*t*P1[j])); } return out; }
+const RB_DIN=0.62, RB_DOUT=0.62, RB_BACK=4;
+// entry: lane mouth -> tangent onto the ring; returns {pts (tiles), phi (ring angle where it joins)}
+function rbEntry(rb,arm,lane){ const g=rbArmGeom(rb,arm), P0=rbLanePt(rb,arm,lane,true,RB_BACK), R=rbRingR(rb);
+  const phi=Math.atan2(P0[1]-rb.cy,P0[0]-rb.cx)+RB_DIN, P1=[rb.cx+Math.cos(phi)*R,rb.cy+Math.sin(phi)*R];
+  return {pts:rbBez(P0,[-g.o[0],-g.o[1]],P1,[-Math.sin(phi),Math.cos(phi)],0.28,0.45),phi}; }
+function rbExit(rb,arm,lane){ const g=rbArmGeom(rb,arm), P1=rbLanePt(rb,arm,lane,false,RB_BACK), R=rbRingR(rb);
+  const phi=Math.atan2(P1[1]-rb.cy,P1[0]-rb.cx)-RB_DOUT, P0=[rb.cx+Math.cos(phi)*R,rb.cy+Math.sin(phi)*R];
+  return {pts:rbBez(P0,[-Math.sin(phi),Math.cos(phi)],P1,g.o,0.45,0.28),phi}; }
+// kerbed splitter island between the entry and exit paths (polygon in tiles) + painted hatch nose
+function rbSplitter(rb,arm){ const g=rbArmGeom(rb,arm); if(g.split!==undefined) return g.split; const sg=g.sg, nl=Math.max(1,Math.floor(sg.w/2));
+  const paths=[]; for(let i=0;i<nl;i++){ paths.push(rbEntry(rb,arm,i).pts); paths.push(rbExit(rb,arm,i).pts); }
+  const loc=p=>{ const dx=p[0]-rb.cx, dy=p[1]-rb.cy; return [dx*g.o[0]+dy*g.o[1], dx*g.l[0]+dy*g.l[1]]; };
+  const lp=paths.map(P=>P.map(loc)); const u0=rb.rout+0.15, u1=g.uE+3; const L=[],Rr=[];
+  for(let u=u0;u<=u1+1e-6;u+=0.1){ let vp=1e9, vn=-1e9;   // nearest path centre on each side of the arm centreline at this u (vehicle footprint ~ RB_VEH)
+    for(const P of lp) for(const q of P){ if(Math.abs(q[0]-u)>RB_VEH) continue; const dv=q[1]-g.c; if(dv>0) vp=Math.min(vp,dv-Math.sqrt(Math.max(0,RB_VEH*RB_VEH-(q[0]-u)*(q[0]-u)))); else vn=Math.max(vn,dv+Math.sqrt(Math.max(0,RB_VEH*RB_VEH-(q[0]-u)*(q[0]-u)))); }
+    if(vp>50) vp=0.5; if(vn<-50) vn=-0.5; const a=Math.min(vp,2.6), b=Math.max(vn,-2.6); if(a<0.06||b>-0.06) break; L.push([u,g.c+a]); Rr.push([u,g.c+b]); }
+  if(L.length<4){ g.split=null; return null; }
+  // the base hugs the ring edge: trim points inside rout
+  const poly=[...L,...Rr.reverse()].map(([u,v])=>rbW(g,rb,u,v)); const nose=rbW(g,rb,L[L.length-1][0],g.c);
+  return g.split={poly,nose,uN:L[L.length-1][0],base:[rbW(g,rb,L[0][0],L[0][1]),rbW(g,rb,Rr[Rr.length-1][0],Rr[Rr.length-1][1])],baseV:[L[0][1],Rr[Rr.length-1][1]]}; }
+function pinPoly(P,x,y){ let c=false; for(let i=0,j=P.length-1;i<P.length;j=i++){ const a=P[i],b=P[j]; if((a[1]>y)!==(b[1]>y)&&x<(b[0]-a[0])*(y-a[1])/(b[1]-a[1])+a[0]) c=!c; } return c; }
+// exact surface of a roundabout at tile-space point: 1 asphalt, 2 central island / splitter (kerbed), 0 verge
+function rbSurf(rb,x,y){ const dx=x-rb.cx, dy=y-rb.cy, r=Math.hypot(dx,dy);
+  for(const arm of rb.arms){ const sp=rbSplitter(rb,arm); if(sp&&pinPoly(sp.poly,x,y)) return 2; }
+  if(r<=rb.rout) return r<rb.rin?2:1;
+  for(const arm of rb.arms){ const g=rbArmGeom(rb,arm), u=dx*g.o[0]+dy*g.o[1], v=dx*g.l[0]+dy*g.l[1]; if(u<=0) continue;
+    if(Math.abs(v-g.c)<=g.hw && u<=g.uE+0.05) return 1;
+    for(const f of g.fil){ const s=f.sd*(v-f.e); if(s>0&&s<=f.Rf&&u<=f.uf&&Math.hypot(u-f.uf,v-f.vf)>=f.Rf) return 1; } }
+  return 0; }
+function rbAtTile(tx,ty){ const k=world.rbMask?world.rbMask[idx(tx,ty)]:0; return k?world.rbs[k-1]:null; }
+// physics / AI / lamps: true when the point (tiles) is drivable asphalt, using the exact roundabout outline where one applies
+function onTarmacT(x,y){ const tx=Math.floor(x),ty=Math.floor(y); if(!inb(tx,ty)) return false; const rb=rbAtTile(tx,ty); if(rb) return rbSurf(rb,x,y)===1; const t=G[idx(tx,ty)]; return t===T.ROAD||t===T.BRIDGE; }
+// paint tiles to match the outline: fully-asphalt tiles become ROAD, partly-covered tiles stay verge (the object draws the smooth edge)
+function rbPaint(rb){ if(!world.rbMask) world.rbMask=new Uint8Array(MW*MH); const ext=rb.rout+RB_RF+3;
+  for(let ty=Math.floor(rb.cy-ext);ty<=rb.cy+ext;ty++) for(let tx=Math.floor(rb.cx-ext);tx<=rb.cx+ext;tx++){ if(!inb(tx,ty)) continue; const i=idx(tx,ty);
+    const own=world.roadH[i]===-2||world.roadV[i]===-2, road=G[i]===T.ROAD||G[i]===T.BRIDGE; if(road&&!own) continue;   // other carriageways keep their tiles
+    let a=0,isl=0; for(const [ox,oy] of [[0.5,0.5],[0.02,0.02],[0.98,0.02],[0.02,0.98],[0.98,0.98]]){ const s=rbSurf(rb,tx+ox,ty+oy); if(s===1) a++; else if(s===2) isl++; }
+    if(!a&&!isl&&!own) continue; world.rbMask[i]=rb.id+1;
+    if(a===5){ if(!road) G[i]=world.water&&world.water[i]?T.BRIDGE:T.ROAD; world.roadH[i]=world.roadV[i]=-2; }
+    else if(isl===5&&Math.hypot(tx+0.5-rb.cx,ty+0.5-rb.cy)<rb.rin){ G[i]=T.ISLAND; world.roadH[i]=world.roadV[i]=-1; }
+    else if(G[i]!==T.WATER){ G[i]=(world.water&&world.water[i])?T.BRIDGE:(isDesert(tx,ty)?T.SAND:T.GRASS); if(G[i]!==T.BRIDGE) world.roadH[i]=world.roadV[i]=-1; } } }
 function genWorld(){
   const t0=performance.now();
   const R = mulberry(20261012);
@@ -174,7 +236,7 @@ function genWorld(){
     for(let y=Math.floor(cy-rout-1);y<=cy+rout+1;y++) for(let x=Math.floor(cx-rout-1);x<=cx+rout+1;x++){ const d=Math.hypot(x+0.5-cx,y+0.5-cy);
       if(d<=rout+0.3 && d>=rin-0.3){ set(x,y,water[idx(x,y)]?T.BRIDGE:T.ROAD); world.roadH[idx(x,y)]=-2; world.roadV[idx(x,y)]=-2; }
       else if(d<rin-0.3) set(x,y,T.ISLAND); }
-    world.objects.push({kind:'rb',x:(cx-rout-1)*TILE,y:(cy-rout-1)*TILE,w:(2*rout+2)*TILE,h:(2*rout+2)*TILE,rb,seed:(R()*1e9)|0});
+    { const e=rout+RB_RF+5; world.objects.push({kind:'rb',x:(cx-e)*TILE,y:(cy-e)*TILE,w:2*e*TILE,h:2*e*TILE,rb,seed:(R()*1e9)|0}); }
     return rb;
   }
   // ---- smooth curved roads (motorway bends, winding country roads) joining straight segment ends
@@ -432,6 +494,7 @@ function genWorld(){
   for(const rb of world.rbs){ for(const sg of S){
     const ends= sg.dir==='h' ? [[sg.b0,sg.a+sg.w/2,-1],[sg.b1+1,sg.a+sg.w/2,1]] : [[sg.a+sg.w/2,sg.b0,-1],[sg.a+sg.w/2,sg.b1+1,1]];
     for(const [ex,ey,side] of ends){ const d=Math.hypot(ex-rb.cx,ey-rb.cy); if(d<rb.rout+2.5){ rb.arms.push({seg:sg.id,side,ang:Math.atan2(ey-rb.cy,ex-rb.cx)}); sg['rb'+(side<0?0:1)]=rb.id; } } } }
+  for(const rb of world.rbs) rbPaint(rb);
   for(const sg of S) sg.js.sort((a,b)=> sg.dir==='h'? a.x-b.x : a.y-b.y);
   (world.tm=world.tm||[]).push(['// ---------------- ',performance.now()-t0|0]);
   // ---------------- buildings & landmarks ----------------
@@ -727,6 +790,7 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
 }
 function onRoadM(mx,my){
   const px=mx*PPM, py=my*PPM, tx=Math.floor(px/TILE), ty=Math.floor(py/TILE); if(!inb(tx,ty)) return false;
+  { const rb=rbAtTile(tx,ty); if(rb) return rbSurf(rb,px/TILE,py/TILE)===1; }
   const ci=world.cornerAt[idx(tx,ty)];
   if(ci>=0){ const c=world.corners[ci]; return Math.hypot(px/TILE-c.cx,py/TILE-c.cy)>c.R; }
   const t=G[idx(tx,ty)]; return t===T.ROAD||t===T.BRIDGE;
@@ -874,6 +938,53 @@ function drawSign(g,o){ if(!o.sign) return; const big=o.style==='supermarket'; g
   g.translate(sx,sy); if(o.front==='w') { g.translate(-o.w/2+10,0); g.rotate(-Math.PI/2); } if(o.front==='e'){ g.translate(o.w/2-10,0); g.rotate(Math.PI/2); }
   if(tw+8>(o.front==='w'||o.front==='e'?o.h:o.w)-4 && !big){ g.restore(); return; }
   g.fillStyle=big?'#c0392b':'rgba(20,24,30,0.85)'; g.fillRect(-tw/2-5,-fs/2-3,tw+10,fs+6); g.fillStyle=big?'#fff':['#f5d76e','#fff','#7fdcff','#ff8c8c'][o.seed%4]; g.textAlign='center'; g.textBaseline='middle'; g.fillText(o.sign,0,1); g.restore(); }
+// v24 UK roundabout: flared fillet entries/exits, kerbed outline, continuous edge lines, splitter islands with keep-left bollards, give-way lines
+function drawRB(g,o){ const rb=o.rb, X=rb.cx*TILE, Y=rb.cy*TILE, Ro=rb.rout*TILE, S=TILE, P=p=>[p[0]*S,p[1]*S];
+  const W=(gm,u,v)=>P(rbW(gm,rb,u,v)), ang=p=>Math.atan2(p[1]-rb.cy,p[0]-rb.cx);
+  const G2=rb.arms.map(a=>rbArmGeom(rb,a));
+  // asphalt outline as subpaths: ring disc, arm mouths, fillets
+  const shape=(withArms,op)=>{ g.beginPath(); g.arc(X,Y,Ro,0,Math.PI*2); op();
+    for(const gm of G2){ if(withArms){ const a=W(gm,0,gm.c-gm.hw), b=W(gm,gm.uE+0.6,gm.c-gm.hw), c=W(gm,gm.uE+0.6,gm.c+gm.hw), d=W(gm,0,gm.c+gm.hw); g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.lineTo(c[0],c[1]); g.lineTo(d[0],d[1]); g.closePath(); op(); }
+      for(const f of gm.fil){ const fc=W(gm,f.uf,f.vf), te=W(gm,f.uf,f.e), tr=W(gm,f.tr[0],f.tr[1]), a0=Math.atan2(te[1]-fc[1],te[0]-fc[0]), a1=Math.atan2(tr[1]-fc[1],tr[0]-fc[0]);
+        const in0=W(gm,0,f.e); g.beginPath(); g.moveTo(in0[0],in0[1]); g.lineTo(te[0],te[1]); let da=a1-a0; while(da>Math.PI) da-=2*Math.PI; while(da<-Math.PI) da+=2*Math.PI; g.arc(fc[0],fc[1],f.Rf*S,a0,a0+da,da<0); g.lineTo(X,Y); g.closePath(); op(); } } };
+  // kerb + verge shadow first, then tarmac over it: only the outer boundary keeps the kerb
+  g.save(); g.lineJoin='round'; g.strokeStyle='rgba(0,0,0,0.18)'; g.lineWidth=14; shape(false,()=>g.stroke()); g.strokeStyle='#b9b6ad'; g.lineWidth=7; shape(false,()=>g.stroke());
+  g.fillStyle=g.createPattern(TEX.asph[2],'repeat'); shape(true,()=>g.fill()); g.restore();
+  // continuous edge line: ring arcs between arms + fillet arcs (offset 0.18 tiles inside the kerb)
+  const off=0.2; g.strokeStyle='#ececec'; g.lineWidth=3; g.lineCap='butt';
+  const ends=[]; for(const gm of G2) for(const f of gm.fil){ const tr=rbW(gm,rb,f.tr[0],f.tr[1]); ends.push({a:ang(tr),gm,f}); }
+  ends.sort((p,q)=>p.a-q.a);
+  // ring arcs: from each fillet's ring tangent to the next tangent clockwise, skipping arm mouths (pairs belonging to the same arm across its mouth)
+  for(let i=0;i<ends.length;i++){ const A=ends[i], B=ends[(i+1)%ends.length]; let da=B.a-A.a; if(da<=0) da+=Math.PI*2; if(A.gm===B.gm&&da<Math.PI) continue; g.beginPath(); g.arc(X,Y,(rb.rout-off)*S,A.a,A.a+da); g.stroke(); }
+  for(const gm of G2) for(const f of gm.fil){ const fc=W(gm,f.uf,f.vf), te=W(gm,f.uf,f.e), tr=W(gm,f.tr[0],f.tr[1]), a0=Math.atan2(te[1]-fc[1],te[0]-fc[0]), a1=Math.atan2(tr[1]-fc[1],tr[0]-fc[0]);
+    let da=a1-a0; while(da>Math.PI) da-=2*Math.PI; while(da<-Math.PI) da+=2*Math.PI; g.beginPath(); g.arc(fc[0],fc[1],(f.Rf+off)*S,a0,a0+da,da<0);
+    const e2=W(gm,gm.uE+0.6,f.e-f.sd*off), e1=W(gm,f.uf,f.e-f.sd*off); g.moveTo(e1[0],e1[1]); g.lineTo(e2[0],e2[1]); g.stroke(); }
+  // inner edge line round the central island + lane divider on the circulatory carriageway
+  g.beginPath(); g.arc(X,Y,(rb.rin+off)*S,0,Math.PI*2); g.stroke();
+  g.lineWidth=2; g.setLineDash([16,16]); g.beginPath(); g.arc(X,Y,(rb.rin+rb.rout)/2*S,0,Math.PI*2); g.stroke(); g.setLineDash([]);
+  // central island: kerb, verge, trees
+  g.fillStyle='#8a877f'; g.beginPath(); g.arc(X,Y,rb.rin*S,0,7); g.fill(); g.fillStyle=g.createPattern(TEX.island[0],'repeat'); g.beginPath(); g.arc(X,Y,rb.rin*S-5,0,7); g.fill();
+  const r=mulberry(o.seed); for(let k=0;k<6;k++){ const a=r()*6.28, d=r()*rb.rin*S*0.6; drawObject(g,{kind:'tree',x:X+Math.cos(a)*d,y:Y+Math.sin(a)*d,r:9+r()*6,seed:(r()*1e9)|0}); }
+  for(let k=0;k<rb.arms.length;k++){ const arm=rb.arms[k], gm=G2[k], sp=rbSplitter(rb,arm);
+    // give-way: double dashed line across the entry mouth along the ring edge (entry side, v>c), triangle just behind it
+    const f=gm.fil.find(q=>q.sd>0), aT=ang(rbW(gm,rb,f.tr[0],f.tr[1])); const vb=sp?sp.baseV[0]:gm.c, aS=ang(rbW(gm,rb,Math.sqrt(Math.max(0,rb.rout*rb.rout-vb*vb)),vb));
+    let a0=aS, a1=aT; if(((a1-a0+Math.PI*3)%(Math.PI*2))-Math.PI<0){ const t=a0; a0=a1; a1=t; } let da=a1-a0; while(da<0) da+=Math.PI*2;
+    g.strokeStyle='#ececec'; g.lineWidth=4; g.setLineDash([12,9]); for(const rr of [rb.rout+0.12,rb.rout+0.42]){ g.beginPath(); g.arc(X,Y,rr*S,a0+0.02,a0+da-0.02); g.stroke(); } g.setLineDash([]);
+    const tri=W(gm,rb.rout+2.4,(vb+gm.c+gm.hw+1.2)/2); g.save(); g.translate(tri[0],tri[1]); g.rotate(Math.atan2(gm.o[1],gm.o[0])+Math.PI/2); g.lineWidth=3; g.beginPath(); g.moveTo(-11,-26); g.lineTo(11,-26); g.lineTo(0,26); g.closePath(); g.stroke(); g.restore();
+    if(!sp) continue;
+    // painted hatched nose ahead of the raised island
+    const n0=W(gm,sp.uN,gm.c), n1=W(gm,gm.uE+RB_BACK+2.5,gm.c), nl=W(gm,sp.uN,gm.c+0.12), nr=W(gm,sp.uN,gm.c-0.12);
+    g.fillStyle='#ececec'; g.beginPath(); g.moveTo(nl[0],nl[1]); g.lineTo(n1[0],n1[1]); g.lineTo(nr[0],nr[1]); g.closePath(); g.fill();
+    // raised splitter island: shadow, kerb, block paving / grass, keep-left bollards at both noses
+    const pp=sp.poly.map(P); const path=()=>{ g.beginPath(); g.moveTo(pp[0][0],pp[0][1]); for(const q of pp) g.lineTo(q[0],q[1]); g.closePath(); };
+    g.save(); g.translate(3,3); path(); g.fillStyle='rgba(0,0,0,0.28)'; g.fill(); g.restore();
+    path(); g.fillStyle='#c9c6bd'; g.fill(); g.lineJoin='round'; g.strokeStyle='#e8e6df'; g.lineWidth=2; g.stroke();
+    g.save(); path(); g.clip(); g.fillStyle=g.createPattern(TEX.island[0],'repeat'); g.translate(0,0); g.beginPath(); g.moveTo(pp[0][0],pp[0][1]); for(const q of pp) g.lineTo(q[0],q[1]); g.closePath(); g.lineWidth=8; g.strokeStyle='#c9c6bd'; g.fill(); g.stroke(); g.restore();
+    const bol=(p)=>{ g.fillStyle='rgba(0,0,0,0.35)'; g.beginPath(); g.arc(p[0]+3,p[1]+3,6,0,7); g.fill(); g.fillStyle='#f4f4f4'; g.beginPath(); g.arc(p[0],p[1],6,0,7); g.fill(); g.fillStyle='#1d5fbf'; g.beginPath(); g.arc(p[0],p[1],4.2,0,7); g.fill();
+      g.strokeStyle='#fff'; g.lineWidth=1.6; g.beginPath(); const dx=-gm.o[0]*2.6, dy=-gm.o[1]*2.6, lx=gm.l[0]*2.6, ly=gm.l[1]*2.6; g.moveTo(p[0]-dx-lx,p[1]-dy-ly); g.lineTo(p[0]+dx+lx,p[1]+dy+ly); g.stroke(); };
+    const nose=W(gm,sp.uN-0.35,gm.c); bol(nose);
+    const bm=W(gm,rb.rout+0.55,(sp.baseV[0]+sp.baseV[1])/2); bol(bm); }
+  g.lineWidth=1; }
 function drawObject(g,o){
   if(OBJX[o.kind]) return OBJX[o.kind](g,o);
   switch(o.kind){
@@ -890,14 +1001,7 @@ function drawObject(g,o){
   case 'bale': { g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.arc(o.x+4,o.y+4,9,0,7); g.fill(); g.fillStyle='#d8b55a'; g.beginPath(); g.arc(o.x,o.y,9,0,7); g.fill(); g.strokeStyle='#a8873a'; g.beginPath(); g.arc(o.x,o.y,5,0,7); g.stroke(); break; }
   case 'silo': { g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.arc(o.x+16,o.y+16,o.r,0,7); g.fill(); const gr=g.createRadialGradient(o.x-8,o.y-8,2,o.x,o.y,o.r); gr.addColorStop(0,'#f0f0f0'); gr.addColorStop(1,'#8d9196'); g.fillStyle=gr; g.beginPath(); g.arc(o.x,o.y,o.r,0,7); g.fill(); g.fillStyle='#666'; g.beginPath(); g.arc(o.x,o.y,4,0,7); g.fill(); break; }
   case 'fountain': { const R2=o.big?44:22; g.fillStyle='#9aa3ad'; g.beginPath(); g.arc(o.x,o.y,R2+5,0,7); g.fill(); g.fillStyle='#4a90d9'; g.beginPath(); g.arc(o.x,o.y,R2,0,7); g.fill(); g.fillStyle='#c8e6ff'; g.beginPath(); g.arc(o.x,o.y,R2*0.3,0,7); g.fill(); g.strokeStyle='rgba(255,255,255,0.6)'; g.beginPath(); g.arc(o.x,o.y,R2*0.6,0,7); g.stroke(); break; }
-  case 'rb': { const rb=o.rb, X=rb.cx*TILE, Y=rb.cy*TILE; g.fillStyle=g.createPattern(TEX.asph[2],'repeat'); for(const am of rb.arms){ const sg=world.segs[am.seg]; const E=(am.side<0?sg.b0:sg.b1+1)*TILE, C=sg.dir==='h'?X:Y; const lo=Math.min(E,C), hi=Math.max(E,C); if(sg.dir==='h') g.fillRect(lo,sg.a*TILE,hi-lo,sg.w*TILE); else g.fillRect(sg.a*TILE,lo,sg.w*TILE,hi-lo); } g.beginPath(); g.arc(X,Y,rb.rout*TILE,0,7); g.fill();
-    g.strokeStyle='#ececec'; g.lineWidth=2; g.setLineDash([16,16]); g.beginPath(); g.arc(X,Y,(rb.rin+rb.rout)/2*TILE,0,7); g.stroke(); g.setLineDash([]);
-    g.strokeStyle='#ececec'; g.beginPath(); g.arc(X,Y,rb.rout*TILE-6,0,7); g.stroke();
-    g.fillStyle='#8a877f'; g.beginPath(); g.arc(X,Y,rb.rin*TILE,0,7); g.fill(); g.fillStyle=g.createPattern(TEX.island[0],'repeat'); g.beginPath(); g.arc(X,Y,rb.rin*TILE-5,0,7); g.fill();
-    const r=mulberry(o.seed); for(let k=0;k<6;k++){ const a=r()*6.28, d=r()*rb.rin*TILE*0.6; drawObject(g,{kind:'tree',x:X+Math.cos(a)*d,y:Y+Math.sin(a)*d,r:9+r()*6,seed:(r()*1e9)|0}); }
-    // give-way triangles on each arm
-    g.fillStyle='#ececec'; for(const a of rb.arms){ const px=X+Math.cos(a.ang)*(rb.rout*TILE+8), py=Y+Math.sin(a.ang)*(rb.rout*TILE+8); g.save(); g.translate(px,py); g.rotate(a.ang+Math.PI/2); for(let k=-40;k<=40;k+=10) g.fillRect(k,-2,6,4); g.restore(); }
-    g.lineWidth=1; break; }
+  case 'rb': drawRB(g,o); break;
   case 'tree': drawTree(g,o); break;
   case 'lot': { g.strokeStyle='#e6e6e0'; g.lineWidth=2; const bay=24, r=mulberry(o.seed);
     for(const row of [0,1]){ const y0=o.y+(row?o.h/2:0); for(let x=o.x+4;x<o.x+o.w-4;x+=bay){ g.beginPath(); g.moveTo(x,y0+(row?o.h/2-40:4)); g.lineTo(x,y0+(row?o.h/2-4:40)); g.stroke();
@@ -1353,6 +1457,7 @@ function stepTruck(s,inp,dt){ if(typeof FX!=='undefined'&&FX.boom){ s.v=0; s.thr
   s.skid=(s.skid?brk>0.6:s.lockT>0.15)&&Math.abs(s.v)>3;
   // ----- surface
   const surf=surfaceAt(s); s.offroad=(surf===T.GRASS||surf===T.PGRASS||surf===T.SAND||surf===T.GRAVEL);
+  { const f=fwd(s.h), qx=(s.x-f[0]*2)*PPM/TILE, qy=(s.y-f[1]*2)*PPM/TILE, rb=rbAtTile(Math.floor(qx),Math.floor(qy)); if(rb) s.offroad=rbSurf(rb,qx,qy)!==1; }   // roundabout: exact flared outline
   // ----- gearbox & engine
   const dir= s.mode==='R'?-1:1, av=Math.abs(s.v);
   const ratio= s.mode==='R'? REV_RATIO : GEARS[s.gear-1];
@@ -1683,9 +1788,9 @@ function planPiece(v,r){
     const del=mod2pi(arm.ang-(myArm?myArm.ang:0)); const mv= del<2.0?'L':del<3.9?'S':'R';
     const ap=rb.appr&&rb.appr[sg.id+':'+d]; let tl=P.lane;
     if(ap && ap.lanes[tl].indexOf(mv)<0){ let bd=99; for(let i=0;i<ap.lanes.length;i++) if(ap.lanes[i].indexOf(mv)>=0&&Math.abs(i-P.lane)<bd){ bd=Math.abs(i-P.lane); tl=i; } }
-    if(tl!==P.lane){ laneChange(v,sg,d,P.lane,tl,P.pos,E); P.lane=tl; }
+    if(tl!==P.lane){ laneChange(v,sg,d,P.lane,tl,P.pos,E-d*RB_BACK); P.lane=tl; }
     if(traffic.log) traffic.log.push({rb:rb.id,key:sg.id+':'+d,lane:P.lane,move:mv,allowed:ap?ap.lanes[P.lane]:'*',veh:v.id});
-    const p=lanePt(sg,d,P.lane,E); pathLine(v,p[0],p[1]);
+    const p=lanePt(sg,d,P.lane,E-d*RB_BACK); pathLine(v,p[0],p[1]);
     return planRB(v,rb,sg,d,r,arm); }
   const p=lanePt(sg,d,P.lane,E); pathLine(v,p[0],p[1]);
   return planUTurn(v,sg,d,E,r);
@@ -1724,24 +1829,26 @@ function laneChange(v,sg,d,l0,l1,pos,lineA){
   for(let k=1;k<=n;k++){ const t=k/n, e=t*t*(3-2*t), al=(m1+(m2-m1)*t)*M_T, cr=(c0+(c1-c0)*e)*M_T; if(sg.dir==='h') pathPush(v,al,cr); else pathPush(v,cr,al); }
   v.mk.push({kind:'sig',d0:d0-12,d1:pathEnd(v),side:l1<l0?-1:1});
 }
+function rbQueued(v){ const f=v.s+v.L/2; for(const m of v.mk){ if(m.kind==='rb'&&m.d-f<90&&v.s<(m.join||m.d)+5) return true; if(m.kind==='ring'&&v.s>m.d0-2&&v.s<m.d1) return true; } return false; }
 function planRB(v,rb,sg,d,r,forceArm){
-  const C=[rb.cx*M_T,rb.cy*M_T], R=(rb.rin*0.42+rb.rout*0.58)*M_T;
-  const n=v.px.length, ex=v.px[n-1], ey=v.py[n-1];
+  // v24: tangential flared entry -> clockwise ring -> tangential exit; give way at the ring edge to traffic already circulating
+  const R=rbRingR(rb)*M_T, C=[rb.cx*M_T,rb.cy*M_T];
   const myArm=rb.arms.find(a=>a.seg===sg.id&&a.side===d);
   let arms=rb.arms.filter(a=>a!==myArm); if(!arms.length) arms=rb.arms;
   const arm=forceArm||arms[(r()*arms.length)|0], Q=world.segs[arm.seg], qd=arm.side<0?1:-1, qpos=arm.side<0?Q.b0:Q.b1+1;
   const lane=Math.min(nLanes(Q)-1,(r()*nLanes(Q))|0);
-  const xp=lanePt(Q,qd,lane,qpos);
-  const aIn=Math.atan2(ey-C[1],ex-C[0])+0.38, aOut=Math.atan2(xp[1]-C[1],xp[0]-C[0])-0.38;
+  const dIn=pathEnd(v); let dGw=dIn, aIn, aOut;
+  if(myArm){ const en=rbEntry(rb,myArm,v.plan.lane); aIn=en.phi; let hit=false;
+    for(const p of en.pts){ pathPush(v,p[0]*M_T,p[1]*M_T); if(!hit&&Math.hypot(p[0]-rb.cx,p[1]-rb.cy)<rb.rout+0.35){ hit=true; dGw=pathEnd(v); } } }
+  else { const n=v.px.length; aIn=Math.atan2(v.py[n-1]-C[1],v.px[n-1]-C[0])+0.4; pathLine(v,C[0]+Math.cos(aIn)*R,C[1]+Math.sin(aIn)*R); dGw=pathEnd(v); }
+  const ex=rbExit(rb,arm,lane); aOut=ex.phi;
   let del=mod2pi(aOut-aIn); if(del<0.4) del+=6.283185307;
-  const dIn=pathEnd(v);
-  v.mk.push({kind:'rb',d:dIn,rb,ang:aIn-0.2});
-  pathQuad(v,C[0]+Math.cos(aIn-0.38)*R,C[1]+Math.sin(aIn-0.38)*R,C[0]+Math.cos(aIn)*R,C[1]+Math.sin(aIn)*R);
-  const d0=pathEnd(v); const k=Math.ceil(del*R/2);
+  const mrb={kind:'rb',d:dGw,rb,ang:aIn+0.18,key:sg.id+':'+d}; v.mk.push(mrb);
+  const d0=pathEnd(v), k=Math.ceil(del*R/2); mrb.join=d0+6;
   for(let i=1;i<=k;i++){ const a=aIn+del*i/k; pathPush(v,C[0]+Math.cos(a)*R,C[1]+Math.sin(a)*R); }
   const d1=pathEnd(v);
-  pathQuad(v,C[0]+Math.cos(aOut+0.38)*R,C[1]+Math.sin(aOut+0.38)*R,xp[0],xp[1]);
-  v.mk.push({kind:'ring',d0:dIn,d1:pathEnd(v),rb});
+  for(const p of ex.pts) pathPush(v,p[0]*M_T,p[1]*M_T);
+  v.mk.push({kind:'ring',d0:dGw-1.5,d1:pathEnd(v),rb});
   v.mk.push({kind:'slow',d0:dIn,d1:pathEnd(v),v:8});
   v.mk.push({kind:'sig',d0:d1-14,d1:pathEnd(v),side:-1});
   if(del>3.6) v.mk.push({kind:'sig',d0:dIn-30,d1:d0+del*R*0.6,side:1});
@@ -1906,7 +2013,9 @@ function stepVeh(v,dt,pbs){
       else if(m.kind==='gw'){ if(gap<18){ if(!giveWayBusy(v,m.J)||v.stopT>10) { if(gap<2.5) m.go=true; } else stop=true; } }
       else { if(gap<14){ let busy=false; for(const o of traffic.vs){ if(o===v||o.ring!==m.rb) continue; const a=Math.atan2(o.y-m.rb.cy*M_T,o.x-m.rb.cx*M_T); const df=mod2pi(m.ang-a); if(df<1.5&&df>0.05){ busy=true; break; } }
           if(!busy){ const t=truck, dr=Math.hypot(t.x-m.rb.cx*M_T,t.y-m.rb.cy*M_T); if(dr<(m.rb.rout+1)*M_T&&Math.abs(t.v)>0.8){ const a=Math.atan2(t.y-m.rb.cy*M_T,t.x-m.rb.cx*M_T), df=mod2pi(m.ang-a); if(df<1.6&&df>0.05) busy=true; } }
-          if(!busy||v.stopT>5) m.go=true; else stop=true; } }
+          if(busy&&v.stopT>12){ busy=false; for(const o of traffic.vs){ if(o===v||o.ring!==m.rb) continue; const a=Math.atan2(o.y-m.rb.cy*M_T,o.x-m.rb.cx*M_T), df=mod2pi(m.ang-a); if(df<0.5&&df>-0.15&&o.v>0.5){ busy=true; break; } } }   // long wait: only a car right at the merge still blocks
+          if(!busy) for(const o of traffic.vs){ const e=o.rbIn; if(o!==v&&e&&e.m.rb===m.rb&&e.m.key===m.key&&o.mk.indexOf(e.m)>=0&&o.s-o.L/2<e.m.join){ busy=true; break; } }   // one car per entry at a time: side-by-side lanes never squeeze onto the ring together
+          if(!busy){ if(gap<2.5){ m.go=true; if(!m.join) m.join=m.d+20; v.rbIn={m}; } } else stop=true; } }
       if(stop) acc=Math.min(acc,idmAcc(v,v0,Math.max(0.1,gap),0));
     }
   }
@@ -1938,7 +2047,7 @@ function stepVeh(v,dt,pbs){
   v.lead=lgap<1e8?lveh:null;
   // deadlock breaker: only ghost through the car ahead when the queue is genuinely locked (a loop of cars waiting on each other, or the
   // head of the queue has been stood for over a minute) — never just because we are queued behind a red light (v24: cars were driving into each other)
-  if(v.stopT>7 && !lplayer && lgap<6 && queueLocked(v)){ v.ghostT=2.5; v.stopT=0; }
+  if(v.stopT>7 && !lplayer && lgap<6 && queueLocked(v) && !rbQueued(v)){ v.ghostT=2.5; v.stopT=0; }
   if(v.ghostT>0) v.ghostT-=dt;
   if(v.shakeT<=0 && (v.offX||v.offY)){
     // recovery: a forward shove is simply absorbed as progress along the path (never slide back into whoever hit us);
@@ -2112,10 +2221,10 @@ function drawApproach(g,o){
   }
   g.fillStyle='#ececec';
   if(o.mode==='lights') rect(a1,a1-d*0.16,rmin+0.08,rmax-0.02);                  // stop line
-  if(o.mode==='gw'||o.mode==='rb'){ for(let c=rmin+0.08;c<rmax-0.1;c+=0.5){ const c2=Math.min(rmax-0.04,c+0.3); rect(a1-d*0.04,a1-d*0.14,c,c2); rect(a1-d*0.24,a1-d*0.34,c,c2); } }
+  if(o.mode==='gw'){ for(let c=rmin+0.08;c<rmax-0.1;c+=0.5){ const c2=Math.min(rmax-0.04,c+0.3); rect(a1-d*0.04,a1-d*0.14,c,c2); rect(a1-d*0.24,a1-d*0.34,c,c2); } }
   if(L<2) return;
   for(let i=0;i<nl;i++){ const cr=laneLat(sg,d,i)+0.5;
-    if((o.mode==='gw'||o.mode==='rb') && L>=3) at(a1-d*2.0,cr,()=>{ g.strokeStyle='#ececec'; g.lineWidth=3; g.beginPath(); g.moveTo(-10,-22); g.lineTo(10,-22); g.lineTo(0,26); g.closePath(); g.stroke(); });
+    if(o.mode==='gw' && L>=3) at(a1-d*2.0,cr,()=>{ g.strokeStyle='#ececec'; g.lineWidth=3; g.beginPath(); g.moveTo(-10,-22); g.lineTo(10,-22); g.lineTo(0,26); g.closePath(); g.stroke(); });
     const p1= o.mode==='gw'||o.mode==='rb' ? 4.4 : 2.5;
     if(L>=p1+1 && (nl>1||o.lanes[0].length<3||o.mode==='rb')) at(a1-d*p1,cr,()=>drawLaneArrow(g,o.lanes[i]));
     if(L>=p1+22 && !o.slow && nl>1) at(a1-d*(p1+5.5),cr,()=>drawLaneArrow(g,o.lanes[i]));
