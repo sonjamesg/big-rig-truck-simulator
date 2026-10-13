@@ -14,19 +14,24 @@ function boot(){
   cam.x=st.x; cam.y=st.y;
   window.__bigrig={NAV,setRoute,clearRoute,mBX,mBY,truck,input,world,cam,bigmap,openMap,closeMap,onRoadM,kingpin,traffic,toggleRefuel,fuelStationAt,refuel,get loadMs(){return world.loadMs;},spawnVehicle,toggleCouple,coupleCandidate,trailerInBay,BigRig,get fps(){return fps;},chunks:chunkCache};
   truck.fuel=260; truck.tank=400; truck.money=2500; truck.damage=0;
-  if(!loadGame()) applyModel('rigger'); uiInit(); padInstall(); mpInit(); mobInit();
+  const hadSave=loadGame(); if(!hadSave) applyModel('rigger'); uiInit(); padInstall(); mpInit(); mobInit();
   Object.assign(window.__bigrig,{BREAKDOWN,MP,mpHost,mpJoin,mpChatSend,startGame,getChunk,renderChunk,MAPC,drawMapDetail,pad,padUpdate,career,acceptJob,abandonJob,tryUnload,bayAlign,buyTruck,openBoard,openDealer,closeUI,fcv,addXP,saveGame,loadGame,applyModel,TRUCK_MODELS,TIERS,CARGOS,levelOf,uncouple,couple,fillBoard,jobRoute});
-  world.loadMs=performance.now()-tb; world.ready=true; const ld=document.getElementById('loading'); if(ld) ld.textContent='World ready ('+(world.loadMs/1000).toFixed(1)+' s)';
+  world.loadMs=performance.now()-tb; world.ready=true; const ld=document.getElementById('loading'); if(ld) ld.textContent='World ready ('+(world.loadMs/1000).toFixed(1)+' s)'; if(hadSave) welcomeCard();
   requestAnimationFrame(frame);
 }
 // ---------- input
 const KEYMAP={ArrowUp:'up',KeyW:'up',ArrowDown:'down',KeyS:'down',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',Space:'hand',KeyH:'horn'};
+function welcomeCard(){ const ov=document.getElementById('overlay'); if(!ov||document.getElementById('wbCard')) return; const nm=(localStorage.getItem('bigrig.name')||'driver').replace(/[<>"&]/g,'');
+  const c=document.createElement('div'); c.id='wbCard'; c.style.cssText='margin:14px auto;padding:14px 18px;max-width:340px;border-radius:12px;background:rgba(15,21,34,.92);border:1px solid rgba(245,184,46,.5);text-align:center;font-family:inherit';
+  c.innerHTML=`<div style="font-size:20px;font-weight:900;color:#f5b82e">Welcome back, ${nm}</div><div style="font-size:12px;opacity:.8;margin:4px 0 10px">${money(truck.money)} \u2022 Level ${levelOf?levelOf(career.xp):''} \u2022 ${modelById(career.cur).name}${career.active?' \u2022 job in progress':''}</div><button id="wbGo" style="font:inherit;font-weight:900;padding:9px 26px;border-radius:9px;border:2px solid #fff;background:#f5b82e;color:#111;cursor:pointer">CONTINUE \u24B6</button> <button id="wbNew" style="font:inherit;padding:9px 14px;border-radius:9px;border:1px solid rgba(255,255,255,.3);background:transparent;color:#ddd;cursor:pointer">Reset progress</button>`;
+  const go=ov.querySelector('.go'); (go||ov).after?go.after(c):ov.appendChild(c); const b=c.querySelector('#wbGo'); b.addEventListener('click',e=>{ e.stopPropagation(); startGame(); }); b.focus();
+  const n=c.querySelector('#wbNew'); n.addEventListener('click',e=>{ e.stopPropagation(); if(n.dataset.arm){ resetGame(); return; } n.dataset.arm=1; n.textContent='Click again to wipe save'; n.style.color='#ff8a7a'; }); n.addEventListener('keydown',e=>e.stopPropagation()); }
 function startGame(){ if(started||!world.ready) return; started=true; document.getElementById('overlay').classList.add('hidden'); initAudio(); }
 addEventListener('keydown',e=>{ const k=KEYMAP[e.code]; if(k){ input[k]=true; e.preventDefault(); } if(!started && (k||e.code==='Enter')) startGame(); else if(audio.ctx&&audio.ctx.state==='suspended') audio.ctx.resume(); });
 addEventListener('keydown',e=>{ if((e.code==='KeyT'||e.code==='KeyC')&&started&&!e.repeat){ toggleCouple(); e.preventDefault(); } if(e.code==='KeyF'&&started&&!e.repeat){ toggleRefuel(); e.preventDefault(); } });
 addEventListener('keyup',e=>{ const k=KEYMAP[e.code]; if(k){ input[k]=false; e.preventDefault(); } });
 addEventListener('blur',()=>{ for(const k in input) input[k]=false; });
-document.getElementById('overlay').addEventListener('pointerdown',e=>{ e.preventDefault(); startGame(); });
+document.getElementById('overlay').addEventListener('pointerdown',e=>{ if(e.target.closest&&e.target.closest('#wbNew')) return; e.preventDefault(); startGame(); });
 document.querySelectorAll('[data-k]').forEach(b=>{ const k=b.dataset.k;
   const on=e=>{ e.preventDefault(); input[k]=true; b.classList.add('on'); startGame(); }, off=e=>{ e.preventDefault(); input[k]=false; b.classList.remove('on'); };
   b.addEventListener('pointerdown',on); b.addEventListener('pointerup',off); b.addEventListener('pointercancel',off); b.addEventListener('pointerleave',off); });

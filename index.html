@@ -994,7 +994,7 @@ function initAudio(){
   if(audio.ctx) { if(audio.ctx.state==='suspended') audio.ctx.resume(); return; }
   const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
   const ctx=new AC(); audio.ctx=ctx;
-  const master=ctx.createGain(); master.gain.value=0.7; master.connect(ctx.destination); audio.master=master;
+  const master=ctx.createGain(); master.gain.value=(typeof SETTINGS!=='undefined'?SETTINGS.vol:0.7); master.connect(ctx.destination); audio.master=master;
   // engine sample
   const eng=ctx.createGain(); eng.gain.value=0; const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1800; eng.connect(lp); lp.connect(master); audio.eng=eng; audio.engLP=lp;
   // synth rumble layer (firing frequency of a 6-cylinder: rpm/20 Hz)
@@ -1812,16 +1812,16 @@ function buildDepots(objs,R){
   const sd=world.startDepot; const D0=makeDepot('Big Rig Haulage HQ','HQ',1,sd.x0,sd.y0,sd.w,sd.h,{keep:true,entrance:{x:(sd.x0+sd.w)*M_T,y:(sd.y0+15)*M_T}});
   // other depots: find open grass next to a (non-motorway) road
   const okT=t=>t===T.GRASS||t===T.TREE||t===T.SAND||t===T.QUAY||t===T.FIELD||t===T.HEDGE||t===T.GRAVEL||t===T.WALK||t===T.PGRASS||t===T.ROCK||t===T.CONC;
-  function findSpot(tx,ty,w,h,maxGap){
+  function findSpot(tx,ty,w,h,maxGap,rej,allowB,maxR){ const okB=allowB?(t=>okT(t)||t===T.BLDG||t===T.LOT||t===T.PLAZA):okT, soft=t=>allowB&&(t===T.WALK||t===T.PLAZA||t===T.PGRASS||t===T.BLDG||t===T.LOT);
     // summed-area table of unusable tiles over the search window (fast rectangle tests)
     const RAD=162, X0=Math.max(0,tx-RAD-2), Y0=Math.max(0,ty-RAD-2), X1=Math.min(MW-1,tx+RAD+w+3), Y1=Math.min(MH-1,ty+RAD+h+3), SW=X1-X0+2, sat=new Int32Array(SW*(Y1-Y0+2));
-    for(let j=Y0;j<=Y1;j++){ let row=0; const o=(j-Y0+1)*SW, op=(j-Y0)*SW; for(let i=X0;i<=X1;i++){ const k=idx(i,j); row+=(!okT(G[k])||world.reserved[k])?1:0; sat[o+i-X0+1]=sat[op+i-X0+1]+row; } }
+    for(let j=Y0;j<=Y1;j++){ let row=0; const o=(j-Y0+1)*SW, op=(j-Y0)*SW; for(let i=X0;i<=X1;i++){ const k=idx(i,j); row+=(!okB(G[k])||(world.reserved[k]&&!soft(G[k])))?1:0; sat[o+i-X0+1]=sat[op+i-X0+1]+row; } }
     const badIn=(x,y,ww,hh)=>{ if(x<X0||y<Y0||x+ww-1>X1||y+hh-1>Y1) return true; const a=x-X0, b=y-Y0, c=a+ww, d=b+hh; return sat[d*SW+c]-sat[b*SW+c]-sat[d*SW+a]+sat[b*SW+a]>0; };
-    for(let rad=0;rad<160;rad+=2) for(let dy=-rad;dy<=rad;dy+=2) for(let dx=-rad;dx<=rad;dx+=2){ if(Math.max(Math.abs(dx),Math.abs(dy))!==rad) continue;
+    for(let rad=0;rad<(maxR||160);rad+=2) for(let dy=-rad;dy<=rad;dy+=2) for(let dx=-rad;dx<=rad;dx+=2){ if(Math.max(Math.abs(dx),Math.abs(dy))!==rad) continue;
       const x=tx+dx, y=ty+dy; if(x<2||y<4||x+w>MW-2||y+h>MH-2) continue;
-      if(badIn(x-1,y,w+2,h+1)) continue;
+      if(badIn(x-1,y,w+2,h+1)) continue; if(rej&&rej(x,y)) continue;
       for(let gap=1;gap<=(maxGap||8);gap++){ const j=y-1-gap; let road=0; for(let i=x+w/2-2;i<x+w/2+2;i++){ const sid=world.roadH[idx(i,j)]; if((get(i,j)===T.ROAD||get(i,j)===T.BRIDGE)&&sid>=0&&world.segs[sid].type!=='hwy'&&world.roadV[idx(i,j)]<0) road++; }
-        if(road===4){ let clear=true; for(let jj=y-gap;jj<y;jj++) for(let i=x+w/2-3;i<x+w/2+3;i++) if((!okT(get(i,jj))&&get(i,jj)!==T.WALK)||world.reserved[idx(i,jj)]) clear=false; if(clear) return [x,y,gap]; } }
+        if(road===4){ let clear=true; for(let jj=y-gap;jj<y;jj++) for(let i=x+w/2-3;i<x+w/2+3;i++) if((!okB(get(i,jj))&&get(i,jj)!==T.WALK)||(world.reserved[idx(i,jj)]&&!soft(get(i,jj)))) clear=false; if(clear) return [x,y,gap]; } }
     } return null; }
   const region=(x,y)=> world.regionAt(x,y);
   const plan=[['Albion Docks Freight','ADF',3,520,470],['Albion Airport Cargo','AAC',3,620,470],['Millford Agri Depot','MAD',1,300,900],['Ashby Farm Supplies','AFS',1,280,1170],['Greyfell Quarry','GQY',4,120,1610],
@@ -1872,11 +1872,28 @@ function buildDepots(objs,R){
   const tf0=performance.now(); for(const [n,tx,ty] of fplan){ let s=findSpot(tx,ty,26,20); if(s){ forecourt(n,s[0],s[1],s[2],+(1.49+R()*0.25).toFixed(2)); continue; }
     s=findSpot(tx,ty,18,12); if(!s){ console.warn('no fuel spot',n); continue; } fuelStation(n,s[0],s[1],s[2],+(1.49+R()*0.25).toFixed(2)); }
   // ---- repair garages (stub for later: damage repairs)
-  function garage(name,x,y,gap){ const w=14,h=10; access(x,y,w,gap); clearObjs(x,y,w,h); fill(x,y,w,h,T.CONC); for(let j=y;j<y+h;j++) for(let i=x;i<x+w;i++) world.reserved[idx(i,j)]=1;
-    fill(x+1,y+h-5,12,5,T.BLDG); objs.push({kind:'bldg',x:(x+1)*TILE,y:(y+h-5)*TILE,w:12*TILE,h:5*TILE,style:'warehouse',height:20,seed:(R()*1e9)|0,logo:'TRUCK REPAIRS'});
+  function garage(name,x,y,gap,w=14,h=10){ access(x,y,w,gap); clearObjs(x,y,w,h); fill(x,y,w,h,T.CONC); for(let j=y;j<y+h;j++) for(let i=x;i<x+w;i++) world.reserved[idx(i,j)]=1;
+    fill(x+w-13,y+h-5,12,5,T.BLDG); objs.push({kind:'bldg',x:(x+w-13)*TILE,y:(y+h-5)*TILE,w:12*TILE,h:5*TILE,style:'warehouse',height:20,seed:(R()*1e9)|0,logo:'TRUCK REPAIRS'});
     objs.push({kind:'paint',x:(x+2)*TILE,y:(y+1.2)*TILE,text:'REPAIRS',small:true});
     world.garages.push({id:'G'+(world.garages.length+1),name,x:(x+w/2)*M_T,y:(y+h/2)*M_T,bay:{x:(x+w/2)*M_T,y:(y+2.5)*M_T},ratePerPct:45,region:region(x,y)}); }
   for(const [n,tx,ty] of [['Albion Truck Repairs',420,470],['Millford Motors',360,900],['Sandvale Heavy Repairs',1700,520],['Dustwater Garage',1000,520],['Kingsbridge Commercial',1600,1760],['Redhill Garage',980,1260]]){ const s=findSpot(tx,ty,14,10); if(s) garage(n,s[0],s[1],s[2]); }
+  // v13: every city gets 4 fuel stations (HGV bays + car pumps) and 4 artic-friendly repair garages, spread over its districts
+  { const CN={C1:'Albion',SV:'Sandvale',KB:'Kingsbridge',MF:'Millford',DW:'Dustwater',CM:'Coppermine',RH:'Redhill',FW:'Fenwick',AB:'Ashby'}, Q=['North','East','South','West','Central','Park','Ring','Bridge'];
+    world.cityPOI={};
+    for(const k in CN){ const c=world.cities[k]; if(!c) continue; const x0=c.xs[0], y0=c.ys[0], x1=c.X1, y1=c.Y1, cx=(x0+x1)/2, cy=(y0+y1)/2, hw=(x1-x0)/2, hh=(y1-y0)/2, mg=Math.max(hw,hh)<40?130:Math.max(hw,hh)<90?80:40;
+      const inC=p=>{ const tx=p.x/M_T, ty=p.y/M_T; return tx>x0-mg&&tx<x1+mg&&ty>y0-mg&&ty<y1+mg; };
+      const tg=[[0,-.55],[.55,0],[0,.55],[-.55,0],[-.5,-.5],[.5,-.5],[.5,.5],[-.5,.5]].map(([a,b])=>[Math.round(cx+a*hw),Math.round(cy+b*hh)]); for(const [a,b] of [[0,-1.3],[1.3,0],[0,1.3],[-1.3,0],[1,-1],[1,1],[-1,1],[-1,-1]]) tg.push([Math.round(cx+a*hw),Math.round(cy+b*hh)]);
+      const far=(list,d)=>(x,y)=>x<x0-mg||x>x1+mg-20||y<y0-mg||y>y1+mg-16||list.some(p=>Math.hypot(p.x/M_T-x,p.y/M_T-y)<d);
+      const clrB=(x,y,w,h)=>{ const X0=x*TILE,Y0=y*TILE,X1=(x+w)*TILE,Y1=(y+h)*TILE; for(const o of objs){ if(o._dead||!(o.kind==='bldg'||o.kind==='lot'||o.kind==='awning')||o.w===undefined) continue; if(o.x<X1&&o.x+o.w>X0&&o.y<Y1&&o.y+o.h>Y0){ o._dead=1; if(o.kind!=='awning'){ const a=Math.floor(o.x/TILE),b=Math.floor(o.y/TILE); for(let j=b;j<b+Math.ceil(o.h/TILE);j++) for(let i=a;i<a+Math.ceil(o.w/TILE);i++) if(!world.reserved[idx(i,j)]&&(get(i,j)===T.BLDG||get(i,j)===T.LOT||get(i,j)===T.PLAZA)) set(i,j,T.PGRASS); } } } };
+      const spotB=(tx,ty,w,h,rej)=>{ const sp=findSpot(tx,ty,w,h,8,rej,true); if(sp){ clrB(sp[0]-1,sp[1]-sp[2],w+2,h+sp[2]); } return sp; };
+      const fs=()=>world.fuel.filter(inC), gs=()=>world.garages.filter(inC), MR=Math.round(Math.max(hw,hh)+mg), pr=()=>+(1.49+R()*0.25).toFixed(2);
+      const tryF=(nm,tx,ty,sep)=>{ for(const [w,h,b,f] of [[26,20,0,1],[18,12,0,.6],[26,20,1,.6],[18,12,1,.4]]){ const sp=findSpot(tx,ty,w,h,16,far(fs(),sep*f),!!b,MR); if(sp){ if(b) clrB(sp[0]-1,sp[1]-sp[2],w+2,h+sp[2]); (w===26?forecourt:fuelStation)(nm,sp[0],sp[1],sp[2],pr()); return true; } } return false; };
+      const tryG=(nm,tx,ty,sep)=>{ for(const [w,h,b,f] of [[22,14,0,1],[22,14,1,.6],[14,10,1,.5],[14,10,1,.25]]){ const sp=findSpot(tx,ty,w,h,16,far(gs(),sep*f),!!b,MR); if(sp){ if(b) clrB(sp[0]-1,sp[1]-sp[2],w+2,h+sp[2]); garage(nm,sp[0],sp[1],sp[2],w,h); return true; } } return false; };
+      const sep=Math.max(14,Math.min(hw,hh)*0.5);
+      for(let t=0;fs().length<4&&t<10;t++){ const [tx,ty]=tg[t]; if(!tryF(CN[k]+' '+Q[t%8]+(t>=8?' Road':'')+' Fuel',tx,ty,sep)) t+=0; }
+      for(let t=0;gs().length<4&&t<10;t++){ const [tx,ty]=tg[(t+2)%16]; tryG(CN[k]+' '+Q[(t+2)%8]+((t+2)%16>=8?' Road':'')+' Truck Repairs',tx,ty,sep); }
+      world.cityPOI[CN[k]]={fuel:fs().length,garages:gs().length}; }
+    console.log('[sites] per city fuel+garages',JSON.stringify(world.cityPOI)); }
 if(typeof buildCareerSites==='function') buildCareerSites({findSpot,access,clearObjs,region,R,objs,okT});
   // fill bays with parked trailers
   const types=['curtain','curtain','fridge','cont','flat','tank'];
@@ -2175,7 +2192,7 @@ const TRUCK_MODELS=[
   {id:'kestrel', name:'Kestrel Sport 600',  price:92000, hp:600,power:1.50,vmax:26.4,tank:600,econ:0.95,style:{roof:'aero',stripe:'#ffcc00',skirts:1,visor:1},cols:['#c0392b','#111111','#2471a3','#f1c40f'],blurb:'Fast, sharp and surprisingly thrifty.'},
   {id:'titan',   name:'Titan V8 750',       price:135000,hp:750,power:1.75,vmax:27.8,tank:800,econ:1.30,style:{roof:'high',nose:2.0,stacks:1,lightbar:1,visor:1},cols:['#0b0b0b','#b03a2e','#f1c40f','#2874a6','#ffffff'],blurb:'The king of the road. 100 km/h limiter.'}];
 const career={depotLatch:true,xp:0,tier:1,owned:['rigger'],cur:'rigger',colors:{},jobs:[],active:null,done:0,earned:0,unload:null,ui:null,lastSave:0,boardSeq:1,uiOpen:null};
-const SAVE_KEY='bigrig.save.v7';
+const SAVE_KEY_OLD='bigrig.save.v7'; const saveKey=()=>'bigrig.save.'+(world.v2poi?'v2':'main'); const SETTINGS={vol:0.7};
 // ---------- levels & tiers
 const levelNeed=n=>Math.round(120*Math.pow(n-1,1.55));            // cumulative XP to reach level n
 function levelOf(xp){ let n=1; while(xp>=levelNeed(n+1)) n++; return n; }
@@ -2217,16 +2234,34 @@ const modelById=id=>TRUCK_MODELS.find(m=>m.id===id)||TRUCK_MODELS[0];
 function applyModel(id,col){ const m=modelById(id); col=col||career.colors[id]||m.cols[0]; career.cur=m.id; career.colors[m.id]=col;
   CABART=modelArt(m,col); CABSH=silhouette(CABART); truck.power=m.power; truck.vmax=m.vmax; truck.econ=m.econ; truck.tank=m.tank; truck.model=m.id; if(truck.fuel>truck.tank) truck.fuel=truck.tank; }
 // ---------- save / load
-function saveGame(){ try{ const tr=truck.trl; const d={v:7,money:truck.money,fuel:truck.fuel,damage:truck.damage,xp:career.xp,owned:career.owned,cur:career.cur,colors:career.colors,done:career.done,earned:career.earned,
-    trailer:tr?{type:tr.type,col:tr.col,logo:tr.logo,cargo:tr.cargo,cargoKg:tr.cargoKg,weight:tr.weight,typeName:tr.typeName}:null, t:Date.now()};
-    localStorage.setItem(SAVE_KEY,JSON.stringify(d)); career.lastSave=timeS; return true; }catch(e){ return false; } }
-function loadGame(){ let d=null; try{ d=JSON.parse(localStorage.getItem(SAVE_KEY)||'null'); }catch(e){} if(!d) return false;
+function jobSer(j){ return {id:j.id,cargo:j.cargo.name,tier:j.tier,from:world.depots.indexOf(j.from),to:world.malls.indexOf(j.to),km:j.km,kg:j.kg,weight:j.weight,trailerType:j.trailerType,pay:j.pay,xp:j.xp,mins:j.mins,approx:j.approx}; }
+function jobDe(o){ const c=CARGOS.find(c=>c.name===o.cargo), from=world.depots[o.from], to=world.malls[o.to]; if(!c||!from||!to) return null; return Object.assign({},o,{cargo:c,from,to}); }
+function saveGame(){ try{ if(!world.ready) return false; const tr=truck.trl, a=career.active; const d={v:8,name:localStorage.getItem('bigrig.name')||'',money:truck.money,fuel:truck.fuel,damage:truck.damage,xp:career.xp,tier:career.tier,owned:career.owned,cur:career.cur,colors:career.colors,done:career.done,earned:career.earned,boardSeq:career.boardSeq,
+    pos:{x:truck.x,y:truck.y,h:truck.h}, settings:SETTINGS, jobs:career.jobs.filter(j=>!j.taken).map(jobSer),
+    active:a?{job:jobSer(a.job),phase:a.phase==='unloading'?'deliver':a.phase,bay:a.job.to.bays.indexOf(a.bay),trl:a.phase==='recouple'?{x:a.trailer.x,y:a.trailer.y,th:a.trailer.th,type:a.trailer.type,col:a.trailer.col,logo:a.trailer.logo,cargo:a.trailer.cargo,cargoKg:a.trailer.cargoKg,weight:a.trailer.weight}:null,el:timeS-a.t0}:null,
+    trailer:tr?{type:tr.type,col:tr.col,logo:tr.logo,cargo:tr.cargo,cargoKg:tr.cargoKg,weight:tr.weight,typeName:tr.typeName,job:tr.job||null}:null, t:Date.now()};
+    localStorage.setItem(saveKey(),JSON.stringify(d)); career.lastSave=timeS; return true; }catch(e){ console.warn('save failed',e); return false; } }
+function hasSave(){ try{ return JSON.parse(localStorage.getItem(saveKey())||(world.v2poi?'null':localStorage.getItem(SAVE_KEY_OLD))||'null'); }catch(e){ return null; } }
+function posOK(x,y){ if(!isFinite(x)||!isFinite(y)||x<0||y<0||x>MW*M_T||y>MH*M_T) return false; for(const [dx,dy] of [[0,0],[3,0],[-3,0],[0,3],[0,-3]]) if(solidAtM(x+dx,y+dy)) return false; return true; }
+function loadGame(){ const d=hasSave(); if(!d) return false;
   truck.money=d.money??truck.money; truck.fuel=d.fuel??truck.fuel; truck.damage=d.damage||0; career.xp=d.xp||0; career.tier=tierOf(career.xp); career.owned=d.owned||['rigger']; if(!career.owned.includes('rigger')) career.owned.unshift('rigger');
-  career.colors=d.colors||{}; career.done=d.done||0; career.earned=d.earned||0; applyModel(d.cur||'rigger');
+  career.colors=d.colors||{}; career.done=d.done||0; career.earned=d.earned||0; career.boardSeq=Math.max(career.boardSeq,d.boardSeq||1); applyModel(d.cur||'rigger'); if(d.settings) Object.assign(SETTINGS,d.settings);
+  if(d.name&&!localStorage.getItem('bigrig.name')) localStorage.setItem('bigrig.name',d.name);
   if(d.trailer===null&&truck.trl){ const t=truck.trl; t.coupled=false; truck.trl=null; const i=world.trailers.indexOf(t); if(i>=0) world.trailers.splice(i,1); }
   else if(d.trailer&&d.trailer.type!=='player'&&truck.trl){ const o=truck.trl, i=world.trailers.indexOf(o); const tr=makeTrailer(d.trailer.type,mulberry(5),Object.assign({},d.trailer,{coupled:true})); tr.art=trailerArt(tr.type,tr.col,tr.logo); truck.trl=tr; if(i>=0) world.trailers[i]=tr; }
+  if(d.pos){ if(posOK(d.pos.x,d.pos.y)){ truck.x=d.pos.x; truck.y=d.pos.y; truck.h=truck.th=d.pos.h||0; }
+    else { let best=null,bd=1e18; for(const dp of world.depots){ const q=Math.hypot(dp.entrance.x-d.pos.x,dp.entrance.y-d.pos.y); if(q<bd&&dp.bays.length){ bd=q; best=dp; } } const p=best&&ftSpot(best); if(p){ truck.x=p.x; truck.y=p.y; truck.h=truck.th=p.h; career.posFallback=best.name; } } }
+  if(truck.trl){ const f=fwd(truck.h); const k=kingpin(truck); truck.trl.th=truck.h; if(k){ truck.trl.x=k[0]; truck.trl.y=k[1]; } }
+  cam.x=truck.x*PPM; cam.y=truck.y*PPM;
+  if(Array.isArray(d.jobs)) career.jobs=d.jobs.map(jobDe).filter(Boolean);
+  if(d.active){ const j=jobDe(d.active.job); if(j){ try{
+    if(d.active.phase==='pickup'){ career.jobs.unshift(j); acceptJob(j); }
+    else { const bay=j.to.bays[d.active.bay]||j.to.bays[0]; bay.assigned=true; j.taken=true; let tr=null;
+      if(d.active.phase==='recouple'&&d.active.trl){ const o=d.active.trl; tr=makeTrailer(o.type,mulberry(7),Object.assign({},o,{coupled:false,target:true,job:j.id})); world.trailers.push(tr); setRoute({x:tr.x,y:tr.y,name:'Your cargo trailer'}); }
+      else if(truck.trl){ tr=truck.trl; tr.job=j.id; setRoute(j.to); }
+      if(tr) career.active={job:j,trailer:tr,pickBay:{},bay,phase:tr.coupled?'deliver':'recouple',t0:timeS-(d.active.el||0),tc:timeS,dmg0:truck.damage}; } }catch(e){ console.warn('job restore',e); } } }
   return true; }
-function resetGame(){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} location.reload(); }
+function resetGame(){ try{ career.noSave=1; localStorage.removeItem(saveKey()); if(!world.v2poi) localStorage.removeItem(SAVE_KEY_OLD); }catch(e){} location.reload(); }
 // ---------- jobs
 const R7=mulberry((Date.now()%1e9)|0);
 function pickupsFor(c){ const ds=world.depots.filter(d=>d.bays.length); const pref=c.trl==='cont'?ds.filter(d=>/Docks|Harbour|Freight/.test(d.name)):c.trl==='tank'?ds.filter(d=>/Quarry|Mine|Logistics|Harbour/.test(d.name)):c.trl==='fridge'?ds.filter(d=>/Agri|Farm|Distribution|Air/.test(d.name)):ds; return pref.length?pref:ds; }
@@ -2286,7 +2321,7 @@ function updateCareer(dt){ const a=career.active;
   // depot: stopping inside a yard with no job opens the board once
   let inDepot=null; for(const d of world.depots){ const x0=d.x*M_T,y0=d.y*M_T; if(s.x>x0&&s.x<x0+d.w*M_T&&s.y>y0&&s.y<y0+d.h*M_T) inDepot=d; }
   if(inDepot&&!career.active&&Math.abs(s.v)<0.1&&!career.depotLatch&&!career.uiOpen&&started&&timeS>3){ career.depotT=(career.depotT||0)+dt; if(career.depotT>1.2){ career.depotLatch=true; openBoard(); } } else career.depotT=0; if(!inDepot) career.depotLatch=false;
-  if(timeS-career.lastSave>20&&started) saveGame(); }
+  if(timeS-career.lastSave>10&&started&&!career.noSave) saveGame(); }
 // ---------- world-space drawing (bay highlight, ghost, dock doors)
 function drawCareerWorld(vx0,vy0,vx1,vy1){ const a=career.active;
   for(const m of world.malls||[]){ if(m.x*PPM<vx0-600||m.x*PPM>vx1+600||m.y*PPM<vy0-600||m.y*PPM>vy1+600) continue;
@@ -2346,6 +2381,8 @@ function drawAlignPanel(a,al){ const W=372,H=118,x=VW/2-W/2,y=VH-H-58; ctx.save(
   career.unloadBtn=[x+W-92,y+48,80,32];
   if(unl){ const p=Math.min(1,a.ut/a.udur); ctx.fillStyle='#222a36'; ctx.fillRect(x+96,y+92,W-200,8); ctx.fillStyle='#2f81f7'; ctx.fillRect(x+96,y+92,(W-200)*p,8); }
   ctx.restore(); }
+
+addEventListener('visibilitychange',()=>{ if(document.hidden&&started&&!career.noSave) saveGame(); }); addEventListener('beforeunload',()=>{ if(started&&!career.noSave) saveGame(); });
 
 'use strict';
 // ===================== v7 UI: job board, dealership, results, tier unlock (DOM overlay inside #frame so it works in fullscreen) =====================
@@ -3205,19 +3242,24 @@ function boot(){
   cam.x=st.x; cam.y=st.y;
   window.__bigrig={NAV,setRoute,clearRoute,mBX,mBY,truck,input,world,cam,bigmap,openMap,closeMap,onRoadM,kingpin,traffic,toggleRefuel,fuelStationAt,refuel,get loadMs(){return world.loadMs;},spawnVehicle,toggleCouple,coupleCandidate,trailerInBay,BigRig,get fps(){return fps;},chunks:chunkCache};
   truck.fuel=260; truck.tank=400; truck.money=2500; truck.damage=0;
-  if(!loadGame()) applyModel('rigger'); uiInit(); padInstall(); mpInit(); mobInit();
+  const hadSave=loadGame(); if(!hadSave) applyModel('rigger'); uiInit(); padInstall(); mpInit(); mobInit();
   Object.assign(window.__bigrig,{BREAKDOWN,MP,mpHost,mpJoin,mpChatSend,startGame,getChunk,renderChunk,MAPC,drawMapDetail,pad,padUpdate,career,acceptJob,abandonJob,tryUnload,bayAlign,buyTruck,openBoard,openDealer,closeUI,fcv,addXP,saveGame,loadGame,applyModel,TRUCK_MODELS,TIERS,CARGOS,levelOf,uncouple,couple,fillBoard,jobRoute});
-  world.loadMs=performance.now()-tb; world.ready=true; const ld=document.getElementById('loading'); if(ld) ld.textContent='World ready ('+(world.loadMs/1000).toFixed(1)+' s)';
+  world.loadMs=performance.now()-tb; world.ready=true; const ld=document.getElementById('loading'); if(ld) ld.textContent='World ready ('+(world.loadMs/1000).toFixed(1)+' s)'; if(hadSave) welcomeCard();
   requestAnimationFrame(frame);
 }
 // ---------- input
 const KEYMAP={ArrowUp:'up',KeyW:'up',ArrowDown:'down',KeyS:'down',ArrowLeft:'left',KeyA:'left',ArrowRight:'right',KeyD:'right',Space:'hand',KeyH:'horn'};
+function welcomeCard(){ const ov=document.getElementById('overlay'); if(!ov||document.getElementById('wbCard')) return; const nm=(localStorage.getItem('bigrig.name')||'driver').replace(/[<>"&]/g,'');
+  const c=document.createElement('div'); c.id='wbCard'; c.style.cssText='margin:14px auto;padding:14px 18px;max-width:340px;border-radius:12px;background:rgba(15,21,34,.92);border:1px solid rgba(245,184,46,.5);text-align:center;font-family:inherit';
+  c.innerHTML=`<div style="font-size:20px;font-weight:900;color:#f5b82e">Welcome back, ${nm}</div><div style="font-size:12px;opacity:.8;margin:4px 0 10px">${money(truck.money)} \u2022 Level ${levelOf?levelOf(career.xp):''} \u2022 ${modelById(career.cur).name}${career.active?' \u2022 job in progress':''}</div><button id="wbGo" style="font:inherit;font-weight:900;padding:9px 26px;border-radius:9px;border:2px solid #fff;background:#f5b82e;color:#111;cursor:pointer">CONTINUE \u24B6</button> <button id="wbNew" style="font:inherit;padding:9px 14px;border-radius:9px;border:1px solid rgba(255,255,255,.3);background:transparent;color:#ddd;cursor:pointer">Reset progress</button>`;
+  const go=ov.querySelector('.go'); (go||ov).after?go.after(c):ov.appendChild(c); const b=c.querySelector('#wbGo'); b.addEventListener('click',e=>{ e.stopPropagation(); startGame(); }); b.focus();
+  const n=c.querySelector('#wbNew'); n.addEventListener('click',e=>{ e.stopPropagation(); if(n.dataset.arm){ resetGame(); return; } n.dataset.arm=1; n.textContent='Click again to wipe save'; n.style.color='#ff8a7a'; }); n.addEventListener('keydown',e=>e.stopPropagation()); }
 function startGame(){ if(started||!world.ready) return; started=true; document.getElementById('overlay').classList.add('hidden'); initAudio(); }
 addEventListener('keydown',e=>{ const k=KEYMAP[e.code]; if(k){ input[k]=true; e.preventDefault(); } if(!started && (k||e.code==='Enter')) startGame(); else if(audio.ctx&&audio.ctx.state==='suspended') audio.ctx.resume(); });
 addEventListener('keydown',e=>{ if((e.code==='KeyT'||e.code==='KeyC')&&started&&!e.repeat){ toggleCouple(); e.preventDefault(); } if(e.code==='KeyF'&&started&&!e.repeat){ toggleRefuel(); e.preventDefault(); } });
 addEventListener('keyup',e=>{ const k=KEYMAP[e.code]; if(k){ input[k]=false; e.preventDefault(); } });
 addEventListener('blur',()=>{ for(const k in input) input[k]=false; });
-document.getElementById('overlay').addEventListener('pointerdown',e=>{ e.preventDefault(); startGame(); });
+document.getElementById('overlay').addEventListener('pointerdown',e=>{ if(e.target.closest&&e.target.closest('#wbNew')) return; e.preventDefault(); startGame(); });
 document.querySelectorAll('[data-k]').forEach(b=>{ const k=b.dataset.k;
   const on=e=>{ e.preventDefault(); input[k]=true; b.classList.add('on'); startGame(); }, off=e=>{ e.preventDefault(); input[k]=false; b.classList.remove('on'); };
   b.addEventListener('pointerdown',on); b.addEventListener('pointerup',off); b.addEventListener('pointercancel',off); b.addEventListener('pointerleave',off); });

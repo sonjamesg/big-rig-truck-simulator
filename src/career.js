@@ -29,7 +29,7 @@ const TRUCK_MODELS=[
   {id:'kestrel', name:'Kestrel Sport 600',  price:92000, hp:600,power:1.50,vmax:26.4,tank:600,econ:0.95,style:{roof:'aero',stripe:'#ffcc00',skirts:1,visor:1},cols:['#c0392b','#111111','#2471a3','#f1c40f'],blurb:'Fast, sharp and surprisingly thrifty.'},
   {id:'titan',   name:'Titan V8 750',       price:135000,hp:750,power:1.75,vmax:27.8,tank:800,econ:1.30,style:{roof:'high',nose:2.0,stacks:1,lightbar:1,visor:1},cols:['#0b0b0b','#b03a2e','#f1c40f','#2874a6','#ffffff'],blurb:'The king of the road. 100 km/h limiter.'}];
 const career={depotLatch:true,xp:0,tier:1,owned:['rigger'],cur:'rigger',colors:{},jobs:[],active:null,done:0,earned:0,unload:null,ui:null,lastSave:0,boardSeq:1,uiOpen:null};
-const SAVE_KEY='bigrig.save.v7';
+const SAVE_KEY_OLD='bigrig.save.v7'; const saveKey=()=>'bigrig.save.'+(world.v2poi?'v2':'main'); const SETTINGS={vol:0.7};
 // ---------- levels & tiers
 const levelNeed=n=>Math.round(120*Math.pow(n-1,1.55));            // cumulative XP to reach level n
 function levelOf(xp){ let n=1; while(xp>=levelNeed(n+1)) n++; return n; }
@@ -71,16 +71,34 @@ const modelById=id=>TRUCK_MODELS.find(m=>m.id===id)||TRUCK_MODELS[0];
 function applyModel(id,col){ const m=modelById(id); col=col||career.colors[id]||m.cols[0]; career.cur=m.id; career.colors[m.id]=col;
   CABART=modelArt(m,col); CABSH=silhouette(CABART); truck.power=m.power; truck.vmax=m.vmax; truck.econ=m.econ; truck.tank=m.tank; truck.model=m.id; if(truck.fuel>truck.tank) truck.fuel=truck.tank; }
 // ---------- save / load
-function saveGame(){ try{ const tr=truck.trl; const d={v:7,money:truck.money,fuel:truck.fuel,damage:truck.damage,xp:career.xp,owned:career.owned,cur:career.cur,colors:career.colors,done:career.done,earned:career.earned,
-    trailer:tr?{type:tr.type,col:tr.col,logo:tr.logo,cargo:tr.cargo,cargoKg:tr.cargoKg,weight:tr.weight,typeName:tr.typeName}:null, t:Date.now()};
-    localStorage.setItem(SAVE_KEY,JSON.stringify(d)); career.lastSave=timeS; return true; }catch(e){ return false; } }
-function loadGame(){ let d=null; try{ d=JSON.parse(localStorage.getItem(SAVE_KEY)||'null'); }catch(e){} if(!d) return false;
+function jobSer(j){ return {id:j.id,cargo:j.cargo.name,tier:j.tier,from:world.depots.indexOf(j.from),to:world.malls.indexOf(j.to),km:j.km,kg:j.kg,weight:j.weight,trailerType:j.trailerType,pay:j.pay,xp:j.xp,mins:j.mins,approx:j.approx}; }
+function jobDe(o){ const c=CARGOS.find(c=>c.name===o.cargo), from=world.depots[o.from], to=world.malls[o.to]; if(!c||!from||!to) return null; return Object.assign({},o,{cargo:c,from,to}); }
+function saveGame(){ try{ if(!world.ready) return false; const tr=truck.trl, a=career.active; const d={v:8,name:localStorage.getItem('bigrig.name')||'',money:truck.money,fuel:truck.fuel,damage:truck.damage,xp:career.xp,tier:career.tier,owned:career.owned,cur:career.cur,colors:career.colors,done:career.done,earned:career.earned,boardSeq:career.boardSeq,
+    pos:{x:truck.x,y:truck.y,h:truck.h}, settings:SETTINGS, jobs:career.jobs.filter(j=>!j.taken).map(jobSer),
+    active:a?{job:jobSer(a.job),phase:a.phase==='unloading'?'deliver':a.phase,bay:a.job.to.bays.indexOf(a.bay),trl:a.phase==='recouple'?{x:a.trailer.x,y:a.trailer.y,th:a.trailer.th,type:a.trailer.type,col:a.trailer.col,logo:a.trailer.logo,cargo:a.trailer.cargo,cargoKg:a.trailer.cargoKg,weight:a.trailer.weight}:null,el:timeS-a.t0}:null,
+    trailer:tr?{type:tr.type,col:tr.col,logo:tr.logo,cargo:tr.cargo,cargoKg:tr.cargoKg,weight:tr.weight,typeName:tr.typeName,job:tr.job||null}:null, t:Date.now()};
+    localStorage.setItem(saveKey(),JSON.stringify(d)); career.lastSave=timeS; return true; }catch(e){ console.warn('save failed',e); return false; } }
+function hasSave(){ try{ return JSON.parse(localStorage.getItem(saveKey())||(world.v2poi?'null':localStorage.getItem(SAVE_KEY_OLD))||'null'); }catch(e){ return null; } }
+function posOK(x,y){ if(!isFinite(x)||!isFinite(y)||x<0||y<0||x>MW*M_T||y>MH*M_T) return false; for(const [dx,dy] of [[0,0],[3,0],[-3,0],[0,3],[0,-3]]) if(solidAtM(x+dx,y+dy)) return false; return true; }
+function loadGame(){ const d=hasSave(); if(!d) return false;
   truck.money=d.money??truck.money; truck.fuel=d.fuel??truck.fuel; truck.damage=d.damage||0; career.xp=d.xp||0; career.tier=tierOf(career.xp); career.owned=d.owned||['rigger']; if(!career.owned.includes('rigger')) career.owned.unshift('rigger');
-  career.colors=d.colors||{}; career.done=d.done||0; career.earned=d.earned||0; applyModel(d.cur||'rigger');
+  career.colors=d.colors||{}; career.done=d.done||0; career.earned=d.earned||0; career.boardSeq=Math.max(career.boardSeq,d.boardSeq||1); applyModel(d.cur||'rigger'); if(d.settings) Object.assign(SETTINGS,d.settings);
+  if(d.name&&!localStorage.getItem('bigrig.name')) localStorage.setItem('bigrig.name',d.name);
   if(d.trailer===null&&truck.trl){ const t=truck.trl; t.coupled=false; truck.trl=null; const i=world.trailers.indexOf(t); if(i>=0) world.trailers.splice(i,1); }
   else if(d.trailer&&d.trailer.type!=='player'&&truck.trl){ const o=truck.trl, i=world.trailers.indexOf(o); const tr=makeTrailer(d.trailer.type,mulberry(5),Object.assign({},d.trailer,{coupled:true})); tr.art=trailerArt(tr.type,tr.col,tr.logo); truck.trl=tr; if(i>=0) world.trailers[i]=tr; }
+  if(d.pos){ if(posOK(d.pos.x,d.pos.y)){ truck.x=d.pos.x; truck.y=d.pos.y; truck.h=truck.th=d.pos.h||0; }
+    else { let best=null,bd=1e18; for(const dp of world.depots){ const q=Math.hypot(dp.entrance.x-d.pos.x,dp.entrance.y-d.pos.y); if(q<bd&&dp.bays.length){ bd=q; best=dp; } } const p=best&&ftSpot(best); if(p){ truck.x=p.x; truck.y=p.y; truck.h=truck.th=p.h; career.posFallback=best.name; } } }
+  if(truck.trl){ const f=fwd(truck.h); const k=kingpin(truck); truck.trl.th=truck.h; if(k){ truck.trl.x=k[0]; truck.trl.y=k[1]; } }
+  cam.x=truck.x*PPM; cam.y=truck.y*PPM;
+  if(Array.isArray(d.jobs)) career.jobs=d.jobs.map(jobDe).filter(Boolean);
+  if(d.active){ const j=jobDe(d.active.job); if(j){ try{
+    if(d.active.phase==='pickup'){ career.jobs.unshift(j); acceptJob(j); }
+    else { const bay=j.to.bays[d.active.bay]||j.to.bays[0]; bay.assigned=true; j.taken=true; let tr=null;
+      if(d.active.phase==='recouple'&&d.active.trl){ const o=d.active.trl; tr=makeTrailer(o.type,mulberry(7),Object.assign({},o,{coupled:false,target:true,job:j.id})); world.trailers.push(tr); setRoute({x:tr.x,y:tr.y,name:'Your cargo trailer'}); }
+      else if(truck.trl){ tr=truck.trl; tr.job=j.id; setRoute(j.to); }
+      if(tr) career.active={job:j,trailer:tr,pickBay:{},bay,phase:tr.coupled?'deliver':'recouple',t0:timeS-(d.active.el||0),tc:timeS,dmg0:truck.damage}; } }catch(e){ console.warn('job restore',e); } } }
   return true; }
-function resetGame(){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} location.reload(); }
+function resetGame(){ try{ career.noSave=1; localStorage.removeItem(saveKey()); if(!world.v2poi) localStorage.removeItem(SAVE_KEY_OLD); }catch(e){} location.reload(); }
 // ---------- jobs
 const R7=mulberry((Date.now()%1e9)|0);
 function pickupsFor(c){ const ds=world.depots.filter(d=>d.bays.length); const pref=c.trl==='cont'?ds.filter(d=>/Docks|Harbour|Freight/.test(d.name)):c.trl==='tank'?ds.filter(d=>/Quarry|Mine|Logistics|Harbour/.test(d.name)):c.trl==='fridge'?ds.filter(d=>/Agri|Farm|Distribution|Air/.test(d.name)):ds; return pref.length?pref:ds; }
@@ -140,7 +158,7 @@ function updateCareer(dt){ const a=career.active;
   // depot: stopping inside a yard with no job opens the board once
   let inDepot=null; for(const d of world.depots){ const x0=d.x*M_T,y0=d.y*M_T; if(s.x>x0&&s.x<x0+d.w*M_T&&s.y>y0&&s.y<y0+d.h*M_T) inDepot=d; }
   if(inDepot&&!career.active&&Math.abs(s.v)<0.1&&!career.depotLatch&&!career.uiOpen&&started&&timeS>3){ career.depotT=(career.depotT||0)+dt; if(career.depotT>1.2){ career.depotLatch=true; openBoard(); } } else career.depotT=0; if(!inDepot) career.depotLatch=false;
-  if(timeS-career.lastSave>20&&started) saveGame(); }
+  if(timeS-career.lastSave>10&&started&&!career.noSave) saveGame(); }
 // ---------- world-space drawing (bay highlight, ghost, dock doors)
 function drawCareerWorld(vx0,vy0,vx1,vy1){ const a=career.active;
   for(const m of world.malls||[]){ if(m.x*PPM<vx0-600||m.x*PPM>vx1+600||m.y*PPM<vy0-600||m.y*PPM>vy1+600) continue;
@@ -200,3 +218,5 @@ function drawAlignPanel(a,al){ const W=372,H=118,x=VW/2-W/2,y=VH-H-58; ctx.save(
   career.unloadBtn=[x+W-92,y+48,80,32];
   if(unl){ const p=Math.min(1,a.ut/a.udur); ctx.fillStyle='#222a36'; ctx.fillRect(x+96,y+92,W-200,8); ctx.fillStyle='#2f81f7'; ctx.fillRect(x+96,y+92,(W-200)*p,8); }
   ctx.restore(); }
+
+addEventListener('visibilitychange',()=>{ if(document.hidden&&started&&!career.noSave) saveGame(); }); addEventListener('beforeunload',()=>{ if(started&&!career.noSave) saveGame(); });
