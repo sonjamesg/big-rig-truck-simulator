@@ -4,7 +4,7 @@ const VTYPES={
   hatch:{L:4.0,W:1.75,heavy:false,acc:2.2},  sedan:{L:4.6,W:1.8,heavy:false,acc:2.0}, estate:{L:4.8,W:1.85,heavy:false,acc:1.9},
   sports:{L:4.4,W:1.85,heavy:false,acc:3.0}, suv:{L:4.8,W:1.95,heavy:false,acc:1.8},  taxi:{L:4.6,W:1.85,heavy:false,acc:2.0},
   van:{L:5.6,W:2.05,heavy:false,acc:1.5},    box:{L:8.0,W:2.45,heavy:true,acc:1.0},   bus:{L:11.5,W:2.55,heavy:true,acc:0.9},
-  lorry:{L:6.2,W:2.5,heavy:true,acc:0.75}
+  lorry:{L:6.2,W:2.5,heavy:true,acc:0.75}, cab:{L:6.2,W:2.5,heavy:true,acc:0.9}
 };
 const CAR_COLS=['#c0392b','#ecf0f1','#2c3e50','#2980b9','#7f8c8d','#16a085','#f1c40f','#8e44ad','#d35400','#1e1e1e','#bdc3c7','#27ae60','#6d1a1a','#34495e'];
 const MIX={dirt:{van:3,suv:4,box:1,lorry:2},city:{hatch:14,sedan:16,estate:6,sports:3,suv:8,taxi:12,van:12,bus:9,box:8,lorry:4},
@@ -262,18 +262,18 @@ function planRB(v,rb,sg,d,r,forceArm){
 let tRand=mulberry(4242);
 function viewRectM(){ const z=cam.z; return [ (cam.x-VW/2/z)/PPM, (cam.y-VH/2/z)/PPM, (cam.x+VW/2/z)/PPM, (cam.y+VH/2/z)/PPM ]; }
 function onScreen(x,y,m){ const v=viewRectM(); return x>v[0]-m&&x<v[2]+m&&y>v[1]-m&&y<v[3]+m; }
-function spawnVehicle(x,y,force){
+function spawnVehicle(x,y,force,opt){
   const r=tRand;
   const tx=Math.floor(x/M_T), ty=Math.floor(y/M_T); if(!inb(tx,ty)) return null;
   const i=idx(tx,ty); let sid=world.roadH[i]>=0&&world.roadV[i]>=0 ? (r()<0.5?world.roadH[i]:world.roadV[i]) : Math.max(world.roadH[i],world.roadV[i]);
-  if(sid<0) return null; const sg=world.segs[sid];
-  const along=(sg.dir==='h'?tx:ty)+0.5;
+  if(opt&&opt.seg!=null) sid=opt.seg; if(sid<0) return null; const sg=world.segs[sid];
+  const along=opt&&opt.along!=null?opt.along:(sg.dir==='h'?tx:ty)+0.5;
   for(const J of sg.js){ const [a,b]=jRange(sg,J); if(along>a-3&&along<b+3) return null; }
   if(along<sg.b0+2||along>sg.b1-1) return null;
-  const dir=r()<0.5?1:-1, lane=(r()*nLanes(sg))|0;
+  const dir=opt&&opt.dir?opt.dir:(r()<0.5?1:-1), lane=opt?0:(r()*nLanes(sg))|0;
   const p=lanePt(sg,dir,lane,along);
   for(const o of traffic.vs) if(Math.abs(o.x-p[0])<16&&Math.abs(o.y-p[1])<16) return null;
-  const kind=pickW(MIX[sg.type]||MIX.city,r()), t=VTYPES[kind];
+  const kind=opt&&opt.kind?opt.kind:pickW(MIX[sg.type]||MIX.city,r()), t=VTYPES[kind];
   const v={id:traffic.nextId++,kind,L:t.L,W:t.W,heavy:t.heavy,amax:t.acc,art:artFor(kind,r),px:[],py:[],pd:[],i:0,s:0,mk:[],
     plan:{seg:sid,dir,lane,pos:along},v:0,x:p[0],y:p[1],offX:0,offY:0,stopT:0,honkT:0,blockT:0,shakeT:0,ghostT:0,pinT:0,brake:false,sig:0,h:undefined,
     drv:0.88+r()*0.22, r:mulberry((r()*1e9)|0), born:timeS, dist:0};

@@ -97,7 +97,7 @@ function buildDepots(objs,R){
   const region=(x,y)=> world.regionAt(x,y);
   const plan=[['Albion Airport Cargo','AAC',3,620,470],['Millford Agri Depot','MAD',1,300,900],['Ashby Farm Supplies','AFS',1,280,1170],['Greyfell Quarry','GQY',4,120,1610],
     ['Sandvale Distribution','SVD',3,1560,520],['Sandvale Air Cargo','SAC',4,1300,360],['Dustwater Outpost','DWO',2,1020,500],['Coppermine Mine','CMM',4,1640,660],
-    ['Kingsbridge Freight Park','KFP',3,1415,1386],['Kingsbridge Harbour Terminal','KHT',3,1700,1760],['Redhill Logistics','RHL',2,1000,1792],['Moorside Timber Yard','MTY',2,1830,1510]];
+    ['Kingsbridge Freight Park','KFP',3,1415,1386],['Kingsbridge Harbour Terminal','KHT',3,1640,1832],['Redhill Logistics','RHL',2,1000,1792],['Moorside Timber Yard','MTY',2,1830,1510]];
   const access=(x,y,w,gap)=>{ for(let jj=y-gap;jj<y;jj++) for(let i=x+(w>>1)-3;i<x+(w>>1)+3;i++){ set(i,jj,T.CONC); world.reserved[idx(i,jj)]=1; } clearObjs(x+(w>>1)-3,y-gap,6,gap); };
   if(world.port){ const H=world.port.hole, gap=H.y-(world.port.aisles[3]+4); access(H.x,H.y,20,gap); const dp=makeDepot('Albion Port Container Terminal','APT',2,H.x,H.y,20,15,{entrance:{x:(H.x+10)*M_T,y:(H.y-gap)*M_T}}); dp.region=region(H.x,H.y); }
   for(const [n,c,tier,tx,ty] of plan){ const s=findSpot(tx,ty,20,15); if(!s){ console.warn('no depot spot',n); continue; } const [x,y,gap]=s;

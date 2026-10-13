@@ -331,19 +331,19 @@ function genWorld(){
     splitBuildings(x0,y0,w,h, dt?['office','glass','gravel','tower','office','solar']:['gravel','brick','office','flat','brick','green'], dt?40:16, dt?70:26, dt?0.35:0.55);
   }
   function stadium(x0,y0,w,h){ fill(x0,y0,w,h,T.PLAZA); const b=building(x0+2,y0+2,w-4,h-4,'stadium',30); if(b){ for(const [fx,fy] of [[b.x+10,b.y+10],[b.x+b.w-10,b.y+10],[b.x+10,b.y+b.h-10],[b.x+b.w-10,b.y+b.h-10]]) world.flags.push({x:fx,y:fy,col:['#c0392b','#2e5c9a','#f1c40f','#27ae60'][world.flags.length%4]}); } }
-  function townBlocks(xs,ys,mode,skip){
+  function townBlocks(xs,ys,mode,skip){ const dtm0=mode==='dt'; if(dtm0) mode='city';
     for(let i=0;i<xs.length-1;i++) for(let j=0;j<ys.length-1;j++){ if(skip===i+','+j) continue;
       const x0=xs[i]+RW+1, y0=ys[j]+RW+1, w=xs[i+1]-x0-1, h=ys[j+1]-y0-1; if(w<4||h<4) continue; const r=R();
       if(mode==='res'){ fill(x0,y0,w,h,T.PGRASS); for(let hx=x0;hx+4<=x0+w;hx+=5) for(const top of [true,false]){ const hh=3+(R()<0.5?1:0), yy=top?y0:y0+h-hh; if(R()<0.85){ const b=building(hx,yy,4,hh,'house',12+R()*6); if(b&&R()<0.6) objs.push({kind:'drive',x:(hx+0.3)*TILE,y:(top?yy+hh:yy-1)*TILE,seed:(R()*1e9)|0,top}); } } continue; }
-      const centre= mode==='city' && i>=2&&i<=3&&j>=1&&j<=3;
-      if(r<0.1){ park(x0,y0,w,h); continue; }
+      const dtm=dtm0; const centre= dtm || (mode==='city' && i>=2&&i<=3&&j>=1&&j<=3);
+      if(r<(dtm?0.05:0.1)){ park(x0,y0,w,h); continue; }
       if(r<0.18){ lot(x0+3,y0+2,w-6,h>>1); splitBuildings(x0,y0+(h>>1)+2,w,h-(h>>1)-2,['brick','office'],14,24,0.6); continue; }
       if(centre && r<0.5){ fill(x0,y0,w,h,T.PLAZA); building(x0+3,y0+3,w-6,h-6,r<0.3?'tower':'glass',80+R()*60); continue; }
       splitBuildings(x0,y0,w,h, mode==='city'?(centre?['office','glass','tower','solar']:['office','brick','gravel','flat']):['brick','house','gravel','flat','brick'], mode==='city'?30:12, mode==='city'?60:22, 0.6);
     } }
   // other cities: stadium + downtown towers via townBlocks; mark a stadium block first
   function cityFill(g,si,sj){ const x0=g.xs[si]+RW+1, y0=g.ys[sj]+RW+1, w=g.xs[si+1]-x0-1, h=g.ys[sj+1]-y0-1; stadium(x0,y0,w,h); g.skip=si+','+sj; townBlocks(g.xs,g.ys,'city',g.skip); }
-  cityFill(SV,9,8); townBlocks(KB.xs,KB.ys,'city'); { const K=world.kbDistricts; cityFill(K.MK,2,1); for(const k of ['NG','CH','RS']) townBlocks(K[k].xs,K[k].ys,'city'); townBlocks(K.RM.xs,K.RM.ys,'town'); townBlocks(K.WM.xs,K.WM.ys,'res'); townBlocks(K.OH.xs,K.OH.ys,'town'); for(let k=0;k<3;k++) ind(1772+k*18,1736,15,22); for(let k=0;k<3;k++) ind(1772+k*18,1764,15,22); }
+  cityFill(SV,9,8); townBlocks(KB.xs,KB.ys,'dt'); for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y>=KB.ys[0]*TILE&&o.y<KB.Y1*TILE) o.cyber=true; { const K=world.kbDistricts; cityFill(K.MK,2,1); for(const k of ['NG','CH','RS']) townBlocks(K[k].xs,K[k].ys,'city'); townBlocks(K.RM.xs,K.RM.ys,'town'); townBlocks(K.WM.xs,K.WM.ys,'res'); townBlocks(K.OH.xs,K.OH.ys,'town'); for(let k=0;k<3;k++) ind(1772+k*18,1736,15,22); for(let k=0;k<3;k++) ind(1772+k*18,1764,15,22); }
   for(const g of [MF,DW,CM,RH,FW]) townBlocks(g.xs,g.ys,'town'); townBlocks(AB.xs,AB.ys,'res');
   for(let k=0;k<6;k++) building(505+k*6,906,4,4,'house',12);  building(490,906,6,4,'church',22);        // Wendwood hamlet
   for(let k=0;k<4;k++) building(MTN.x-12+k*6,1592,4,3,'house',10);                                      // summit cafe & viewpoint
@@ -379,7 +379,10 @@ function genWorld(){
     world.port.berths=[0,1,2].map(i=>{ const L=(P.y1-P.y0)/3; return {i,y0:P.y0+i*L,y1:P.y0+(i+1)*L,ship:null}; });
     world.port.cranes=[0,1,2,3].map(i=>({i,y:P.y0+18+i*(P.y1-P.y0-36)/3,ty:0,tr:0.5,ph:0,car:null}));
   }
-  docks(1540,1846,1750,1884); for(let k=0;k<3;k++) world.overhead.push({kind:'crane',x:(1580+k*60)*TILE,y:1874*TILE});
+  docks(1540,1846,1750,1884);
+  { // v18 Kingsbridge container quay (faces south onto the harbour): local u = towards the water, v = along the quay (east)
+    const L=(1745-1552)/3; world.kbPort={O:[0,1885],U:[0,1],V:[1,0],vIn:1436,vOut:1800,dep:'KHT',legL:-12,asg:[0,1,2],off:[0,0,0],qy0:1548,qy1:1748,
+      berths:[0,1,2].map(i=>({i,y0:1552+i*L,y1:1552+(i+1)*L,ship:null})), cranes:[0,1,2].map(i=>({i,y:1552+L*(i+0.5),ty:0,tr:0.5,ph:0,car:null}))}; }
   // airports: concrete apron, runways, terminal, hangars
   function airport(name,x0,y0,x1,y1,rws,term){ for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++){ const t=G[idx(x,y)]; if(t!==T.ROAD&&t!==T.WATER&&t!==T.BRIDGE&&t!==T.WALK) set(x,y,T.CONC); }
     const ap={name,rw:[]}; for(const [rx,ry,rw] of rws){ objs.push({kind:'runway',x:rx*TILE,y:ry*TILE,w:rw*TILE,h:12*TILE}); ap.rw.push({x:rx*TILE,y:(ry+6)*TILE,len:rw*TILE}); for(let k=0;k<rw;k+=10) world.beacons.push({x:(rx+k)*TILE,y:(ry-0.5)*TILE,col:'#ffd23f',ph:k*0.05,run:1}); }

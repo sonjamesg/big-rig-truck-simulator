@@ -105,6 +105,12 @@ function roof(g,o){
     if(st==='tower'&&r()<0.6){ g.strokeStyle='#ddd'; g.lineWidth=2; g.beginPath(); g.moveTo(x+14,y+14); g.lineTo(x+14,y+40); g.stroke(); g.fillStyle='#e74c3c'; g.beginPath(); g.arc(x+14,y+14,3,0,7); g.fill(); g.lineWidth=1; }
     if(o.sign && st!=='shop'){ }
     if(st==='supermarket'||st==='shop'){ /* signs drawn below */ }
+    if(o.cyber&&w>40&&h>40){ // v18 Kingsbridge downtown: stepped setbacks, window bands, neon trim, rooftop plant
+      const nc=['#ff2bd6','#00d8ff','#b14bff','#39ff88','#ffd000'][(r()*5)|0], tiers=o.height>110?3:2;
+      for(let t=1;t<=tiers;t++){ const m=t*Math.min(w,h)*0.12; g.fillStyle='rgba(0,0,0,0.22)'; g.fillRect(x+m+5,y+m+5,w-2*m,h-2*m); g.fillStyle=shade(pal[0],1+t*0.07); g.fillRect(x+m,y+m,w-2*m,h-2*m); g.strokeStyle=shade(pal[0],0.6); g.strokeRect(x+m+0.5,y+m+0.5,w-2*m-1,h-2*m-1); }
+      g.fillStyle='rgba(150,205,240,0.8)'; for(let k=6;k<w-6;k+=7){ g.fillRect(x+k,y+4,4,3); g.fillRect(x+k,y+h-7,4,3); } for(let k=6;k<h-6;k+=7){ g.fillRect(x+4,y+k,3,4); g.fillRect(x+w-7,y+k,3,4); }
+      g.fillStyle=nc; g.fillRect(x+2,y+2,w-4,2); g.fillRect(x+2,y+2,2,h-4);
+      const m=tiers*Math.min(w,h)*0.12; for(let k=0;k<3;k++) acUnit(g,x+m+6+k*18,y+m+6); }
     if(st==='tower' && w>90){ g.strokeStyle='#e8e8e8'; g.lineWidth=3; g.beginPath(); g.arc(x+w/2,y+h/2,Math.min(w,h)*0.22,0,7); g.stroke(); g.fillStyle='#e8e8e8'; g.font='bold 30px sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText('H',x+w/2,y+h/2+1); g.lineWidth=1; }
   }
 }
