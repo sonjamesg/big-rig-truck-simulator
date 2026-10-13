@@ -222,6 +222,7 @@ function trailerHitTest(s){
 function drawTrailerAt(tr,kx,ky,th,shadow){
   if(tr.type==='player'){ if(shadow) blit(TRLSH,kx,ky,th,6,6); else blit(TRLART,kx,ky,th); return; }
   const ft=fwd(th), cx=kx-ft[0]*TRL_KP_TO_CENTRE, cy=ky-ft[1]*TRL_KP_TO_CENTRE;
+  if(!tr.art||!tr.art.sh) return;
   if(shadow) blitV(tr.art.sh,cx,cy,th,TRL_LEN,TRL_W,6,6); else blitV(tr.art.c,cx,cy,th,TRL_LEN,TRL_W,0,0); }
 function drawParkedTrailers(vx0,vy0,vx1,vy1){
   const vis=[]; for(const t of world.trailers){ if(t.coupled) continue; const X=t.x*PPM,Y=t.y*PPM; if(X<vx0-160||X>vx1+160||Y<vy0-160||Y>vy1+160) continue; vis.push(t); }

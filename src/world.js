@@ -59,7 +59,7 @@ function genWorld(){
   // keep land under cities / airports, then cut dock basins
   for(const [x0,y0,x1,y1] of [[145,135,720,655],[1060,150,1830,515],[1395,1375,1800,1884],[995,1785,1385,1905],[240,775,355,885],[235,1095,300,1162]]) for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++) water[idx(x,y)]=0;
   for(let y=145;y<456;y++) for(let x=478;x<800;x++) if(!(x<600&&y>=PORT_Y0&&y<PORT_Y1)) water[idx(x,y)]=1;   // v14 Port Albion: compact terminal, open water around it
-  for(let y=1885;y<1936;y++) for(let x=1430;x<1790;x++) water[idx(x,y)]=1;                                             // Kingsbridge harbour
+  for(let y=1885;y<1936;y++) for(let x=1430;x<1790;x++) water[idx(x,y)]=1; for(let y=1850;y<1885;y++) for(let x=1478;x<1528;x++) water[idx(x,y)]=1; for(let y=1394;y<1885;y++) for(let x=1752;x<1760;x++) water[idx(x,y)]=1;   // Kingsbridge harbour + inlet + Kingsbridge Channel                                             // Kingsbridge harbour
   for(let k=0;k<4;k++) for(let x=1480+k*80;x<1496+k*80;x++) for(let y=1815;y<1885;y++) water[idx(x,y)]=1;
   (world.tm=world.tm||[]).push(['// ground: water',performance.now()-t0|0]);
   const CW=new Float32Array(MH); for(let y=0;y<MH;y++) CW[y]=cW(y);
@@ -162,7 +162,7 @@ function genWorld(){
   function gridRoads(g,type,walk){ if(walk) fill(g.xs[0]-1,g.ys[0]-1,g.X1-g.xs[0]+3,g.Y1-g.ys[0]+3,T.WALK); g.rows=[]; g.cols=[];
     for(const y of g.ys) g.rows.push(road('h',y,g.xs[0],g.X1,RW,type)); for(const x of g.xs) g.cols.push(road('v',x,g.ys[0],g.Y1,RW,type)); }
   // --- cities (corners of the landmasses) & towns
-  const C1=grid(150,140,11,11,28), SV=grid(1460,170,13,12,30), KB=grid(1400,1440,13,11,30);
+  const C1=grid(150,140,11,11,28), SV=grid(1460,170,13,12,30), KB=grid(1560,1560,6,5,22);   // v17 Kingsbridge downtown core (inside the loop)
   gridRoads(C1,'city',true); gridRoads(SV,'city',true); gridRoads(KB,'city',true);
   const MF=grid(250,780,5,5,24), DW=grid(1000,420,4,4,22), CM=grid(1600,600,4,3,22), RH=grid(980,1150,5,5,22), FW=grid(1500,1120,4,4,22);
   for(const g of [MF,DW,CM,RH,FW]) gridRoads(g,'town',true);
@@ -185,11 +185,31 @@ function genWorld(){
   for(const k of [3,9]) road('v',SV.xs[k],103,SV.ys[0]-1,RW,'city');
   for(const k of [2,8]) road('v',SV.xs[k],SV.Y1+1,716,RW,'city');
   const apRoad=road('h',SV.ys[6],1060,SV.xs[0]-1,RW,'city');                           // Sandvale Airport road
-  for(const k of [2,6,9]) road('h',KB.ys[k],KB.X1+1,1941,RW,'city');
-  road('v',KB.xs[0],KB.Y1+1,1941,RW,'city');
-  road('h',1378,1360+RBT,KB.xs[2]+RW-1,RW,'dual'); for(const k of [0,2]) road('v',KB.xs[k],1382,KB.ys[0]-1,RW,'city');
+  // v17 Kingsbridge: elevated-style dual loop round a compact downtown, roundabout interchanges at its corners, five radials, district grids of differing pitch, channel bridges
+  mway([[1530,1530,'rb'],[1705,1530,'rb'],[1705,1680,'rb'],[1530,1680,'rb']],true,0,'Kingsbridge Loop','dual');
+  mway([[1360,1380,'rb'],[1530,1380],[1530,1530,'rb']],false,40,'K1 Northway','dual');
+  mway([[1705,1530,'rb'],[1940,1530]],false,0,'K2 Eastway','dual');
+  mway([[1705,1680,'rb'],[1850,1680],[1850,1940]],false,40,'K3 Portway','dual');
+  mway([[1530,1680,'rb'],[1400,1680]],false,0,'K4 Westway','dual');
+  road('v',1400,1683,1790,RW,'city'); road('h',1589,1400,1526,2,'rural');                           // Airport Way + Dam Road (K5) feed in
+  for(const k of [1,3]){ road('h',KB.ys[k],1533,KB.xs[0]-1,RW,'city'); road('h',KB.ys[k],KB.X1+1,1701,RW,'city'); }
+  for(const k of [1,4]){ road('v',KB.xs[k],1533,KB.ys[0]-1,RW,'city'); road('v',KB.xs[k],KB.Y1+1,1676,RW,'city'); }
+  const KD={NG:grid(1404,1400,5,5,26),CH:grid(1545,1398,7,4,30),RM:grid(1768,1404,5,4,40),RS:grid(1768,1545,5,4,38),WM:grid(1408,1540,4,4,36),OH:grid(1408,1697,4,4,34),MK:grid(1545,1697,6,4,34)};
+  for(const g of Object.values(KD)) gridRoads(g,'city',true);
+  // stitch each district grid to its neighbours: extend edge streets outward to the first straight road (bridging the channel where needed)
+  { const hit=(x,y)=>inb(x,y)&&(world.roadH[idx(x,y)]>=0||world.roadV[idx(x,y)]>=0);
+    const ext=(dir,a,from,step,lim)=>{ for(let k=1;k<=lim;k++){ const b=from+step*k; let any=false; for(let q=0;q<RW;q++){ const x=dir==='h'?b:a+q, y=dir==='h'?a+q:b; if(hit(x,y)) any=true; } if(any){ if(k>1) road(dir,a,Math.min(from+step,b-step),Math.max(from+step,b-step),RW,'city'); return; } } };
+    for(const g of Object.values(KD)){ for(const y of g.ys){ ext('h',y,g.xs[0],-1,40); ext('h',y,g.X1,1,40); } for(const x of g.xs){ ext('v',x,g.ys[0],-1,40); ext('v',x,g.Y1,1,40); } } }
+  road('h',1866,1404,1846,RW,'city');                                                                  // Kingsbridge coast road
+  // Bath-style crescents: sweeping arcs joining grid ends (AI-drivable curves)
+  link('city',RW,KD.RM.cols[1],0,KD.RM.cols[3],0,[[KD.RM.xs[2]+2,1384]],8,'Royal Crescent');
+  link('city',RW,KD.OH.cols[0],1,KD.OH.cols[2],1,[[KD.OH.xs[1]+2,KD.OH.Y1+22]],8,'Harbour Crescent');
+  // diagonal avenues along district edges (curves; drivable + routable)
+  pending.push(()=>{ curve('city',RW,crSpline([[1716,1700],[1722,1706],[1745,1740],[1800,1800],[1840,1858],[1845,1870]],0.5),null,null,'Channel Diagonal');
+    curve('city',RW,crSpline([[1514,1516],[1508,1510],[1490,1500],[1450,1470],[1410,1440],[1400,1430]],0.5),null,null,'Northgate Diagonal'); });
+  world.kbDistricts=KD;
   const rbN=road('v',1359,1300,1380-RBT-1,2,'rural');
-  wind('h',1784,903,KB.xs[0]-1,RW,'city',30,'Airport Way');                     // curved bridge over the River Moor                                             // Kingsbridge Airport road (over the River Moor)
+  wind('h',1784,903,1399,RW,'city',30,'Airport Way');                     // curved bridge over the River Moor                                             // Kingsbridge Airport road (over the River Moor)
   wind('h',MF.ys[2],103,MF.xs[0]-1,RW,'town',14,'Millford Road'); wind('v',MF.xs[1],MF.Y1+1,976,RW,'town',10,'Millford South Road');
   road('v',AB.xs[2],983,AB.ys[0]-1,2,'rural');
   wind('h',DW.ys[2],DW.X1+1,1246,RW,'town',22,'Dustwater Road');
@@ -213,7 +233,7 @@ function genWorld(){
   { const pB=road('v',430,1925,1941,2,'rural'); pB.name='Greyfell Pass';
     windLink('rural',2,mS,1,pB,0,[[350,1612],[392,1640],[346,1676],[404,1710],[352,1748],[414,1786],[362,1826],[420,1872]],0,'Greyfell Pass'); }
   // v12: Moor Dam road — M3 → over the dam (Moor Reservoir behind it) → Kingsbridge
-  { const dy=1589, dA=road('h',dy,903,912,2,'rural'), dam=road('h',dy,Math.floor(riverX(dy))-22,Math.floor(riverX(dy))+22,2,'rural'), dB=road('h',dy,KB.xs[0]-12,KB.xs[0]-1,2,'rural');
+  { const dy=1589, dA=road('h',dy,903,912,2,'rural'), dam=road('h',dy,Math.floor(riverX(dy))-22,Math.floor(riverX(dy))+22,2,'rural'), dB=road('h',dy,1388,1399,2,'rural');
     dam.name='Moor Dam'; dam.dam=true; world.dam={x0:dam.b0,x1:dam.b1+1,y:dy};
     windLink('rural',2,dA,1,dam,0,null,24,'Dam Road',11); windLink('rural',2,dam,1,dB,0,null,30,'Dam Road',12); }
   // v12: dirt tracks — desert quarry off Dustwater, forest track in Highmoor
@@ -323,7 +343,7 @@ function genWorld(){
     } }
   // other cities: stadium + downtown towers via townBlocks; mark a stadium block first
   function cityFill(g,si,sj){ const x0=g.xs[si]+RW+1, y0=g.ys[sj]+RW+1, w=g.xs[si+1]-x0-1, h=g.ys[sj+1]-y0-1; stadium(x0,y0,w,h); g.skip=si+','+sj; townBlocks(g.xs,g.ys,'city',g.skip); }
-  cityFill(SV,9,8); cityFill(KB,4,6);
+  cityFill(SV,9,8); townBlocks(KB.xs,KB.ys,'city'); { const K=world.kbDistricts; cityFill(K.MK,2,1); for(const k of ['NG','CH','RS']) townBlocks(K[k].xs,K[k].ys,'city'); townBlocks(K.RM.xs,K.RM.ys,'town'); townBlocks(K.WM.xs,K.WM.ys,'res'); townBlocks(K.OH.xs,K.OH.ys,'town'); for(let k=0;k<3;k++) ind(1772+k*18,1736,15,22); for(let k=0;k<3;k++) ind(1772+k*18,1764,15,22); }
   for(const g of [MF,DW,CM,RH,FW]) townBlocks(g.xs,g.ys,'town'); townBlocks(AB.xs,AB.ys,'res');
   for(let k=0;k<6;k++) building(505+k*6,906,4,4,'house',12);  building(490,906,6,4,'church',22);        // Wendwood hamlet
   for(let k=0;k<4;k++) building(MTN.x-12+k*6,1592,4,3,'house',10);                                      // summit cafe & viewpoint
@@ -359,7 +379,7 @@ function genWorld(){
     world.port.berths=[0,1,2].map(i=>{ const L=(P.y1-P.y0)/3; return {i,y0:P.y0+i*L,y1:P.y0+(i+1)*L,ship:null}; });
     world.port.cranes=[0,1,2,3].map(i=>({i,y:P.y0+18+i*(P.y1-P.y0-36)/3,ty:0,tr:0.5,ph:0,car:null}));
   }
-  docks(1404,1748,1800,1884); for(let k=0;k<4;k++) world.overhead.push({kind:'crane',x:(1478+k*80)*TILE,y:1812*TILE});
+  docks(1540,1846,1750,1884); for(let k=0;k<3;k++) world.overhead.push({kind:'crane',x:(1580+k*60)*TILE,y:1874*TILE});
   // airports: concrete apron, runways, terminal, hangars
   function airport(name,x0,y0,x1,y1,rws,term){ for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++){ const t=G[idx(x,y)]; if(t!==T.ROAD&&t!==T.WATER&&t!==T.BRIDGE&&t!==T.WALK) set(x,y,T.CONC); }
     const ap={name,rw:[]}; for(const [rx,ry,rw] of rws){ objs.push({kind:'runway',x:rx*TILE,y:ry*TILE,w:rw*TILE,h:12*TILE}); ap.rw.push({x:rx*TILE,y:(ry+6)*TILE,len:rw*TILE}); for(let k=0;k<rw;k+=10) world.beacons.push({x:(rx+k)*TILE,y:(ry-0.5)*TILE,col:'#ffd23f',ph:k*0.05,run:1}); }
