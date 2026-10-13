@@ -100,16 +100,16 @@ BigRig._navDiag=function(target){ const N=MW*MH; const r=setRoute(target); if(r)
 function ftClear(x,y,h,trl){ const f=fwd(h), r=rgt(h), s0=trl?-12.3:-1.4; for(let s=s0;s<=5.2;s+=0.8) for(const w of [-1.4,0,1.4]){ const px=x+f[0]*s+r[0]*w, py=y+f[1]*s+r[1]*w; if(solidAtM(px,py)) return false;
     for(const t of world.trailers){ if(t===trl) continue; const tf=fwd(t.th); for(let q=-1.2;q<=12.4;q+=1.5){ if(Math.hypot(t.x-tf[0]*q-px,t.y-tf[1]*q-py)<2.2) return false; } } } return true; }
 function ftSpot(dp){ const trl=truck.trl, ex=dp.entrance.x, ey=dp.entrance.y, cands=[];
-  for(let j=dp.y+1;j<dp.y+dp.h-1;j+=0.5) for(let i=dp.x+1;i<dp.x+dp.w-1;i+=0.5){ const x=i*M_T, y=j*M_T, h=Math.atan2(ex-x,-(ey-y)), hs=Math.round(h/(Math.PI/2))*(Math.PI/2); cands.push([Math.hypot(ex-x,ey-y)-3*Math.abs(i-(dp.x+dp.w/2))*M_T,x,y,hs]); }
+  for(let j=dp.y+1;j<dp.y+dp.h-5;j+=0.5) for(let i=dp.x+1;i<dp.x+dp.w-1;i+=0.5){ const x=i*M_T, y=j*M_T, h=Math.atan2(ex-x,-(ey-y)), hs=Math.round(h/(Math.PI/2))*(Math.PI/2); cands.push([Math.hypot(ex-x,ey-y)-3*Math.abs(i-(dp.x+dp.w/2))*M_T,x,y,hs]); }
   cands.sort((a,b)=>b[0]-a[0]); // furthest from the gate first, so the whole rig sits inside the yard
-  for(const [,x,y,h] of cands){ if(ftClear(x,y,h,trl)){ const f=fwd(h); if(trl){ const rx=x-f[0]*12.3, ry=y-f[1]*12.3; if(rx<dp.x*M_T||rx>(dp.x+dp.w)*M_T||ry<dp.y*M_T||ry>(dp.y+dp.h)*M_T) continue; } return {x,y,h}; } }
+  for(const [,x,y,h] of cands){ if(ftClear(x,y,h,trl)){ const f=fwd(h); if(trl){ const rx=x-f[0]*12.3, ry=y-f[1]*12.3; if(rx<dp.x*M_T||rx>(dp.x+dp.w)*M_T||ry<dp.y*M_T||ry>(dp.y+dp.h-5)*M_T) continue; } return {x,y,h}; } }
   // no room in the yard: line the trailer up in a free bay, cab facing out
   for(const b of dp.bays){ if(b.trailer) continue; const h=b.th||0, f=fwd(h); return {x:b.kx-f[0]*0.3,y:b.ky-f[1]*0.3,h,bay:true}; } return null; }
 function fastTravel(dp){ const s=truck; if(Math.abs(s.v)>0.3){ flash('Fast travel: stop the truck first'); return false; } if(typeof BREAKDOWN!=='undefined'&&BREAKDOWN.active){ flash('Fast travel unavailable while broken down'); return false; }
   const p=ftSpot(dp); if(!p){ flash('Fast travel: no clear spot at '+dp.name); return false; }
   const fr=document.getElementById('frame')||document.body; let ov=document.getElementById('ftfade'); if(!ov){ ov=document.createElement('div'); ov.id='ftfade'; ov.style.cssText='position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .28s;z-index:50'; fr.appendChild(ov); }
   ov.style.opacity='1'; if(typeof closeMap==='function') closeMap();
-  setTimeout(()=>{ s.x=p.x; s.y=p.y; s.h=p.h; s.th=p.h; s.v=0; s.steer=0; if(s.vx!==undefined){ s.vx=0; s.vy=0; } if(s.av!==undefined) s.av=0;
+  setTimeout(()=>{ s.x=p.x; s.y=p.y; s.h=p.h; cam.x=p.x*PPM; cam.y=p.y*PPM; s.th=p.h; s.v=0; s.steer=0; if(s.vx!==undefined){ s.vx=0; s.vy=0; } if(s.av!==undefined) s.av=0;
     if(NAV.route&&NAV.route.target){ const t=NAV.route.target; setRoute(t.ref||{x:t.x,y:t.y,name:t.name}); }
     flash('Fast travelled to '+dp.name+(p.bay?' (parked at a bay)':'')); BigRig.emit('fastTravel',{depot:dp.id}); setTimeout(()=>ov.style.opacity='0',60); },300); return true; }
 BigRig.fastTravel=fastTravel;
