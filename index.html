@@ -3290,7 +3290,12 @@ body.touch #lobby .row{flex-wrap:wrap;justify-content:center} body.touch #lobby 
 #mob{display:none;position:fixed;inset:0;z-index:5;pointer-events:none;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 body.touch #mob{display:block}
 #mob .b{position:absolute;pointer-events:auto;touch-action:none;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#fff;font-weight:900;border-radius:16px;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.32);box-shadow:0 4px 14px rgba(0,0,0,.35);transition:transform .06s,background .06s,opacity .2s}
-#mob .b small{font-size:9px;font-weight:800;letter-spacing:.8px;opacity:.85;margin-top:2px}
+#mob .b small{font-size:11px;font-weight:800;letter-spacing:.5px;opacity:.95;margin-top:2px;white-space:nowrap;line-height:1.1;max-width:94%;overflow:hidden;text-align:center;display:block}
+#mob .b{line-height:1;text-align:center}
+body.touch #mob .gas,body.touch #mob .brk{border:none;border-radius:14px;box-shadow:0 4px 0 #1d2029,inset 0 1px 0 rgba(255,255,255,.2)} body.touch #mob .gas{background:linear-gradient(180deg,#3fbf74,#1f8a4d)} body.touch #mob .brk{background:linear-gradient(180deg,#d9446b,#9b1f45)}
+body.touch #mob .steer{background:#2a2d33;border:none;box-shadow:inset 0 3px 6px rgba(0,0,0,.6),0 2px 0 rgba(255,255,255,.4)} body.touch #mob .knob{background:radial-gradient(circle at 35% 30%,#d9446b,#9b1f45);border:none;box-shadow:0 4px 0 #5c1028}
+.dside{display:none;position:fixed;top:0;bottom:0;pointer-events:none;background:linear-gradient(180deg,#c9cdd6,#aeb3be 60%,#9aa0ac);box-shadow:inset 0 3px 0 rgba(255,255,255,.6),0 0 18px rgba(0,0,0,.45)} body.touch:not(.portrait) .dside{display:block} body.touch.ovl .dside,body.touch.mapo .dside,body.touch:has(#overlay:not(.hidden)) .dside{display:none!important}
+#deckL{left:0;border-radius:0 26px 26px 0} #deckR{right:0;border-radius:26px 0 0 26px} .dside .brand{position:absolute;left:0;right:0;text-align:center;font:italic 900 13px system-ui;letter-spacing:2px;color:#3b3f86;white-space:nowrap} .dside .brand b{color:#b0282c}
 #mob .b.on{transform:scale(.94);background:rgba(245,184,46,.55);border-color:#f5b82e}
 #mob .b.hide{opacity:0;pointer-events:none} #mob .b.dim{opacity:.35}
 #mob .gas{background:linear-gradient(180deg,rgba(61,220,132,.35),rgba(31,157,85,.3));border-color:rgba(61,220,132,.7);border-radius:18px}
@@ -3304,15 +3309,15 @@ body.touch #mob{display:block}
 body.touch.portrait #deck{display:block}
 #deck .brand{position:absolute;left:50%;transform:translateX(-50%);top:10px;font:italic 900 15px system-ui;letter-spacing:2px;color:#3b3f86;white-space:nowrap} #deck .brand b{color:#b0282c}
 #deck .grille{position:absolute;right:16px;bottom:calc(10px + env(safe-area-inset-bottom));width:44px;height:30px;transform:rotate(-28deg);background:repeating-linear-gradient(90deg,rgba(60,60,70,.55) 0 5px,transparent 5px 12px);border-radius:4px}
-body.portrait #mob .dp{background:#2a2d33;border:none;border-radius:6px;box-shadow:0 3px 0 #111,inset 0 1px 0 rgba(255,255,255,.15);color:#aab}
-body.portrait #mob .dpc{background:#2a2d33;border:none;border-radius:0;box-shadow:none}
-body.portrait #mob .ab{border-radius:50%;background:radial-gradient(circle at 35% 30%,#d9446b,#9b1f45);border:none;box-shadow:0 4px 0 #5c1028,inset 0 1px 0 rgba(255,255,255,.35);font-size:22px}
-body.portrait #mob .ab small{position:absolute;bottom:-20px;color:#3b3f86;font-size:11px;opacity:1}
-body.portrait #mob .pill{border-radius:20px;background:#6b7080;border:none;box-shadow:0 2px 0 #3a3e48;font-size:10px;letter-spacing:1px;transform:rotate(-24deg)}
-body.portrait #mob .pill small{position:absolute;bottom:-17px;color:#3b3f86;font-size:10px}
-body.portrait #mob .fn{border-radius:12px;background:#3d4252;border:none;box-shadow:0 3px 0 #1d2029;font-size:17px}
-body.portrait #mob .fn.on,body.portrait #mob .ab.on,body.portrait #mob .dp.on{transform:translateY(2px);filter:brightness(1.3)}
-body.portrait #mob .fn.ctxon{background:#c98a10;box-shadow:0 3px 0 #6d4a06}
+body.touch #mob .dp{background:#2a2d33;border:none;border-radius:6px;box-shadow:0 3px 0 #111,inset 0 1px 0 rgba(255,255,255,.15);color:#aab}
+body.touch #mob .dpc{background:#2a2d33;border:none;border-radius:0;box-shadow:none}
+body.touch #mob .ab{border-radius:50%;background:radial-gradient(circle at 35% 30%,#d9446b,#9b1f45);border:none;box-shadow:0 4px 0 #5c1028,inset 0 1px 0 rgba(255,255,255,.35);font-size:22px}
+body.touch #mob .ab small{position:absolute;bottom:-19px;left:50%;transform:translateX(-50%);color:#3b3f86;font-size:12px;opacity:1;max-width:none}
+body.portrait #mob .pill{border-radius:20px;background:#6b7080;border:none;box-shadow:0 2px 0 #3a3e48;font-size:14px;letter-spacing:1px;transform:rotate(-20deg);flex-direction:row;gap:6px}
+body.portrait #mob .pill small{color:#fff;font-size:11px;margin:0;max-width:none}
+body.touch #mob .fn{border-radius:12px;background:#3d4252;border:none;box-shadow:0 3px 0 #1d2029;font-size:17px}
+body.touch #mob .fn.on,body.touch #mob .ab.on,body.touch #mob .dp.on{transform:translateY(2px);filter:brightness(1.3)}
+body.touch #mob .fn.ctxon{background:#c98a10;box-shadow:0 3px 0 #6d4a06}
 body.touch.portrait .modal,body.touch .modal{width:min(916px,96vw)!important;height:min(552px,94vh)!important}
 @media (max-width:760px){ #ui .grid{grid-template-columns:minmax(0,1fr)!important} #ui .bar{flex-wrap:wrap} #ui .mh .sub{display:none} #ui .detail{flex-wrap:wrap} #ui .btn.start{width:100%} #ui .show{flex-direction:column;overflow:auto} #ui .tl{width:auto;flex-direction:row;overflow-x:auto;border-right:none} #ui .ti{flex:none} .result{width:94vw!important} }
 body.touch.ovl #mob,body.touch.ovl #deck{display:none!important} body.touch.ovl #frame{z-index:40}
@@ -3342,15 +3347,16 @@ if(('ontouchstart' in window)||navigator.maxTouchPoints>0){ document.body.classL
 function mobInit(){ if(!document.body.classList.contains('touch')) return; MOB.on=true; mobCSS();
   const vp=document.querySelector('meta[name=viewport]'); if(vp) vp.content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover';
   const m=document.createElement('div'); m.id='mob'; document.body.appendChild(m); const dk=document.createElement('div'); dk.id='deck'; dk.innerHTML='<div class="brand">BIG RIG <b>BOY</b></div><div class="grille"></div>'; document.body.insertBefore(dk,m);
+  for(const [id,h] of [['deckL','BIG RIG'],['deckR','<b>BOY</b>']]){ const d=document.createElement('div'); d.id=id; d.className='dside'; d.innerHTML='<div class="brand">'+h+'</div>'; document.body.insertBefore(d,m); }
   // driving
-  mobBtn('mGas','<div class="pedal-ribs"></div><small>GAS</small>','gas','up'); mobBtn('mBrk','<div class="pedal-ribs"></div><small>BRAKE / REV</small>','brk','down');
+  mobBtn('mGas','<div class="pedal-ribs"></div><small>GAS</small>','gas','up'); mobBtn('mBrk','<div class="pedal-ribs"></div><small>BRAKE</small>','brk','down');
   const s=mobBtn('mSteer','<div class="knob">\u25C0\u25B6</div>','steer',null); mobSteer(s);
   mobBtn('mLeft','\u25C0','dp','left'); mobBtn('mRight','\u25B6','dp','right'); mobBtn('mUp','\u25B2','dp',()=>{ if(career.uiOpen) MOB.nav.up(); else if(MP.on) mpToggleList(); }); mobBtn('mDown','\u25BC','dp',()=>{ if(career.uiOpen) MOB.nav.down(); });
   mobBtn('mCen','','dp dpc',null);
   mobBtn('mA','A<small>GAS</small>','ab',()=>{ if(career.uiOpen) MOB.nav.okA(); else { if(!started) startGame(); input.up=true; } });
   mobBtn('mB','B<small>BRAKE</small>','ab',()=>{ if(career.uiOpen) MOB.nav.back(); else input.down=true; });
   for(const id of ['mA','mB']){ const el=document.getElementById(id); const off=()=>{ input[id==='mA'?'up':'down']=false; }; el.addEventListener('pointerup',off); el.addEventListener('pointercancel',off); el.addEventListener('pointerleave',off); }
-  mobBtn('mIndL','\u2B05<small>IND</small>','fn',act(()=>indToggle(1))); mobBtn('mIndR','\u27A1<small>IND</small>','fn',act(()=>indToggle(2))); mobBtn('mHaz','\u26A0<small>HAZ</small>','fn',act(()=>hazToggle())); mobBtn('mHand','P<small>HANDBRAKE</small>','fn','hand'); mobBtn('mHorn','\u{1F4E3}<small>HORN</small>','fn','horn');
+  mobBtn('mIndL','\u2B05<small>IND</small>','fn',act(()=>indToggle(1))); mobBtn('mIndR','\u27A1<small>IND</small>','fn',act(()=>indToggle(2))); mobBtn('mHaz','\u26A0<small>HAZ</small>','fn',act(()=>hazToggle())); mobBtn('mHand','P<small>H/BRAKE</small>','fn','hand'); mobBtn('mHorn','\u{1F4E3}<small>HORN</small>','fn','horn');
   mobBtn('mCouple','\u{1F517}<small>COUPLE</small>','fn ctx',act(()=>toggleCouple())); mobBtn('mFuel','\u26FD<small>REFUEL</small>','fn ctx',act(()=>toggleRefuel())); mobBtn('mUnload','\u{1F4E6}<small>UNLOAD</small>','fn ctx',act(()=>tryUnload()));
   mobBtn('mJobs','\u{1F4CB}<small>JOBS</small>','fn pill',act(()=>{ if(career.uiOpen) closeUI(); else openBoard(); })); mobBtn('mMap','\u{1F5FA}<small>MAP</small>','fn pill',act(()=>{ bigmap.open?closeMap():openMap(); }));
   mobBtn('mChat','\u{1F4AC}<small>CHAT</small>','fn',()=>{ if(!MP.on) return; const ci=document.getElementById('mpChatIn'); ci.style.display='block'; setTimeout(()=>ci.focus(),0); });
@@ -3368,31 +3374,35 @@ function mobLayout(){ if(!MOB.on) return; const W=innerWidth, H=innerHeight, por
   let cw,ch,cx,cy;
   if(!por){ // landscape: canvas centred, controls live in the side gutters
     const G=Math.max(150,Math.min(230,W*0.19)); cw=W-2*G; ch=cw/1.6; if(ch>H-8){ ch=H-8; cw=ch*1.6; } cx=(W-cw)/2; cy=(H-ch)/2;
-    const g=(W-cw)/2, pad=10, bh=Math.min(170,H*0.42);
-    place('mSteer',pad,H-bh*0.62-pad,g-2*pad,bh*0.62); place('mGas',W-g+pad+(g-2*pad)*0.48,H-bh-pad,(g-2*pad)*0.52,bh); place('mBrk',W-g+pad,H-bh*0.72-pad,(g-2*pad)*0.44,bh*0.72);
-    const sb=Math.min(58,(g-3*pad)/2), row=(i,j,side)=>[side?W-g+pad+j*(sb+pad):pad+j*(sb+pad),pad+i*(sb+pad)];
-    let p=row(0,0,0); place('mHand',p[0],p[1],sb,sb); p=row(0,1,0); place('mHorn',p[0],p[1],sb,sb); p=row(1,0,0); place('mJobs',p[0],p[1],sb,sb); p=row(1,1,0); place('mMap',p[0],p[1],sb,sb);
-    p=row(2,0,0); place('mChat',p[0],p[1],sb,sb,MP.on);
-    p=row(0,0,1); place('mCouple',p[0],p[1],sb,sb); p=row(0,1,1); place('mFuel',p[0],p[1],sb,sb); p=row(1,0,1); place('mUnload',p[0],p[1],sb*2+pad,sb); p=row(2,0,1); place('mIndL',p[0],p[1],sb,sb); p=row(2,1,1); place('mIndR',p[0],p[1],sb,sb); p=row(3,0,1); place('mHaz',p[0],p[1],sb*2+pad,sb*0.7);
+    const g=(W-cw)/2, pad=8, iw=g-2*pad, sat=sa('--sat');
+    for(const id of ['deckL','deckR']){ const d=document.getElementById(id); if(d){ d.style.width=(g-2)+'px'; d.querySelector('.brand').style.top=(6+sat)+'px'; } }
+    const top=26+sat, stH=Math.min(120,H*0.30), sb=Math.max(40,Math.min(58,(iw-pad)/2,(H-top-stH-5*pad)/2.6)), sw=(iw-pad)/2, iy=top+2*(sb+pad);
+    place('mHand',pad,top,sw,sb); place('mHorn',pad+sw+pad,top,sw,sb); place('mJobs',pad,top+sb+pad,sw,sb); place('mMap',pad+sw+pad,top+sb+pad,sw,sb);
+    const tw=(iw-2*6)/3; ['mIndL','mHaz','mIndR'].forEach((id,k)=>place(id,pad+k*(tw+6),iy,tw,sb*0.6));
+    place('mSteer',pad,H-stH-pad,iw,stH);
+    const R=W-g+pad; place('mCouple',R,top,sw,sb); place('mFuel',R+sw+pad,top,sw,sb); place('mUnload',R,top+sb+pad,MP.on?sw:iw,sb); place('mChat',R+sw+pad,top+sb+pad,sw,sb,MP.on);
+    const py=top+2*(sb+pad), ph=Math.max(70,H-py-pad); place('mBrk',R,py+ph*0.22,sw,ph*0.78); place('mGas',R+sw+pad,py,sw,ph);
     for(const id of ['mLeft','mRight','mUp','mDown','mCen','mA','mB']) place(id,0,0,0,0,false);
   } else { // portrait: handheld — screen on top, deck below
     const top=sa('--sat'); cw=Math.min(W-12,H*0.56); ch=cw; cx=(W-cw)/2; cy=6+Math.max(0,top); const deckTop=cy+ch+6; const dk=document.getElementById('deck'); dk.style.top=deckTop+'px';
     const DH=H-deckTop, u=Math.min(W/412,DH/330); const S=v=>v*u;
     const dcx=S(78), dcy=deckTop+S(98), k=S(38); place('mUp',dcx-k/2,dcy-k*1.5,k,k); place('mDown',dcx-k/2,dcy+k/2,k,k); place('mLeft',dcx-k*1.5,dcy-k/2,k,k); place('mRight',dcx+k/2,dcy-k/2,k,k); place('mCen',dcx-k/2,dcy-k/2,k,k);
     const ab=S(58); place('mB',W-S(150),dcy-ab*0.2,ab,ab); place('mA',W-S(78),dcy-ab*0.85,ab,ab);
-    const fy=deckTop+S(178), fw=Math.min(S(56),(W-40)/5-8), gap=(W-5*fw)/6; ['mCouple','mFuel','mUnload','mHand','mHorn'].forEach((id,i)=>place(id,gap+i*(fw+gap),fy,fw,fw*0.78)); ['mIndL','mHaz','mIndR'].forEach((id,i)=>place(id,gap+(i*2)*(fw+gap),fy+fw*1.08,fw,fw*0.5));
+    const fy=deckTop+S(178), fw=Math.min(S(66),(W-24)/5-6), gap=(W-5*fw)/6; ['mCouple','mFuel','mUnload','mHand','mHorn'].forEach((id,i)=>place(id,gap+i*(fw+gap),fy,fw,fw*0.78)); ['mIndL','mHaz','mIndR'].forEach((id,i)=>place(id,gap+(i*2)*(fw+gap),fy+fw*1.08,fw,fw*0.5));
     const py=fy+fw*1.78; place('mMap',W/2-S(86),py,S(66),S(24)); place('mJobs',W/2+S(14),py,S(66),S(24)); place('mChat',S(14),py-S(6),S(48),S(36),MP.on);
     for(const id of ['mSteer','mGas','mBrk']) place(id,0,0,0,0,false);
   }
   cv.style.width=cw+'px'; cv.style.height=ch+'px'; fr.style.left=cx+'px'; fr.style.top=cy+'px'; fr.style.width=cw+'px'; fr.style.height=ch+'px';
+  MOB.fitOk=0; mobFit();
   // overlays (#ui / lobby) cover the whole screen in portrait, the canvas area in landscape is too small for modals so they also go full-screen
 }
-function mobContext(){ if(!MOB.on) return; const a=career.active; const s=truck;
+function mobFit(){ for(const sm of document.querySelectorAll('#mob .b small')){ if(sm.closest('.ab')||sm.closest('.pill')) continue; sm.style.fontSize=''; let f=parseFloat(getComputedStyle(sm).fontSize); while(f>9&&sm.scrollWidth>sm.clientWidth+1){ f-=0.5; sm.style.fontSize=f+'px'; } } }
+function mobContext(){ if(!MOB.on) return; if(document.querySelector('#mob .b')&&document.getElementById('mHand').clientWidth&&!MOB.fitOk){ mobFit(); MOB.fitOk=1; } const a=career.active; const s=truck;
   const fuel=!!(started&&fuelStationAt&&fuelStationAt())||refuel.active; let cpl=false; if(started){ if(s.trl) cpl=Math.abs(s.v)<1; else { const c=coupleCandidate(); cpl=!!(c&&c.d<8); } }
   let unl=false; if(a&&(a.phase==='deliver'||a.phase==='unloading')){ const al=bayAlign(a.bay); unl=!!(al&&al.dist<30); }
-  const por=MOB.mode==='portrait'; const set=(id,on)=>{ const b=document.getElementById(id); if(!b) return; if(por){ b.classList.remove('hide'); b.classList.toggle('ctxon',on); b.classList.toggle('dim',!on); } else { b.classList.toggle('hide',!on); } };
+  const por=MOB.mode==='portrait'; const set=(id,on)=>{ const b=document.getElementById(id); if(!b) return; if(true){ b.classList.remove('hide'); b.classList.toggle('ctxon',on); b.classList.toggle('dim',!on); } else { b.classList.toggle('hide',!on); } };
   set('mCouple',cpl); set('mFuel',fuel); set('mUnload',unl); const c=document.getElementById('mChat'); if(c) c.style.display=MP.on?'flex':'none';
-  const cb=document.getElementById('mCouple'); if(cb) cb.querySelector('small').textContent=s.trl?'UNCOUPLE':'COUPLE'; }
+  const cb=document.getElementById('mCouple'); if(cb) { const sm=cb.querySelector('small'), t=s.trl?'UNCOUPLE':'COUPLE'; if(sm.textContent!==t){ sm.textContent=t; mobFit(); } } }
 
 (function ovlWatch(){ const f=()=>{ const ov=document.getElementById('overlay'); const on=!!(typeof career!=='undefined'&&career.uiOpen)||!!document.getElementById('bdPanel')||!!document.querySelector('#ui .celebrate')||!!(ov&&!ov.classList.contains('hidden')&&ov.offsetParent!==null); document.body.classList.toggle('ovl',on); }; setInterval(f,150); })();
 
