@@ -19,12 +19,12 @@ function padUpdate(dt){
   const lx=dz(g.axes[0]||0,0.15), ly=dz(g.axes[1]||0,0.15), rt=dz(V(7),0.04), lt=dz(V(6),0.04);
   if(now.some(x=>x)||Math.abs(lx)+Math.abs(ly)>0.2||rt>0.05||lt>0.05){ if(!pad.active){ pad.active=true; padHud(); } pad.lastUse=timeS; }
   // ---- menus (job board, dealership, results, tier unlock)
-  if(career.uiOpen){ input.padThr=input.padBrk=input.padSteer=0; if(pad.hb){ input.hand=false; pad.hb=false; }
+  if(career.uiOpen||(typeof BREAKDOWN!=='undefined'&&BREAKDOWN.active&&document.getElementById('bdPanel'))){ input.padThr=input.padBrk=input.padSteer=0; if(pad.hb){ input.hand=false; pad.hb=false; }
     pad.navT-=dt; let dir=null; if(hit(12)) dir='u'; else if(hit(13)) dir='d'; else if(hit(14)) dir='l'; else if(hit(15)) dir='r';
     else if(pad.navT<=0&&(Math.abs(lx)>0.6||Math.abs(ly)>0.6)){ dir=Math.abs(lx)>Math.abs(ly)?(lx>0?'r':'l'):(ly>0?'d':'u'); pad.navT=0.22; }
     if(dir) padNav(dir);
     if(hit(0)){ const el=padFocusEl(); if(el){ el.click(); setTimeout(()=>padNav(null),40); } }
-    if(hit(1)){ if(career.uiOpen==='result'){ const k=document.querySelector('#ui #keep'); if(k) k.click(); } else closeUI(); }
+    if(hit(1)&&career.uiOpen){ if(career.uiOpen==='result'){ const k=document.querySelector('#ui #keep'); if(k) k.click(); } else closeUI(); }
     if(hit(9)&&career.uiOpen==='board') closeUI();
     if(hit(4)||hit(5)){ const g2=document.querySelector('#ui .grid'); if(g2) g2.scrollBy({top:hit(5)?160:-160,behavior:'smooth'}); }
     return; }
@@ -33,7 +33,8 @@ function padUpdate(dt){
   if(bigmap.open){ input.padThr=input.padBrk=input.padSteer=0;
     if(Math.abs(lx)+Math.abs(ly)>0){ bigmap.cx+=lx*dt*420/bigmap.z; bigmap.cy+=ly*dt*420/bigmap.z; if(typeof mapClamp==='function') mapClamp(); }
     const zin=rt+(now[5]?0.8:0), zout=lt+(now[4]?0.8:0); if(zin>0.05) mapZoomTo(bigmap.zt*Math.pow(2.4,zin*dt)); if(zout>0.05) mapZoomTo(bigmap.zt/Math.pow(2.4,zout*dt));
-    if(hit(0)){ const cx=VW/2, cy=VH/2+10; const poi=navPOIAt(cx,cy,mBX,mBY); if(poi){ const r=setRoute(poi.o); if(r) flash('Sat nav to '+poi.name+': '+fmtD(r.len)); } else routeToMapPoint(cx,cy); }
+    if(NAV.sel&&hit(0)){ const d=NAV.sel.o; NAV.sel=null; fastTravel(d); return; } if(NAV.sel&&hit(2)){ const sel=NAV.sel; NAV.sel=null; const r=setRoute(sel.o); if(r) flash('Sat nav to '+sel.name+': '+fmtD(r.len)); return; }
+    if(hit(0)){ const cx=VW/2, cy=VH/2+10; const poi=navPOIAt(cx,cy,mBX,mBY); if(poi&&poi.kind==='Depot'){ NAV.sel=poi; return; } if(poi){ const r=setRoute(poi.o); if(r) flash('Sat nav to '+poi.name+': '+fmtD(r.len)); } else routeToMapPoint(cx,cy); }
     if(hit(3)&&typeof mapCentreTruck==='function') mapCentreTruck();
     if(hit(1)||hit(8)) closeMap(); if(hit(9)){ closeMap(); openBoard(); }
     return; }
@@ -49,8 +50,8 @@ function padUpdate(dt){
   if(hit(8)) openMap(); if(hit(9)) openBoard(); if(hit(5)&&NAV.route){ clearRoute(); flash('Route cancelled'); }
 }
 // ---- spatial focus navigation for the DOM panels
-function padFocusables(){ const root=document.querySelector('#ui .mback, #ui .celebrate'); if(!root) return [];
-  return Array.from(root.querySelectorAll('.card:not(.lock), .chip, .btn:not([disabled]), .x, .ti, .sw')).filter(e=>e.offsetParent!==null); }
+function padFocusables(){ const root=document.querySelector('#bdPanel')||document.querySelector('#ui .mback, #ui .celebrate'); if(!root) return [];
+  return Array.from(root.querySelectorAll('.card:not(.lock), .chip, .btn:not([disabled]), .x, .ti, .sw, .bdOpt')).filter(e=>e.offsetParent!==null); }
 function padFocusEl(){ const f=padFocusables(); if(pad.focus&&f.includes(pad.focus)) return pad.focus; return null; }
 function padNav(dir){ const els=padFocusables(); if(!els.length) return; let cur=padFocusEl();
   if(!cur){ cur=els.find(e=>e.id==='accept'||e.id==='buy'||e.id==='use'||e.id==='leave')&&dir===null?null:null; cur=els.find(e=>e.classList.contains('sel'))||els.find(e=>e.classList.contains('card'))||els.find(e=>e.classList.contains('btn'))||els[0]; }
@@ -58,7 +59,7 @@ function padNav(dir){ const els=padFocusables(); if(!els.length) return; let cur
     for(const e of els){ if(e===cur) continue; const q=e.getBoundingClientRect(), ex=q.left+q.width/2, ey=q.top+q.height/2, dx=ex-cx, dy=ey-cy;
       const along=dir==='r'?dx:dir==='l'?-dx:dir==='d'?dy:-dy, side=(dir==='r'||dir==='l')?Math.abs(dy):Math.abs(dx); if(along<=4) continue; const sc=along+side*2.2; if(sc<bs){ bs=sc; best=e; } }
     if(best) cur=best; }
-  for(const e of document.querySelectorAll('#ui .padfocus')) e.classList.remove('padfocus'); pad.focus=cur; cur.classList.add('padfocus'); const gr=cur.closest('.grid,.tl'); if(gr){ const q=cur.getBoundingClientRect(), r2=gr.getBoundingClientRect(); if(q.top<r2.top) gr.scrollTop-=r2.top-q.top+8; else if(q.bottom>r2.bottom) gr.scrollTop+=q.bottom-r2.bottom+8; } }
+  for(const e of document.querySelectorAll('.padfocus')) e.classList.remove('padfocus'); pad.focus=cur; cur.classList.add('padfocus'); const gr=cur.closest('.grid,.tl'); if(gr){ const q=cur.getBoundingClientRect(), r2=gr.getBoundingClientRect(); if(q.top<r2.top) gr.scrollTop-=r2.top-q.top+8; else if(q.bottom>r2.bottom) gr.scrollTop+=q.bottom-r2.bottom+8; } }
 // ---- glyphs: when the pad is the active device, key hints in canvas prompts become controller buttons
 function padGlyphs(t){ if(!pad.active||typeof t!=='string') return t;
   return t.replace(/Press F to/g,'Press '+GLYPH.X+' to').replace(/\(F to stop\)/g,'('+GLYPH.X+' to stop)').replace(/Press T to/g,'Press '+GLYPH.A+' to').replace(/\bT: (couple|uncouple)/g,GLYPH.A+': $1')
@@ -68,3 +69,8 @@ function padHud(){ const b=document.querySelector('#bJobs kbd'); if(b) b.textCon
 addEventListener('keydown',()=>{ if(pad.active&&timeS-pad.lastUse>0.5){ pad.active=false; padHud(); } });
 function drawPadMapCursor(){ if(!pad.active||!bigmap.open) return; const x=VW/2,y=VH/2+10; ctx.save(); ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,10,0,7); ctx.moveTo(x-18,y); ctx.lineTo(x-6,y); ctx.moveTo(x+6,y); ctx.lineTo(x+18,y); ctx.moveTo(x,y-18); ctx.lineTo(x,y-6); ctx.moveTo(x,y+6); ctx.lineTo(x,y+18); ctx.stroke();
   const poi=navPOIAt(x,y,mBX,mBY); ctx.fillStyle='rgba(8,12,20,0.85)'; const t=GLYPH.A+' '+(poi?'Route to '+poi.name:'Route to this point')+'   LS pan \u2022 RT/LT zoom \u2022 '+GLYPH.Y+' centre \u2022 '+GLYPH.B+' close'; ctx.font='bold 12px system-ui,sans-serif'; const w=ctx.measureText(t).width+20; ctx.fillRect(x-w/2,VH-56,w,24); ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.fillText(t,x,VH-39); ctx.restore(); }
+
+// keyboard for every modal: arrows move focus, Enter/Space selects (job board, results, tier unlock, dealership, breakdown)
+addEventListener('keydown',e=>{ const bd=typeof BREAKDOWN!=='undefined'&&BREAKDOWN.active&&document.getElementById('bdPanel'); if(!career.uiOpen&&!bd) return; const t=e.target; if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA')) return;
+  const dir={ArrowUp:'u',ArrowDown:'d',ArrowLeft:'l',ArrowRight:'r'}[e.code]; if(dir){ padNav(padFocusEl()?dir:null); e.preventDefault(); e.stopImmediatePropagation(); return; }
+  if(e.code==='Enter'||e.code==='Space'||e.code==='NumpadEnter'){ let el=padFocusEl(); if(!el){ padNav(null); el=padFocusEl(); } if(el){ el.click(); setTimeout(()=>padNav(null),40); e.preventDefault(); e.stopImmediatePropagation(); } } },true);

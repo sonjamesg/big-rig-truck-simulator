@@ -54,11 +54,17 @@ function updateNav(dt){ const R=NAV.route; if(!R) return; const f=fwd(truck.h), 
   R.idx=Math.max(R.idx,best); R.off=bd;
   if(Math.hypot(R.target.x-cx,R.target.y-cy)<30 || (R.len-R.cum[R.idx]<25&&bd<25)){ chime(); flash('You have arrived: '+R.target.name); BigRig.emit('routeArrived',{target:R.target}); NAV.route=null; return; }
   if(bd>22){ NAV.offT+=dt; if(NAV.offT>1.5&&timeS-NAV.lastCalc>2){ NAV.reroutes++; const tg=R.target; const nr=setRoute(tg.ref&&tg.ref.name?tg.ref:{x:tg.x,y:tg.y,name:tg.name}); if(nr){ flash('Rerouting\u2026'); BigRig.emit('reroute',{n:NAV.reroutes}); } } } else NAV.offT=0; }
+// UK keep-left: route drawn on the left-hand carriageway, lane picked for the next turn; one-way/slip roads stay centred on the lane
+function navRaw(R,k){ const n=R.P.length, a=R.P[Math.max(0,k-2)], b=R.P[Math.min(n-1,k+2)], l=Math.hypot(b[0]-a[0],b[1]-a[1])||1, tx=(b[0]-a[0])/l, ty=(b[1]-a[1])/l, lx=ty, ly=-tx, p=R.P[k];
+  if(R.oneway&&R.oneway[k]) return 0; let dl=0, dr=0; while(dl<16&&onRoadM(p[0]+lx*(dl+0.5),p[1]+ly*(dl+0.5))) dl+=0.5; while(dr<16&&onRoadM(p[0]-lx*(dr+0.5),p[1]-ly*(dr+0.5))) dr+=0.5;
+  const W=dl+dr; if(W<4.5) return (dl-dr)/2; const wl=W/2, nL=Math.max(1,Math.round(wl/3.5)); let lane=0; const nt=R.turns.find(t=>t.k>=k&&t.k-k<45/ ((R.cum[1]-R.cum[0])||2)); if(nt&&nt.kind==='R') lane=nL-1; return dl-(lane+0.5)*wl/nL; }
+function navOff(R,k){ if(!R.off){ R.off=new Float32Array(R.P.length).fill(NaN); } if(isNaN(R.off[k])){ let s=0,c=0; for(let q=k-4;q<=k+4;q++){ if(q<0||q>=R.P.length) continue; if(!R.raw) R.raw=new Float32Array(R.P.length).fill(NaN); if(isNaN(R.raw[q])) R.raw[q]=navRaw(R,q); s+=R.raw[q]; c++; } R.off[k]=s/c; }
+  const n=R.P.length, a=R.P[Math.max(0,k-2)], b=R.P[Math.min(n-1,k+2)], l=Math.hypot(b[0]-a[0],b[1]-a[1])||1, o=R.off[k]; return [R.P[k][0]+(b[1]-a[1])/l*o, R.P[k][1]-(b[0]-a[0])/l*o]; }
 function navLine(px,py,w,col){ const R=NAV.route; if(!R) return; ctx.save(); ctx.lineJoin='round'; ctx.lineCap='round'; ctx.strokeStyle='rgba(0,0,0,0.55)'; ctx.lineWidth=w+3; ctx.beginPath();
-  for(let k=R.idx;k<R.P.length;k+=2){ const x=px(R.P[k][0]), y=py(R.P[k][1]); k===R.idx?ctx.moveTo(x,y):ctx.lineTo(x,y); } const e=R.P[R.P.length-1]; ctx.lineTo(px(e[0]),py(e[1])); ctx.stroke(); ctx.strokeStyle=col; ctx.lineWidth=w; ctx.stroke();
+  for(let k=R.idx;k<R.P.length;k+=2){ const Q=(k-R.idx<400)?navOff(R,k):R.P[k], x=px(Q[0]), y=py(Q[1]); k===R.idx?ctx.moveTo(x,y):ctx.lineTo(x,y); } const e=R.P[R.P.length-1]; ctx.lineTo(px(e[0]),py(e[1])); ctx.stroke(); ctx.strokeStyle=col; ctx.lineWidth=w; ctx.stroke();
   ctx.fillStyle='#ff3df0'; ctx.strokeStyle='#000'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(px(R.target.x),py(R.target.y),6,0,7); ctx.fill(); ctx.stroke(); ctx.restore(); }
 function drawNavWorld(){ const R=NAV.route; if(!R) return; const end=Math.min(R.P.length-5,R.idx+100);
-  for(let k=R.idx+3;k<end;k+=5){ const p=R.P[k], q=R.P[k+3]; const h=Math.atan2(q[0]-p[0],-(q[1]-p[1])); const a=0.55*Math.min(1,(k-R.idx)/10);
+  for(let k=R.idx+3;k<end;k+=5){ const p=navOff(R,k), q=navOff(R,k+3); const h=Math.atan2(q[0]-p[0],-(q[1]-p[1])); const a=0.55*Math.min(1,(k-R.idx)/10);
     ctx.save(); ctx.translate(p[0]*PPM,p[1]*PPM); ctx.rotate(h); ctx.fillStyle='rgba(90,220,255,'+a.toFixed(2)+')'; ctx.beginPath(); ctx.moveTo(0,-12); ctx.lineTo(13,4); ctx.lineTo(6,4); ctx.lineTo(0,-4); ctx.lineTo(-6,4); ctx.lineTo(-13,4); ctx.closePath(); ctx.fill(); ctx.restore(); } }
 const NAVP={x:960-252,y:56,w:236,h:96};
 function fmtD(m){ return m>=1000?(m/1000).toFixed(m>=10000?0:1)+' km':(Math.round(m/10)*10)+' m'; }
@@ -90,3 +96,22 @@ BigRig._navDiag=function(target){ const N=MW*MH; const r=setRoute(target); if(r)
   let best=[99]; for(let i=0;i<N;i++) if(seen[i]&&i%2===0){ const x=i%MW,y=(i/MW)|0; for(let dy=-25;dy<=25;dy++)for(let dx=-25;dx<=25;dx++){ const j=i+dx+dy*MW; if(j>=0&&j<N&&A(j)){ const dd=Math.hypot(dx,dy); if(dd<best[0]) best=[dd,x,y,x+dx,y+dy]; } } }
   if(best.length>1){ const L=[]; const m=Math.ceil(best[0]); for(let k=0;k<=m;k++){ const x=Math.round(best[1]+(best[3]-best[1])*k/m), y=Math.round(best[2]+(best[4]-best[2])*k/m); L.push(G[idx(x,y)]+'/'+world.roadH[idx(x,y)]+'/'+world.roadV[idx(x,y)]); } best.push(L); }
   return {endN:n,gap:best}; };
+// ===================== FAST TRAVEL (free): big-map depot tooltip -> spawn in that depot's yard facing the exit =====================
+function ftClear(x,y,h,trl){ const f=fwd(h), r=rgt(h), s0=trl?-12.3:-1.4; for(let s=s0;s<=5.2;s+=0.8) for(const w of [-1.4,0,1.4]){ const px=x+f[0]*s+r[0]*w, py=y+f[1]*s+r[1]*w; if(solidAtM(px,py)) return false;
+    for(const t of world.trailers){ if(t===trl) continue; const tf=fwd(t.th); for(let q=-1.2;q<=12.4;q+=1.5){ if(Math.hypot(t.x-tf[0]*q-px,t.y-tf[1]*q-py)<2.2) return false; } } } return true; }
+function ftSpot(dp){ const trl=truck.trl, ex=dp.entrance.x, ey=dp.entrance.y, cands=[];
+  for(let j=dp.y+1;j<dp.y+dp.h-1;j+=0.5) for(let i=dp.x+1;i<dp.x+dp.w-1;i+=0.5){ const x=i*M_T, y=j*M_T, h=Math.atan2(ex-x,-(ey-y)), hs=Math.round(h/(Math.PI/2))*(Math.PI/2); cands.push([Math.hypot(ex-x,ey-y)-3*Math.abs(i-(dp.x+dp.w/2))*M_T,x,y,hs]); }
+  cands.sort((a,b)=>b[0]-a[0]); // furthest from the gate first, so the whole rig sits inside the yard
+  for(const [,x,y,h] of cands){ if(ftClear(x,y,h,trl)){ const f=fwd(h); if(trl){ const rx=x-f[0]*12.3, ry=y-f[1]*12.3; if(rx<dp.x*M_T||rx>(dp.x+dp.w)*M_T||ry<dp.y*M_T||ry>(dp.y+dp.h)*M_T) continue; } return {x,y,h}; } }
+  // no room in the yard: line the trailer up in a free bay, cab facing out
+  for(const b of dp.bays){ if(b.trailer) continue; const h=b.th||0, f=fwd(h); return {x:b.kx-f[0]*0.3,y:b.ky-f[1]*0.3,h,bay:true}; } return null; }
+function fastTravel(dp){ const s=truck; if(Math.abs(s.v)>0.3){ flash('Fast travel: stop the truck first'); return false; } if(typeof BREAKDOWN!=='undefined'&&BREAKDOWN.active){ flash('Fast travel unavailable while broken down'); return false; }
+  const p=ftSpot(dp); if(!p){ flash('Fast travel: no clear spot at '+dp.name); return false; }
+  const fr=document.getElementById('frame')||document.body; let ov=document.getElementById('ftfade'); if(!ov){ ov=document.createElement('div'); ov.id='ftfade'; ov.style.cssText='position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .28s;z-index:50'; fr.appendChild(ov); }
+  ov.style.opacity='1'; if(typeof closeMap==='function') closeMap();
+  setTimeout(()=>{ s.x=p.x; s.y=p.y; s.h=p.h; s.th=p.h; s.v=0; s.steer=0; if(s.vx!==undefined){ s.vx=0; s.vy=0; } if(s.av!==undefined) s.av=0;
+    if(NAV.route&&NAV.route.target){ const t=NAV.route.target; setRoute(t.ref||{x:t.x,y:t.y,name:t.name}); }
+    flash('Fast travelled to '+dp.name+(p.bay?' (parked at a bay)':'')); BigRig.emit('fastTravel',{depot:dp.id}); setTimeout(()=>ov.style.opacity='0',60); },300); return true; }
+BigRig.fastTravel=fastTravel;
+// tooltip button hit-boxes (set when drawn)
+let FT_BTN=null, NAV_BTN=null;

@@ -250,7 +250,7 @@ function mapClamp(){ const z=bigmap.z, hw=(VW-40)/2/z, hh=(VH-60)/2/z; bigmap.cx
 function mapCentreTruck(){ bigmap.cx=truck.x*PPM/TILE; bigmap.cy=truck.y*PPM/TILE; bigmap.anchor=null; mapClamp(); }
 function mapZoomTo(zt,mx,my){ bigmap.zt=Math.max(mapFitZ(),Math.min(14,zt)); bigmap.anchor=(mx===undefined)?[VW/2,VH/2+10]:[mx,my]; }
 function openMap(){ if(!started) return; bigmap.open=true; bigmap.z=bigmap.zt=bigmap.saved||LOCAL_Z; mapCentreTruck(); }
-function closeMap(){ if(bigmap.open) bigmap.saved=bigmap.zt||bigmap.z; bigmap.open=false; }
+function closeMap(){ NAV.sel=null; if(bigmap.open) bigmap.saved=bigmap.zt||bigmap.z; bigmap.open=false; }
 const MAPBTN=[['+',()=>mapZoomTo(bigmap.zt*1.6)],['−',()=>mapZoomTo(bigmap.zt/1.6)],['◎',mapCentreTruck],['✕',()=>closeMap()]];
 function mapBtnRect(i){ return [VW-62,58+i*48,40,40]; }
 const mBX=t=>VW/2+(t-bigmap.cx)*bigmap.z, mBY=t=>VH/2+10+(t-bigmap.cy)*bigmap.z;
@@ -283,7 +283,11 @@ function drawBigMap(){
     ctx.fillStyle='rgba(255,221,51,0.25)'; ctx.beginPath(); ctx.arc(lx,ly,14,0,7); ctx.fill(); }
   ctx.translate(lx,ly); ctx.rotate(truck.h); const k=1.5+0.12*Math.sin(timeS*6); ctx.fillStyle='#ffdd33'; ctx.strokeStyle='#000'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(0,-11*k); ctx.lineTo(7.5*k,8*k); ctx.lineTo(0,4*k); ctx.lineTo(-7.5*k,8*k); ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.restore();
-  if(NAV.hover){ const hv=NAV.hover, t=hv.kind+': '+hv.name+'  (click for sat nav)'; ctx.font='bold 12px system-ui,sans-serif'; const tw=ctx.measureText(t).width; const tx=Math.min(VW-tw-30,NAV.hx+14), ty=NAV.hy-12; ctx.fillStyle='rgba(10,14,22,0.92)'; ctx.fillRect(tx-6,ty-14,tw+12,22); ctx.strokeStyle='#f5b82e'; ctx.strokeRect(tx-6,ty-14,tw+12,22); ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.fillText(t,tx,ty+1); }
+  FT_BTN=NAV_BTN=null; if(NAV.sel&&NAV.sel.kind==='Depot'){ const hv=NAV.sel, X=mBX(hv.o.entrance.x/M_T), Y=mBY(hv.o.entrance.y/M_T); ctx.font='bold 13px system-ui,sans-serif'; const tw=Math.max(200,ctx.measureText(hv.name).width+20), tx=Math.max(24,Math.min(VW-tw-24,X+14)), ty=Math.max(50,Math.min(VH-90,Y-30));
+    ctx.fillStyle='rgba(10,14,22,0.95)'; ctx.fillRect(tx,ty,tw,66); ctx.strokeStyle='#f5b82e'; ctx.lineWidth=1.5; ctx.strokeRect(tx,ty,tw,66); ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText('Depot: '+hv.name,tx+10,ty+19);
+    const pad2=typeof pad!=='undefined'&&pad.active; NAV_BTN=[tx+10,ty+30,(tw-30)/2,26]; FT_BTN=[tx+20+(tw-30)/2,ty+30,(tw-30)/2,26];
+    for(const [b,l,c] of [[NAV_BTN,(pad2?'X ':'')+'Sat nav','#2e86de'],[FT_BTN,(pad2?'A ':'')+'Fast travel','#27ae60']]){ ctx.fillStyle=c; ctx.beginPath(); ctx.roundRect?ctx.roundRect(b[0],b[1],b[2],b[3],6):ctx.rect(b[0],b[1],b[2],b[3]); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='bold 12px system-ui,sans-serif'; ctx.textAlign='center'; ctx.fillText(l,b[0]+b[2]/2,b[1]+17); } ctx.textAlign='left'; }
+  if(NAV.hover&&!(NAV.sel&&NAV.sel.o===NAV.hover.o)){ const hv=NAV.hover, t=hv.kind+': '+hv.name+(hv.kind==='Depot'?'  (click: sat nav / fast travel)':'  (click for sat nav)'); ctx.font='bold 12px system-ui,sans-serif'; const tw=ctx.measureText(t).width; const tx=Math.min(VW-tw-30,NAV.hx+14), ty=NAV.hy-12; ctx.fillStyle='rgba(10,14,22,0.92)'; ctx.fillRect(tx-6,ty-14,tw+12,22); ctx.strokeStyle='#f5b82e'; ctx.strokeRect(tx-6,ty-14,tw+12,22); ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.fillText(t,tx,ty+1); }
   ctx.fillStyle='#f5b82e'; ctx.font='bold 18px system-ui,sans-serif'; ctx.textAlign='left'; ctx.fillText('WORLD MAP',24,28); ctx.font='11px system-ui,sans-serif'; ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.fillText('1 km ≈ '+Math.round(250*bigmap.z)+' px',150,28);
   // buttons
   ctx.textAlign='center'; ctx.textBaseline='middle'; MAPBTN.forEach(([t],i)=>{ const [bx,by,bw,bh]=mapBtnRect(i); ctx.fillStyle='rgba(12,18,28,0.85)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(bx,by,bw,bh,8):ctx.rect(bx,by,bw,bh); ctx.fill(); ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.lineWidth=1; ctx.stroke(); ctx.fillStyle='#fff'; ctx.font='bold 22px system-ui,sans-serif'; ctx.fillText(t,bx+bw/2,by+bh/2+1); });
@@ -302,9 +306,11 @@ cv.addEventListener('pointerdown',e=>{ const [x,y]=canvasPos(e); downAt=[x,y,per
 cv.addEventListener('pointermove',e=>{ if(bigmap.open&&!bigmap.drag){ const [x,y]=canvasPos(e); NAV.hover=navPOIAt(x,y,mBX,mBY); NAV.hx=x; NAV.hy=y; cv.style.cursor=NAV.hover?'pointer':''; } if(bigmap.open&&bigmap.drag){ const [x,y]=canvasPos(e); bigmap.cx=bigmap.drag[2]-(x-bigmap.drag[0])/bigmap.z; bigmap.cy=bigmap.drag[3]-(y-bigmap.drag[1])/bigmap.z; mapClamp(); } });
 cv.addEventListener('pointerup',e=>{ const [x,y]=canvasPos(e); const click=downAt&&Math.hypot(x-downAt[0],y-downAt[1])<6&&performance.now()-downAt[2]<400; bigmap.drag=null;
   if(bigmap.lp){ clearTimeout(bigmap.lp); bigmap.lp=null; }
-  if(click){ if(!bigmap.open&&navPanelClick(x,y)) return; if(bigmap.open){ let hitB=false; MAPBTN.forEach((b,i)=>{ const [bx,by,bw,bh]=mapBtnRect(i); if(x>=bx&&x<=bx+bw&&y>=by&&y<=by+bh) hitB=true; }); const poi=hitB?null:navPOIAt(x,y,mBX,mBY); if(poi){ const r=setRoute(poi.o); if(r) flash('Sat nav to '+poi.name+': '+fmtD(r.len)); } MAPBTN.forEach(([t,f],i)=>{ const [bx,by,bw,bh]=mapBtnRect(i); if(x>=bx&&x<=bx+bw&&y>=by&&y<=by+bh) f(); }); } else if(x>=MM.x&&x<=MM.x+MM.w&&y>=MM.y&&y<=MM.y+MM.h) openMap(); } });
+  if(click){ if(!bigmap.open&&navPanelClick(x,y)) return; if(bigmap.open){ let hitB=false; MAPBTN.forEach((b,i)=>{ const [bx,by,bw,bh]=mapBtnRect(i); if(x>=bx&&x<=bx+bw&&y>=by&&y<=by+bh) hitB=true; }); const inB=b=>b&&x>=b[0]&&x<=b[0]+b[2]&&y>=b[1]&&y<=b[1]+b[3]; if(NAV.sel&&inB(FT_BTN)){ const d=NAV.sel.o; NAV.sel=null; fastTravel(d); return; } if(NAV.sel&&inB(NAV_BTN)){ const sel=NAV.sel; NAV.sel=null; const r=setRoute(sel.o); if(r) flash('Sat nav to '+sel.name+': '+fmtD(r.len)); return; }
+      const poi=hitB?null:navPOIAt(x,y,mBX,mBY); NAV.sel=null; if(poi&&poi.kind==='Depot'){ NAV.sel=poi; } else if(poi){ const r=setRoute(poi.o); if(r) flash('Sat nav to '+poi.name+': '+fmtD(r.len)); } MAPBTN.forEach(([t,f],i)=>{ const [bx,by,bw,bh]=mapBtnRect(i); if(x>=bx&&x<=bx+bw&&y>=by&&y<=by+bh) f(); }); } else if(x>=MM.x&&x<=MM.x+MM.w&&y>=MM.y&&y<=MM.y+MM.h) openMap(); } });
 cv.addEventListener('wheel',e=>{ if(!bigmap.open) return; e.preventDefault(); const [mx,my]=canvasPos(e); mapZoomTo((bigmap.zt||bigmap.z)*Math.exp(-e.deltaY*0.0018),mx,my); },{passive:false});
-addEventListener('keydown',e=>{ if(e.code==='KeyM'){ bigmap.open?closeMap():openMap(); } if(e.code==='Escape') closeMap();
+addEventListener('keydown',e=>{ if(bigmap.open&&NAV.sel&&(e.code==='Enter'||e.code==='Space')){ const d=NAV.sel.o; NAV.sel=null; fastTravel(d); e.preventDefault(); return; }
+  if(e.code==='KeyM'){ bigmap.open?closeMap():openMap(); } if(e.code==='Escape') closeMap();
   if(bigmap.open){ if(e.code==='Equal'||e.code==='NumpadAdd'){ mapZoomTo(bigmap.zt*1.6); e.preventDefault(); } if(e.code==='Minus'||e.code==='NumpadSubtract'){ mapZoomTo(bigmap.zt/1.6); e.preventDefault(); } if(e.code==='Home'){ mapCentreTruck(); e.preventDefault(); } } });
 requestAnimationFrame(()=>setTimeout(boot,30));
 
