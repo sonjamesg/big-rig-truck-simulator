@@ -45,8 +45,8 @@ function drawFuelHUD(){
     ctx.save(); ctx.font='bold 16px system-ui,sans-serif'; ctx.textAlign='center'; const tw=ctx.measureText(text).width+30; ctx.fillStyle='rgba(8,12,20,0.75)'; ctx.fillRect(VW/2-tw/2,VH-170,tw,30); ctx.fillStyle='#7dff9a'; ctx.fillText(text,VW/2,VH-149); ctx.restore(); }
 }
 // minimap / big-map icons for depots, petrol stations and repair garages
-function drawPOIs(px,py,big){
-  const icon=(X,Y,col,ch)=>{ ctx.fillStyle=col; ctx.strokeStyle='#000'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(X,Y,big?7:5.5,0,7); ctx.fill(); ctx.stroke(); ctx.fillStyle='#fff'; ctx.font=`bold ${big?9:8}px system-ui,sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(ch,X,Y+0.5); };
+function drawPOIs(px,py,big,R){ const rr=R||(big?7:5.5);
+  const icon=(X,Y,col,ch)=>{ ctx.fillStyle=col; ctx.strokeStyle='#000'; ctx.lineWidth=R?Math.max(1.5,rr*0.18):1.5; ctx.beginPath(); ctx.arc(X,Y,rr,0,7); ctx.fill(); ctx.stroke(); ctx.fillStyle='#fff'; ctx.font=`bold ${Math.round(rr*1.25)}px system-ui,sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(ch,X,Y+0.5); };
   for(const d of world.depots) icon(px(d.entrance.x),py(d.entrance.y),'#2f7fe0','D');
   for(const f of world.fuel) icon(px(f.x),py(f.y),'#25a244','F');
   for(const g of world.garages) icon(px(g.x),py(g.y),'#e67e22','G');

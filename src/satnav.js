@@ -96,8 +96,13 @@ function drawNavHUD(){ const R=NAV.route; if(!R) return; const {x,y,w,h}=NAVP; c
   ctx.restore(); }
 function navPanelClick(x,y){ if(NAV.route&&x>=NAVP.x+NAVP.w-30&&x<=NAVP.x+NAVP.w-8&&y>=NAVP.y+8&&y<=NAVP.y+30){ clearRoute(); flash('Route cancelled'); return true; } return false; }
 // big-map icon hit test
-function navPOIAt(x,y,BX,BY){ let best=null,bd=11; const test=(o,mx,my,kind)=>{ const d=Math.hypot(BX(mx/M_T)-x,BY(my/M_T)-y); if(d<bd){ bd=d; best={o,kind,name:o.name}; } };
-  for(const d of world.depots) test(d,d.entrance.x,d.entrance.y,'Depot'); for(const f of world.fuel) test(f,f.x,f.y,'Fuel'); for(const g of world.garages) test(g,g.x,g.y,'Garage'); for(const m of world.malls||[]) test(m,m.entrance.x,m.entrance.y,m.kind==='mall'?'Mall':'Supermarket'); for(const d of world.dealers||[]) test(d,d.entrance.x,d.entrance.y,'Truck dealer'); return best; }
+// icon radius on the big map grows with zoom (canvas px), clamped
+function mapIconR(z){ return Math.max(7,Math.min(18,5+2.2*z)); }
+// hit radius: icon + margin, and at least ~44 CSS px across on touch screens
+function mapHitR(){ const r=mapIconR(bigmap.z)+5; if(!document.body.classList.contains('touch')) return Math.max(11,r); const cw=cv.getBoundingClientRect().width||VW; return Math.max(r,22*VW/cw); }
+let RAIL_POI=null; function railPOIs(){ if(typeof RAIL==='undefined'||!RAIL.ready) return []; if(!RAIL_POI||RAIL_POI.length!==RAIL.stations.length) RAIL_POI=RAIL.stations.map(st=>({name:st.name+(st.kind==='hub'?'':' station'),st,x:RAIL.X[st.s],y:RAIL.Y[st.s],entrance:{x:RAIL.X[st.s],y:RAIL.Y[st.s]}})); return RAIL_POI; }
+function navPOIAt(x,y,BX,BY){ let best=null,bd=mapHitR(); const test=(o,mx,my,kind)=>{ const d=Math.hypot(BX(mx/M_T)-x,BY(my/M_T)-y); if(d<bd){ bd=d; best={o,kind,name:o.name}; } }; for(const s of railPOIs()) test(s,s.x,s.y,'Station');
+  for(const d of world.depots) test(d,d.entrance.x,d.entrance.y,/Port/.test(d.name)?'Port':'Depot'); for(const f of world.fuel) test(f,f.x,f.y,'Fuel'); for(const g of world.garages) test(g,g.x,g.y,'Garage'); for(const m of world.malls||[]) test(m,m.entrance.x,m.entrance.y,m.kind==='mall'?'Mall':'Supermarket'); for(const d of world.dealers||[]) test(d,d.entrance.x,d.entrance.y,'Truck dealer'); return best; }
 BigRig.setRoute=setRoute; BigRig.clearRoute=clearRoute; BigRig.route=()=>NAV.route&&{target:NAV.route.target,length:NAV.route.len,remaining:NAV.route.len-NAV.route.cum[NAV.route.idx],turns:NAV.route.turns.length,reroutes:NAV.reroutes};
 BigRig._navDiag=function(target){ const N=MW*MH; const r=setRoute(target); if(r) return 'ok'; const gen=navGen; const A=i=>navStamp[i]===gen;
   const e=target.entrance||target, E=navSnap(e.x/M_T,e.y/M_T,70); const seen=new Uint8Array(N), s0=idx(E[0],E[1]); const q=[s0]; seen[s0]=1; let n=0;
@@ -114,13 +119,24 @@ function ftSpot(dp){ const trl=truck.trl, ex=dp.entrance.x, ey=dp.entrance.y, ca
   for(const [,x,y,h] of cands){ if(ftClear(x,y,h,trl)){ const f=fwd(h); if(trl){ const rx=x-f[0]*12.3, ry=y-f[1]*12.3; if(rx<dp.x*M_T||rx>(dp.x+dp.w)*M_T||ry<dp.y*M_T||ry>(dp.y+dp.h-5)*M_T) continue; } return {x,y,h}; } }
   // no room in the yard: line the trailer up in a free bay, cab facing out
   for(const b of dp.bays){ if(b.trailer) continue; const h=b.th||0, f=fwd(h); return {x:b.kx-f[0]*0.3,y:b.ky-f[1]*0.3,h,bay:true}; } return null; }
-function fastTravel(dp){ const s=truck; if(Math.abs(s.v)>0.3){ flash('Fast travel: stop the truck first'); return false; } if(typeof BREAKDOWN!=='undefined'&&BREAKDOWN.active){ flash('Fast travel unavailable while broken down'); return false; }
-  const p=ftSpot(dp); if(!p){ flash('Fast travel: no clear spot at '+dp.name); return false; }
+// generic: nearest clear straight road tile to a place, parked along the road
+function ftRoadSpot(mx,my){ const trl=truck.trl, tx=Math.floor(mx/M_T), ty=Math.floor(my/M_T), C=[];
+  const R=(x,y)=>inb(x,y)&&isRoadT(idx(x,y)); for(let dy=-130;dy<=130;dy++) for(let dx=-130;dx<=130;dx++){ const x=tx+dx,y=ty+dy; if(!R(x,y)) continue; const i=idx(x,y); let H=world.roadH[i]>=0, V=world.roadV[i]>=0; if(H===V){ H=R(x-1,y)&&R(x+1,y)&&R(x-2,y)&&R(x+2,y); V=R(x,y-1)&&R(x,y+1)&&R(x,y-2)&&R(x,y+2); if(H===V) continue; } C.push([dx*dx+dy*dy,x,y,H]); }
+  C.sort((a,b)=>a[0]-b[0]);
+  for(const [,x,y,H] of C){ const cx=(x+0.5)*M_T, cy=(y+0.5)*M_T; for(const h of H?[Math.PI/2,-Math.PI/2]:[0,Math.PI]){ if(ftClear(cx,cy,h,trl)) return {x:cx,y:cy,h}; } } return null; }
+function ftFee(o){ const e=o.entrance||o, km=Math.hypot(e.x-truck.x,e.y-truck.y)/1000; return Math.round(25+8*km); }
+// rules: stopped, not broken down, not carrying a job's cargo (deliver/unloading/recouple), can afford the fee
+function ftBlock(o){ const s=truck; if(Math.abs(s.v)>0.3) return 'Fast travel: stop the truck first'; if(typeof BREAKDOWN!=='undefined'&&BREAKDOWN.active) return 'Fast travel unavailable while broken down';
+  const a=typeof career!=='undefined'&&career.active; if(a&&(a.phase==='deliver'||a.phase==='unloading'||a.phase==='recouple')) return 'No fast travel while delivering a load \u2014 drive it there or cancel the job';
+  const f=ftFee(o); if(s.money<f) return 'Fast travel costs \u00a3'+f+' \u2014 not enough money'; return null; }
+function fastTravel(dp){ const s=truck; const why=ftBlock(dp); if(why){ flash(why); return false; }
+  const e=dp.entrance||dp, p=(dp.bays&&dp.x!==undefined)?ftSpot(dp):ftRoadSpot(e.x,e.y); if(!p){ flash('Fast travel: no clear spot at '+dp.name); return false; }
+  const fee=ftFee(dp);
   const fr=document.getElementById('frame')||document.body; let ov=document.getElementById('ftfade'); if(!ov){ ov=document.createElement('div'); ov.id='ftfade'; ov.style.cssText='position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .28s;z-index:50'; fr.appendChild(ov); }
   ov.style.opacity='1'; if(typeof closeMap==='function') closeMap();
-  setTimeout(()=>{ s.x=p.x; s.y=p.y; s.h=p.h; cam.x=p.x*PPM; cam.y=p.y*PPM; s.th=p.h; s.v=0; s.steer=0; if(s.vx!==undefined){ s.vx=0; s.vy=0; } if(s.av!==undefined) s.av=0;
+  setTimeout(()=>{ s.x=p.x; s.y=p.y; s.h=p.h; cam.x=p.x*PPM; cam.y=p.y*PPM; s.th=p.h; s.v=0; s.steer=0; if(s.vx!==undefined){ s.vx=0; s.vy=0; } if(s.av!==undefined) s.av=0; s.money-=fee;
     if(NAV.route&&NAV.route.target){ const t=NAV.route.target; setRoute(t.ref||{x:t.x,y:t.y,name:t.name}); }
-    flash('Fast travelled to '+dp.name+(p.bay?' (parked at a bay)':'')); BigRig.emit('fastTravel',{depot:dp.id}); setTimeout(()=>ov.style.opacity='0',60); },300); return true; }
+    flash('Fast travelled to '+dp.name+' (\u00a3'+fee+')'+(p.bay?' \u2014 parked at a bay':'')); BigRig.emit('fastTravel',{depot:dp.id,name:dp.name,x:p.x,y:p.y,fee}); setTimeout(()=>ov.style.opacity='0',60); },300); return true; }
 BigRig.fastTravel=fastTravel;
 // tooltip button hit-boxes (set when drawn)
 let FT_BTN=null, NAV_BTN=null;

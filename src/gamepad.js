@@ -35,7 +35,7 @@ function padUpdate(dt){
     if(Math.abs(lx)+Math.abs(ly)>0){ bigmap.cx+=lx*dt*420/bigmap.z; bigmap.cy+=ly*dt*420/bigmap.z; if(typeof mapClamp==='function') mapClamp(); }
     const zin=rt+(now[5]?0.8:0), zout=lt+(now[4]?0.8:0); if(zin>0.05) mapZoomTo(bigmap.zt*Math.pow(2.4,zin*dt)); if(zout>0.05) mapZoomTo(bigmap.zt/Math.pow(2.4,zout*dt));
     if(NAV.sel&&hit(0)){ const d=NAV.sel.o; NAV.sel=null; fastTravel(d); return; } if(NAV.sel&&hit(2)){ const sel=NAV.sel; NAV.sel=null; const r=setRoute(sel.o); if(r) flash('Sat nav to '+sel.name+': '+fmtD(r.len)); return; }
-    if(hit(0)){ const cx=VW/2, cy=VH/2+10; const poi=navPOIAt(cx,cy,mBX,mBY); if(poi&&poi.kind==='Depot'){ NAV.sel=poi; return; } if(poi){ const r=setRoute(poi.o); if(r) flash('Sat nav to '+poi.name+': '+fmtD(r.len)); } else routeToMapPoint(cx,cy); }
+    if(hit(0)){ const cx=VW/2, cy=VH/2+10; const poi=navPOIAt(cx,cy,mBX,mBY); if(poi){ NAV.sel=poi; return; } else routeToMapPoint(cx,cy); }
     if(hit(3)&&typeof mapCentreTruck==='function') mapCentreTruck();
     if(hit(1)||hit(8)) closeMap(); if(hit(9)){ closeMap(); openBoard(); }
     return; }

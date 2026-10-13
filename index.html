@@ -2377,8 +2377,8 @@ function drawFuelHUD(){
     ctx.save(); ctx.font='bold 16px system-ui,sans-serif'; ctx.textAlign='center'; const tw=ctx.measureText(text).width+30; ctx.fillStyle='rgba(8,12,20,0.75)'; ctx.fillRect(VW/2-tw/2,VH-170,tw,30); ctx.fillStyle='#7dff9a'; ctx.fillText(text,VW/2,VH-149); ctx.restore(); }
 }
 // minimap / big-map icons for depots, petrol stations and repair garages
-function drawPOIs(px,py,big){
-  const icon=(X,Y,col,ch)=>{ ctx.fillStyle=col; ctx.strokeStyle='#000'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(X,Y,big?7:5.5,0,7); ctx.fill(); ctx.stroke(); ctx.fillStyle='#fff'; ctx.font=`bold ${big?9:8}px system-ui,sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(ch,X,Y+0.5); };
+function drawPOIs(px,py,big,R){ const rr=R||(big?7:5.5);
+  const icon=(X,Y,col,ch)=>{ ctx.fillStyle=col; ctx.strokeStyle='#000'; ctx.lineWidth=R?Math.max(1.5,rr*0.18):1.5; ctx.beginPath(); ctx.arc(X,Y,rr,0,7); ctx.fill(); ctx.stroke(); ctx.fillStyle='#fff'; ctx.font=`bold ${Math.round(rr*1.25)}px system-ui,sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(ch,X,Y+0.5); };
   for(const d of world.depots) icon(px(d.entrance.x),py(d.entrance.y),'#2f7fe0','D');
   for(const f of world.fuel) icon(px(f.x),py(f.y),'#25a244','F');
   for(const g of world.garages) icon(px(g.x),py(g.y),'#e67e22','G');
@@ -3150,8 +3150,13 @@ function drawNavHUD(){ const R=NAV.route; if(!R) return; const {x,y,w,h}=NAVP; c
   ctx.restore(); }
 function navPanelClick(x,y){ if(NAV.route&&x>=NAVP.x+NAVP.w-30&&x<=NAVP.x+NAVP.w-8&&y>=NAVP.y+8&&y<=NAVP.y+30){ clearRoute(); flash('Route cancelled'); return true; } return false; }
 // big-map icon hit test
-function navPOIAt(x,y,BX,BY){ let best=null,bd=11; const test=(o,mx,my,kind)=>{ const d=Math.hypot(BX(mx/M_T)-x,BY(my/M_T)-y); if(d<bd){ bd=d; best={o,kind,name:o.name}; } };
-  for(const d of world.depots) test(d,d.entrance.x,d.entrance.y,'Depot'); for(const f of world.fuel) test(f,f.x,f.y,'Fuel'); for(const g of world.garages) test(g,g.x,g.y,'Garage'); for(const m of world.malls||[]) test(m,m.entrance.x,m.entrance.y,m.kind==='mall'?'Mall':'Supermarket'); for(const d of world.dealers||[]) test(d,d.entrance.x,d.entrance.y,'Truck dealer'); return best; }
+// icon radius on the big map grows with zoom (canvas px), clamped
+function mapIconR(z){ return Math.max(7,Math.min(18,5+2.2*z)); }
+// hit radius: icon + margin, and at least ~44 CSS px across on touch screens
+function mapHitR(){ const r=mapIconR(bigmap.z)+5; if(!document.body.classList.contains('touch')) return Math.max(11,r); const cw=cv.getBoundingClientRect().width||VW; return Math.max(r,22*VW/cw); }
+let RAIL_POI=null; function railPOIs(){ if(typeof RAIL==='undefined'||!RAIL.ready) return []; if(!RAIL_POI||RAIL_POI.length!==RAIL.stations.length) RAIL_POI=RAIL.stations.map(st=>({name:st.name+(st.kind==='hub'?'':' station'),st,x:RAIL.X[st.s],y:RAIL.Y[st.s],entrance:{x:RAIL.X[st.s],y:RAIL.Y[st.s]}})); return RAIL_POI; }
+function navPOIAt(x,y,BX,BY){ let best=null,bd=mapHitR(); const test=(o,mx,my,kind)=>{ const d=Math.hypot(BX(mx/M_T)-x,BY(my/M_T)-y); if(d<bd){ bd=d; best={o,kind,name:o.name}; } }; for(const s of railPOIs()) test(s,s.x,s.y,'Station');
+  for(const d of world.depots) test(d,d.entrance.x,d.entrance.y,/Port/.test(d.name)?'Port':'Depot'); for(const f of world.fuel) test(f,f.x,f.y,'Fuel'); for(const g of world.garages) test(g,g.x,g.y,'Garage'); for(const m of world.malls||[]) test(m,m.entrance.x,m.entrance.y,m.kind==='mall'?'Mall':'Supermarket'); for(const d of world.dealers||[]) test(d,d.entrance.x,d.entrance.y,'Truck dealer'); return best; }
 BigRig.setRoute=setRoute; BigRig.clearRoute=clearRoute; BigRig.route=()=>NAV.route&&{target:NAV.route.target,length:NAV.route.len,remaining:NAV.route.len-NAV.route.cum[NAV.route.idx],turns:NAV.route.turns.length,reroutes:NAV.reroutes};
 BigRig._navDiag=function(target){ const N=MW*MH; const r=setRoute(target); if(r) return 'ok'; const gen=navGen; const A=i=>navStamp[i]===gen;
   const e=target.entrance||target, E=navSnap(e.x/M_T,e.y/M_T,70); const seen=new Uint8Array(N), s0=idx(E[0],E[1]); const q=[s0]; seen[s0]=1; let n=0;
@@ -3168,13 +3173,24 @@ function ftSpot(dp){ const trl=truck.trl, ex=dp.entrance.x, ey=dp.entrance.y, ca
   for(const [,x,y,h] of cands){ if(ftClear(x,y,h,trl)){ const f=fwd(h); if(trl){ const rx=x-f[0]*12.3, ry=y-f[1]*12.3; if(rx<dp.x*M_T||rx>(dp.x+dp.w)*M_T||ry<dp.y*M_T||ry>(dp.y+dp.h-5)*M_T) continue; } return {x,y,h}; } }
   // no room in the yard: line the trailer up in a free bay, cab facing out
   for(const b of dp.bays){ if(b.trailer) continue; const h=b.th||0, f=fwd(h); return {x:b.kx-f[0]*0.3,y:b.ky-f[1]*0.3,h,bay:true}; } return null; }
-function fastTravel(dp){ const s=truck; if(Math.abs(s.v)>0.3){ flash('Fast travel: stop the truck first'); return false; } if(typeof BREAKDOWN!=='undefined'&&BREAKDOWN.active){ flash('Fast travel unavailable while broken down'); return false; }
-  const p=ftSpot(dp); if(!p){ flash('Fast travel: no clear spot at '+dp.name); return false; }
+// generic: nearest clear straight road tile to a place, parked along the road
+function ftRoadSpot(mx,my){ const trl=truck.trl, tx=Math.floor(mx/M_T), ty=Math.floor(my/M_T), C=[];
+  const R=(x,y)=>inb(x,y)&&isRoadT(idx(x,y)); for(let dy=-130;dy<=130;dy++) for(let dx=-130;dx<=130;dx++){ const x=tx+dx,y=ty+dy; if(!R(x,y)) continue; const i=idx(x,y); let H=world.roadH[i]>=0, V=world.roadV[i]>=0; if(H===V){ H=R(x-1,y)&&R(x+1,y)&&R(x-2,y)&&R(x+2,y); V=R(x,y-1)&&R(x,y+1)&&R(x,y-2)&&R(x,y+2); if(H===V) continue; } C.push([dx*dx+dy*dy,x,y,H]); }
+  C.sort((a,b)=>a[0]-b[0]);
+  for(const [,x,y,H] of C){ const cx=(x+0.5)*M_T, cy=(y+0.5)*M_T; for(const h of H?[Math.PI/2,-Math.PI/2]:[0,Math.PI]){ if(ftClear(cx,cy,h,trl)) return {x:cx,y:cy,h}; } } return null; }
+function ftFee(o){ const e=o.entrance||o, km=Math.hypot(e.x-truck.x,e.y-truck.y)/1000; return Math.round(25+8*km); }
+// rules: stopped, not broken down, not carrying a job's cargo (deliver/unloading/recouple), can afford the fee
+function ftBlock(o){ const s=truck; if(Math.abs(s.v)>0.3) return 'Fast travel: stop the truck first'; if(typeof BREAKDOWN!=='undefined'&&BREAKDOWN.active) return 'Fast travel unavailable while broken down';
+  const a=typeof career!=='undefined'&&career.active; if(a&&(a.phase==='deliver'||a.phase==='unloading'||a.phase==='recouple')) return 'No fast travel while delivering a load \u2014 drive it there or cancel the job';
+  const f=ftFee(o); if(s.money<f) return 'Fast travel costs \u00a3'+f+' \u2014 not enough money'; return null; }
+function fastTravel(dp){ const s=truck; const why=ftBlock(dp); if(why){ flash(why); return false; }
+  const e=dp.entrance||dp, p=(dp.bays&&dp.x!==undefined)?ftSpot(dp):ftRoadSpot(e.x,e.y); if(!p){ flash('Fast travel: no clear spot at '+dp.name); return false; }
+  const fee=ftFee(dp);
   const fr=document.getElementById('frame')||document.body; let ov=document.getElementById('ftfade'); if(!ov){ ov=document.createElement('div'); ov.id='ftfade'; ov.style.cssText='position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .28s;z-index:50'; fr.appendChild(ov); }
   ov.style.opacity='1'; if(typeof closeMap==='function') closeMap();
-  setTimeout(()=>{ s.x=p.x; s.y=p.y; s.h=p.h; cam.x=p.x*PPM; cam.y=p.y*PPM; s.th=p.h; s.v=0; s.steer=0; if(s.vx!==undefined){ s.vx=0; s.vy=0; } if(s.av!==undefined) s.av=0;
+  setTimeout(()=>{ s.x=p.x; s.y=p.y; s.h=p.h; cam.x=p.x*PPM; cam.y=p.y*PPM; s.th=p.h; s.v=0; s.steer=0; if(s.vx!==undefined){ s.vx=0; s.vy=0; } if(s.av!==undefined) s.av=0; s.money-=fee;
     if(NAV.route&&NAV.route.target){ const t=NAV.route.target; setRoute(t.ref||{x:t.x,y:t.y,name:t.name}); }
-    flash('Fast travelled to '+dp.name+(p.bay?' (parked at a bay)':'')); BigRig.emit('fastTravel',{depot:dp.id}); setTimeout(()=>ov.style.opacity='0',60); },300); return true; }
+    flash('Fast travelled to '+dp.name+' (\u00a3'+fee+')'+(p.bay?' \u2014 parked at a bay':'')); BigRig.emit('fastTravel',{depot:dp.id,name:dp.name,x:p.x,y:p.y,fee}); setTimeout(()=>ov.style.opacity='0',60); },300); return true; }
 BigRig.fastTravel=fastTravel;
 // tooltip button hit-boxes (set when drawn)
 let FT_BTN=null, NAV_BTN=null;
@@ -3216,7 +3232,7 @@ function padUpdate(dt){
     if(Math.abs(lx)+Math.abs(ly)>0){ bigmap.cx+=lx*dt*420/bigmap.z; bigmap.cy+=ly*dt*420/bigmap.z; if(typeof mapClamp==='function') mapClamp(); }
     const zin=rt+(now[5]?0.8:0), zout=lt+(now[4]?0.8:0); if(zin>0.05) mapZoomTo(bigmap.zt*Math.pow(2.4,zin*dt)); if(zout>0.05) mapZoomTo(bigmap.zt/Math.pow(2.4,zout*dt));
     if(NAV.sel&&hit(0)){ const d=NAV.sel.o; NAV.sel=null; fastTravel(d); return; } if(NAV.sel&&hit(2)){ const sel=NAV.sel; NAV.sel=null; const r=setRoute(sel.o); if(r) flash('Sat nav to '+sel.name+': '+fmtD(r.len)); return; }
-    if(hit(0)){ const cx=VW/2, cy=VH/2+10; const poi=navPOIAt(cx,cy,mBX,mBY); if(poi&&poi.kind==='Depot'){ NAV.sel=poi; return; } if(poi){ const r=setRoute(poi.o); if(r) flash('Sat nav to '+poi.name+': '+fmtD(r.len)); } else routeToMapPoint(cx,cy); }
+    if(hit(0)){ const cx=VW/2, cy=VH/2+10; const poi=navPOIAt(cx,cy,mBX,mBY); if(poi){ NAV.sel=poi; return; } else routeToMapPoint(cx,cy); }
     if(hit(3)&&typeof mapCentreTruck==='function') mapCentreTruck();
     if(hit(1)||hit(8)) closeMap(); if(hit(9)){ closeMap(); openBoard(); }
     return; }
@@ -3281,6 +3297,7 @@ function mpOnMsg(raw,from){ let m; try{ m=typeof raw==='string'?JSON.parse(raw):
   if(m.t==='welcome'){ MP.myId=m.id; for(const p of m.roster) if(p.id!==MP.myId){ MP.players[p.id]=MP.players[p.id]||mpNewPlayer(p.id,p.n); MP.players[p.id].n=p.n; } for(const d of m.drops||[]) mpApplyDrop(d); mpToast('Connected to '+MP.code+' \u2022 '+m.roster.length+' players'); mpRender(); BigRig.emit('mpJoined',{id:m.id}); return; }
   if(m.t==='join'){ if(m.id!==MP.myId){ MP.players[m.id]=MP.players[m.id]||mpNewPlayer(m.id,m.n); MP.players[m.id].n=m.n; mpToast('\u{1F69A} '+m.n+' joined'); mpRender(); } return; }
   if(m.t==='clock'){ if(!MP.host&&typeof m.g==='number'){ gameT=m.g; if(typeof m.d==='number') gameDay=m.d; if(m.w) WX.st=m.w; } return; }
+  if(m.t==='ft'){ if(MP.host&&from){ m.id=from; mpSendAll(m,from); } const p=MP.players[m.id]; if(p){ p.buf=p.buf.filter(q=>q[2]>=m.ts); p.has=false; } return; }
   if(m.t==='leave'){ mpPlayerGone(m.id); return; }
   if(m.t==='drop'){ if(MP.host&&from){ m.id=from; mpSendAll(m,from); } const p=MP.players[m.id]; if(p){ p.dropT=m.ts; if(p.held===m.gid) p.held=0; } mpApplyDrop(m); return; }
   if(m.t==='chat'){ if(MP.host&&from){ m.id=from; m.n=(MP.players[from]||{}).n||'?'; mpSendAll(m,from); } mpChatLine(m.n,String(m.x).slice(0,140)); return; }
@@ -3405,6 +3422,9 @@ function mpRender(){ const pl=document.getElementById('mplist'), bd=document.get
 setInterval(()=>{ if(MP.on&&MP.listOpen) mpRender(); },1000);
 function mpChatSend(t){ t=String(t||'').trim().slice(0,140); if(!t||!MP.on) return; mpSend({t:'chat',id:MP.myId,n:MP.name,x:t}); mpChatLine(MP.name,t); }
 function mpChatLine(n,t){ const L=document.getElementById('mpLines'); if(!L) return; const d=document.createElement('div'); d.className='l'; d.innerHTML='<b>'+esc(n)+':</b> '+esc(t); L.appendChild(d); MP.chat.push([n,t]); while(L.children.length>5) L.firstChild.remove(); setTimeout(()=>{ d.style.transition='opacity .6s'; d.style.opacity='0'; setTimeout(()=>d.remove(),700); },12000); }
+
+// fast travel: tell peers to snap (not glide) the truck to its new spot
+BigRig.on('fastTravel',()=>{ if(!MP.on) return; mpSend({t:'ft',id:MP.myId,ts:Math.round(performance.now())}); mpSend(mpSelfPose(),true); });
 
 'use strict';
 // ===================== v11 MOBILE: landscape thumb layout (controls in side gutters, never over the HUD) + portrait handheld deck =====================
@@ -4082,11 +4102,11 @@ function railDrawCrossing(c,t){ const S=PPM, flash=c.lit?((t*1.6)%1<0.5?0:1):-1;
 // ---------- maps
 function railMinimap(){ if(!RAIL.ready||!MINIMAP) return; const g=MINIMAP.getContext('2d'); g.fillStyle='#4a3f38'; for(let s=0;s<RAIL.L;s+=2){ g.fillRect(Math.floor(RAIL.X[s]/M_T),Math.floor(RAIL.Y[s]/M_T),1,1); }
   g.fillStyle='#ffffff'; for(const st of RAIL.stations){ g.fillRect(Math.floor(RAIL.X[st.s]/M_T)-1,Math.floor(RAIL.Y[st.s]/M_T)-1,3,3); } }
-function railBigMap(BX,BY,z){ if(!RAIL.ready) return; ctx.save(); ctx.lineWidth=Math.max(2,z*1.2); ctx.strokeStyle='rgba(40,30,25,0.9)'; ctx.setLineDash([]); ctx.beginPath(); for(let s=0;s<=RAIL.L;s+=8){ const i=s%RAIL.L, x=BX(RAIL.X[i]/M_T), y=BY(RAIL.Y[i]/M_T); s?ctx.lineTo(x,y):ctx.moveTo(x,y); } ctx.stroke();
+function railBigMap(BX,BY,z,R){ R=R||5; if(!RAIL.ready) return; ctx.save(); ctx.lineWidth=Math.max(2,z*1.2); ctx.strokeStyle='rgba(40,30,25,0.9)'; ctx.setLineDash([]); ctx.beginPath(); for(let s=0;s<=RAIL.L;s+=8){ const i=s%RAIL.L, x=BX(RAIL.X[i]/M_T), y=BY(RAIL.Y[i]/M_T); s?ctx.lineTo(x,y):ctx.moveTo(x,y); } ctx.stroke();
   ctx.strokeStyle='rgba(255,255,255,0.85)'; ctx.lineWidth=Math.max(1,z*0.5); ctx.setLineDash([6,6]); ctx.stroke(); ctx.setLineDash([]);
   const t=railTime(); for(const tr of RAIL.trains){ const h=railHead(tr,t); ctx.fillStyle=tr.pax?'#4fd1ff':'#ff9f1a'; ctx.beginPath(); ctx.arc(BX(RAIL.X[Math.floor(h)]/M_T),BY(RAIL.Y[Math.floor(h)]/M_T),4,0,7); ctx.fill(); }
-  for(const st of RAIL.stations){ const x=BX(RAIL.X[st.s]/M_T), y=BY(RAIL.Y[st.s]/M_T); ctx.fillStyle='#fff'; ctx.strokeStyle='#16335c'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,st.kind==='hub'?6:4,0,7); ctx.fill(); ctx.stroke();
-    if(z>0.9){ ctx.font='600 11px system-ui,sans-serif'; ctx.textAlign='left'; ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.strokeText('\u{1F686} '+st.name,x+8,y+4); ctx.fillStyle='#d9ecff'; ctx.fillText('\u{1F686} '+st.name,x+8,y+4); } }
+  for(const st of RAIL.stations){ const x=BX(RAIL.X[st.s]/M_T), y=BY(RAIL.Y[st.s]/M_T); ctx.fillStyle='#fff'; ctx.strokeStyle='#16335c'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,st.kind==='hub'?R:R*0.75,0,7); ctx.fill(); ctx.stroke(); if(R>=9){ ctx.fillStyle='#16335c'; ctx.font='bold '+Math.round(R*0.95)+'px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(st.kind==='hub'?'H':'R',x,y+0.5); ctx.textBaseline='alphabetic'; }
+    if(z>0.9) mapLabel('\u{1F686} '+st.name,x+R*0.75+4,y,'#d9ecff'); }
   ctx.restore(); }
 
 // ---------- day / night cycle (game clock) ----------
@@ -4451,11 +4471,12 @@ function drawBigMap(){
   const BX=t=>VW/2+(t-bigmap.cx)*z, BY=t=>VH/2+10+(t-bigmap.cy)*z;
   if(z>0.8) for(const v of traffic.vs){ ctx.fillStyle=v.heavy?'#ff9f1a':'#fff'; ctx.fillRect(BX(v.x/4)-1.5,BY(v.y/4)-1.5,3,3); }
   for(const t of world.trailers){ if(t.coupled) continue; if(z<0.8&&!t.target) continue; ctx.fillStyle=t.target?'#ffd600':'#4fd1ff'; ctx.fillRect(BX(t.x/4)-2,BY(t.y/4)-2,4,4); }
-  railBigMap(BX,BY,z);
+  const IR=mapIconR(z); MAPLBL.length=0; railBigMap(BX,BY,z,IR);
   navLine(m=>BX(m/4),m=>BY(m/4),4,'#ff3df0');
-  drawPOIs(m=>BX(m/4),m=>BY(m/4),z>0.6);
+  drawPOIs(m=>BX(m/4),m=>BY(m/4),z>0.6,IR);
   mpDrawMap(m=>BX(m/4),m=>BY(m/4),true);
-  if(z>1.2) for(const dp of world.depots){ ctx.fillStyle='#8fc8ff'; ctx.font='bold 11px system-ui,sans-serif'; ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.textAlign='left'; const X=BX(dp.entrance.x/4)+9, Y=BY(dp.entrance.y/4)+4; ctx.strokeText(dp.name,X,Y); ctx.fillText(dp.name,X,Y); }
+  if(z>1.2) for(const dp of world.depots) mapLabel(dp.name,BX(dp.entrance.x/4)+IR+4,BY(dp.entrance.y/4),'#8fc8ff',true);
+  if(z>=4){ for(const f of world.fuel) mapLabel(f.name,BX(f.x/4)+IR+4,BY(f.y/4),'#9be7a8'); for(const g of world.garages) mapLabel(g.name,BX(g.x/4)+IR+4,BY(g.y/4),'#ffc58a'); for(const m of world.malls||[]) mapLabel(m.name,BX(m.entrance.x/4)+IR+4,BY(m.entrance.y/4),'#ff9cc0'); for(const d of world.dealers||[]) mapLabel(d.name,BX(d.entrance.x/4)+IR+4,BY(d.entrance.y/4),'#d6a8f0'); }
   for(const S of world.susp||[]){ const p=(u,v)=>S.dir==='h'?[BX(u),BY(v)]:[BX(v),BY(u)], c=S.a+S.w/2, a=p(S.r0,c), b=p(S.r1,c); ctx.save(); ctx.strokeStyle='#e0603f'; ctx.lineWidth=Math.max(2,z*2.5); ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
     for(const t of [S.t0,S.t1]){ const q=p(t,c); ctx.fillStyle='#c4402b'; ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.fillRect(q[0]-4,q[1]-4,8,8); ctx.strokeRect(q[0]-4,q[1]-4,8,8); } ctx.restore(); }
   ctx.textAlign='center'; ctx.textBaseline='middle';
@@ -4470,25 +4491,29 @@ function drawBigMap(){
     ctx.fillStyle='rgba(255,221,51,0.25)'; ctx.beginPath(); ctx.arc(lx,ly,14,0,7); ctx.fill(); }
   ctx.translate(lx,ly); ctx.rotate(truck.h); const k=1.5+0.12*Math.sin(timeS*6); ctx.fillStyle='#ffdd33'; ctx.strokeStyle='#000'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(0,-11*k); ctx.lineTo(7.5*k,8*k); ctx.lineTo(0,4*k); ctx.lineTo(-7.5*k,8*k); ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.restore();
-  FT_BTN=NAV_BTN=null; if(NAV.sel&&NAV.sel.kind==='Depot'){ const hv=NAV.sel, X=mBX(hv.o.entrance.x/M_T), Y=mBY(hv.o.entrance.y/M_T); ctx.font='bold 13px system-ui,sans-serif'; const tw=Math.max(200,ctx.measureText(hv.name).width+20), tx=Math.max(24,Math.min(VW-tw-24,X+14)), ty=Math.max(50,Math.min(VH-90,Y-30));
-    ctx.fillStyle='rgba(10,14,22,0.95)'; ctx.fillRect(tx,ty,tw,66); ctx.strokeStyle='#f5b82e'; ctx.lineWidth=1.5; ctx.strokeRect(tx,ty,tw,66); ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText('Depot: '+hv.name,tx+10,ty+19);
-    const pad2=typeof pad!=='undefined'&&pad.active; NAV_BTN=[tx+10,ty+30,(tw-30)/2,26]; FT_BTN=[tx+20+(tw-30)/2,ty+30,(tw-30)/2,26];
-    for(const [b,l,c] of [[NAV_BTN,(pad2?'X ':'')+'Sat nav','#2e86de'],[FT_BTN,(pad2?'A ':'')+'Fast travel','#27ae60']]){ ctx.fillStyle=c; ctx.beginPath(); ctx.roundRect?ctx.roundRect(b[0],b[1],b[2],b[3],6):ctx.rect(b[0],b[1],b[2],b[3]); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='bold 12px system-ui,sans-serif'; ctx.textAlign='center'; ctx.fillText(l,b[0]+b[2]/2,b[1]+17); } ctx.textAlign='left'; }
-  if(NAV.hover&&!(NAV.sel&&NAV.sel.o===NAV.hover.o)){ const hv=NAV.hover, t=hv.kind+': '+hv.name+(hv.kind==='Depot'?'  (click: sat nav / fast travel)':'  (click for sat nav)'); ctx.font='bold 12px system-ui,sans-serif'; const tw=ctx.measureText(t).width; const tx=Math.min(VW-tw-30,NAV.hx+14), ty=NAV.hy-12; ctx.fillStyle='rgba(10,14,22,0.92)'; ctx.fillRect(tx-6,ty-14,tw+12,22); ctx.strokeStyle='#f5b82e'; ctx.strokeRect(tx-6,ty-14,tw+12,22); ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.fillText(t,tx,ty+1); }
+  FT_BTN=NAV_BTN=null; if(NAV.sel){ const hv=NAV.sel, e=hv.o.entrance||hv.o, X=mBX(e.x/M_T), Y=mBY(e.y/M_T), tch=document.body.classList.contains('touch'), bh=tch?40:26, H=bh+56; ctx.font='bold 13px system-ui,sans-serif'; const t1=hv.kind+': '+hv.name, why=ftBlock(hv.o), t2=why?why.replace(/^Fast travel:? ?/,''):'Fast travel fee \u00a3'+ftFee(hv.o); const tw=Math.min(VW-48,Math.max(230,ctx.measureText(t1).width+20)), tx=Math.max(24,Math.min(VW-tw-24,X+16)), ty=Math.max(50,Math.min(VH-H-30,Y-H/2));
+    ctx.fillStyle='rgba(10,14,22,0.95)'; ctx.fillRect(tx,ty,tw,H); ctx.strokeStyle='#f5b82e'; ctx.lineWidth=1.5; ctx.strokeRect(tx,ty,tw,H); ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText(t1,tx+10,ty+19,tw-20); ctx.font='11px system-ui,sans-serif'; ctx.fillStyle=why?'#ffb020':'#9be7a8'; ctx.fillText(t2,tx+10,ty+36,tw-20);
+    const pad2=typeof pad!=='undefined'&&pad.active; NAV_BTN=[tx+10,ty+46,(tw-30)/2,bh]; FT_BTN=[tx+20+(tw-30)/2,ty+46,(tw-30)/2,bh];
+    for(const [b,l,c] of [[NAV_BTN,(pad2?'X ':'')+'Sat nav','#2e86de'],[FT_BTN,(pad2?'A ':'')+'Fast travel','#27ae60']]){ ctx.fillStyle=c; ctx.beginPath(); ctx.roundRect?ctx.roundRect(b[0],b[1],b[2],b[3],6):ctx.rect(b[0],b[1],b[2],b[3]); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='bold 12px system-ui,sans-serif'; ctx.textAlign='center'; ctx.fillText(l,b[0]+b[2]/2,b[1]+b[3]/2+4); } ctx.textAlign='left'; }
+  if(NAV.hover&&!(NAV.sel&&NAV.sel.o===NAV.hover.o)){ const hv=NAV.hover, t=hv.kind+': '+hv.name+'  (click: sat nav / fast travel)'; ctx.font='bold 12px system-ui,sans-serif'; const tw=ctx.measureText(t).width; const tx=Math.min(VW-tw-30,NAV.hx+14), ty=NAV.hy-12; ctx.fillStyle='rgba(10,14,22,0.92)'; ctx.fillRect(tx-6,ty-14,tw+12,22); ctx.strokeStyle='#f5b82e'; ctx.strokeRect(tx-6,ty-14,tw+12,22); ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.fillText(t,tx,ty+1); }
   ctx.fillStyle='#f5b82e'; ctx.font='bold 18px system-ui,sans-serif'; ctx.textAlign='left'; ctx.fillText('WORLD MAP',24,28); ctx.font='11px system-ui,sans-serif'; ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.fillText('1 km ≈ '+Math.round(250*bigmap.z)+' px',150,28);
   // buttons
   ctx.textAlign='center'; ctx.textBaseline='middle'; MAPBTN.forEach(([t],i)=>{ const [bx,by,bw,bh]=mapBtnRect(i); ctx.fillStyle='rgba(12,18,28,0.85)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(bx,by,bw,bh,8):ctx.rect(bx,by,bw,bh); ctx.fill(); ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.lineWidth=1; ctx.stroke(); ctx.fillStyle='#fff'; ctx.font='bold 22px system-ui,sans-serif'; ctx.fillText(t,bx+bw/2,by+bh/2+1); });
   // legend
-  { if(bigmap.leg===undefined) bigmap.leg=!PORTRAIT_SQ; const items=[['#2e86de','D','Depot'],['#27ae60','F','Fuel'],['#e67e22','G','Garage'],['#d6336c','S','Mall / shop'],['#8e44ad','$','Dealer'],['#ffdd33','\u25B2','Your lorry']];
+  { if(bigmap.leg===undefined) bigmap.leg=!PORTRAIT_SQ; const items=[['#2e86de','D','Depot'],['#27ae60','F','Fuel'],['#e67e22','G','Garage'],['#d6336c','S','Mall / shop'],['#8e44ad','$','Dealer'],['#ffffff','R','Station'],['#ffdd33','\u25B2','Your lorry']];
     const lx0=28, w=bigmap.leg?196:92, h=bigmap.leg?24+Math.ceil(items.length/2)*17+4:24, ly0=VH-28-h; LEG_BTN=[lx0,ly0,w,h];
     ctx.fillStyle='rgba(12,18,28,0.88)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(lx0,ly0,w,h,8):ctx.rect(lx0,ly0,w,h); ctx.fill(); ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1; ctx.stroke();
     ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.font='bold 11px system-ui,sans-serif'; ctx.fillStyle='#f5b82e'; ctx.fillText('LEGEND '+(bigmap.leg?'\u25BE':'\u25B8'),lx0+10,ly0+12);
-    if(bigmap.leg) items.forEach(([c,l,n],i)=>{ const x=lx0+10+(i%2)*92, y=ly0+32+((i/2)|0)*17; ctx.fillStyle=c; ctx.beginPath(); ctx.arc(x+6,y,6,0,7); ctx.fill(); ctx.fillStyle=i===5?'#000':'#fff'; ctx.font='bold 9px system-ui'; ctx.textAlign='center'; ctx.fillText(l,x+6,y+0.5); ctx.textAlign='left'; ctx.font='11px system-ui,sans-serif'; ctx.fillStyle='#e8eef5'; ctx.fillText(n,x+16,y); }); }
+    if(bigmap.leg) items.forEach(([c,l,n],i)=>{ const dark=c==='#ffdd33'||c==='#ffffff'; const x=lx0+10+(i%2)*92, y=ly0+32+((i/2)|0)*17; ctx.fillStyle=c; ctx.beginPath(); ctx.arc(x+6,y,6,0,7); ctx.fill(); ctx.fillStyle=dark?'#000':'#fff'; ctx.font='bold 9px system-ui'; ctx.textAlign='center'; ctx.fillText(l,x+6,y+0.5); ctx.textAlign='left'; ctx.font='11px system-ui,sans-serif'; ctx.fillStyle='#e8eef5'; ctx.fillText(n,x+16,y); }); }
   ctx.textBaseline='alphabetic';
-  ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='12px system-ui,sans-serif'; ctx.textAlign='right'; { const R=VW-(document.body.classList.contains('touch')?24:150), L=270; let t='drag to pan \u00b7 wheel or +/\u2212 to zoom \u00b7 click icon = sat nav \u00b7 right-click/hold = route to point \u00b7 Home = centre'; for(const alt of ['drag to pan \u00b7 +/\u2212 zoom \u00b7 tap icon = sat nav \u00b7 hold = route','drag \u00b7 +/\u2212 zoom \u00b7 tap icon = sat nav']) if(ctx.measureText(t).width>R-L) t=alt; if(ctx.measureText(t).width<=R-L) ctx.fillText(t,R,28); }
+  ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='12px system-ui,sans-serif'; ctx.textAlign='right'; { const R=VW-(document.body.classList.contains('touch')?24:150), L=270; let t='drag to pan \u00b7 wheel or +/\u2212 to zoom \u00b7 click icon = sat nav \u00b7 right-click/hold = route to point \u00b7 Home = centre'; for(const alt of ['drag to pan \u00b7 +/\u2212 zoom \u00b7 tap icon = sat nav / travel \u00b7 hold = route','drag \u00b7 +/\u2212 zoom \u00b7 tap icon = sat nav / travel']) if(ctx.measureText(t).width>R-L) t=alt; if(ctx.measureText(t).width<=R-L) ctx.fillText(t,R,28); }
   ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.strokeRect(20.5,40.5,VW-41,VH-61);
 }
 let LEG_BTN=null;
+// big-map labels with simple collision avoidance (skips any label that would overlap one already drawn this frame)
+const MAPLBL=[]; function mapLabel(t,x,y,col,bold){ if(!t) return false; ctx.font=(bold?'bold ':'600 ')+'11px system-ui,sans-serif'; const w=ctx.measureText(t).width, r=[x-2,y-8,w+4,16];
+  for(const q of MAPLBL) if(r[0]<q[0]+q[2]&&q[0]<r[0]+r[2]&&r[1]<q[1]+q[3]&&q[1]<r[1]+r[3]) return false; MAPLBL.push(r);
+  ctx.save(); ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.strokeText(t,x,y); ctx.fillStyle=col; ctx.fillText(t,x,y); ctx.restore(); return true; }
 function canvasPos(e){ const r=cv.getBoundingClientRect(); return [(e.clientX-r.left)*VW/r.width,(e.clientY-r.top)*VH/r.height]; }
 let downAt=null;
 cv.addEventListener('pointerdown',e=>{ const [x,y]=canvasPos(e); downAt=[x,y,performance.now()];
@@ -4497,7 +4522,7 @@ cv.addEventListener('pointermove',e=>{ if(bigmap.open&&!bigmap.drag){ const [x,y
 cv.addEventListener('pointerup',e=>{ const [x,y]=canvasPos(e); const click=downAt&&Math.hypot(x-downAt[0],y-downAt[1])<6&&performance.now()-downAt[2]<400; bigmap.drag=null;
   if(bigmap.lp){ clearTimeout(bigmap.lp); bigmap.lp=null; }
   if(click){ if(!bigmap.open&&navPanelClick(x,y)) return; if(bigmap.open){ let hitB=false; MAPBTN.forEach((b,i)=>{ const [bx,by,bw,bh]=mapBtnRect(i); if(x>=bx&&x<=bx+bw&&y>=by&&y<=by+bh) hitB=true; }); const inB=b=>b&&x>=b[0]&&x<=b[0]+b[2]&&y>=b[1]&&y<=b[1]+b[3]; if(NAV.sel&&inB(FT_BTN)){ const d=NAV.sel.o; NAV.sel=null; fastTravel(d); return; } if(NAV.sel&&inB(NAV_BTN)){ const sel=NAV.sel; NAV.sel=null; const r=setRoute(sel.o); if(r) flash('Sat nav to '+sel.name+': '+fmtD(r.len)); return; }
-      const poi=hitB?null:navPOIAt(x,y,mBX,mBY); NAV.sel=null; if(poi&&poi.kind==='Depot'){ NAV.sel=poi; } else if(poi){ const r=setRoute(poi.o); if(r) flash('Sat nav to '+poi.name+': '+fmtD(r.len)); } MAPBTN.forEach(([t,f],i)=>{ const [bx,by,bw,bh]=mapBtnRect(i); if(x>=bx&&x<=bx+bw&&y>=by&&y<=by+bh) f(); }); } else if(x>=MM.x&&x<=MM.x+MM.w&&y>=MM.y&&y<=MM.y+MM.h) openMap(); } });
+      const poi=hitB?null:navPOIAt(x,y,mBX,mBY); const was=NAV.sel; NAV.sel=null; if(poi) NAV.sel=poi; else if(was) hitB=true; MAPBTN.forEach(([t,f],i)=>{ const [bx,by,bw,bh]=mapBtnRect(i); if(x>=bx&&x<=bx+bw&&y>=by&&y<=by+bh) f(); }); } else if(x>=MM.x&&x<=MM.x+MM.w&&y>=MM.y&&y<=MM.y+MM.h) openMap(); } });
 cv.addEventListener('wheel',e=>{ if(!bigmap.open) return; e.preventDefault(); const [mx,my]=canvasPos(e); mapZoomTo((bigmap.zt||bigmap.z)*Math.exp(-e.deltaY*0.0018),mx,my); },{passive:false});
 addEventListener('keydown',e=>{ if(bigmap.open&&NAV.sel&&(e.code==='Enter'||e.code==='Space')){ const d=NAV.sel.o; NAV.sel=null; fastTravel(d); e.preventDefault(); return; }
   if(e.code==='KeyM'){ bigmap.open?closeMap():openMap(); } if(e.code==='Escape') closeMap();

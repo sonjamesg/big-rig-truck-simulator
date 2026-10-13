@@ -287,9 +287,9 @@ function railDrawCrossing(c,t){ const S=PPM, flash=c.lit?((t*1.6)%1<0.5?0:1):-1;
 // ---------- maps
 function railMinimap(){ if(!RAIL.ready||!MINIMAP) return; const g=MINIMAP.getContext('2d'); g.fillStyle='#4a3f38'; for(let s=0;s<RAIL.L;s+=2){ g.fillRect(Math.floor(RAIL.X[s]/M_T),Math.floor(RAIL.Y[s]/M_T),1,1); }
   g.fillStyle='#ffffff'; for(const st of RAIL.stations){ g.fillRect(Math.floor(RAIL.X[st.s]/M_T)-1,Math.floor(RAIL.Y[st.s]/M_T)-1,3,3); } }
-function railBigMap(BX,BY,z){ if(!RAIL.ready) return; ctx.save(); ctx.lineWidth=Math.max(2,z*1.2); ctx.strokeStyle='rgba(40,30,25,0.9)'; ctx.setLineDash([]); ctx.beginPath(); for(let s=0;s<=RAIL.L;s+=8){ const i=s%RAIL.L, x=BX(RAIL.X[i]/M_T), y=BY(RAIL.Y[i]/M_T); s?ctx.lineTo(x,y):ctx.moveTo(x,y); } ctx.stroke();
+function railBigMap(BX,BY,z,R){ R=R||5; if(!RAIL.ready) return; ctx.save(); ctx.lineWidth=Math.max(2,z*1.2); ctx.strokeStyle='rgba(40,30,25,0.9)'; ctx.setLineDash([]); ctx.beginPath(); for(let s=0;s<=RAIL.L;s+=8){ const i=s%RAIL.L, x=BX(RAIL.X[i]/M_T), y=BY(RAIL.Y[i]/M_T); s?ctx.lineTo(x,y):ctx.moveTo(x,y); } ctx.stroke();
   ctx.strokeStyle='rgba(255,255,255,0.85)'; ctx.lineWidth=Math.max(1,z*0.5); ctx.setLineDash([6,6]); ctx.stroke(); ctx.setLineDash([]);
   const t=railTime(); for(const tr of RAIL.trains){ const h=railHead(tr,t); ctx.fillStyle=tr.pax?'#4fd1ff':'#ff9f1a'; ctx.beginPath(); ctx.arc(BX(RAIL.X[Math.floor(h)]/M_T),BY(RAIL.Y[Math.floor(h)]/M_T),4,0,7); ctx.fill(); }
-  for(const st of RAIL.stations){ const x=BX(RAIL.X[st.s]/M_T), y=BY(RAIL.Y[st.s]/M_T); ctx.fillStyle='#fff'; ctx.strokeStyle='#16335c'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,st.kind==='hub'?6:4,0,7); ctx.fill(); ctx.stroke();
-    if(z>0.9){ ctx.font='600 11px system-ui,sans-serif'; ctx.textAlign='left'; ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.strokeText('\u{1F686} '+st.name,x+8,y+4); ctx.fillStyle='#d9ecff'; ctx.fillText('\u{1F686} '+st.name,x+8,y+4); } }
+  for(const st of RAIL.stations){ const x=BX(RAIL.X[st.s]/M_T), y=BY(RAIL.Y[st.s]/M_T); ctx.fillStyle='#fff'; ctx.strokeStyle='#16335c'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,st.kind==='hub'?R:R*0.75,0,7); ctx.fill(); ctx.stroke(); if(R>=9){ ctx.fillStyle='#16335c'; ctx.font='bold '+Math.round(R*0.95)+'px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(st.kind==='hub'?'H':'R',x,y+0.5); ctx.textBaseline='alphabetic'; }
+    if(z>0.9) mapLabel('\u{1F686} '+st.name,x+R*0.75+4,y,'#d9ecff'); }
   ctx.restore(); }

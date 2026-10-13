@@ -21,6 +21,7 @@ function mpOnMsg(raw,from){ let m; try{ m=typeof raw==='string'?JSON.parse(raw):
   if(m.t==='welcome'){ MP.myId=m.id; for(const p of m.roster) if(p.id!==MP.myId){ MP.players[p.id]=MP.players[p.id]||mpNewPlayer(p.id,p.n); MP.players[p.id].n=p.n; } for(const d of m.drops||[]) mpApplyDrop(d); mpToast('Connected to '+MP.code+' \u2022 '+m.roster.length+' players'); mpRender(); BigRig.emit('mpJoined',{id:m.id}); return; }
   if(m.t==='join'){ if(m.id!==MP.myId){ MP.players[m.id]=MP.players[m.id]||mpNewPlayer(m.id,m.n); MP.players[m.id].n=m.n; mpToast('\u{1F69A} '+m.n+' joined'); mpRender(); } return; }
   if(m.t==='clock'){ if(!MP.host&&typeof m.g==='number'){ gameT=m.g; if(typeof m.d==='number') gameDay=m.d; if(m.w) WX.st=m.w; } return; }
+  if(m.t==='ft'){ if(MP.host&&from){ m.id=from; mpSendAll(m,from); } const p=MP.players[m.id]; if(p){ p.buf=p.buf.filter(q=>q[2]>=m.ts); p.has=false; } return; }
   if(m.t==='leave'){ mpPlayerGone(m.id); return; }
   if(m.t==='drop'){ if(MP.host&&from){ m.id=from; mpSendAll(m,from); } const p=MP.players[m.id]; if(p){ p.dropT=m.ts; if(p.held===m.gid) p.held=0; } mpApplyDrop(m); return; }
   if(m.t==='chat'){ if(MP.host&&from){ m.id=from; m.n=(MP.players[from]||{}).n||'?'; mpSendAll(m,from); } mpChatLine(m.n,String(m.x).slice(0,140)); return; }
@@ -145,3 +146,6 @@ function mpRender(){ const pl=document.getElementById('mplist'), bd=document.get
 setInterval(()=>{ if(MP.on&&MP.listOpen) mpRender(); },1000);
 function mpChatSend(t){ t=String(t||'').trim().slice(0,140); if(!t||!MP.on) return; mpSend({t:'chat',id:MP.myId,n:MP.name,x:t}); mpChatLine(MP.name,t); }
 function mpChatLine(n,t){ const L=document.getElementById('mpLines'); if(!L) return; const d=document.createElement('div'); d.className='l'; d.innerHTML='<b>'+esc(n)+':</b> '+esc(t); L.appendChild(d); MP.chat.push([n,t]); while(L.children.length>5) L.firstChild.remove(); setTimeout(()=>{ d.style.transition='opacity .6s'; d.style.opacity='0'; setTimeout(()=>d.remove(),700); },12000); }
+
+// fast travel: tell peers to snap (not glide) the truck to its new spot
+BigRig.on('fastTravel',()=>{ if(!MP.on) return; mpSend({t:'ft',id:MP.myId,ts:Math.round(performance.now())}); mpSend(mpSelfPose(),true); });
