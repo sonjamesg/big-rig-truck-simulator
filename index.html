@@ -254,6 +254,10 @@ function genWorld(){
   for(const k of [2,8]) road('v',C1.xs[k],103,C1.ys[0]-1,RW,'city');
   for(const k of [2,6]) road('v',C1.xs[k],C1.Y1+1,459,RW,'city');
   road('h',460,103,600,RW,'city');                                                    // Albion Airport road
+  { const o=12, X0=C1.xs[0]-o, Y0=C1.ys[0]-o, X1=C1.X1+o-RW+1, Y1=C1.Y1+o-RW+1;   // v23 Albion Ring: city loop 12 tiles outside the grid
+    road('h',Y0,X0,X1+RW-1,RW,'city'); road('h',Y1,X0,X1+RW-1,RW,'city'); road('v',X0,Y0,Y1+RW-1,RW,'city'); road('v',X1,Y0,Y1+RW-1,RW,'city');
+    for(const k of [1,5,9]) road('v',C1.xs[k],Y0+RW,C1.ys[0]-1,RW,'city'); for(const k of [1,4,9]) road('h',C1.ys[k],X0+RW,C1.xs[0]-1,RW,'city'); for(const k of [3,8]) road('v',C1.xs[k],C1.Y1+1,Y1-1,RW,'city');   // extra radials to the ring
+    world.abRing={X0,Y0,X1,Y1}; }
   for(const k of [1,5,9]) road('h',C1.ys[k],C1.X1+1,469,RW,'city'); road('v',470,C1.ys[0],459,RW,'city');   // docks
   { // v14 port aisles: the city streets carry straight through the gate, two extra aisles tee off the boundary road, a quay road links them
     const A=[C1.ys[5],Math.round((C1.ys[5]+C1.ys[7])/2),C1.ys[7],Math.round((C1.ys[7]+C1.ys[9])/2),C1.ys[9]];
@@ -430,7 +434,14 @@ dense(KB.xs,KB.ys,['office','glass','tower','solar','office','glass'],45,140);
       for(let y=y0;y+4<=y1;y+=4) for(let x=x0;x+4<=x1;x+=4){ if(!free(x,y,4,4)) continue; fill(x,y,4,4,T.PGRASS); const k=R();
         if(k<0.3){ fill(x,y+1,4,1,T.PLAZA); fill(x+1,y,1,4,T.PLAZA); objs.push({kind:'fountain',x:(x+1.5)*TILE,y:(y+1.5)*TILE}); }
         for(const [a,b] of [[0.6,0.6],[3.4,0.6],[0.6,3.4],[3.4,3.4]]) if(R()<0.85) objs.push({kind:'tree',x:(x+a)*TILE,y:(y+b)*TILE,r:9+R()*5,sp:(R()*3)|0,seed:(R()*1e9)|0}); } } };
-  greenUp(KB.xs,KB.ys); for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y>=KB.ys[0]*TILE&&o.y<KB.Y1*TILE) o.cyber=true; { const K=world.kbDistricts; cityFill(K.MK,2,1); for(const k of ['NG','CH','RS']) townBlocks(K[k].xs,K[k].ys,'city'); for(const k of ['NG','CH','RS']) dense(K[k].xs,K[k].ys,['office','brick','flat','glass','gravel'],22,60); for(const k of ['NG','CH','RS']) greenUp(K[k].xs,K[k].ys); townBlocks(K.RM.xs,K.RM.ys,'town'); townBlocks(K.WM.xs,K.WM.ys,'res'); townBlocks(K.OH.xs,K.OH.ys,'town'); for(let k=0;k<3;k++) ind(1772+k*18,1736,15,22); for(let k=0;k<3;k++) ind(1772+k*18,1764,15,22); } { const SH=['FRESH FISH','CHANDLERY','DOCK CAFE','TOOLS','MARINE','PARTS','KEBAB','BAIT & TACKLE']; let n=0;   // Portside shops + warehouses
+  greenUp(KB.xs,KB.ys);
+  const denseRect=(X0,Y0,X1,Y1,st,h0,h1)=>{ const placed=[]; const OK={[T.GRASS]:1,[T.PLAZA]:1,[T.SAND]:1,[T.PGRASS]:1,[T.TREE]:1}; for(let y=Y0;y+4<=Y1;y+=5) for(let x=X0;x+4<=X1;x+=5){ const w=4+(R()<0.4?1:0),h=4+(R()<0.4?1:0); let ok=true;
+      for(let q=-1;q<=h&&ok;q++) for(let k=-1;k<=w;k++){ if(!inb(x+k,y+q)){ok=false;break;} const t=G[idx(x+k,y+q)], e=q<0||k<0||q===h||k===w; if(!(OK[t]||(e&&(t===T.ROAD||t===T.WALK)))||(!e&&reserved[idx(x+k,y+q)])){ok=false;break;} }
+      if(ok&&R()<0.85){ fill(x,y,w,h,T.BLDG); objs.push({kind:'bldg',x:x*TILE,y:y*TILE,w:w*TILE,h:h*TILE,style:st[(R()*st.length)|0],height:h0+R()*(h1-h0),seed:(R()*1e9)|0}); placed.push([x*TILE-20,y*TILE-20,(x+w)*TILE+20,(y+h)*TILE+20]); } }
+    for(const o of objs) if(o.kind==='tree'&&!o._dead) for(const b of placed) if(o.x>b[0]&&o.x<b[2]&&o.y>b[1]&&o.y<b[3]){ o._dead=1; break; } };
+  if(world.abRing){ const A=world.abRing; greenUp(C1.xs,C1.ys); denseRect(A.X0+RW+1,A.Y0+RW+1,A.X1-1,C1.ys[0]-2,['brick','flat','office','shop','gravel'],18,45); denseRect(A.X0+RW+1,C1.Y1+2,A.X1-1,A.Y1-1,['brick','flat','office','shop','warehouse'],16,40);
+    denseRect(A.X0+RW+1,C1.ys[0]-1,C1.xs[0]-2,C1.Y1+1,['brick','flat','shop','office'],16,40); denseRect(C1.X1+2,C1.ys[0]-1,A.X1-1,C1.Y1+1,['warehouse','brick','office','shop'],16,40); }
+for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y>=KB.ys[0]*TILE&&o.y<KB.Y1*TILE) o.cyber=true; { const K=world.kbDistricts; cityFill(K.MK,2,1); for(const k of ['NG','CH','RS']) townBlocks(K[k].xs,K[k].ys,'city'); for(const k of ['NG','CH','RS']) dense(K[k].xs,K[k].ys,['office','brick','flat','glass','gravel'],22,60); for(const k of ['NG','CH','RS']) greenUp(K[k].xs,K[k].ys); townBlocks(K.RM.xs,K.RM.ys,'town'); townBlocks(K.WM.xs,K.WM.ys,'res'); townBlocks(K.OH.xs,K.OH.ys,'town'); for(let k=0;k<3;k++) ind(1772+k*18,1736,15,22); for(let k=0;k<3;k++) ind(1772+k*18,1764,15,22); } { const SH=['FRESH FISH','CHANDLERY','DOCK CAFE','TOOLS','MARINE','PARTS','KEBAB','BAIT & TACKLE']; let n=0;   // Portside shops + warehouses
   for(let y=1780;y+6<=1862;y+=7) for(let x=1690;x+7<=1850;x+=8){ let ok=true; for(let q=-1;q<=6&&ok;q++) for(let k=-1;k<=7;k++){ const t=get(x+k,y+q); if(t!==T.GRASS&&t!==T.PGRASS&&t!==T.SAND&&t!==T.CONC&&t!==T.WALK&&t!==T.PLAZA){ ok=false; break; } }
     if(ok){ const wh=R()<0.5, w=wh?7:5, h=wh?6:4; fill(x,y,w,h,T.BLDG); objs.push(Object.assign({kind:'bldg',x:x*TILE,y:y*TILE,w:w*TILE,h:h*TILE,style:wh?'warehouse':'shop',height:wh?16+R()*8:9+R()*5,seed:(R()*1e9)|0},wh?{logo:COMPANIES[(R()*COMPANIES.length)|0]}:{sign:SH[(n++)%SH.length]})); } } }
   for(const g of [MF,DW,CM,RH,FW]) townBlocks(g.xs,g.ys,'town'); townBlocks(AB.xs,AB.ys,'res');
