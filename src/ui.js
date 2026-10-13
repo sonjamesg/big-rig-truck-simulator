@@ -137,24 +137,25 @@ function openBoard(){ if(!started) return; if(!world.malls||!world.malls.length)
   const tiers=TIERS.map(t=>`<span class="chip" data-f="${t.tier}">Tier ${t.tier}</span>`).join('');
   const b=openModal('board',`<div class="mh"><div style="font-size:28px">\u{1F4CB}</div><div><h2>JOB BOARD</h2><div class="sub">Deliveries to shopping malls, retail parks &amp; supermarkets \u2022 pick up at depots, docks &amp; warehouses</div></div><div class="sp"></div>
     <div style="text-align:right;font-size:12px"><span class="tb" style="background:${T_.color}">TIER ${career.tier}</span> <b>${esc(T_.name)}</b> \u2022 Lv ${lv}<br><span class="xpb"><i style="width:${Math.min(100,(career.xp-a0)/(a1-a0)*100)}%"></i></span> <span style="opacity:.7">${career.xp} XP</span></div><button class="x">\u2715</button></div>
-    <div class="bar"><span class="lbl">Show</span><span class="chip" data-f="all">All</span><span class="chip" data-f="avail">Available</span>${tiers}<div style="flex:1"></div><span class="lbl">Sort</span><span class="chip" data-s="pay">\u{1F4B7} Pay</span><span class="chip" data-s="km">\u{1F4CF} Distance</span><span class="chip" data-s="xp">\u2B50 XP</span></div>
+    <div class="bar"><span class="lbl">Show</span><span class="chip" data-f="all">All</span><span class="chip" data-f="avail">Available</span>${tiers}<div style="flex:1"></div><span class="lbl">Sort</span><span class="chip" data-s="near" title="Nearest pickup first (N)">\u{1F4CD} Nearest</span><span class="chip" data-s="pay">\u{1F4B7} Pay</span><span class="chip" data-s="km">\u{1F4CF} Distance</span><span class="chip" data-s="xp">\u2B50 XP</span></div>
     <div class="body"><div class="grid"></div></div><div class="detail"></div>
     <div class="foot"><span>\u{1F4B0} ${money(truck.money)}</span><span>\u2714 ${career.done} jobs \u2022 ${money(career.earned)} earned</span>${career.active?`<span style="color:#ffd866">Active: ${esc(career.active.job.cargo.name)} \u2192 ${esc(career.active.job.to.name)}</span><button class="chip" id="abandon">Abandon job</button>`:''}<span class="sp"></span><button class="chip" id="reset">\u21BA Reset progress</button></div>`);
   b.querySelectorAll('[data-f]').forEach(c=>c.addEventListener('click',()=>{ boardState.filter=c.dataset.f; renderBoard(); }));
   b.querySelectorAll('[data-s]').forEach(c=>c.addEventListener('click',()=>{ boardState.sort=c.dataset.s; renderBoard(); }));
   const ab=b.querySelector('#abandon'); if(ab) ab.addEventListener('click',()=>{ abandonJob(); closeUI(); });
   const rs=b.querySelector('#reset'); rs.addEventListener('click',()=>{ if(rs.dataset.arm){ resetGame(); return; } rs.dataset.arm=1; rs.textContent='Click again to wipe save'; rs.classList.add('warn'); setTimeout(()=>{ delete rs.dataset.arm; rs.textContent='\u21BA Reset progress'; rs.classList.remove('warn'); },3000); });
-  renderBoard(); }
+  b.addEventListener('keydown',e=>{}); renderBoard(); }
 function renderBoard(){ const b=uiRoot&&uiRoot.querySelector('.mback'); if(!b||career.uiOpen!=='board') return; const g=b.querySelector('.grid');
   b.querySelectorAll('[data-f]').forEach(c=>c.classList.toggle('on',c.dataset.f===boardState.filter)); b.querySelectorAll('[data-s]').forEach(c=>c.classList.toggle('on',c.dataset.s===boardState.sort));
   let js=career.jobs.slice(); const f=boardState.filter; if(f==='avail') js=js.filter(j=>j.tier<=career.tier); else if(f!=='all') js=js.filter(j=>j.tier===+f);
-  js.sort((a,b2)=>boardState.sort==='km'?a.km-b2.km:boardState.sort==='xp'?b2.xp-a.xp:b2.pay-a.pay);
+  const away=j=>Math.hypot(j.from.entrance.x-truck.x,j.from.entrance.y-truck.y); for(const j of js) j.away=away(j);
+  js.sort((a,b2)=>boardState.sort==='near'?a.away-b2.away:boardState.sort==='km'?a.km-b2.km:boardState.sort==='xp'?b2.xp-a.xp:b2.pay-a.pay);
   if(!boardState.sel||!js.includes(boardState.sel)) boardState.sel=js.find(j=>j.tier<=career.tier)||js[0]||null;
   g.innerHTML=js.map((j,i)=>{ const lock=j.tier>career.tier, T_=tierInfo(j.tier), c=j.cargo;
     return `<div class="card ${lock?'lock':''} ${j===boardState.sel?'sel':''}" data-j="${j.id}" style="animation-delay:${i*30}ms">
       <div class="ctop"><div class="ill" style="background:linear-gradient(145deg,${c.col},${shade(c.col,0.45)})"><span class="em">${c.icon}</span>${trlSVG(c.trl,shade(c.col,1.3))}</div>
       <div class="cinfo"><div class="cn" title="${esc(c.name)}">${esc(c.name)}</div><div class="ct">${esc(TRAILER_TYPES[c.trl].name)} \u2022 ${(j.weight/1000).toFixed(1)} t</div></div></div>
-      <div class="prow"><span class="m">${money(j.pay)}</span><span class="xp">+${j.xp} XP</span><span class="tb" style="background:${T_.color}">TIER ${j.tier}</span></div>
+      <div class="prow"><span class="m">${money(j.pay)}</span><span class="xp">+${j.xp} XP</span><span class="aw" style="font-size:11px;opacity:.8">\u{1F4CD} ${(j.away/1000).toFixed(1)} km away</span><span class="tb" style="background:${T_.color}">TIER ${j.tier}</span></div>
       <div class="rt"><span>FROM</span><b title="${esc(j.from.name)}">${esc(j.from.name)}</b><span>TO</span><b title="${esc(j.to.name)}">${esc(j.to.name)}</b></div>
       <div class="meta"><span>\u{1F4CD} ${j.approx?'~':''}${j.km.toFixed(1)} km</span><span>\u23F1 ${j.mins} min</span><span>\u{1F5FA} ${esc(j.to.region)}</span></div>
       ${lock?`<div class="lockov">\u{1F512} Tier ${j.tier} required</div>`:''}</div>`; }).join('')||'<div style="opacity:.6;padding:20px">No jobs match this filter.</div>';

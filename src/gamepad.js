@@ -26,6 +26,7 @@ function padUpdate(dt){
     if(hit(0)){ const el=padFocusEl(); if(el){ el.click(); setTimeout(()=>padNav(null),40); } }
     if(hit(1)&&career.uiOpen){ if(career.uiOpen==='result'){ const k=document.querySelector('#ui #keep'); if(k) k.click(); } else closeUI(); }
     if(hit(9)&&career.uiOpen==='board') closeUI();
+    if(hit(3)&&career.uiOpen==='board'){ boardState.sort=boardState.sort==='near'?'pay':'near'; renderBoard(); }
     if(hit(4)||hit(5)){ const g2=document.querySelector('#ui .grid'); if(g2) g2.scrollBy({top:hit(5)?160:-160,behavior:'smooth'}); }
     return; }
   pad.focus=null;
@@ -72,6 +73,6 @@ function drawPadMapCursor(){ if(!pad.active||!bigmap.open) return; const x=VW/2,
   const poi=navPOIAt(x,y,mBX,mBY); ctx.fillStyle='rgba(8,12,20,0.85)'; const t=GLYPH.A+' '+(poi?'Route to '+poi.name:'Route to this point')+'   LS pan \u2022 RT/LT zoom \u2022 '+GLYPH.Y+' centre \u2022 '+GLYPH.B+' close'; ctx.font='bold 12px system-ui,sans-serif'; const w=ctx.measureText(t).width+20; ctx.fillRect(x-w/2,VH-56,w,24); ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.fillText(t,x,VH-39); ctx.restore(); }
 
 // keyboard for every modal: arrows move focus, Enter/Space selects (job board, results, tier unlock, dealership, breakdown)
-addEventListener('keydown',e=>{ const bd=typeof BREAKDOWN!=='undefined'&&BREAKDOWN.active&&document.getElementById('bdPanel'); if(!career.uiOpen&&!bd) return; const t=e.target; if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA')) return;
+addEventListener('keydown',e=>{ const bd=typeof BREAKDOWN!=='undefined'&&BREAKDOWN.active&&document.getElementById('bdPanel'); if(!career.uiOpen&&!bd) return; const t=e.target; if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA')) return; if(e.code==='KeyN'&&career.uiOpen==='board'){ boardState.sort=boardState.sort==='near'?'pay':'near'; renderBoard(); e.preventDefault(); return; }
   const dir={ArrowUp:'u',ArrowDown:'d',ArrowLeft:'l',ArrowRight:'r'}[e.code]; if(dir){ padNav(padFocusEl()?dir:null); e.preventDefault(); e.stopImmediatePropagation(); return; }
   if(e.code==='Enter'||e.code==='Space'||e.code==='NumpadEnter'){ let el=padFocusEl(); if(!el){ padNav(null); el=padFocusEl(); } if(el){ el.click(); setTimeout(()=>padNav(null),40); e.preventDefault(); e.stopImmediatePropagation(); } } },true);

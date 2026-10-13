@@ -8,6 +8,12 @@ function navTileInfo(i){ const h=world.roadH[i], v=world.roadV[i]; if(h===-1&&v=
   if(h===-2) return ['rb',0.8,8]; if(h===-3) return ['curve',0.7,20]; const s=world.segs[h>=0?h:v]; return [s.type,NAV_COST[s.type]||1,NAV_SPEED[s.type]||11]; }
 const isRoadT=i=>{ const t=G[i]; return (t===T.ROAD||t===T.BRIDGE) && !(world.roadH[i]===-1&&world.roadV[i]===-1); };
 function navSnap(tx,ty,rmax){ tx=Math.round(tx); ty=Math.round(ty); for(let r=0;r<=(rmax||60);r++) for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){ if(Math.max(Math.abs(dx),Math.abs(dy))!==r) continue; const x=tx+dx,y=ty+dy; if(inb(x,y)&&isRoadT(idx(x,y))) return [x,y]; } return null; }
+// v14: snap the route start to the road the truck is actually on (never a nearby motorway / overpass it isn't using)
+function navSnapTruck(){ const t=truck, f=fwd(t.h); for(const d of [0,2,-2,4]){ const x=Math.floor((t.x+f[0]*d)/M_T), y=Math.floor((t.y+f[1]*d)/M_T); if(inb(x,y)&&isRoadT(idx(x,y))) return [x,y]; }
+  const tx=t.x/M_T, ty=t.y/M_T, onH=(()=>{ const i=idx(Math.floor(tx),Math.floor(ty)); const ti=navTileInfo(i); return ti&&ti[0]==='hwy'; })(); let best=null,bs=1e9,found=-1;
+  for(let r=1;r<=40;r++){ if(found>=0&&r>found+6) break; for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){ if(Math.max(Math.abs(dx),Math.abs(dy))!==r) continue; const x=Math.floor(tx)+dx,y=Math.floor(ty)+dy; if(!inb(x,y)) continue; const i=idx(x,y); if(!isRoadT(i)) continue; if(found<0) found=r;
+    const ti=navTileInfo(i), hw=ti&&(ti[0]==='hwy'||ti[0]==='ramp'), dd=Math.hypot(dx,dy), fw=(dx*f[0]+dy*f[1])/(dd||1); const sc=dd+(hw&&!onH?30:0)+(G[i]===T.BRIDGE?8:0)-fw*1.5; if(sc<bs){ bs=sc; best=[x,y]; } } }
+  return best; }
 function navAStar(sx,sy,gx,gy){
   const N=MW*MH; if(!navG){ navG=new Float32Array(N); navStamp=new Int32Array(N); navFrom=new Int32Array(N); navClosed=new Int32Array(N); }
   const gen=++navGen, S=idx(sx,sy), Gl=idx(gx,gy); const hx=i=>(Math.abs((i%MW)-gx)+Math.abs(((i/MW)|0)-gy))*0.9;
@@ -41,7 +47,7 @@ function setRoute(target){
   if(typeof target==='string'){ const d=world.depots.find(o=>o.id===target||o.code===target), f=world.fuel.find(o=>o.id===target), g=world.garages.find(o=>o.id===target); target=d||f||g; if(!target) return null; }
   if(target.entrance){ tx=target.entrance.x/M_T; ty=target.entrance.y/M_T; name=target.name; } else { tx=target.x/M_T; ty=target.y/M_T; name=target.name||target.label||'Map point'; }
   const tgt={x:tx*M_T,y:ty*M_T,name,ref:target};
-  const f=fwd(truck.h), st=navSnap((truck.x+f[0]*2)/M_T,(truck.y+f[1]*2)/M_T,40), en=navSnap(tx,ty,70);
+  const st=navSnapTruck(), en=navSnap(tx,ty,70);
   if(!st||!en){ NAV.fail=!st?'snapStart':'snapEnd'; flash('Sat nav: no road route found'); return null; }
   const t0=performance.now(); const p=navAStar(st[0],st[1],en[0],en[1]); if(!p){ NAV.fail='astar'; flash('Sat nav: no road route found'); NAV.route=null; return null; }
   NAV.route=navBuild(p,tgt); NAV.route.ms=performance.now()-t0; NAV.offT=0; NAV.lastCalc=timeS;
@@ -53,7 +59,7 @@ function updateNav(dt){ const R=NAV.route; if(!R) return; const f=fwd(truck.h), 
   if(bd>40){ for(let k=0;k<R.P.length;k+=3){ const d=Math.hypot(R.P[k][0]-cx,R.P[k][1]-cy); if(d<bd){ bd=d; best=k; } } }
   R.idx=Math.max(R.idx,best); R.off=bd;
   if(Math.hypot(R.target.x-cx,R.target.y-cy)<30 || (R.len-R.cum[R.idx]<25&&bd<25)){ chime(); flash('You have arrived: '+R.target.name); BigRig.emit('routeArrived',{target:R.target}); NAV.route=null; return; }
-  if(bd>22){ NAV.offT+=dt; if(NAV.offT>1.5&&timeS-NAV.lastCalc>2){ NAV.reroutes++; const tg=R.target; const nr=setRoute(tg.ref&&tg.ref.name?tg.ref:{x:tg.x,y:tg.y,name:tg.name}); if(nr){ flash('Rerouting\u2026'); BigRig.emit('reroute',{n:NAV.reroutes}); } } } else NAV.offT=0; }
+  if(bd>18){ NAV.offT+=dt; if(NAV.offT>1.0&&timeS-NAV.lastCalc>1.5){ NAV.reroutes++; const tg=R.target; const nr=setRoute(tg.ref&&tg.ref.name?tg.ref:{x:tg.x,y:tg.y,name:tg.name}); if(nr){ flash('Rerouting\u2026'); BigRig.emit('reroute',{n:NAV.reroutes}); } } } else NAV.offT=0; }
 // UK keep-left: route drawn on the left-hand carriageway, lane picked for the next turn; one-way/slip roads stay centred on the lane
 function navRaw(R,k){ const n=R.P.length, a=R.P[Math.max(0,k-2)], b=R.P[Math.min(n-1,k+2)], l=Math.hypot(b[0]-a[0],b[1]-a[1])||1, tx=(b[0]-a[0])/l, ty=(b[1]-a[1])/l, lx=ty, ly=-tx, p=R.P[k];
   if(R.oneway&&R.oneway[k]) return 0; let dl=0, dr=0; while(dl<16&&onRoadM(p[0]+lx*(dl+0.5),p[1]+ly*(dl+0.5))) dl+=0.5; while(dr<16&&onRoadM(p[0]-lx*(dr+0.5),p[1]-ly*(dr+0.5))) dr+=0.5;
@@ -61,7 +67,7 @@ function navRaw(R,k){ const n=R.P.length, a=R.P[Math.max(0,k-2)], b=R.P[Math.min
 function navOff(R,k){ if(!R.off){ R.off=new Float32Array(R.P.length).fill(NaN); } if(isNaN(R.off[k])){ let s=0,c=0; for(let q=k-4;q<=k+4;q++){ if(q<0||q>=R.P.length) continue; if(!R.raw) R.raw=new Float32Array(R.P.length).fill(NaN); if(isNaN(R.raw[q])) R.raw[q]=navRaw(R,q); s+=R.raw[q]; c++; } R.off[k]=s/c; }
   const n=R.P.length, a=R.P[Math.max(0,k-2)], b=R.P[Math.min(n-1,k+2)], l=Math.hypot(b[0]-a[0],b[1]-a[1])||1, o=R.off[k]; return [R.P[k][0]+(b[1]-a[1])/l*o, R.P[k][1]-(b[0]-a[0])/l*o]; }
 function navLine(px,py,w,col){ const R=NAV.route; if(!R) return; ctx.save(); ctx.lineJoin='round'; ctx.lineCap='round'; ctx.strokeStyle='rgba(0,0,0,0.55)'; ctx.lineWidth=w+3; ctx.beginPath();
-  for(let k=R.idx;k<R.P.length;k+=2){ const Q=(k-R.idx<400)?navOff(R,k):R.P[k], x=px(Q[0]), y=py(Q[1]); k===R.idx?ctx.moveTo(x,y):ctx.lineTo(x,y); } const e=R.P[R.P.length-1]; ctx.lineTo(px(e[0]),py(e[1])); ctx.stroke(); ctx.strokeStyle=col; ctx.lineWidth=w; ctx.stroke();
+  ctx.moveTo(px(truck.x),py(truck.y)); for(let k=R.idx;k<R.P.length;k+=2){ const Q=(k-R.idx<400)?navOff(R,k):R.P[k]; ctx.lineTo(px(Q[0]),py(Q[1])); } const e=R.P[R.P.length-1]; ctx.lineTo(px(e[0]),py(e[1])); ctx.stroke(); ctx.strokeStyle=col; ctx.lineWidth=w; ctx.stroke();
   ctx.fillStyle='#ff3df0'; ctx.strokeStyle='#000'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(px(R.target.x),py(R.target.y),6,0,7); ctx.fill(); ctx.stroke(); ctx.restore(); }
 function drawNavWorld(){ const R=NAV.route; if(!R) return; const end=Math.min(R.P.length-5,R.idx+100);
   for(let k=R.idx+3;k<end;k+=5){ const p=navOff(R,k), q=navOff(R,k+3); const h=Math.atan2(q[0]-p[0],-(q[1]-p[1])); const a=0.55*Math.min(1,(k-R.idx)/10);
