@@ -4227,14 +4227,14 @@ function drawNight(vx0,vy0,vx1,vy1,z){ const K=DN.dark, D=DN.dusk; if(K<0.01&&D<
   L.globalCompositeOperation='destination-out'; const sx=x=>(x-vx0)*z*q, sy=y=>(y-vy0)*z*q, pad=300;
   const lights=[]; const C=DN.cell; for(let cy=Math.floor((vy0-pad)/C);cy<=Math.floor((vy1+pad)/C);cy++) for(let cx=Math.floor((vx0-pad)/C);cx<=Math.floor((vx1+pad)/C);cx++){ const a=DN.grid.get(cx+','+cy); if(a) for(const l of a) if(l.x>vx0-pad&&l.x<vx1+pad&&l.y>vy0-pad&&l.y<vy1+pad) lights.push(l); }
   for(const P of (typeof portList==='function'?portList():[])) if(P.cranes) for(const c of P.cranes){ for(const u of [P.legL,-1,c.u,16]){ const p=PL(P,u,c.y); const x=p[0]*TILE,y=p[1]*TILE; if(x>vx0-300&&x<vx1+300&&y>vy0-300&&y<vy1+300) dnLight(x,y,u===c.u?150:70,u===c.u?'rgba(235,240,255,0.7)':'rgba(255,60,40,0.9)',0.8); } }
-  const dyn=DN.dyn||[]; for(const l of lights.concat(dyn)){ if(l.k==='b') continue; const r=l.r*z*q; L.globalAlpha=l.k==='st'?0.85:0.95; L.drawImage(DN.spr,sx(l.x)-r,sy(l.y)-r,r*2,r*2); }
+  const dyn=DN.dyn||[]; for(const l of lights.concat(dyn)){ if(l.k==='b') continue; const so=l.k==='st'?slOn(l.l):1; if(so<0.02) continue; const r=l.r*z*q; L.globalAlpha=l.k==='st'?0.85*so:0.95; L.drawImage(DN.spr,sx(l.x)-r,sy(l.y)-r,r*2,r*2); }
   const veh=dnVehs();
   L.globalAlpha=1; for(const V of veh){ const x=V.fx*PPM,y=V.fy*PPM; if(x<vx0-500||x>vx1+500||y<vy0-500||y>vy1+500) continue; const ang=Math.atan2(V.f[1],V.f[0]); L.save(); L.translate(sx(x),sy(y)); L.rotate(ang); const s=z*q*(V.big?1.55:1.1); L.scale(s,s); L.globalAlpha=1; L.drawImage(DN.cone,0,-64); L.drawImage(DN.spr,-26,-26,52,52); L.restore(); }
   L.globalCompositeOperation='source-over'; L.globalAlpha=1;
   ctx.globalCompositeOperation='source-over'; ctx.drawImage(DN.lc,0,0,VW,VH);
   // additive colour: lamp glows, windows/neon, tail + nav lights
   ctx.globalCompositeOperation='lighter'; const gz=(col,x,y,r,a)=>{ const R=r*z; ctx.globalAlpha=a*K; ctx.drawImage(dnGlow(col),(x-vx0)*z-R,(y-vy0)*z-R,R*2,R*2); };
-  let nb=0; for(const l of lights){ if(l.k==='st'){ gz(DN_COL.st,l.x,l.y,l.r*0.6,0.8); const h=l.l; gz('rgba(255,236,190,1)',h.hx,h.hy,9,0.9); } else if(l.k==='fl') gz(DN_COL.fl,l.x,l.y,l.r*0.5,0.45);
+  let nb=0; for(const l of lights){ if(l.k==='st'){ const so=slOn(l.l); if(so>0.02){ gz(DN_COL.st,l.x,l.y,l.r*0.6,0.8*so); gz('rgba(255,236,190,1)',l.l.hx,l.l.hy,12,0.95*so); } } else if(l.k==='fl') gz(DN_COL.fl,l.x,l.y,l.r*0.5,0.45);
     else if(l.k==='b'&&nb++<500){ const o=l.o; ctx.globalAlpha=0.75*K; const cy=o.cyber; ctx.fillStyle=cy?'#9ff':'#ffd27a'; for(const w of l.win){ if(!w[2]&&!cy) continue; ctx.fillRect((w[0]-vx0)*z,(w[1]-vy0)*z,Math.max(1.5,5*z),Math.max(1.5,4*z)); }
       if(cy){ const col=DN_NEON[(o.seed>>>3)%4]; ctx.globalAlpha=0.8*K; ctx.strokeStyle=col; ctx.lineWidth=Math.max(1.5,3*z); ctx.strokeRect((o.x-vx0)*z+2,(o.y-vy0)*z+2,o.w*z-4,o.h*z-4); gz(col,o.x+o.w/2,o.y+o.h/2,Math.max(o.w,o.h)*0.6,0.25); } } }
   for(const l of dyn) gz(l.c||DN_COL.fl,l.x,l.y,l.r*0.5,l.a||0.6);
@@ -4280,15 +4280,15 @@ function slBuild(){ if(SL.list) return SL.list; const out=[], taken=new Set();
     for(const d of world.depots||[]) if(tx>=d.x-1&&tx<=d.x+d.w&&ty>=d.y-1&&ty<=d.y+d.h) return false;
     const key=Math.round(px/2)+','+Math.round(py/2); if(taken.has(key)) return false; taken.add(key); return true; };
   // post at p (tiles), arm toward the road along unit n (pointing into the road); pool 2 m inside the kerb
-  const put=(kx,ky,nx,ny,dbl)=>{ const px=kx-nx*0.18, py=ky-ny*0.18; if(!dbl&&!okPost(px,py)) return; const ax=kx+nx*0.45, ay=ky+ny*0.45, lx=kx+nx*0.55, ly=ky+ny*0.55;
-    out.push({px:px*TILE,py:py*TILE,hx:ax*TILE,hy:ay*TILE,x:lx*TILE,y:ly*TILE,r:110,dbl:!!dbl}); };
+  const put=(kx,ky,nx,ny,dbl)=>{ const px=kx-nx*0.25, py=ky-ny*0.25; if(!dbl&&!okPost(px,py)) return; const ax=kx+nx*0.72, ay=ky+ny*0.72;
+    out.push({px:px*TILE,py:py*TILE,hx:ax*TILE,hy:ay*TILE,x:ax*TILE,y:ay*TILE,r:110,dbl:!!dbl}); };
   const inJ=(tx,ty)=>{ for(const J of world.junctions) if(tx>J.x-1.5&&tx<J.x+J.w+1.5&&ty>J.y-1.5&&ty<J.y+J.h+1.5) return true; return false; };
   for(const sg of world.segs||[]){ if(!sg||sg.b1===undefined||sg.type==='dirt'||sg.type==='lane') continue; const hwy=sg.type==='hwy';
     for(let a=sg.b0+1, n=0;a<sg.b1;a++){ const cx=sg.dir==='h'?a+0.5:sg.a+sg.w/2, cy=sg.dir==='h'?sg.a+sg.w/2:a+0.5, z=slZone(cx,cy); if(z===2) continue;
       const sp=z===0?7:12; if(((a-sg.b0)%sp)!==0||inJ(Math.floor(cx),Math.floor(cy))) continue; n++;
       if(hwy&&sg.w>=6&&z===1){ // central reservation double lamp: arms either way over the fast lanes
-        const ox=sg.dir==='h'?0:1, oy=sg.dir==='h'?1:0; out.push({px:cx*TILE,py:cy*TILE,hx:(cx-ox*0.45)*TILE,hy:(cy-oy*0.45)*TILE,x:(cx-ox*0.9)*TILE,y:(cy-oy*0.9)*TILE,r:110,dbl:1});
-        out.push({px:cx*TILE,py:cy*TILE,hx:(cx+ox*0.45)*TILE,hy:(cy+oy*0.45)*TILE,x:(cx+ox*0.9)*TILE,y:(cy+oy*0.9)*TILE,r:110,dbl:1,twin:1}); continue; }
+        const ox=sg.dir==='h'?0:1, oy=sg.dir==='h'?1:0; out.push({px:cx*TILE,py:cy*TILE,hx:(cx-ox*0.85)*TILE,hy:(cy-oy*0.85)*TILE,x:(cx-ox*0.85)*TILE,y:(cy-oy*0.85)*TILE,r:110,dbl:1});
+        out.push({px:cx*TILE,py:cy*TILE,hx:(cx+ox*0.85)*TILE,hy:(cy+oy*0.85)*TILE,x:(cx+ox*0.85)*TILE,y:(cy+oy*0.85)*TILE,r:110,dbl:1,twin:1}); continue; }
       const sides=z===0?[-1,1]:[(n&1)?1:-1];
       for(const sd of sides){ const e=sg.a+(sd<0?0:sg.w); if(sg.dir==='h') put(a+0.5,e,0,-sd); else put(e,a+0.5,-sd,0); } } }
   for(const cv of world.curves||[]){ if(cv.type==='dirt'||cv.type==='lane'||!cv.pts||cv.pts.length<2) continue; let acc=0, n=0;
@@ -4299,15 +4299,30 @@ function slBuild(){ if(SL.list) return SL.list; const out=[], taken=new Set();
   for(const J of world.junctions){ const z=slZone(J.x+J.w/2,J.y+J.h/2); if(z===0) continue; const hs=world.segs[J.hs], vs=world.segs[J.vs]; if(z===2&&(!hs||!vs||hs.type==='dirt'||vs.type==='dirt')) continue;
     for(const [cx,cy,dx,dy] of [[J.x,J.y,-1,-1],[J.x+J.w,J.y,1,-1],[J.x,J.y+J.h,-1,1],[J.x+J.w,J.y+J.h,1,1]]){ const k=Math.SQRT1_2; put(cx+dx*0.35,cy+dy*0.35,-dx*k,-dy*k); } }
   for(const rb of world.rbs||[]){ for(let q=0;q<6;q++){ const a=q*Math.PI/3+0.3, c=Math.cos(a), s=Math.sin(a); put(rb.cx+c*(rb.rout+0.15),rb.cy+s*(rb.rout+0.15),-c,-s); } }
+  let sd=12345; for(const l of out){ sd=(sd*16807)%2147483647; l.u=sd/2147483647; sd=(sd*16807)%2147483647; l.v=sd/2147483647; }
   const g=new Map(); for(const l of out){ const k=((l.px/SL.cell)|0)+','+((l.py/SL.cell)|0); let a=g.get(k); if(!a) g.set(k,a=[]); a.push(l); } SL.grid=g; SL.list=out; return out; }
-// posts drawn in world space (day and night); cheap: only the cells in view
-function drawStreetLamps(vx0,vy0,vx1,vy1){ slBuild(); const C=SL.cell; ctx.save(); ctx.lineCap='round';
+// per-lamp switch state: each lamp has its own on-time 0.25-1.0 game-h after sunset (18.6) and off-time around sunrise, with a short warm-up flicker
+function slOn(l){ const h=gameT, on=18.85+l.u*0.75, off=5.55+l.v*0.75, W=0.07; let t;
+  if(h>=12){ if(h<on) return 0; t=h-on; } else if(h<off) t=9; else { const d=h-off; if(d>W) return 0; return (Math.sin(d*900+l.u*50)>0.2?0.85:0.15)*(1-d/W); }
+  if(t>=W) return 1; const f=t/W; return f*(Math.sin(t*1100+l.v*70)>-0.1?1:0.2); }
+// posts drawn after the night layer so they stay visible; colours darken with DN.dark but never vanish
+function drawStreetLamps(vx0,vy0,vx1,vy1){ slBuild(); const C=SL.cell, K=DN.dark, sh=1-0.55*K; ctx.save(); ctx.lineCap='round';
+  const col=(r,g,b)=>'rgb('+((r*sh+20*K)|0)+','+((g*sh+24*K)|0)+','+((b*sh+40*K)|0)+')';
+  const post=col(46,50,56), arm=col(70,75,82), base=col(30,33,38), hi=col(150,156,165), head=col(36,39,44);
   for(let cy=Math.floor((vy0-60)/C);cy<=Math.floor((vy1+60)/C);cy++) for(let cx=Math.floor((vx0-60)/C);cx<=Math.floor((vx1+60)/C);cx++){ const a=SL.grid.get(cx+','+cy); if(!a) continue;
-    for(const l of a){ if(l.px<vx0-60||l.px>vx1+60||l.py<vy0-60||l.py>vy1+60) continue;
-      ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(l.px+5,l.py+6); ctx.lineTo(l.hx+5,l.hy+6); ctx.stroke();
-      ctx.strokeStyle='#5d6268'; ctx.lineWidth=2.2; ctx.beginPath(); ctx.moveTo(l.px,l.py); ctx.lineTo(l.hx,l.hy); ctx.stroke();
-      if(!l.twin){ ctx.fillStyle='#3c4046'; ctx.beginPath(); ctx.arc(l.px,l.py,2.8,0,7); ctx.fill(); ctx.fillStyle='#8b9097'; ctx.beginPath(); ctx.arc(l.px-0.6,l.py-0.6,1.3,0,7); ctx.fill(); }
-      const ang=Math.atan2(l.hy-l.py,l.hx-l.px); ctx.save(); ctx.translate(l.hx,l.hy); ctx.rotate(ang); ctx.fillStyle='#2f3338'; ctx.fillRect(-3,-2.2,6.5,4.4); ctx.fillStyle=DN.dark>0.3?'#fff2c8':'#cfd4da'; ctx.fillRect(-2,-1.3,4.5,2.6); ctx.restore(); } }
+    for(const l of a){ if(l.px<vx0-60||l.px>vx1+60||l.py<vy0-60||l.py>vy1+60) continue; const on=K>0.02?slOn(l):0; l.on=on;
+      const ang=Math.atan2(l.hy-l.py,l.hx-l.px);
+      // soft shadow (sun from top-left; faint at night)
+      ctx.strokeStyle='rgba(0,0,0,'+(0.28*(1-0.6*K))+')'; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(l.px+3,l.py+4); ctx.lineTo(l.hx+9,l.hy+11); ctx.stroke();
+      ctx.fillStyle='rgba(0,0,0,'+(0.22*(1-0.6*K))+')'; ctx.beginPath(); ctx.ellipse(l.hx+9,l.hy+11,6,4,ang,0,7); ctx.fill();
+      // arm
+      ctx.strokeStyle=base; ctx.lineWidth=4.6; ctx.beginPath(); ctx.moveTo(l.px,l.py); ctx.lineTo(l.hx,l.hy); ctx.stroke();
+      ctx.strokeStyle=arm; ctx.lineWidth=2.6; ctx.beginPath(); ctx.moveTo(l.px,l.py); ctx.lineTo(l.hx,l.hy); ctx.stroke();
+      // post + base plate
+      if(!l.twin){ ctx.fillStyle=base; ctx.fillRect(l.px-5,l.py-5,10,10); ctx.fillStyle=post; ctx.beginPath(); ctx.arc(l.px,l.py,4,0,7); ctx.fill(); ctx.fillStyle=hi; ctx.beginPath(); ctx.arc(l.px-1.2,l.py-1.2,1.6,0,7); ctx.fill(); }
+      // lamp head
+      ctx.save(); ctx.translate(l.hx,l.hy); ctx.rotate(ang); ctx.fillStyle=head; ctx.beginPath(); ctx.ellipse(0,0,7,4.6,0,0,7); ctx.fill();
+      ctx.fillStyle=on>0.05?'rgba(255,'+(200+40*on|0)+','+(120+80*on|0)+','+(0.5+0.5*on)+')':col(170,176,184); ctx.beginPath(); ctx.ellipse(0.5,0,4.6,2.8,0,0,7); ctx.fill(); ctx.restore(); } }
   ctx.restore(); }
 
 // ---------- weather: random clear / rain / fog cycles (host-synced in MP, saved) ----------
@@ -4431,7 +4446,7 @@ function draw(){
   drawPortLow(vx0,vy0,vx1,vy1); drawFXLow(vx0,vy0,vx1,vy1); drawRemotePlayers(vx0,vy0,vx1,vy1); drawBreakdown();
   drawLorry(); drawRail(vx0,vy0,vx1,vy1); drawFXHigh(); drawPortHigh(vx0,vy0,vx1,vy1);
   for(const o of world.overhead) if(o.x>vx0-400&&o.x<vx1+400&&o.y>vy0-400&&o.y<vy1+400) drawOverhead(o);
-  drawStreetLamps(vx0,vy0,vx1,vy1); drawAmbientHigh(VR); drawWeather(vx0,vy0,vx1,vy1,z); drawNight(vx0,vy0,vx1,vy1,z);
+  drawAmbientHigh(VR); drawWeather(vx0,vy0,vx1,vy1,z); drawNight(vx0,vy0,vx1,vy1,z); drawStreetLamps(vx0,vy0,vx1,vy1);
   ctx.setTransform(1,0,0,1,0,0);
   drawHUD();
   if(bigmap.open){ drawBigMap(); dnMapShade(0,0,VW,VH,0.35); drawPadMapCursor(); }
