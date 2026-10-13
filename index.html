@@ -4204,7 +4204,7 @@ function dnClock(){ const m=Math.floor(gameT*60)%1440; return String((m/60)|0).p
 function dnSprite(r,stops){ const c=document.createElement('canvas'); c.width=c.height=r*2; const g=c.getContext('2d'), gr=g.createRadialGradient(r,r,0,r,r,r); for(const [o,col] of stops) gr.addColorStop(o,col); g.fillStyle=gr; g.fillRect(0,0,r*2,r*2); return c; }
 function dnGlow(col){ return DN.glow[col]||(DN.glow[col]=dnSprite(32,[[0,col],[0.35,col.replace(/[\d.]+\)$/,'0.35)')],[1,col.replace(/[\d.]+\)$/,'0)')]])); }
 function dnBuild(){ if(DN.grid) return; const G=new Map(), C=DN.cell; const add=(x,y,r,k,o)=>{ const key=((x/C)|0)+','+((y/C)|0); let a=G.get(key); if(!a) G.set(key,a=[]); a.push(Object.assign({x,y,r,k},o||{})); };
-  for(const sg of world.segs||[]){ if(!sg||sg.b1===undefined) continue; let n=0; for(let a=sg.b0+2;a<sg.b1-1;a+=9){ const d=(n++&1)?1:-1; try{ const p=lanePt(sg,d,0,a); const o=sg.dir==='h'?[0,d*1.2]:[-d*1.2,0]; add((p[0]+o[0]*M_T)*PPM,(p[1]+o[1]*M_T)*PPM,95,'st'); }catch(e){} } }
+  for(const l of slBuild()) add(l.x,l.y,l.r,'st',{l});
   let s=7; const rnd=()=>{ s=(s*16807)%2147483647; return s/2147483647; };
   for(const o of world.objects) if(o.kind==='bldg'){ const win=[];
     if(typeof ROOF2!=='undefined'&&ROOF2[o.style]&&o.style!=='house'&&o.style!=='warehouse'){ const f=Math.min(o.h*0.32,Math.max(6,(o.height||30)*0.16)), fy=o.y+o.h-f; for(let j=3;j<f-4;j+=7) for(let k=4;k<o.w-6;k+=9) if(win.length<60) win.push([o.x+k,fy+j,rnd()<0.55]); for(let k=8;k<o.w-8;k+=12) if(win.length<80) win.push([o.x+k,o.y+5,rnd()<0.4]); }
@@ -4234,7 +4234,7 @@ function drawNight(vx0,vy0,vx1,vy1,z){ const K=DN.dark, D=DN.dusk; if(K<0.01&&D<
   ctx.globalCompositeOperation='source-over'; ctx.drawImage(DN.lc,0,0,VW,VH);
   // additive colour: lamp glows, windows/neon, tail + nav lights
   ctx.globalCompositeOperation='lighter'; const gz=(col,x,y,r,a)=>{ const R=r*z; ctx.globalAlpha=a*K; ctx.drawImage(dnGlow(col),(x-vx0)*z-R,(y-vy0)*z-R,R*2,R*2); };
-  let nb=0; for(const l of lights){ if(l.k==='st') gz(DN_COL.st,l.x,l.y,l.r*0.55,0.6); else if(l.k==='fl') gz(DN_COL.fl,l.x,l.y,l.r*0.5,0.45);
+  let nb=0; for(const l of lights){ if(l.k==='st'){ gz(DN_COL.st,l.x,l.y,l.r*0.6,0.8); const h=l.l; gz('rgba(255,236,190,1)',h.hx,h.hy,9,0.9); } else if(l.k==='fl') gz(DN_COL.fl,l.x,l.y,l.r*0.5,0.45);
     else if(l.k==='b'&&nb++<500){ const o=l.o; ctx.globalAlpha=0.75*K; const cy=o.cyber; ctx.fillStyle=cy?'#9ff':'#ffd27a'; for(const w of l.win){ if(!w[2]&&!cy) continue; ctx.fillRect((w[0]-vx0)*z,(w[1]-vy0)*z,Math.max(1.5,5*z),Math.max(1.5,4*z)); }
       if(cy){ const col=DN_NEON[(o.seed>>>3)%4]; ctx.globalAlpha=0.8*K; ctx.strokeStyle=col; ctx.lineWidth=Math.max(1.5,3*z); ctx.strokeRect((o.x-vx0)*z+2,(o.y-vy0)*z+2,o.w*z-4,o.h*z-4); gz(col,o.x+o.w/2,o.y+o.h/2,Math.max(o.w,o.h)*0.6,0.25); } } }
   for(const l of dyn) gz(l.c||DN_COL.fl,l.x,l.y,l.r*0.5,l.a||0.6);
@@ -4267,6 +4267,48 @@ function drawClockHUD(){ const x=VW-126, y=62, w=112, h=30, day=DN.dark<0.5; ctx
   else { ctx.fillStyle='#dfe6ff'; ctx.beginPath(); ctx.arc(x+17,y+15,8,0,7); ctx.fill(); ctx.fillStyle='rgba(13,15,20,1)'; ctx.beginPath(); ctx.arc(x+21,y+12,7,0,7); ctx.fill(); }
   ctx.fillStyle='#fff'; ctx.font='800 18px system-ui,sans-serif'; ctx.textBaseline='middle'; ctx.textAlign='left'; ctx.fillText(dnClock(),x+36,y+16); ctx.restore(); }
 function dnMapShade(x,y,w,h,k){ const a=DN.dark*(k||0.45); if(a<0.02) return; ctx.save(); ctx.fillStyle='rgba(6,12,32,'+a+')'; ctx.fillRect(x,y,w,h); ctx.restore(); }
+
+// ---------- street lamps (v27): posts on the pavement/verge at both road edges, arm over the lane edge, pool just inside the kerb ----------
+// density by area: city core ~28 m both sides, suburbs ~48 m staggered, rural roads only at junctions/roundabouts, open country/desert none.
+const SL={list:null,grid:null,cell:1024};
+function slZone(tx,ty){ let best=2; for(const k in (world.cities||{})){ const c=world.cities[k]; if(!c||!c.xs) continue; const x0=c.xs[0],y0=c.ys[0],x1=c.X1,y1=c.Y1, mx=(x1-x0)*0.2, my=(y1-y0)*0.2;
+    if(tx>=x0+mx&&tx<=x1-mx&&ty>=y0+my&&ty<=y1-my) return 0; const dx=Math.max(x0-tx,0,tx-x1), dy=Math.max(y0-ty,0,ty-y1); if(Math.hypot(dx,dy)<40) best=1; } return best; }
+function slBuild(){ if(SL.list) return SL.list; const out=[], taken=new Set();
+  const railT=new Set(); if(typeof RAIL!=='undefined'&&RAIL.X) for(let i=0;i<RAIL.L;i+=2){ const cx=RAIL.X[i]/M_TILE, cy=RAIL.Y[i]/M_TILE; for(let oy=-2;oy<=2;oy++) for(let ox=-2;ox<=2;ox++) railT.add(Math.floor(cx+ox*0.5)+','+Math.floor(cy+oy*0.5)); }
+  const BAD=new Set([T.ROAD,T.BRIDGE,T.WATER,T.BLDG,T.TANK,T.PUMP,T.CONT,T.QUAY]);
+  const okPost=(px,py)=>{ const tx=Math.floor(px),ty=Math.floor(py); if(!inb(tx,ty)) return false; const i=idx(tx,ty); if(BAD.has(G[i])||(world.reserved&&world.reserved[i])||railT.has(tx+','+ty)) return false;
+    for(const d of world.depots||[]) if(tx>=d.x-1&&tx<=d.x+d.w&&ty>=d.y-1&&ty<=d.y+d.h) return false;
+    const key=Math.round(px/2)+','+Math.round(py/2); if(taken.has(key)) return false; taken.add(key); return true; };
+  // post at p (tiles), arm toward the road along unit n (pointing into the road); pool 2 m inside the kerb
+  const put=(kx,ky,nx,ny,dbl)=>{ const px=kx-nx*0.18, py=ky-ny*0.18; if(!dbl&&!okPost(px,py)) return; const ax=kx+nx*0.45, ay=ky+ny*0.45, lx=kx+nx*0.55, ly=ky+ny*0.55;
+    out.push({px:px*TILE,py:py*TILE,hx:ax*TILE,hy:ay*TILE,x:lx*TILE,y:ly*TILE,r:110,dbl:!!dbl}); };
+  const inJ=(tx,ty)=>{ for(const J of world.junctions) if(tx>J.x-1.5&&tx<J.x+J.w+1.5&&ty>J.y-1.5&&ty<J.y+J.h+1.5) return true; return false; };
+  for(const sg of world.segs||[]){ if(!sg||sg.b1===undefined||sg.type==='dirt'||sg.type==='lane') continue; const hwy=sg.type==='hwy';
+    for(let a=sg.b0+1, n=0;a<sg.b1;a++){ const cx=sg.dir==='h'?a+0.5:sg.a+sg.w/2, cy=sg.dir==='h'?sg.a+sg.w/2:a+0.5, z=slZone(cx,cy); if(z===2) continue;
+      const sp=z===0?7:12; if(((a-sg.b0)%sp)!==0||inJ(Math.floor(cx),Math.floor(cy))) continue; n++;
+      if(hwy&&sg.w>=6&&z===1){ // central reservation double lamp: arms either way over the fast lanes
+        const ox=sg.dir==='h'?0:1, oy=sg.dir==='h'?1:0; out.push({px:cx*TILE,py:cy*TILE,hx:(cx-ox*0.45)*TILE,hy:(cy-oy*0.45)*TILE,x:(cx-ox*0.9)*TILE,y:(cy-oy*0.9)*TILE,r:110,dbl:1});
+        out.push({px:cx*TILE,py:cy*TILE,hx:(cx+ox*0.45)*TILE,hy:(cy+oy*0.45)*TILE,x:(cx+ox*0.9)*TILE,y:(cy+oy*0.9)*TILE,r:110,dbl:1,twin:1}); continue; }
+      const sides=z===0?[-1,1]:[(n&1)?1:-1];
+      for(const sd of sides){ const e=sg.a+(sd<0?0:sg.w); if(sg.dir==='h') put(a+0.5,e,0,-sd); else put(e,a+0.5,-sd,0); } } }
+  for(const cv of world.curves||[]){ if(cv.type==='dirt'||cv.type==='lane'||!cv.pts||cv.pts.length<2) continue; let acc=0, n=0;
+    for(let i=1;i<cv.pts.length;i++){ const A=cv.pts[i-1],B=cv.pts[i], l=Math.hypot(B[0]-A[0],B[1]-A[1]); acc+=l; const z=slZone(B[0],B[1]); if(z===2){ acc=0; continue; } const sp=z===0?7:12; if(acc<sp) continue; acc=0; n++;
+      const ux=(B[0]-A[0])/(l||1), uy=(B[1]-A[1])/(l||1), nx=-uy, ny=ux, hw=cv.w/2; if(inJ(Math.floor(B[0]),Math.floor(B[1]))) continue;
+      for(const sd of (z===0?[-1,1]:[(n&1)?1:-1])) put(B[0]+nx*sd*hw,B[1]+ny*sd*hw,-nx*sd,-ny*sd); } }
+  // rural junctions + roundabouts: a lamp on each corner / around the ring
+  for(const J of world.junctions){ const z=slZone(J.x+J.w/2,J.y+J.h/2); if(z===0) continue; const hs=world.segs[J.hs], vs=world.segs[J.vs]; if(z===2&&(!hs||!vs||hs.type==='dirt'||vs.type==='dirt')) continue;
+    for(const [cx,cy,dx,dy] of [[J.x,J.y,-1,-1],[J.x+J.w,J.y,1,-1],[J.x,J.y+J.h,-1,1],[J.x+J.w,J.y+J.h,1,1]]){ const k=Math.SQRT1_2; put(cx+dx*0.35,cy+dy*0.35,-dx*k,-dy*k); } }
+  for(const rb of world.rbs||[]){ for(let q=0;q<6;q++){ const a=q*Math.PI/3+0.3, c=Math.cos(a), s=Math.sin(a); put(rb.cx+c*(rb.rout+0.15),rb.cy+s*(rb.rout+0.15),-c,-s); } }
+  const g=new Map(); for(const l of out){ const k=((l.px/SL.cell)|0)+','+((l.py/SL.cell)|0); let a=g.get(k); if(!a) g.set(k,a=[]); a.push(l); } SL.grid=g; SL.list=out; return out; }
+// posts drawn in world space (day and night); cheap: only the cells in view
+function drawStreetLamps(vx0,vy0,vx1,vy1){ slBuild(); const C=SL.cell; ctx.save(); ctx.lineCap='round';
+  for(let cy=Math.floor((vy0-60)/C);cy<=Math.floor((vy1+60)/C);cy++) for(let cx=Math.floor((vx0-60)/C);cx<=Math.floor((vx1+60)/C);cx++){ const a=SL.grid.get(cx+','+cy); if(!a) continue;
+    for(const l of a){ if(l.px<vx0-60||l.px>vx1+60||l.py<vy0-60||l.py>vy1+60) continue;
+      ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(l.px+5,l.py+6); ctx.lineTo(l.hx+5,l.hy+6); ctx.stroke();
+      ctx.strokeStyle='#5d6268'; ctx.lineWidth=2.2; ctx.beginPath(); ctx.moveTo(l.px,l.py); ctx.lineTo(l.hx,l.hy); ctx.stroke();
+      if(!l.twin){ ctx.fillStyle='#3c4046'; ctx.beginPath(); ctx.arc(l.px,l.py,2.8,0,7); ctx.fill(); ctx.fillStyle='#8b9097'; ctx.beginPath(); ctx.arc(l.px-0.6,l.py-0.6,1.3,0,7); ctx.fill(); }
+      const ang=Math.atan2(l.hy-l.py,l.hx-l.px); ctx.save(); ctx.translate(l.hx,l.hy); ctx.rotate(ang); ctx.fillStyle='#2f3338'; ctx.fillRect(-3,-2.2,6.5,4.4); ctx.fillStyle=DN.dark>0.3?'#fff2c8':'#cfd4da'; ctx.fillRect(-2,-1.3,4.5,2.6); ctx.restore(); } }
+  ctx.restore(); }
 
 // ---------- weather: random clear / rain / fog cycles (host-synced in MP, saved) ----------
 const WX={st:'clear',rain:0,fog:0,wet:0,timer:240,grip:1,drops:null,wip:0};
@@ -4389,7 +4431,7 @@ function draw(){
   drawPortLow(vx0,vy0,vx1,vy1); drawFXLow(vx0,vy0,vx1,vy1); drawRemotePlayers(vx0,vy0,vx1,vy1); drawBreakdown();
   drawLorry(); drawRail(vx0,vy0,vx1,vy1); drawFXHigh(); drawPortHigh(vx0,vy0,vx1,vy1);
   for(const o of world.overhead) if(o.x>vx0-400&&o.x<vx1+400&&o.y>vy0-400&&o.y<vy1+400) drawOverhead(o);
-  drawAmbientHigh(VR); drawWeather(vx0,vy0,vx1,vy1,z); drawNight(vx0,vy0,vx1,vy1,z);
+  drawStreetLamps(vx0,vy0,vx1,vy1); drawAmbientHigh(VR); drawWeather(vx0,vy0,vx1,vy1,z); drawNight(vx0,vy0,vx1,vy1,z);
   ctx.setTransform(1,0,0,1,0,0);
   drawHUD();
   if(bigmap.open){ drawBigMap(); dnMapShade(0,0,VW,VH,0.35); drawPadMapCursor(); }

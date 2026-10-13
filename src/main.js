@@ -92,7 +92,7 @@ function draw(){
   drawPortLow(vx0,vy0,vx1,vy1); drawFXLow(vx0,vy0,vx1,vy1); drawRemotePlayers(vx0,vy0,vx1,vy1); drawBreakdown();
   drawLorry(); drawRail(vx0,vy0,vx1,vy1); drawFXHigh(); drawPortHigh(vx0,vy0,vx1,vy1);
   for(const o of world.overhead) if(o.x>vx0-400&&o.x<vx1+400&&o.y>vy0-400&&o.y<vy1+400) drawOverhead(o);
-  drawAmbientHigh(VR); drawWeather(vx0,vy0,vx1,vy1,z); drawNight(vx0,vy0,vx1,vy1,z);
+  drawStreetLamps(vx0,vy0,vx1,vy1); drawAmbientHigh(VR); drawWeather(vx0,vy0,vx1,vy1,z); drawNight(vx0,vy0,vx1,vy1,z);
   ctx.setTransform(1,0,0,1,0,0);
   drawHUD();
   if(bigmap.open){ drawBigMap(); dnMapShade(0,0,VW,VH,0.35); drawPadMapCursor(); }
