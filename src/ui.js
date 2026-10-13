@@ -132,8 +132,8 @@ function trlSVG(type,col){ const body={curtain:`<rect x="14" y="6" width="58" he
   flat:`<rect x="14" y="20" width="58" height="4" fill="#5b4a3a"/><rect x="20" y="12" width="44" height="8" fill="${col}"/>`}[type]||'';
   return `<svg viewBox="0 0 80 34"><rect x="0" y="9" width="12" height="17" rx="2" fill="#d63b2f"/><rect x="2" y="11" width="6" height="6" fill="#9ec9e8"/>${body}<rect x="12" y="25" width="62" height="2" fill="#222"/>${[6,52,60,68].map(x=>`<circle cx="${x}" cy="28" r="3.3" fill="#111"/>`).join('')}</svg>`; }
 // ---------- job board
-const boardState={filter:'all',sort:'pay',sel:null};
-function openBoard(){ if(!started) return; if(!world.malls||!world.malls.length) return; fillBoard(); const T_=tierInfo(career.tier), lv=levelOf(career.xp), a0=levelNeed(lv), a1=levelNeed(lv+1);
+const boardState={filter:'all',sort:'near',sel:null};
+function openBoard(){ if(!started) return; boardState.sort='near'; boardState.sel=null; if(!world.malls||!world.malls.length) return; fillBoard(); const T_=tierInfo(career.tier), lv=levelOf(career.xp), a0=levelNeed(lv), a1=levelNeed(lv+1);
   const tiers=TIERS.map(t=>`<span class="chip" data-f="${t.tier}">Tier ${t.tier}</span>`).join('');
   const b=openModal('board',`<div class="mh"><div style="font-size:28px">\u{1F4CB}</div><div><h2>JOB BOARD</h2><div class="sub">Deliveries to shopping malls, retail parks &amp; supermarkets \u2022 pick up at depots, docks &amp; warehouses</div></div><div class="sp"></div>
     <div style="text-align:right;font-size:12px"><span class="tb" style="background:${T_.color}">TIER ${career.tier}</span> <b>${esc(T_.name)}</b> \u2022 Lv ${lv}<br><span class="xpb"><i style="width:${Math.min(100,(career.xp-a0)/(a1-a0)*100)}%"></i></span> <span style="opacity:.7">${career.xp} XP</span></div><button class="x">\u2715</button></div>
@@ -149,7 +149,7 @@ function renderBoard(){ const b=uiRoot&&uiRoot.querySelector('.mback'); if(!b||c
   b.querySelectorAll('[data-f]').forEach(c=>c.classList.toggle('on',c.dataset.f===boardState.filter)); b.querySelectorAll('[data-s]').forEach(c=>c.classList.toggle('on',c.dataset.s===boardState.sort));
   let js=career.jobs.slice(); const f=boardState.filter; if(f==='avail') js=js.filter(j=>j.tier<=career.tier); else if(f!=='all') js=js.filter(j=>j.tier===+f);
   const away=j=>Math.hypot(j.from.entrance.x-truck.x,j.from.entrance.y-truck.y); for(const j of js) j.away=away(j);
-  js.sort((a,b2)=>boardState.sort==='near'?a.away-b2.away:boardState.sort==='km'?a.km-b2.km:boardState.sort==='xp'?b2.xp-a.xp:b2.pay-a.pay);
+  js.sort((a,b2)=>boardState.sort==='near'?((a.tier>career.tier)-(b2.tier>career.tier))||a.away-b2.away:boardState.sort==='km'?a.km-b2.km:boardState.sort==='xp'?b2.xp-a.xp:b2.pay-a.pay);
   if(!boardState.sel||!js.includes(boardState.sel)) boardState.sel=js.find(j=>j.tier<=career.tier)||js[0]||null;
   g.innerHTML=js.map((j,i)=>{ const lock=j.tier>career.tier, T_=tierInfo(j.tier), c=j.cargo;
     return `<div class="card ${lock?'lock':''} ${j===boardState.sel?'sel':''}" data-j="${j.id}" style="animation-delay:${i*30}ms">

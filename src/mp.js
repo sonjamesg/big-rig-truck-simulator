@@ -88,7 +88,7 @@ function mpTrl(tr){ const k=tr[1]+'|'+tr[2]+'|'+tr[3]; if(!mpArt[k]) mpArt[k]=tr
 function drawRemotePlayers(vx0,vy0,vx1,vy1){ if(!MP.on) return; for(const id in MP.players){ const p=MP.players[id], r=p.cur; if(!p.has) continue; const X=r.x*PPM, Y=r.y*PPM; if(X<vx0-300||X>vx1+300||Y<vy0-300||Y>vy1+300) continue;
     const cab=mpCab(r.m,r.c); drawRig(cab.a,cab.sh,r.x,r.y,r.h,r.tr?mpTrl(r.tr):null,r.kx,r.ky,r.th,6);
     const f=fwd(r.h), rt=rgt(r.h), fl=r.fl|0, br=fl&1, rv=fl&2, ind=(fl>>2)&3, hz=fl&32;
-    if(br||rv){ ctx.fillStyle=rv?'rgba(255,255,255,0.95)':'rgba(255,40,30,0.95)'; for(const sd of [-1,1]) ctx.fillRect((r.x-f[0]*1.3+rt[0]*sd*1.1)*PPM-2,(r.y-f[1]*1.3+rt[1]*sd*1.1)*PPM-2,4,4); }
+    if(br||rv){ ctx.fillStyle=rv?'rgba(255,255,255,0.95)':'rgba(255,40,30,0.95)'; let bx=r.x-f[0]*1.3, by=r.y-f[1]*1.3, br_=rt; if(r.tr){ const tf=fwd(r.th); bx=r.kx-tf[0]*TRL.rear; by=r.ky-tf[1]*TRL.rear; br_=rgt(r.th); } for(const sd of [-1,1]) ctx.fillRect((bx+br_[0]*sd*1.1)*PPM-2,(by+br_[1]*sd*1.1)*PPM-2,4,4); }
     if(ind||hz) indLampsAt(r.x,r.y,r.h,!!r.tr,r.kx,r.ky,r.th,ind,hz);
     ctx.font='bold 13px system-ui,sans-serif'; ctx.textAlign='center'; const w=ctx.measureText(p.n).width+14; ctx.fillStyle='rgba(8,12,20,0.75)'; ctx.beginPath(); ctx.roundRect(X-w/2,Y-62,w,20,10); ctx.fill(); ctx.fillStyle='#7fd8ff'; ctx.fillText(p.n,X,Y-48); } }
 function mpDrawMap(X,Y,labels){ if(!MP.on) return; ctx.save(); ctx.font='bold 10px system-ui,sans-serif'; ctx.textAlign='left';
