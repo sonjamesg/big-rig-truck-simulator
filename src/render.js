@@ -167,6 +167,7 @@ function drawObject(g,o){
     g.strokeStyle='#8a877f'; g.lineWidth=3; g.beginPath(); g.arc(X,Y,Rr-1,0,7); g.stroke(); g.lineWidth=1; g.restore(); break; }
   case 'pond': g.fillStyle='#d8c98f'; g.beginPath(); g.ellipse(o.x+o.w/2,o.y+o.h/2,o.w/2+4,o.h/2+4,0,0,7); g.fill(); break;
   case 'curve': drawCurve(g,o.cv); break;
+  case 'taper': drawTaper(g,o.tp); break;
   case 'bush': { const r=mulberry(o.seed); g.fillStyle='rgba(10,20,10,0.28)'; g.beginPath(); g.arc(o.x+3,o.y+3,o.r+2,0,7); g.fill(); const base=['#4d7d33','#5a8a3a','#3f6f2e'][(r()*3)|0];
     for(let k=0;k<4;k++){ g.fillStyle=shade(base,0.85+r()*0.35); g.beginPath(); g.arc(o.x+(r()-0.5)*o.r,o.y+(r()-0.5)*o.r,o.r*(0.5+r()*0.4),0,7); g.fill(); }
     if(r()<0.3){ g.fillStyle=['#f4e04d','#fff','#e86fa0'][(r()*3)|0]; for(let k=0;k<4;k++) g.fillRect(o.x+(r()-0.5)*o.r*1.5,o.y+(r()-0.5)*o.r*1.5,2,2); } break; }
@@ -238,6 +239,30 @@ function hillElev(tx,ty){ let e=0; for(const h of world.hills){ const d=Math.hyp
 function nearHill(tx,ty){ for(const h of world.hills) if(Math.hypot(tx-h.x,ty-h.y)<h.r*1.1) return true; return false; }
 let CUR_CHUNK=null;
 function curvePath(g,P,i0,i1,off){ g.beginPath(); for(let i=i0;i<=i1;i++){ const a=P[Math.max(0,i-1)], b=P[Math.min(P.length-1,i+1)]; const tx=b[0]-a[0],ty=b[1]-a[1],l=Math.hypot(tx,ty)||1; const x=P[i][0]-ty/l*off, y=P[i][1]+tx/l*off; i===i0?g.moveTo(x,y):g.lineTo(x,y); } }
+// v13: lane-drop taper — asphalt edge narrows smoothly from the wide road to the narrow one, pavement tapers out, UK merge arrows
+function drawTaper(g,tp){ const P=tp.pts, n=P.length, T_=TILE;
+  const nrm=i=>{ const a=P[Math.max(0,i-1)], b=P[Math.min(n-1,i+1)]; const tx=b[0]-a[0],ty=b[1]-a[1],l=Math.hypot(tx,ty)||1; return [-ty/l,tx/l]; };
+  const NR=P.map((p,i)=>nrm(i)), at=(i,off)=>[(P[i][0]+NR[i][0]*off)*T_,(P[i][1]+NR[i][1]*off)*T_];
+  const band=(f0,f1,sd)=>{ const F0=i=>f0(i,sd),F1=i=>f1(i,sd); g.beginPath(); for(let i=0;i<n;i++){ const q=at(i,sd*F0(i)); i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]); } for(let i=n-1;i>=0;i--){ const q=at(i,sd*F1(i)); g.lineTo(q[0],q[1]); } g.closePath(); g.fill(); };
+  const poly=(f,sd)=>{ g.beginPath(); for(let i=0;i<n;i++){ const q=at(i,sd*f(i,sd)); i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]); } g.stroke(); };
+  const hw=(i,sd)=>tp.hs(tp.s[i],sd); g.save(); g.lineJoin='round';
+  if(tp.urban){ const pw=(i,sd)=>{ const u=Math.min(1,tp.s[i]/(tp.L*0.7)); return hw(i,sd)+1.02*(1-u*u*(3-2*u)); };
+    g.fillStyle=g.createPattern(TEX.walk[0],'repeat'); for(const sd of [-1,1]) band(hw,pw,sd);
+    g.strokeStyle='#8a877f'; g.lineWidth=2; for(const sd of [-1,1]) poly((i,sd)=>hw(i,sd)+0.03,sd); }
+  g.fillStyle=g.createPattern(TEX.asph[1],'repeat'); const inn=()=>tp.wN/2-7/T_;
+  for(const sd of [-1,1]) band(inn,hw,sd);
+  if(tp.wN<=2&&!tp.urban){ g.strokeStyle='rgba(60,60,55,0.35)'; g.lineWidth=2; for(const sd of [-1,1]) poly((i,sd)=>hw(i,sd)-0.02,sd); }
+  g.strokeStyle='#ececec'; g.lineWidth=2; for(const sd of [-1,1]) poly((i,sd)=>hw(i,sd)-5/T_,sd);
+  // merge arrows in each dropped lane for traffic heading wide -> narrow (UK: drive on the left => negative offset side)
+  const d=tp.dW, J=P[0], nx=-d[1], ny=d[0]; g.strokeStyle='#ececec'; g.fillStyle='#ececec'; g.lineWidth=5; g.lineCap='round';
+  for(let j=0;j<tp.drop;j++){ const lo=-(tp.wN/2+j+0.5);
+    const AK='arr'+j; if(!tp[AK]) tp[AK]=[18,9,1.5].filter(bk=>{ for(let al=-3;al<=2.5;al+=0.5){ const x=J[0]-d[0]*bk+d[0]*al+nx*lo, y=J[1]-d[1]*bk+d[1]*al+ny*lo;
+        for(const Jn of world.junctions) if(x>Jn.x-2&&x<Jn.x+Jn.w+2&&y>Jn.y-2&&y<Jn.y+Jn.h+2) return false; if(bk>2&&get(Math.floor(x),Math.floor(y))!==T.ROAD) return false; } return true; });
+    for(const back of tp[AK]){ const B=(al,lat)=>[(J[0]-d[0]*back+d[0]*al+nx*lat)*T_,(J[1]-d[1]*back+d[1]*al+ny*lat)*T_];
+      const lat=back<2?lo*0.85:lo, a=B(-2.6,lat), b=B(0,lat), c=B(2.2,lat+0.75), dx=c[0]-b[0], dy=c[1]-b[1], l=Math.hypot(dx,dy), ux=dx/l, uy=dy/l;
+      g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.lineTo(c[0]-ux*8,c[1]-uy*8); g.stroke();
+      g.beginPath(); g.moveTo(c[0]+ux*4,c[1]+uy*4); g.lineTo(c[0]-ux*12-uy*7,c[1]-uy*12+ux*7); g.lineTo(c[0]-ux*12+uy*7,c[1]-uy*12-ux*7); g.closePath(); g.fill(); } }
+  g.restore(); }
 function drawCurve(g,cv){
   if(!cv.px) cv.px=cv.pts.map(p=>[p[0]*TILE,p[1]*TILE]); const P=cv.px, W=cv.w*TILE, n=P.length;
   // only the part of the curve inside this chunk (plus margin)

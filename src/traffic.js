@@ -188,7 +188,12 @@ function planPiece(v,r){
   const cref=d>0?sg.cv1:sg.cv0; if(cref) return planCurve(v,sg,d,E,cref);
   const lk=d>0?sg.link1:sg.link0;
   if(lk!==undefined && rbId===undefined){ const N=world.segs[lk], rowsN=[]; for(let i=0;i<nLanes(N);i++) rowsN.push(laneLat(N,d,i));
-    let ni=rowsN.indexOf(laneLat(sg,d,P.lane));
+    let ni=rowsN.indexOf(laneLat(sg,d,P.lane)); const tpw=sg.tap&&sg.tap[d>0?1:0];
+    if(ni<0&&tpw){ // v13: lane drop — follow the painted taper and merge across inside it
+      const l0=laneLat(sg,d,P.lane); let bi=0; for(let i=1;i<rowsN.length;i++) if(Math.abs(rowsN[i]-l0)<Math.abs(rowsN[bi]-l0)) bi=i; ni=bi;
+      const far=d>0?N.b1+1:N.b0, Lb=Math.max(4,Math.min(tpw.L,Math.abs(far-E)-2)); const p0=lanePt(sg,d,P.lane,E); pathLine(v,p0[0],p0[1]); const d0=pathEnd(v);
+      const c0=l0+0.5, c1=rowsN[ni]+0.5, nn=Math.ceil(Lb*2); for(let k=1;k<=nn;k++){ const t=k/nn, e=t*t*(3-2*t), al=(E+d*Lb*t)*M_T, cr=(c0+(c1-c0)*e)*M_T; if(sg.dir==='h') pathPush(v,al,cr); else pathPush(v,cr,al); }
+      v.mk.push({kind:'sig',d0:d0-20,d1:pathEnd(v),side:1}); P.seg=N.id; P.lane=ni; P.pos=E+d*Lb; return true; }
     if(ni<0){ let best=-1,bd=99; for(let i=0;i<nLanes(sg);i++){ if(rowsN.indexOf(laneLat(sg,d,i))>=0&&Math.abs(i-P.lane)<bd){ bd=Math.abs(i-P.lane); best=i; } }
       if(best>=0){ laneChange(v,sg,d,P.lane,best,P.pos,E); P.lane=best; ni=rowsN.indexOf(laneLat(sg,d,best)); } else ni=0; }
     const p=lanePt(sg,d,P.lane,E); pathLine(v,p[0],p[1]);
@@ -211,10 +216,13 @@ function planCurve(v,sg,d,E,cref){
   const p=lanePt(sg,d,P.lane,E); pathLine(v,p[0],p[1]);
   const dv=dirVec(sg,d), c=sg.dir==='h'?[E*M_T,(sg.a+sg.w/2)*M_T]:[(sg.a+sg.w/2)*M_T,E*M_T];
   const o=(p[0]-c[0])*(-dv[1])+(p[1]-c[1])*dv[0]; const d0=pathEnd(v), n=pts.length;
-  for(let i=2;i<n-1;i+=2){ const a=pts[i-1], b=pts[i+1]; let tx=b[0]-a[0], ty=b[1]-a[1]; const l=Math.hypot(tx,ty)||1; tx/=l; ty/=l; pathPush(v,pts[i][0]*M_T-ty*o, pts[i][1]*M_T+tx*o); }
+  const tpc=cv.tap&&cv.tap[cref.start?'A':'B'], oT=tpc?Math.sign(o)*Math.min(Math.abs(o),(cv.w/2-0.5)*M_T):o; let sa=0, o2=o;
+  if(tpc&&oT!==o) v.mk.push({kind:'sig',d0:d0-20,d1:d0+tpc.L*M_T,side:1});
+  for(let i=2;i<n-1;i+=2){ const a=pts[i-1], b=pts[i+1]; let tx=b[0]-a[0], ty=b[1]-a[1]; const l=Math.hypot(tx,ty)||1; tx/=l; ty/=l; sa+=Math.hypot(pts[i][0]-pts[i-2][0],pts[i][1]-pts[i-2][1]);
+    if(tpc){ const u=Math.min(1,sa/tpc.L), e=u*u*(3-2*u); o2=o+(oT-o)*e; } pathPush(v,pts[i][0]*M_T-ty*o2, pts[i][1]*M_T+tx*o2); }
   const Q=world.segs[other.seg], qd=other.end===0?1:-1, qpos=other.end===0?Q.b0:Q.b1+1;
   const qv=dirVec(Q,qd), qc=Q.dir==='h'?[qpos*M_T,(Q.a+Q.w/2)*M_T]:[(Q.a+Q.w/2)*M_T,qpos*M_T];
-  let best=0,bd=1e9; for(let l=0;l<nLanes(Q);l++){ const q=lanePt(Q,qd,l,qpos); const oo=(q[0]-qc[0])*(-qv[1])+(q[1]-qc[1])*qv[0]; if(Math.abs(oo-o)<bd){ bd=Math.abs(oo-o); best=l; } }
+  let best=0,bd=1e9; for(let l=0;l<nLanes(Q);l++){ const q=lanePt(Q,qd,l,qpos); const oo=(q[0]-qc[0])*(-qv[1])+(q[1]-qc[1])*qv[0]; if(Math.abs(oo-o2)<bd){ bd=Math.abs(oo-o2); best=l; } }
   const q=lanePt(Q,qd,best,qpos); pathLine(v,q[0],q[1]);
   v.mk.push({kind:'slow',d0:d0,d1:pathEnd(v),v:cv.vmax});
   if(traffic.log) traffic.log.push({curve:cv.id,from:sg.id,to:Q.id,lane:best,off:o});

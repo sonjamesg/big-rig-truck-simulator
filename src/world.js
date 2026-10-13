@@ -256,6 +256,33 @@ function genWorld(){
   // sidewalks along urban roads (walk the two kerb lines of each urban segment)
   for(const sg of world.segs){ if(sg.type!=='city'&&sg.type!=='town'&&sg.type!=='res') continue;
     for(let b=sg.b0-1;b<=sg.b1+1;b++) for(const a of [sg.a-1,sg.a+sg.w]){ const x=sg.dir==='h'?b:a, y=sg.dir==='h'?a:b; if(!inb(x,y)) continue; const t=G[idx(x,y)]; if(t===T.GRASS||t===T.SAND) G[idx(x,y)]=T.WALK; } }
+  // v13: lane-drop tapers wherever a wider road meets a narrower one end to end (straight->straight or straight->curve)
+  world.tapers=[]; const TPL=15; // taper length in tiles (60 m)
+  function taper(W,end,wN,path,urban,narrowCv,off){ off=off||0; if(path.length<4) return; const wW=W.w; if(wW<=wN) return;
+    // trim path to ~TPL tiles of arc length
+    const P=[path[0]]; let s=0; for(let i=1;i<path.length&&s<TPL+1;i++){ s+=Math.hypot(path[i][0]-path[i-1][0],path[i][1]-path[i-1][1]); P.push(path[i]); }
+    if(s<6.5) return; const L=Math.min(TPL,s-0.5), S=[0]; for(let i=1;i<P.length;i++) S.push(S[i-1]+Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]));
+    const dW=segOut(W,end); const eP=Math.max(wN/2,off+wW/2), eM=Math.max(wN/2,wW/2-off); const tp={id:world.tapers.length,W:W.id,end,wW,wN,L,pts:P,s:S,dW,urban,cv:narrowCv,eP,eM,drop:Math.round(eM-wN/2)};
+    tp.hs=(t,sd)=>{ const u=Math.max(0,Math.min(1,t/L)), e=u*u*(3-2*u); return wN/2+((sd>0?eP:eM)-wN/2)*(1-e); };
+    world.tapers.push(tp);
+    // tiles under the visible taper become drivable (grip matches the asphalt)
+    for(let i=0;i<P.length;i++){ const [px,py]=P[i], a=P[Math.max(0,i-1)], b=P[Math.min(P.length-1,i+1)], tl=Math.hypot(b[0]-a[0],b[1]-a[1])||1, nx=-(b[1]-a[1])/tl, ny=(b[0]-a[0])/tl, hw=Math.max(tp.hs(S[i],1),tp.hs(S[i],-1));
+      for(let ty=Math.floor(py-hw-2);ty<=py+hw+2;ty++) for(let tx=Math.floor(px-hw-2);tx<=px+hw+2;tx++){ if(!inb(tx,ty)) continue; const k=idx(tx,ty), lat=(tx+0.5-px)*nx+(ty+0.5-py)*ny, lon=(tx+0.5-px)*(ny)-(ty+0.5-py)*nx; if(Math.abs(lon)>0.6) continue; const hh=tp.hs(S[i],lat>0?1:-1), d=Math.abs(lat)-hh+hw;
+        if(world.roadH[k]!==-1||world.roadV[k]!==-1) continue;
+        if(d<=hw+0.05){ if(G[k]===T.WATER||water[k]||G[k]===T.BLDG) continue; world.under[k]=G[k]===T.WALK?T.GRASS:G[k]; G[k]=T.ROAD; world.roadH[k]=-3; world.roadV[k]=-3; }
+        else if(G[k]===T.WALK && S[i]<1.5 && d<=hw+1.6){ G[k]=T.GRASS; } } }
+    let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; const back=[P[0][0]-dW[0]*20,P[0][1]-dW[1]*20];
+    for(const q of [...P,back]){ x0=Math.min(x0,q[0]); y0=Math.min(y0,q[1]); x1=Math.max(x1,q[0]); y1=Math.max(y1,q[1]); }
+    const m=wW/2+3; world.objects.push({kind:'taper',tp,x:(x0-m)*TILE,y:(y0-m)*TILE,w:(x1-x0+2*m)*TILE,h:(y1-y0+2*m)*TILE}); return tp; }
+  const URB=t=>t==='city'||t==='town'||t==='res';
+  for(const cv of world.curves) for(const [E,k] of [[cv.A,'A'],[cv.B,'B']]){ if(!E) continue; const W=world.segs[E.seg]; if(W.w<=cv.w) continue;
+    const path=k==='A'?cv.pts:cv.pts.slice().reverse(); const tp=taper(W,E.end,cv.w,path,URB(W.type),cv.id); if(tp) (cv.tap=cv.tap||{})[k]=tp; }
+  for(const a of world.segs){ if(a.link1===undefined) continue; const b=world.segs[a.link1]; if(a.w===b.w) continue;
+    const [W,N,end]=a.w>b.w?[a,b,1]:[b,a,0]; const d=end?1:-1, c=N.a+N.w/2, J=end?W.b1+1:W.b0, path=[];
+    const len=end?(N.b1+1-J):(J-N.b0); for(let t=0;t<=len;t+=0.5){ const al=J+d*t; path.push(W.dir==='h'?[al,c]:[c,al]); }
+    const cr=end?N.cv1:N.cv0; if(cr&&len<TPL+1){ const cv=world.curves[cr.cv]; const cp=cr.start?cv.pts:cv.pts.slice().reverse(); for(let i=1;i<cp.length;i++){ const a=cp[i-1], b=cp[i], l=Math.hypot(b[0]-a[0],b[1]-a[1])||1, dd=W.dir==='h'?[d,0]:[0,d]; if(((b[0]-a[0])*dd[0]+(b[1]-a[1])*dd[1])/l<0.94) break; path.push(b); } }
+    const off=((W.a+W.w/2)-c)*(W.dir==='h'?d:-d);
+    const tp=taper(W,end,N.w,path,URB(W.type),null,off); if(tp) (W.tap=W.tap||{})[end]=tp; }
   (world.tm=world.tm||[]).push(['// ---------------- ',performance.now()-t0|0]);
   // ---------------- junctions & lorry-friendly kerb radii ----------------
   const reserved=new Uint8Array(MW*MH); world.reserved=reserved; world.cornerAt=new Int32Array(MW*MH).fill(-1);

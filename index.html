@@ -334,6 +334,33 @@ function genWorld(){
   // sidewalks along urban roads (walk the two kerb lines of each urban segment)
   for(const sg of world.segs){ if(sg.type!=='city'&&sg.type!=='town'&&sg.type!=='res') continue;
     for(let b=sg.b0-1;b<=sg.b1+1;b++) for(const a of [sg.a-1,sg.a+sg.w]){ const x=sg.dir==='h'?b:a, y=sg.dir==='h'?a:b; if(!inb(x,y)) continue; const t=G[idx(x,y)]; if(t===T.GRASS||t===T.SAND) G[idx(x,y)]=T.WALK; } }
+  // v13: lane-drop tapers wherever a wider road meets a narrower one end to end (straight->straight or straight->curve)
+  world.tapers=[]; const TPL=15; // taper length in tiles (60 m)
+  function taper(W,end,wN,path,urban,narrowCv,off){ off=off||0; if(path.length<4) return; const wW=W.w; if(wW<=wN) return;
+    // trim path to ~TPL tiles of arc length
+    const P=[path[0]]; let s=0; for(let i=1;i<path.length&&s<TPL+1;i++){ s+=Math.hypot(path[i][0]-path[i-1][0],path[i][1]-path[i-1][1]); P.push(path[i]); }
+    if(s<6.5) return; const L=Math.min(TPL,s-0.5), S=[0]; for(let i=1;i<P.length;i++) S.push(S[i-1]+Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]));
+    const dW=segOut(W,end); const eP=Math.max(wN/2,off+wW/2), eM=Math.max(wN/2,wW/2-off); const tp={id:world.tapers.length,W:W.id,end,wW,wN,L,pts:P,s:S,dW,urban,cv:narrowCv,eP,eM,drop:Math.round(eM-wN/2)};
+    tp.hs=(t,sd)=>{ const u=Math.max(0,Math.min(1,t/L)), e=u*u*(3-2*u); return wN/2+((sd>0?eP:eM)-wN/2)*(1-e); };
+    world.tapers.push(tp);
+    // tiles under the visible taper become drivable (grip matches the asphalt)
+    for(let i=0;i<P.length;i++){ const [px,py]=P[i], a=P[Math.max(0,i-1)], b=P[Math.min(P.length-1,i+1)], tl=Math.hypot(b[0]-a[0],b[1]-a[1])||1, nx=-(b[1]-a[1])/tl, ny=(b[0]-a[0])/tl, hw=Math.max(tp.hs(S[i],1),tp.hs(S[i],-1));
+      for(let ty=Math.floor(py-hw-2);ty<=py+hw+2;ty++) for(let tx=Math.floor(px-hw-2);tx<=px+hw+2;tx++){ if(!inb(tx,ty)) continue; const k=idx(tx,ty), lat=(tx+0.5-px)*nx+(ty+0.5-py)*ny, lon=(tx+0.5-px)*(ny)-(ty+0.5-py)*nx; if(Math.abs(lon)>0.6) continue; const hh=tp.hs(S[i],lat>0?1:-1), d=Math.abs(lat)-hh+hw;
+        if(world.roadH[k]!==-1||world.roadV[k]!==-1) continue;
+        if(d<=hw+0.05){ if(G[k]===T.WATER||water[k]||G[k]===T.BLDG) continue; world.under[k]=G[k]===T.WALK?T.GRASS:G[k]; G[k]=T.ROAD; world.roadH[k]=-3; world.roadV[k]=-3; }
+        else if(G[k]===T.WALK && S[i]<1.5 && d<=hw+1.6){ G[k]=T.GRASS; } } }
+    let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; const back=[P[0][0]-dW[0]*20,P[0][1]-dW[1]*20];
+    for(const q of [...P,back]){ x0=Math.min(x0,q[0]); y0=Math.min(y0,q[1]); x1=Math.max(x1,q[0]); y1=Math.max(y1,q[1]); }
+    const m=wW/2+3; world.objects.push({kind:'taper',tp,x:(x0-m)*TILE,y:(y0-m)*TILE,w:(x1-x0+2*m)*TILE,h:(y1-y0+2*m)*TILE}); return tp; }
+  const URB=t=>t==='city'||t==='town'||t==='res';
+  for(const cv of world.curves) for(const [E,k] of [[cv.A,'A'],[cv.B,'B']]){ if(!E) continue; const W=world.segs[E.seg]; if(W.w<=cv.w) continue;
+    const path=k==='A'?cv.pts:cv.pts.slice().reverse(); const tp=taper(W,E.end,cv.w,path,URB(W.type),cv.id); if(tp) (cv.tap=cv.tap||{})[k]=tp; }
+  for(const a of world.segs){ if(a.link1===undefined) continue; const b=world.segs[a.link1]; if(a.w===b.w) continue;
+    const [W,N,end]=a.w>b.w?[a,b,1]:[b,a,0]; const d=end?1:-1, c=N.a+N.w/2, J=end?W.b1+1:W.b0, path=[];
+    const len=end?(N.b1+1-J):(J-N.b0); for(let t=0;t<=len;t+=0.5){ const al=J+d*t; path.push(W.dir==='h'?[al,c]:[c,al]); }
+    const cr=end?N.cv1:N.cv0; if(cr&&len<TPL+1){ const cv=world.curves[cr.cv]; const cp=cr.start?cv.pts:cv.pts.slice().reverse(); for(let i=1;i<cp.length;i++){ const a=cp[i-1], b=cp[i], l=Math.hypot(b[0]-a[0],b[1]-a[1])||1, dd=W.dir==='h'?[d,0]:[0,d]; if(((b[0]-a[0])*dd[0]+(b[1]-a[1])*dd[1])/l<0.94) break; path.push(b); } }
+    const off=((W.a+W.w/2)-c)*(W.dir==='h'?d:-d);
+    const tp=taper(W,end,N.w,path,URB(W.type),null,off); if(tp) (W.tap=W.tap||{})[end]=tp; }
   (world.tm=world.tm||[]).push(['// ---------------- ',performance.now()-t0|0]);
   // ---------------- junctions & lorry-friendly kerb radii ----------------
   const reserved=new Uint8Array(MW*MH); world.reserved=reserved; world.cornerAt=new Int32Array(MW*MH).fill(-1);
@@ -796,6 +823,7 @@ function drawObject(g,o){
     g.strokeStyle='#8a877f'; g.lineWidth=3; g.beginPath(); g.arc(X,Y,Rr-1,0,7); g.stroke(); g.lineWidth=1; g.restore(); break; }
   case 'pond': g.fillStyle='#d8c98f'; g.beginPath(); g.ellipse(o.x+o.w/2,o.y+o.h/2,o.w/2+4,o.h/2+4,0,0,7); g.fill(); break;
   case 'curve': drawCurve(g,o.cv); break;
+  case 'taper': drawTaper(g,o.tp); break;
   case 'bush': { const r=mulberry(o.seed); g.fillStyle='rgba(10,20,10,0.28)'; g.beginPath(); g.arc(o.x+3,o.y+3,o.r+2,0,7); g.fill(); const base=['#4d7d33','#5a8a3a','#3f6f2e'][(r()*3)|0];
     for(let k=0;k<4;k++){ g.fillStyle=shade(base,0.85+r()*0.35); g.beginPath(); g.arc(o.x+(r()-0.5)*o.r,o.y+(r()-0.5)*o.r,o.r*(0.5+r()*0.4),0,7); g.fill(); }
     if(r()<0.3){ g.fillStyle=['#f4e04d','#fff','#e86fa0'][(r()*3)|0]; for(let k=0;k<4;k++) g.fillRect(o.x+(r()-0.5)*o.r*1.5,o.y+(r()-0.5)*o.r*1.5,2,2); } break; }
@@ -867,6 +895,30 @@ function hillElev(tx,ty){ let e=0; for(const h of world.hills){ const d=Math.hyp
 function nearHill(tx,ty){ for(const h of world.hills) if(Math.hypot(tx-h.x,ty-h.y)<h.r*1.1) return true; return false; }
 let CUR_CHUNK=null;
 function curvePath(g,P,i0,i1,off){ g.beginPath(); for(let i=i0;i<=i1;i++){ const a=P[Math.max(0,i-1)], b=P[Math.min(P.length-1,i+1)]; const tx=b[0]-a[0],ty=b[1]-a[1],l=Math.hypot(tx,ty)||1; const x=P[i][0]-ty/l*off, y=P[i][1]+tx/l*off; i===i0?g.moveTo(x,y):g.lineTo(x,y); } }
+// v13: lane-drop taper — asphalt edge narrows smoothly from the wide road to the narrow one, pavement tapers out, UK merge arrows
+function drawTaper(g,tp){ const P=tp.pts, n=P.length, T_=TILE;
+  const nrm=i=>{ const a=P[Math.max(0,i-1)], b=P[Math.min(n-1,i+1)]; const tx=b[0]-a[0],ty=b[1]-a[1],l=Math.hypot(tx,ty)||1; return [-ty/l,tx/l]; };
+  const NR=P.map((p,i)=>nrm(i)), at=(i,off)=>[(P[i][0]+NR[i][0]*off)*T_,(P[i][1]+NR[i][1]*off)*T_];
+  const band=(f0,f1,sd)=>{ const F0=i=>f0(i,sd),F1=i=>f1(i,sd); g.beginPath(); for(let i=0;i<n;i++){ const q=at(i,sd*F0(i)); i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]); } for(let i=n-1;i>=0;i--){ const q=at(i,sd*F1(i)); g.lineTo(q[0],q[1]); } g.closePath(); g.fill(); };
+  const poly=(f,sd)=>{ g.beginPath(); for(let i=0;i<n;i++){ const q=at(i,sd*f(i,sd)); i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]); } g.stroke(); };
+  const hw=(i,sd)=>tp.hs(tp.s[i],sd); g.save(); g.lineJoin='round';
+  if(tp.urban){ const pw=(i,sd)=>{ const u=Math.min(1,tp.s[i]/(tp.L*0.7)); return hw(i,sd)+1.02*(1-u*u*(3-2*u)); };
+    g.fillStyle=g.createPattern(TEX.walk[0],'repeat'); for(const sd of [-1,1]) band(hw,pw,sd);
+    g.strokeStyle='#8a877f'; g.lineWidth=2; for(const sd of [-1,1]) poly((i,sd)=>hw(i,sd)+0.03,sd); }
+  g.fillStyle=g.createPattern(TEX.asph[1],'repeat'); const inn=()=>tp.wN/2-7/T_;
+  for(const sd of [-1,1]) band(inn,hw,sd);
+  if(tp.wN<=2&&!tp.urban){ g.strokeStyle='rgba(60,60,55,0.35)'; g.lineWidth=2; for(const sd of [-1,1]) poly((i,sd)=>hw(i,sd)-0.02,sd); }
+  g.strokeStyle='#ececec'; g.lineWidth=2; for(const sd of [-1,1]) poly((i,sd)=>hw(i,sd)-5/T_,sd);
+  // merge arrows in each dropped lane for traffic heading wide -> narrow (UK: drive on the left => negative offset side)
+  const d=tp.dW, J=P[0], nx=-d[1], ny=d[0]; g.strokeStyle='#ececec'; g.fillStyle='#ececec'; g.lineWidth=5; g.lineCap='round';
+  for(let j=0;j<tp.drop;j++){ const lo=-(tp.wN/2+j+0.5);
+    const AK='arr'+j; if(!tp[AK]) tp[AK]=[18,9,1.5].filter(bk=>{ for(let al=-3;al<=2.5;al+=0.5){ const x=J[0]-d[0]*bk+d[0]*al+nx*lo, y=J[1]-d[1]*bk+d[1]*al+ny*lo;
+        for(const Jn of world.junctions) if(x>Jn.x-2&&x<Jn.x+Jn.w+2&&y>Jn.y-2&&y<Jn.y+Jn.h+2) return false; if(bk>2&&get(Math.floor(x),Math.floor(y))!==T.ROAD) return false; } return true; });
+    for(const back of tp[AK]){ const B=(al,lat)=>[(J[0]-d[0]*back+d[0]*al+nx*lat)*T_,(J[1]-d[1]*back+d[1]*al+ny*lat)*T_];
+      const lat=back<2?lo*0.85:lo, a=B(-2.6,lat), b=B(0,lat), c=B(2.2,lat+0.75), dx=c[0]-b[0], dy=c[1]-b[1], l=Math.hypot(dx,dy), ux=dx/l, uy=dy/l;
+      g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.lineTo(c[0]-ux*8,c[1]-uy*8); g.stroke();
+      g.beginPath(); g.moveTo(c[0]+ux*4,c[1]+uy*4); g.lineTo(c[0]-ux*12-uy*7,c[1]-uy*12+ux*7); g.lineTo(c[0]-ux*12+uy*7,c[1]-uy*12-ux*7); g.closePath(); g.fill(); } }
+  g.restore(); }
 function drawCurve(g,cv){
   if(!cv.px) cv.px=cv.pts.map(p=>[p[0]*TILE,p[1]*TILE]); const P=cv.px, W=cv.w*TILE, n=P.length;
   // only the part of the curve inside this chunk (plus margin)
@@ -1422,7 +1474,12 @@ function planPiece(v,r){
   const cref=d>0?sg.cv1:sg.cv0; if(cref) return planCurve(v,sg,d,E,cref);
   const lk=d>0?sg.link1:sg.link0;
   if(lk!==undefined && rbId===undefined){ const N=world.segs[lk], rowsN=[]; for(let i=0;i<nLanes(N);i++) rowsN.push(laneLat(N,d,i));
-    let ni=rowsN.indexOf(laneLat(sg,d,P.lane));
+    let ni=rowsN.indexOf(laneLat(sg,d,P.lane)); const tpw=sg.tap&&sg.tap[d>0?1:0];
+    if(ni<0&&tpw){ // v13: lane drop — follow the painted taper and merge across inside it
+      const l0=laneLat(sg,d,P.lane); let bi=0; for(let i=1;i<rowsN.length;i++) if(Math.abs(rowsN[i]-l0)<Math.abs(rowsN[bi]-l0)) bi=i; ni=bi;
+      const far=d>0?N.b1+1:N.b0, Lb=Math.max(4,Math.min(tpw.L,Math.abs(far-E)-2)); const p0=lanePt(sg,d,P.lane,E); pathLine(v,p0[0],p0[1]); const d0=pathEnd(v);
+      const c0=l0+0.5, c1=rowsN[ni]+0.5, nn=Math.ceil(Lb*2); for(let k=1;k<=nn;k++){ const t=k/nn, e=t*t*(3-2*t), al=(E+d*Lb*t)*M_T, cr=(c0+(c1-c0)*e)*M_T; if(sg.dir==='h') pathPush(v,al,cr); else pathPush(v,cr,al); }
+      v.mk.push({kind:'sig',d0:d0-20,d1:pathEnd(v),side:1}); P.seg=N.id; P.lane=ni; P.pos=E+d*Lb; return true; }
     if(ni<0){ let best=-1,bd=99; for(let i=0;i<nLanes(sg);i++){ if(rowsN.indexOf(laneLat(sg,d,i))>=0&&Math.abs(i-P.lane)<bd){ bd=Math.abs(i-P.lane); best=i; } }
       if(best>=0){ laneChange(v,sg,d,P.lane,best,P.pos,E); P.lane=best; ni=rowsN.indexOf(laneLat(sg,d,best)); } else ni=0; }
     const p=lanePt(sg,d,P.lane,E); pathLine(v,p[0],p[1]);
@@ -1445,10 +1502,13 @@ function planCurve(v,sg,d,E,cref){
   const p=lanePt(sg,d,P.lane,E); pathLine(v,p[0],p[1]);
   const dv=dirVec(sg,d), c=sg.dir==='h'?[E*M_T,(sg.a+sg.w/2)*M_T]:[(sg.a+sg.w/2)*M_T,E*M_T];
   const o=(p[0]-c[0])*(-dv[1])+(p[1]-c[1])*dv[0]; const d0=pathEnd(v), n=pts.length;
-  for(let i=2;i<n-1;i+=2){ const a=pts[i-1], b=pts[i+1]; let tx=b[0]-a[0], ty=b[1]-a[1]; const l=Math.hypot(tx,ty)||1; tx/=l; ty/=l; pathPush(v,pts[i][0]*M_T-ty*o, pts[i][1]*M_T+tx*o); }
+  const tpc=cv.tap&&cv.tap[cref.start?'A':'B'], oT=tpc?Math.sign(o)*Math.min(Math.abs(o),(cv.w/2-0.5)*M_T):o; let sa=0, o2=o;
+  if(tpc&&oT!==o) v.mk.push({kind:'sig',d0:d0-20,d1:d0+tpc.L*M_T,side:1});
+  for(let i=2;i<n-1;i+=2){ const a=pts[i-1], b=pts[i+1]; let tx=b[0]-a[0], ty=b[1]-a[1]; const l=Math.hypot(tx,ty)||1; tx/=l; ty/=l; sa+=Math.hypot(pts[i][0]-pts[i-2][0],pts[i][1]-pts[i-2][1]);
+    if(tpc){ const u=Math.min(1,sa/tpc.L), e=u*u*(3-2*u); o2=o+(oT-o)*e; } pathPush(v,pts[i][0]*M_T-ty*o2, pts[i][1]*M_T+tx*o2); }
   const Q=world.segs[other.seg], qd=other.end===0?1:-1, qpos=other.end===0?Q.b0:Q.b1+1;
   const qv=dirVec(Q,qd), qc=Q.dir==='h'?[qpos*M_T,(Q.a+Q.w/2)*M_T]:[(Q.a+Q.w/2)*M_T,qpos*M_T];
-  let best=0,bd=1e9; for(let l=0;l<nLanes(Q);l++){ const q=lanePt(Q,qd,l,qpos); const oo=(q[0]-qc[0])*(-qv[1])+(q[1]-qc[1])*qv[0]; if(Math.abs(oo-o)<bd){ bd=Math.abs(oo-o); best=l; } }
+  let best=0,bd=1e9; for(let l=0;l<nLanes(Q);l++){ const q=lanePt(Q,qd,l,qpos); const oo=(q[0]-qc[0])*(-qv[1])+(q[1]-qc[1])*qv[0]; if(Math.abs(oo-o2)<bd){ bd=Math.abs(oo-o2); best=l; } }
   const q=lanePt(Q,qd,best,qpos); pathLine(v,q[0],q[1]);
   v.mk.push({kind:'slow',d0:d0,d1:pathEnd(v),v:cv.vmax});
   if(traffic.log) traffic.log.push({curve:cv.id,from:sg.id,to:Q.id,lane:best,off:o});
