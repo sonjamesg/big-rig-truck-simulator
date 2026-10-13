@@ -92,10 +92,14 @@ function draw(){
   if(bigmap.open){ drawBigMap(); drawPadMapCursor(); }
 }
 function blit(art,mx,my,ang,dx=0,dy=0){ ctx.save(); ctx.translate(mx*PPM+dx,my*PPM+dy); ctx.rotate(ang); ctx.drawImage(art.c,-art.ox/ART_SCALE,-art.oy/ART_SCALE,art.W/ART_SCALE,art.H/ART_SCALE); ctx.restore(); }
+// coupled artic layering: tractor chassis + fifth wheel (behind the cab body) draw UNDER the trailer, cab body over the trailer nose
+function cabLayers(a){ if(a.rear) return a; const Ys=Math.round(a.oy-1.0*PPM*ART_SCALE); const mk=(top)=>{ const c=mkCanvas(a.W,a.H), g=c.getContext('2d'); g.save(); g.beginPath(); top?g.rect(0,0,a.W,Ys):g.rect(0,Ys,a.W,a.H-Ys); g.clip(); g.drawImage(a.c,0,0); g.restore(); return {c,W:a.W,H:a.H,ox:a.ox,oy:a.oy}; };
+  a.front=mk(true); a.rear=mk(false); return a; }
+function drawRig(art,sh,x,y,h,trl,kx,ky,th,shOff){ if(!trl){ blit(sh,x,y,h,shOff,shOff); blit(art,x,y,h); return; } const L=cabLayers(art);
+  drawTrailerAt(trl,kx,ky,th,true); blit(sh,x,y,h,shOff,shOff); blit(L.rear,x,y,h); drawTrailerAt(trl,kx,ky,th,false); blit(L.front,x,y,h); }
 function drawLorry(){
   const s=truck, k=kingpin(s);
-  if(s.trl) drawTrailerAt(s.trl,k[0],k[1],s.th,true); blit(CABSH,s.x,s.y,s.h,5,5);
-  if(s.trl) drawTrailerAt(s.trl,k[0],k[1],s.th,false);
+  if(s.trl){ drawTrailerAt(s.trl,k[0],k[1],s.th,true); blit(CABSH,s.x,s.y,s.h,5,5); blit(cabLayers(CABART).rear,s.x,s.y,s.h); drawTrailerAt(s.trl,k[0],k[1],s.th,false); } else blit(CABSH,s.x,s.y,s.h,5,5);
   // brake / reverse lights
   const ft=fwd(s.th), rt=rgt(s.th);
   if(s.trl && (s.brake>0 || s.mode==='R')){ const rx=(k[0]-ft[0]*12.45)*PPM, ry=(k[1]-ft[1]*12.45)*PPM; ctx.fillStyle= s.mode==='R'&&s.brake===0 ? 'rgba(255,255,230,0.55)':'rgba(255,40,30,0.6)';
@@ -103,7 +107,7 @@ function drawLorry(){
   // front wheels (steered)
   const f=fwd(s.h), r=rgt(s.h); const fx=s.x+f[0]*CAB.wheelbase, fy=s.y+f[1]*CAB.wheelbase;
   for(const sd of [-1,1]){ ctx.save(); ctx.translate((fx+r[0]*sd*1.12)*PPM,(fy+r[1]*sd*1.12)*PPM); ctx.rotate(s.h+s.steer); ctx.fillStyle='#141414'; ctx.fillRect(-2.2,-4.5,4.4,9); ctx.restore(); }
-  blit(CABART,s.x,s.y,s.h);
+  blit(s.trl?cabLayers(CABART).front:CABART,s.x,s.y,s.h);
   // headlight beams at night? (daytime build) - small DRL dots
   ctx.fillStyle='rgba(255,250,220,0.9)'; for(const sd of [-1,1]){ const hx=(s.x+f[0]*5.0+r[0]*sd*1.0)*PPM, hy=(s.y+f[1]*5.0+r[1]*sd*1.0)*PPM; ctx.fillRect(hx-1.5,hy-1.5,3,3); }
 }
