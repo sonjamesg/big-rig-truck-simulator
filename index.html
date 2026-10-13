@@ -3417,7 +3417,7 @@ body.touch #frame{position:fixed;padding:0;border:none;background:#000;box-shado
 body.touch canvas{border-radius:6px}
 body.touch #overlay,body.touch #ui{position:fixed;inset:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);border-radius:0;z-index:20}
 body.touch #ui{pointer-events:none} body.touch #hudbtns{display:none}
-body.touch #overlay{overflow:auto;justify-content:safe center;align-items:center;padding:16px 14px;box-sizing:border-box}
+body.touch #overlay{overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain;justify-content:safe center;align-items:center;padding:16px 14px;box-sizing:border-box}
 body.touch #overlay p:not(#loading){display:none} body.touch #overlay #logo{max-width:78vw!important;max-height:26vh!important} body.touch #overlay .go{max-width:92vw;font-size:18px;box-sizing:border-box}
 body.touch #overlay button,body.touch #overlay input{max-width:100%;box-sizing:border-box} body.touch #lobby,body.touch #wbCard{width:min(92vw,420px)!important;box-sizing:border-box} body.touch #lobby{align-items:stretch} body.touch #lobby .row{flex-direction:column;align-items:stretch;align-self:stretch;gap:8px} body.touch:has(#overlay:not(.hidden)) #mob,body.touch:has(#overlay:not(.hidden)) #deck{display:none!important} body.touch #lobby .row>*{width:100%!important;margin:0!important}
 body.touch #overlay h1{font-size:40px;margin-top:4px} body.touch #overlay h2{font-size:15px;letter-spacing:5px;margin:4px 0 12px} body.touch #overlay p{font-size:12px;margin-top:10px}
@@ -3443,12 +3443,12 @@ body.touch #mob .steer{background:#2a2d33;border:none;box-shadow:inset 0 3px 6px
 #deck{display:none;position:fixed;left:0;right:0;bottom:0;pointer-events:none;background:linear-gradient(180deg,#c9cdd6,#aeb3be 60%,#9aa0ac);border-radius:28px 28px 0 0;box-shadow:inset 0 3px 0 rgba(255,255,255,.6),inset 0 -2px 0 rgba(0,0,0,.2),0 -6px 24px rgba(0,0,0,.45)}
 body.touch.portrait #deck{display:block}
 #deck .brand{position:absolute;left:50%;transform:translateX(-50%);top:10px;font:italic 900 15px system-ui;letter-spacing:2px;color:#3b3f86;white-space:nowrap} #deck .brand b{color:#b0282c}
-#deck .grille{position:absolute;right:16px;bottom:calc(10px + env(safe-area-inset-bottom));width:44px;height:30px;transform:rotate(-28deg);background:repeating-linear-gradient(90deg,rgba(60,60,70,.55) 0 5px,transparent 5px 12px);border-radius:4px}
+#deck .grille{position:absolute;right:16px;bottom:calc(10px + env(safe-area-inset-bottom));width:44px;height:30px;background:repeating-linear-gradient(180deg,rgba(60,60,70,.55) 0 5px,transparent 5px 12px);border-radius:4px}
 body.touch #mob .dp{background:#2a2d33;border:none;border-radius:6px;box-shadow:0 3px 0 #111,inset 0 1px 0 rgba(255,255,255,.15);color:#aab}
 body.touch #mob .dpc{background:#2a2d33;border:none;border-radius:0;box-shadow:none}
 body.touch #mob .ab{border-radius:50%;background:radial-gradient(circle at 35% 30%,#d9446b,#9b1f45);border:none;box-shadow:0 4px 0 #5c1028,inset 0 1px 0 rgba(255,255,255,.35);font-size:22px}
 body.touch #mob .ab small{position:absolute;bottom:-19px;left:50%;transform:translateX(-50%);color:#3b3f86;font-size:12px;opacity:1;max-width:none}
-body.portrait #mob .pill{border-radius:20px;background:#6b7080;border:none;box-shadow:0 2px 0 #3a3e48;font-size:14px;letter-spacing:1px;transform:rotate(-20deg);flex-direction:row;gap:6px}
+body.portrait #mob .pill{border-radius:20px;background:#6b7080;border:none;box-shadow:0 2px 0 #3a3e48;font-size:14px;letter-spacing:1px;transform:none;flex-direction:row;gap:6px}
 body.portrait #mob .pill small{color:#fff;font-size:11px;margin:0;max-width:none}
 body.touch #mob .fn{border-radius:12px;background:#3d4252;border:none;box-shadow:0 3px 0 #1d2029;font-size:17px}
 body.touch #mob .fn.on,body.touch #mob .ab.on,body.touch #mob .dp.on{transform:translateY(2px);filter:brightness(1.3)}
@@ -3494,8 +3494,7 @@ function mobInit(){ if(!document.body.classList.contains('touch')) return; MOB.o
   mobBtn('mIndL','\u2B05<small>IND</small>','fn',act(()=>indToggle(1))); mobBtn('mIndR','\u27A1<small>IND</small>','fn',act(()=>indToggle(2))); mobBtn('mHaz','\u26A0<small>HAZ</small>','fn',act(()=>hazToggle())); mobBtn('mHand','P<small>H/BRAKE</small>','fn','hand'); mobBtn('mHorn','\u{1F4E3}<small>HORN</small>','fn','horn');
   mobBtn('mCouple','\u{1F517}<small>COUPLE</small>','fn ctx',act(()=>toggleCouple())); mobBtn('mFuel','\u26FD<small>REFUEL</small>','fn ctx',act(()=>toggleRefuel())); mobBtn('mUnload','\u{1F4E6}<small>UNLOAD</small>','fn ctx',act(()=>tryUnload()));
   mobBtn('mJobs','\u{1F4CB}<small>JOBS</small>','fn pill',act(()=>{ if(career.uiOpen) closeUI(); else openBoard(); })); mobBtn('mMap','\u{1F5FA}<small>MAP</small>','fn pill',act(()=>{ bigmap.open?closeMap():openMap(); }));
-  mobBtn('mChat','\u{1F4AC}<small>CHAT</small>','fn',()=>{ if(!MP.on) return; const ci=document.getElementById('mpChatIn'); ci.style.display='block'; setTimeout(()=>ci.focus(),0); });
-  document.getElementById('frame').addEventListener('touchmove',e=>{ if(e.target.closest&&e.target.closest('#ui .mback,#ui .celebrate,#bdPanel')) return; e.preventDefault(); },{passive:false});
+  document.getElementById('frame').addEventListener('touchmove',e=>{ if(e.target.closest&&e.target.closest('#overlay,#ui .mback,#ui .celebrate,#bdPanel')) return; e.preventDefault(); },{passive:false});
   addEventListener('resize',mobLayout); addEventListener('orientationchange',()=>setTimeout(mobLayout,200)); mobLayout(); setInterval(mobContext,250); }
 function mobSteer(el){ const knob=el.querySelector('.knob');
   const upd=e=>{ const r=el.getBoundingClientRect(); const u=Math.max(-1,Math.min(1,(e.clientX-(r.left+r.width/2))/(r.width/2-30))); input.padSteer=Math.abs(u)<0.06?0:u; knob.style.left=(50+u*(50-30/r.width*100))+'%'; };
@@ -3515,7 +3514,7 @@ function mobLayout(){ if(!MOB.on) return; const W=innerWidth, H=innerHeight, por
     place('mHand',pad,top,sw,sb); place('mHorn',pad+sw+pad,top,sw,sb); place('mJobs',pad,top+sb+pad,sw,sb); place('mMap',pad+sw+pad,top+sb+pad,sw,sb);
     const tw=(iw-2*6)/3; ['mIndL','mHaz','mIndR'].forEach((id,k)=>place(id,pad+k*(tw+6),iy,tw,sb*0.6));
     place('mSteer',pad,H-stH-pad,iw,stH);
-    const R=W-g+pad; place('mCouple',R,top,sw,sb); place('mFuel',R+sw+pad,top,sw,sb); place('mUnload',R,top+sb+pad,MP.on?sw:iw,sb); place('mChat',R+sw+pad,top+sb+pad,sw,sb,MP.on);
+    const R=W-g+pad; place('mCouple',R,top,sw,sb); place('mFuel',R+sw+pad,top,sw,sb); place('mUnload',R,top+sb+pad,iw,sb);
     const py=top+2*(sb+pad), ph=Math.max(70,H-py-pad); place('mBrk',R,py+ph*0.22,sw,ph*0.78); place('mGas',R+sw+pad,py,sw,ph);
     for(const id of ['mLeft','mRight','mUp','mDown','mCen','mA','mB']) place(id,0,0,0,0,false);
   } else { // portrait: handheld — screen on top, deck below
@@ -3524,7 +3523,7 @@ function mobLayout(){ if(!MOB.on) return; const W=innerWidth, H=innerHeight, por
     const dcx=S(78), dcy=deckTop+S(98), k=S(38); place('mUp',dcx-k/2,dcy-k*1.5,k,k); place('mDown',dcx-k/2,dcy+k/2,k,k); place('mLeft',dcx-k*1.5,dcy-k/2,k,k); place('mRight',dcx+k/2,dcy-k/2,k,k); place('mCen',dcx-k/2,dcy-k/2,k,k);
     const ab=S(58); place('mB',W-S(150),dcy-ab*0.2,ab,ab); place('mA',W-S(78),dcy-ab*0.85,ab,ab);
     const fy=deckTop+S(178), fw=Math.min(S(66),(W-24)/5-6), gap=(W-5*fw)/6; ['mCouple','mFuel','mUnload','mHand','mHorn'].forEach((id,i)=>place(id,gap+i*(fw+gap),fy,fw,fw*0.78)); ['mIndL','mHaz','mIndR'].forEach((id,i)=>place(id,gap+(i*2)*(fw+gap),fy+fw*1.08,fw,fw*0.5));
-    const py=fy+fw*1.78; place('mMap',W/2-S(86),py,S(66),S(24)); place('mJobs',W/2+S(14),py,S(66),S(24)); place('mChat',S(14),py-S(6),S(48),S(36),MP.on);
+    const py=fy+fw*1.78; const pw=S(84),ph2=S(26); place('mMap',W/2-pw-S(8),py,pw,ph2); place('mJobs',W/2+S(8),py,pw,ph2); const gr=document.querySelector('#deck .grille'); if(gr){ gr.style.top=(py-deckTop+ph2/2-S(9))+'px'; gr.style.bottom='auto'; gr.style.height=S(18)+'px'; gr.style.width=S(40)+'px'; }
     for(const id of ['mSteer','mGas','mBrk']) place(id,0,0,0,0,false);
   }
   cv.style.width=cw+'px'; cv.style.height=ch+'px'; fr.style.left=cx+'px'; fr.style.top=cy+'px'; fr.style.width=cw+'px'; fr.style.height=ch+'px';
