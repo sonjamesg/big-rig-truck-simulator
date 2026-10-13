@@ -81,6 +81,7 @@ const TILE = 32;            // px per tile (4 m)
 const PPM = 8;              // px per metre
 const MW = 2048, MH = 2048;   // map size in tiles
 const T = { GRASS:0, ROAD:1, WALK:2, WATER:3, BRIDGE:4, PARK:5, CONC:6, BLDG:7, PGRASS:8, GRAVEL:9, TREE:10, QUAY:11, CONT:12, SAND:13, PLAZA:14, LOT:15, TANK:16, PUMP:17, FIELD:18, ISLAND:19, HEDGE:20, ROCK:21 };
+const PORT_Y0=262, PORT_Y1=414;   // v14 compact Albion container terminal (tiles)
 const SOLID = new Uint8Array(32); [T.WATER,T.BLDG,T.TREE,T.CONT,T.TANK,T.PUMP,T.HEDGE].forEach(t=>SOLID[t]=1);
 function mulberry(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 function hash2(x,y){ let h=(x*374761393+y*668265263)|0; h=(h^(h>>>13))*1274126177|0; return ((h^(h>>>16))>>>0)/4294967296; }
@@ -134,7 +135,7 @@ function genWorld(){
   for(let y=1500;y<1586;y++) for(let x=1110;x<1240;x++){ const dx=(x-riverX(1545))/(48+6*Math.sin(y/9)), dy=(y-1545)/40; if(dx*dx+dy*dy<1) water[idx(x,y)]=1; }   // Moor Reservoir (dammed)
   // keep land under cities / airports, then cut dock basins
   for(const [x0,y0,x1,y1] of [[145,135,720,655],[1060,150,1830,515],[1395,1375,1800,1884],[995,1785,1385,1905],[240,775,355,885],[235,1095,300,1162]]) for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++) water[idx(x,y)]=0;
-  for(let k=0;k<4;k++) for(let y=175+k*68;y<189+k*68;y++) for(let x=575;x<800;x++) water[idx(x,y)]=1;                // Port Albion docks
+  for(let y=145;y<456;y++) for(let x=478;x<800;x++) if(!(x<600&&y>=PORT_Y0&&y<PORT_Y1)) water[idx(x,y)]=1;   // v14 Port Albion: compact terminal, open water around it
   for(let y=1885;y<1936;y++) for(let x=1430;x<1790;x++) water[idx(x,y)]=1;                                             // Kingsbridge harbour
   for(let k=0;k<4;k++) for(let x=1480+k*80;x<1496+k*80;x++) for(let y=1815;y<1885;y++) water[idx(x,y)]=1;
   (world.tm=world.tm||[]).push(['// ground: water',performance.now()-t0|0]);
@@ -253,6 +254,10 @@ function genWorld(){
   for(const k of [2,6]) road('v',C1.xs[k],C1.Y1+1,459,RW,'city');
   road('h',460,103,600,RW,'city');                                                    // Albion Airport road
   for(const k of [1,5,9]) road('h',C1.ys[k],C1.X1+1,469,RW,'city'); road('v',470,C1.ys[0],459,RW,'city');   // docks
+  { // v14 port aisles: the city streets carry straight through the gate, two extra aisles tee off the boundary road, a quay road links them
+    const A=[C1.ys[5],Math.round((C1.ys[5]+C1.ys[7])/2),C1.ys[7],Math.round((C1.ys[7]+C1.ys[9])/2),C1.ys[9]];
+    for(const a of A) road('h',a,474,583,RW,'city'); road('v',584,A[0],A[4]+RW-1,RW,'city');
+    world.port={x0:474,x1:600,y0:PORT_Y0,y1:PORT_Y1,aisles:A,quayX:588,edge:600,hole:{x:477,y:A[3]+RW+3,w:22,h:17}}; }
   for(const k of [2,6,10]) road('h',SV.ys[k],SV.X1+1,1941,RW,'city');
   for(const k of [3,9]) road('v',SV.xs[k],103,SV.ys[0]-1,RW,'city');
   for(const k of [2,8]) road('v',SV.xs[k],SV.Y1+1,716,RW,'city');
@@ -418,8 +423,19 @@ function genWorld(){
       if(!ok||R()<0.25) continue;
       fill(x,y,6,2,T.CONT); objs.push({kind:'cont',x:x*TILE,y:y*TILE,w:6*TILE,h:2*TILE,c1:cols[(R()*8)|0],c2:cols[(R()*8)|0],c3:cols[(R()*8)|0],seed:(R()*1e9)|0}); }
   }
-  docks(474,145,720,455); for(let k=0;k<4;k++) world.overhead.push({kind:'crane',x:560*TILE,y:(182+k*68)*TILE});
-  building(490,150,30,8,'warehouse',30,{logo:'ALBION PORT'}); building(490,440,24,8,'warehouse',28,{logo:COMPANIES[2]});
+  { // v14 Albion container terminal: quay apron + 3 berths, neat stack rows between the aisles, gate, loading-bay terminal
+    const P=world.port; for(let y=P.y0;y<P.y1;y++) for(let x=P.x0;x<P.edge;x++){ const t=G[idx(x,y)]; if(t===T.GRASS||t===T.SAND||t===T.WALK||t===T.PGRASS||t===T.TREE) set(x,y,T.QUAY); }
+    const cols=['#c0392b','#2e86c1','#e67e22','#27ae60','#8e44ad','#d4ac0d','#7f8c8d','#16a085'], H=P.hole, A=P.aisles;
+    const inHole=(x,y)=>x+6>H.x-1&&x<H.x+H.w+1&&y+2>H.y-2&&y<H.y+H.h+1;
+    for(let i=0;i<A.length-1;i++){ for(let y=A[i]+RW+2;y+2<=A[i+1]-2;y+=3) for(let x=P.x0+4;x+6<=580;x+=8){ if(inHole(x,y)) continue; let ok=true; for(let k=0;k<6;k++) for(let q=0;q<2;q++) if(get(x+k,y+q)!==T.QUAY) ok=false; if(!ok) continue;
+      fill(x,y,6,2,T.CONT); objs.push({kind:'cont',x:x*TILE,y:y*TILE,w:6*TILE,h:2*TILE,c1:cols[(R()*8)|0],c2:cols[(R()*8)|0],c3:cols[(R()*8)|0],seed:(R()*1e9)|0}); } }
+    for(let y=A[4]+RW+2;y+2<=P.y1-2;y+=3) for(let x=P.x0+4;x+6<=580;x+=8){ let ok=true; for(let k=0;k<6;k++) for(let q=0;q<2;q++) if(get(x+k,y+q)!==T.QUAY) ok=false; if(ok){ fill(x,y,6,2,T.CONT); objs.push({kind:'cont',x:x*TILE,y:y*TILE,w:6*TILE,h:2*TILE,c1:cols[(R()*8)|0],c2:cols[(R()*8)|0],c3:cols[(R()*8)|0],seed:(R()*1e9)|0}); } }
+    for(let y=A[0]-10;y<A[0]-2;y++) for(let x=P.x0+4;x<580;x++) if(get(x,y)===T.QUAY){} 
+    building(P.x0+6,P.y0+2,14,A[0]-P.y0-5,'warehouse',24,{logo:'ALBION PORT'});
+    objs.push({kind:'paint',x:(P.x0+1)*TILE,y:(A[2]-3)*TILE,text:'PORT GATE',small:true});
+    world.port.berths=[0,1,2].map(i=>{ const L=(P.y1-P.y0)/3; return {i,y0:P.y0+i*L,y1:P.y0+(i+1)*L,ship:null}; });
+    world.port.cranes=[0,1,2,3].map(i=>({i,y:P.y0+18+i*(P.y1-P.y0-36)/3,ty:0,tr:0.5,ph:0,car:null}));
+  }
   docks(1404,1748,1800,1884); for(let k=0;k<4;k++) world.overhead.push({kind:'crane',x:(1478+k*80)*TILE,y:1812*TILE});
   // airports: concrete apron, runways, terminal, hangars
   function airport(name,x0,y0,x1,y1,rws,term){ for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++){ const t=G[idx(x,y)]; if(t!==T.ROAD&&t!==T.WATER&&t!==T.BRIDGE&&t!==T.WALK) set(x,y,T.CONC); }
@@ -517,7 +533,7 @@ function genWorld(){
   (world.tm=world.tm||[]).push(['world.labels=',performance.now()-t0|0]);
   world.labels=[['WESTMERE',330,1000,1],['THE SANDREACH',1200,450,1],['HIGHMOOR',1350,1250,1],['ALBION SOUND',cW(700),700,2],['SANDREACH STRAIT',1500,cE(1500),2],['GREYFELL INLET',560,1272,2],['OUTER SEA',1024,25,2],['OUTER SEA',1024,2028,2],
     ['PORT ALBION',300,290],['SANDVALE',1640,340],['KINGSBRIDGE',1580,1590],['Millford',300,830],['Dustwater',1035,455],['Coppermine',1635,625],['Redhill',1025,1195],['Fenwick',1535,1155],['Ashby',270,1130],['Wendwood',520,890],
-    ['Mount Greyfell',MTN.x,MTN.y-40],['River Moor',riverX(1500)+30,1500],['Albion Airport',400,560],['Sandvale Intl',1260,250],['Kingsbridge Field',1290,1830],['Albion Docks',600,300],['Kingsbridge Harbour',1600,1905],
+    ['Mount Greyfell',MTN.x,MTN.y-40],['River Moor',riverX(1500)+30,1500],['Albion Airport',400,560],['Sandvale Intl',1260,250],['Kingsbridge Field',1290,1830],['Albion Port',540,PORT_Y0-6],['Kingsbridge Harbour',1600,1905],
     ['M1',1000,94],['M1',1951,1300],['M1',94,1500],['M1',1400,1951],['M2',900,1054],['M2',1600,714],['M3',906,1650],['Moor Reservoir',1172,1540,2],['Greyfell Pass',395,1740],['Sound Coast Road',690,600],['Quarry',1170,590]];
   (world.tm=world.tm||[]).push(['// spatial index',performance.now()-t0|0]);
   // spatial index of ground objects per chunk
@@ -1807,7 +1823,7 @@ function buildDepots(objs,R){
     objs.push({kind:'yard',dp,x:(x+(opts.keep?2:8))*TILE,y:(y+(opts.keep?7:1.5))*TILE,w:12*TILE,h:2*TILE});
     const nb=Math.min(opts.maxBays||14,Math.floor((w-1.5)/1.25)), bx0=x+(w-nb*1.25)/2;
     for(let k=0;k<nb;k++){ const cxT=bx0+k*1.25+0.625, y0=y+h-4.7, y1=y+h-0.3;
-      const bay={id:k+1,label:code+'-'+(k+1),depot:dp,cx:cxT*M_T,cy:(y0+y1)/2*M_T,th:0,w:1.25*M_T,L:(y1-y0)*M_T,target:false,trailer:null};
+      const bay={id:k+1,label:code+'-'+(k+1),depot:dp,cx:cxT*M_T,cy:(y0+y1)/2*M_T,th:0,w:1.25*M_T,L:(y1-y0)*M_T,target:false,trailer:null,x0:(cxT-0.625)*M_T,x1:(cxT+0.625)*M_T,y0:y0*M_T,y1:y1*M_T,dock:y1*M_T};
       bay.kx=bay.cx; bay.ky=bay.cy-TRL_KP_TO_CENTRE+0.2;   // where the kingpin must be (reverse-in: trailer nose faces the yard)
       dp.bays.push(bay); objs.push({kind:'tbay',bay,x:(cxT-0.625)*TILE,y:(y0-0.6)*TILE,w:1.25*TILE,h:(y1-y0+0.6)*TILE}); }
     dp.entrance=opts.entrance||{x:(x+w/2)*M_T,y:(y-1)*M_T};
@@ -1829,10 +1845,11 @@ function buildDepots(objs,R){
         if(road===4){ let clear=true; for(let jj=y-gap;jj<y;jj++) for(let i=x+w/2-3;i<x+w/2+3;i++) if((!okB(get(i,jj))&&get(i,jj)!==T.WALK)||(world.reserved[idx(i,jj)]&&!soft(get(i,jj)))) clear=false; if(clear) return [x,y,gap]; } }
     } return null; }
   const region=(x,y)=> world.regionAt(x,y);
-  const plan=[['Albion Docks Freight','ADF',3,520,470],['Albion Airport Cargo','AAC',3,620,470],['Millford Agri Depot','MAD',1,300,900],['Ashby Farm Supplies','AFS',1,280,1170],['Greyfell Quarry','GQY',4,120,1610],
+  const plan=[['Albion Airport Cargo','AAC',3,620,470],['Millford Agri Depot','MAD',1,300,900],['Ashby Farm Supplies','AFS',1,280,1170],['Greyfell Quarry','GQY',4,120,1610],
     ['Sandvale Distribution','SVD',3,1560,520],['Sandvale Air Cargo','SAC',4,1300,360],['Dustwater Outpost','DWO',2,1020,500],['Coppermine Mine','CMM',4,1640,660],
     ['Kingsbridge Freight Park','KFP',3,1415,1386],['Kingsbridge Harbour Terminal','KHT',3,1700,1760],['Redhill Logistics','RHL',2,1000,1792],['Moorside Timber Yard','MTY',2,1830,1510]];
   const access=(x,y,w,gap)=>{ for(let jj=y-gap;jj<y;jj++) for(let i=x+(w>>1)-3;i<x+(w>>1)+3;i++){ set(i,jj,T.CONC); world.reserved[idx(i,jj)]=1; } clearObjs(x+(w>>1)-3,y-gap,6,gap); };
+  if(world.port){ const H=world.port.hole, gap=H.y-(world.port.aisles[3]+4); access(H.x,H.y,20,gap); const dp=makeDepot('Albion Port Container Terminal','APT',2,H.x,H.y,20,15,{entrance:{x:(H.x+10)*M_T,y:(H.y-gap)*M_T}}); dp.region=region(H.x,H.y); }
   for(const [n,c,tier,tx,ty] of plan){ const s=findSpot(tx,ty,20,15); if(!s){ console.warn('no depot spot',n); continue; } const [x,y,gap]=s;
     access(x,y,20,gap); const dp=makeDepot(n,c,tier,x,y,20,15,{entrance:{x:(x+10)*M_T,y:(y-gap)*M_T}}); dp.region=region(x,y); }
   D0.region='Westmere';
@@ -1882,6 +1899,7 @@ function buildDepots(objs,R){
     objs.push({kind:'paint',x:(x+2)*TILE,y:(y+1.2)*TILE,text:'REPAIRS',small:true});
     world.garages.push({id:'G'+(world.garages.length+1),name,x:(x+w/2)*M_T,y:(y+h/2)*M_T,bay:{x:(x+w/2)*M_T,y:(y+2.5)*M_T},ratePerPct:45,region:region(x,y)}); }
   for(const [n,tx,ty] of [['Albion Truck Repairs',420,470],['Millford Motors',360,900],['Sandvale Heavy Repairs',1700,520],['Dustwater Garage',1000,520],['Kingsbridge Commercial',1600,1760],['Redhill Garage',980,1260]]){ const s=findSpot(tx,ty,14,10); if(s) garage(n,s[0],s[1],s[2]); }
+if(typeof buildCareerSites==='function') buildCareerSites({findSpot,access,clearObjs,region,R,objs,okT});
   // v13: every city gets 4 fuel stations (HGV bays + car pumps) and 4 artic-friendly repair garages, spread over its districts
   { const CN={C1:'Albion',SV:'Sandvale',KB:'Kingsbridge',MF:'Millford',DW:'Dustwater',CM:'Coppermine',RH:'Redhill',FW:'Fenwick',AB:'Ashby'}, Q=['North','East','South','West','Central','Park','Ring','Bridge'];
     world.cityPOI={};
@@ -1899,7 +1917,6 @@ function buildDepots(objs,R){
       for(let t=0;gs().length<4&&t<10;t++){ const [tx,ty]=tg[(t+2)%16]; tryG(CN[k]+' '+Q[(t+2)%8]+((t+2)%16>=8?' Road':'')+' Truck Repairs',tx,ty,sep); }
       world.cityPOI[CN[k]]={fuel:fs().length,garages:gs().length}; }
     console.log('[sites] per city fuel+garages',JSON.stringify(world.cityPOI)); }
-if(typeof buildCareerSites==='function') buildCareerSites({findSpot,access,clearObjs,region,R,objs,okT});
   // fill bays with parked trailers
   const types=['curtain','curtain','fridge','cont','flat','tank'];
   for(const dp of world.depots) dp.bays.forEach((bay,i)=>{ if(R()<(dp===D0?0.7:0.55)){ const tr=makeTrailer(types[(R()*types.length)|0],R); tr.x=bay.kx; tr.y=bay.ky; tr.th=bay.th; tr.bay=bay; tr.depot=dp; bay.trailer=tr; world.trailers.push(tr); } });
@@ -2184,6 +2201,7 @@ const CARGOS=[
   {id:'froz', name:'Frozen food',          icon:'\u{1F9CA}',trl:'fridge', kg:[12000,18000],mult:1.30,tier:2,col:'#0288d1'},
   {id:'fresh',name:'Fresh produce',        icon:'\u{1F966}',trl:'fridge', kg:[9000,15000], mult:1.25,tier:2,col:'#43a047'},
   {id:'pharm',name:'Pharmacy supplies',    icon:'\u{1F48A}',trl:'fridge', kg:[4000,7000],  mult:1.45,tier:2,col:'#00897b'},
+  {id:'dockc',name:'Port container (40ft)',icon:'\u{1F6A2}',trl:'cont',kg:[16000,26000],mult:1.35,tier:2,col:'#0e6655',dock:true},
   {id:'cont', name:'Imported goods (40ft)',icon:'\u{1F4E6}',trl:'cont',   kg:[14000,22000],mult:1.30,tier:2,col:'#d84315'},
   {id:'fuel', name:'Forecourt diesel',     icon:'\u26FD',   trl:'tank',   kg:[20000,26000],mult:1.70,tier:3,col:'#455a64'},
   {id:'steel',name:'Shop-fit steelwork',   icon:'\u{1F3D7}',trl:'flat',   kg:[18000,26000],mult:1.60,tier:3,col:'#5d4037'},
@@ -2269,9 +2287,9 @@ function loadGame(){ const d=hasSave(); if(!d) return false;
 function resetGame(){ try{ career.noSave=1; localStorage.removeItem(saveKey()); if(!world.v2poi) localStorage.removeItem(SAVE_KEY_OLD); }catch(e){} location.reload(); }
 // ---------- jobs
 const R7=mulberry((Date.now()%1e9)|0);
-function pickupsFor(c){ const ds=world.depots.filter(d=>d.bays.length); const pref=c.trl==='cont'?ds.filter(d=>/Docks|Harbour|Freight/.test(d.name)):c.trl==='tank'?ds.filter(d=>/Quarry|Mine|Logistics|Harbour/.test(d.name)):c.trl==='fridge'?ds.filter(d=>/Agri|Farm|Distribution|Air/.test(d.name)):ds; return pref.length?pref:ds; }
+function pickupsFor(c){ if(c.dock){ const p=world.depots.filter(d=>d.code==='APT'&&d.bays.length); if(p.length) return p; } const ds=world.depots.filter(d=>d.bays.length); const pref=c.trl==='cont'?ds.filter(d=>/Docks|Harbour|Freight/.test(d.name)):c.trl==='tank'?ds.filter(d=>/Quarry|Mine|Logistics|Harbour/.test(d.name)):c.trl==='fridge'?ds.filter(d=>/Agri|Farm|Distribution|Air/.test(d.name)):ds; return pref.length?pref:ds; }
 function makeJob(tierWanted){ const tier=Math.max(1,Math.min(TIERS.length,tierWanted)); const cs=CARGOS.filter(c=>c.tier===tier); const c=cs[(R7()*cs.length)|0]; const T_=tierInfo(tier);
-  for(let tries=0;tries<40;tries++){ const pk=pickupsFor(c), from=pk[(R7()*pk.length)|0], to=world.malls[(R7()*world.malls.length)|0]; if(!from||!to) return null;
+  for(let tries=0;tries<40;tries++){ const pk=pickupsFor(c), from=pk[(R7()*pk.length)|0], dl=c.dock?world.depots.filter(d=>d!==from&&d.bays.length&&d.code!=='APT'):world.malls, to=dl[(R7()*dl.length)|0]; if(!from||!to) return null;
     const km=Math.hypot(to.entrance.x-from.entrance.x,to.entrance.y-from.entrance.y)*1.3/1000; if(km<1.0||km>T_.maxKm||(tier>1&&km<(tier-1)*2.2)) continue;
     const kg=Math.round((c.kg[0]+R7()*(c.kg[1]-c.kg[0]))/100)*100, TT=TRAILER_TYPES[c.trl];
     const pay=Math.round((240+175*km)*c.mult*T_.payMult*(0.85+kg/60000)/10)*10, xp=Math.round((55+38*km)*c.mult*(0.8+tier*0.35));
@@ -2288,7 +2306,7 @@ function acceptJob(j){ if(j.tier>career.tier) return false; if(career.active) ab
   if(!bay){ bay=dp.bays[(R7()*dp.bays.length)|0]; const old=bay.trailer; if(old){ const i=world.trailers.indexOf(old); if(i>=0) world.trailers.splice(i,1); bay.trailer=null; } }
   const c=j.cargo, tr=makeTrailer(c.trl,R7,{cargo:c.name,cargoKg:j.kg,weight:j.weight,reqLevel:j.tier,target:true,job:j.id});
   tr.x=bay.kx; tr.y=bay.ky; tr.th=bay.th; tr.bay=bay; tr.depot=dp; bay.trailer=tr; bay.target=true; world.trailers.push(tr);
-  const free=j.to.bays.filter(b=>!b.assigned&&!b.parked); const mb=(free.length?free:j.to.bays)[(R7()*(free.length||j.to.bays.length))|0]; mb.assigned=true;
+  const free=j.to.bays.filter(b=>!b.assigned&&!b.parked&&!b.trailer); const mb=(free.length?free:j.to.bays)[(R7()*(free.length||j.to.bays.length))|0]; mb.assigned=true;
   career.active={job:j,trailer:tr,pickBay:bay,bay:mb,phase:'pickup',t0:timeS,dmg0:truck.damage}; j.taken=true;
   setRoute(dp); BigRig.emit('jobAccepted',{job:j}); flash('Job accepted: '+c.name+' \u2192 '+j.to.name+' \u2022 sat nav set to '+dp.name); saveGame(); return true; }
 function abandonJob(silent){ const a=career.active; if(!a) return; a.bay.assigned=false; if(a.pickBay) a.pickBay.target=false; a.trailer.target=false; a.trailer.job=null; career.active=null; clearRoute(); if(!silent) flash('Job abandoned'); }
@@ -3258,6 +3276,46 @@ function drawFXHigh(){ const b=FX.boom; if(b){ const x=b.x*PPM, y=b.y*PPM, fl=Ma
   for(const p of FX.p){ const a=Math.max(0,1-p.t/p.life); ctx.fillStyle='rgba('+p.col+','+(p.fire?a:a*0.45)+')'; ctx.beginPath(); ctx.arc(p.x*PPM,p.y*PPM,p.r*PPM,0,7); ctx.fill(); } }
 
 'use strict';
+// ===================== v14 Albion container terminal: ships sail in, berth, gantry cranes unload them, ships leave (loop) =====================
+const PORTSIM={t:0};
+function portInit(){ const P=world.port; if(!P||P.ready) return; P.ready=1; P.landed=0; for(const b of P.berths) b.wait=2+b.i*9; }
+function updatePort(dt){ const P=world.port; if(!P||!P.berths) return; portInit(); const laneX=P.edge+16, dockX=P.edge+5;
+  for(const b of P.berths){ const yc=(b.y0+b.y1)/2; let s=b.ship;
+    if(!s){ b.wait-=dt; if(b.wait<=0){ const n=18+((Math.random()*12)|0); b.ship=s={x:laneX,y:150,st:'in',n,n0:n,hue:(Math.random()*360)|0,cols:Array.from({length:n},()=>['#c0392b','#2e86c1','#e67e22','#27ae60','#8e44ad','#d4ac0d','#7f8c8d','#16a085'][(Math.random()*8)|0])}; } continue; }
+    if(s.st==='in'){ const d=yc-s.y; s.y+=Math.sign(d)*Math.min(Math.abs(d),dt*Math.max(0.8,Math.min(6,Math.abs(d)*0.12))); if(Math.abs(d)<0.2){ s.st='berth'; } }
+    else if(s.st==='berth'){ s.x-=dt*Math.max(0.4,(s.x-dockX)*0.25); if(s.x<=dockX){ s.x=dockX; s.st='dock'; } }
+    else if(s.st==='dock'){ if(s.n<=0){ s.st='unberth'; s.hold=2; } }
+    else if(s.st==='unberth'){ s.hold-=dt; if(s.hold<0){ s.x+=dt*1.2; if(s.x>=laneX){ s.x=laneX; s.st='out'; s.v=0; } } }
+    else if(s.st==='out'){ s.v=Math.min(6,s.v+dt*0.5); s.y+=s.v*dt; if(s.y>470){ b.ship=null; b.wait=8+Math.random()*14; } } }
+  // cranes: crane 0 -> berth 0, cranes 1&2 -> berth 1, crane 3 -> berth 2
+  const asg=[0,1,1,2], off=[0,-9,9,0];
+  for(const c of P.cranes){ const b=P.berths[asg[c.i]], s=b.ship, yc=(b.y0+b.y1)/2+off[c.i]; c.ty=yc; c.y+=Math.sign(c.ty-c.y)*Math.min(Math.abs(c.ty-c.y),dt*1.5);
+    const work=s&&s.st==='dock'&&s.n>0&&Math.abs(c.y-c.ty)<0.5;
+    if(c.ph===0){ const tgt=work?1:0.15; c.tr+=Math.sign(tgt-c.tr)*Math.min(Math.abs(tgt-c.tr),dt*0.45); if(work&&c.tr>=1){ c.ph=1; c.w=0.8; } }
+    else if(c.ph===1){ c.w-=dt; if(c.w<=0){ if(s&&s.n>0){ s.n--; c.car=s.cols[s.n]; } c.ph=2; } }
+    else if(c.ph===2){ c.tr=Math.max(0,c.tr-dt*0.4); if(c.tr<=0){ c.ph=3; c.w=0.6; } }
+    else { c.w-=dt; if(c.w<=0){ c.car=null; P.landed++; c.ph=0; } } } }
+function drawPortLow(vx0,vy0,vx1,vy1){ const P=world.port; if(!P||!P.berths) return; if(P.edge*TILE<vx0-3000||P.x0*TILE>vx1+3000) return; const T_=TILE;
+  for(const b of P.berths){ const s=b.ship; if(!s) continue; const L=36*T_, W=7*T_, x=s.x*T_, y=s.y*T_;
+    ctx.save(); ctx.translate(x,y); ctx.fillStyle='rgba(0,0,0,0.22)'; ctx.fillRect(-W/2+14,-L/2+14,W,L); ctx.rotate(Math.PI);
+    ctx.fillStyle='hsl('+s.hue+',45%,32%)'; ctx.beginPath(); ctx.moveTo(-W/2,-L/2+W*0.2); ctx.lineTo(0,-L/2-W*0.6); ctx.lineTo(W/2,-L/2+W*0.2); ctx.lineTo(W/2,L/2); ctx.lineTo(-W/2,L/2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#8f2a1d'; ctx.fillRect(-W/2+4,-L/2+W*0.2,W-8,L-W*0.2-4);
+    ctx.fillStyle='#ecf0f1'; ctx.fillRect(-W/2+6,L/2-4*T_,W-12,3.2*T_); ctx.fillStyle='#2c3e50'; ctx.fillRect(-W/2+12,L/2-3.6*T_,W-24,0.8*T_);
+    const cw=(W-16)/3, ch=2.9*T_/2; for(let k=0;k<s.n0;k++){ if(k>=s.n) break; const col=k%3, row=(k/3)|0; ctx.fillStyle=s.cols[k]; ctx.fillRect(-W/2+8+col*cw,-L/2+W*0.5+row*ch*1.05,cw-2,ch-2); }
+    ctx.restore(); }
+  // crane rails along the apron
+  ctx.fillStyle='rgba(60,60,60,0.55)'; for(const rx of [P.quayX-1.2,P.edge-0.6]) ctx.fillRect(rx*T_,P.y0*T_,4,(P.y1-P.y0)*T_); }
+function drawPortHigh(vx0,vy0,vx1,vy1){ const P=world.port; if(!P||!P.cranes) return; if(P.edge*TILE<vx0-3000||P.x0*TILE>vx1+3000) return; const T_=TILE;
+  for(const c of P.cranes){ const y=c.y*T_, xa=(P.quayX-3)*T_, xb=(P.edge+12)*T_, w=2.6*T_;
+    ctx.fillStyle='rgba(0,0,0,0.22)'; ctx.fillRect(xa+30,y-w/2+30,xb-xa,w);
+    ctx.fillStyle='#e8a317'; ctx.fillRect(xa,y-w/2,xb-xa,w); ctx.strokeStyle='#8a5d08'; ctx.lineWidth=2; for(let x=xa;x<xb;x+=18){ ctx.beginPath(); ctx.moveTo(x,y-w/2); ctx.lineTo(x+18,y+w/2); ctx.stroke(); }
+    ctx.fillStyle='#b77d0e'; for(const lx of [P.quayX-1.6,P.edge-1]) { ctx.fillRect(lx*T_-8,y-w/2-10,16,w+20); }
+    ctx.fillStyle='#d0d3d6'; ctx.fillRect(xa-3*T_,y-w/2-4,3*T_,w+8);
+    const tx=((P.quayX-1)+(P.edge+5-(P.quayX-1))*c.tr)*T_; ctx.fillStyle='#34495e'; ctx.fillRect(tx-14,y-16,28,32);
+    if(c.car){ ctx.fillStyle='rgba(0,0,0,0.25)'; ctx.fillRect(tx-14+10,y-3*T_+10,28,6*T_); ctx.fillStyle=c.car; ctx.fillRect(tx-14,y-3*T_,28,6*T_); ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.strokeRect(tx-14,y-3*T_,28,6*T_); } }
+  ctx.lineWidth=1; }
+
+'use strict';
 // ===================== MAIN =====================
 const VW=960, VH=600;
 const cv=document.getElementById('game'), ctx=cv.getContext('2d');
@@ -3314,7 +3372,7 @@ function frame(ts){
     if(truck.bump>0.01 && !truck._bumped){ thump(truck.bump); cam.shake=truck.bump*10; truck._bumped=true; } if(truck.bump<=0.01) truck._bumped=false;
     updateAudio(truck,inp,timeS);
   }
-  if(!paused){ updateTraffic(dt); updateFuel(dt); updateForecourts(dt); if(started) updateCareer(dt); if(started) updateIndicators(dt); updateFX(dt); }
+  if(!paused){ updateTraffic(dt); updateFuel(dt); updateForecourts(dt); if(started) updateCareer(dt); if(started) updateIndicators(dt); updateFX(dt); } updatePort(dt);
   { const z=cam.z; updateAmbient(dt,[cam.x-VW/2/z,cam.y-VH/2/z,cam.x+VW/2/z,cam.y+VH/2/z]); }
   if(started&&!paused) updateNav(dt);
   if(truck.bump>0.05&&!truck._dmg){ truck.damage=Math.min(100,truck.damage+truck.bump*6); truck._dmg=true; } if(truck.bump<=0.01) truck._dmg=false;
@@ -3324,7 +3382,7 @@ function frame(ts){
   const kp=kingpin(truck); const mid=[(truck.x-f[0]*1.9)*PPM, (truck.y-f[1]*1.9)*PPM];
   const tx=mid[0]+f[0]*truck.v*PPM*1.3, ty=mid[1]+f[1]*truck.v*PPM*1.3;
   const k=1-Math.exp(-dt*3); cam.x+=(tx-cam.x)*k; cam.y+=(ty-cam.y)*k;
-  const zt=1.05-0.33*Math.min(1,sp/24); cam.z+=(zt-cam.z)*(1-Math.exp(-dt*1.2));
+  const zt=cam.zLock||(1.05-0.33*Math.min(1,sp/24)); cam.z+=(zt-cam.z)*(1-Math.exp(-dt*1.2));
   cam.shake*=Math.exp(-dt*8);
   draw();
   requestAnimationFrame(frame);
@@ -3347,8 +3405,8 @@ function draw(){
   drawCareerWorld(vx0,vy0,vx1,vy1);
   drawParkedTrailers(vx0,vy0,vx1,vy1);
   drawTraffic(vx0,vy0,vx1,vy1);
-  drawFXLow(vx0,vy0,vx1,vy1); drawRemotePlayers(vx0,vy0,vx1,vy1); drawBreakdown();
-  drawLorry(); drawFXHigh();
+  drawPortLow(vx0,vy0,vx1,vy1); drawFXLow(vx0,vy0,vx1,vy1); drawRemotePlayers(vx0,vy0,vx1,vy1); drawBreakdown();
+  drawLorry(); drawFXHigh(); drawPortHigh(vx0,vy0,vx1,vy1);
   for(const o of world.overhead) if(o.x>vx0-400&&o.x<vx1+400&&o.y>vy0-400&&o.y<vy1+400) drawOverhead(o);
   drawAmbientHigh(VR);
   ctx.setTransform(1,0,0,1,0,0);

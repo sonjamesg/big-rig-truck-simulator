@@ -4,6 +4,7 @@ const TILE = 32;            // px per tile (4 m)
 const PPM = 8;              // px per metre
 const MW = 2048, MH = 2048;   // map size in tiles
 const T = { GRASS:0, ROAD:1, WALK:2, WATER:3, BRIDGE:4, PARK:5, CONC:6, BLDG:7, PGRASS:8, GRAVEL:9, TREE:10, QUAY:11, CONT:12, SAND:13, PLAZA:14, LOT:15, TANK:16, PUMP:17, FIELD:18, ISLAND:19, HEDGE:20, ROCK:21 };
+const PORT_Y0=262, PORT_Y1=414;   // v14 compact Albion container terminal (tiles)
 const SOLID = new Uint8Array(32); [T.WATER,T.BLDG,T.TREE,T.CONT,T.TANK,T.PUMP,T.HEDGE].forEach(t=>SOLID[t]=1);
 function mulberry(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 function hash2(x,y){ let h=(x*374761393+y*668265263)|0; h=(h^(h>>>13))*1274126177|0; return ((h^(h>>>16))>>>0)/4294967296; }
@@ -57,7 +58,7 @@ function genWorld(){
   for(let y=1500;y<1586;y++) for(let x=1110;x<1240;x++){ const dx=(x-riverX(1545))/(48+6*Math.sin(y/9)), dy=(y-1545)/40; if(dx*dx+dy*dy<1) water[idx(x,y)]=1; }   // Moor Reservoir (dammed)
   // keep land under cities / airports, then cut dock basins
   for(const [x0,y0,x1,y1] of [[145,135,720,655],[1060,150,1830,515],[1395,1375,1800,1884],[995,1785,1385,1905],[240,775,355,885],[235,1095,300,1162]]) for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++) water[idx(x,y)]=0;
-  for(let k=0;k<4;k++) for(let y=175+k*68;y<189+k*68;y++) for(let x=575;x<800;x++) water[idx(x,y)]=1;                // Port Albion docks
+  for(let y=145;y<456;y++) for(let x=478;x<800;x++) if(!(x<600&&y>=PORT_Y0&&y<PORT_Y1)) water[idx(x,y)]=1;   // v14 Port Albion: compact terminal, open water around it
   for(let y=1885;y<1936;y++) for(let x=1430;x<1790;x++) water[idx(x,y)]=1;                                             // Kingsbridge harbour
   for(let k=0;k<4;k++) for(let x=1480+k*80;x<1496+k*80;x++) for(let y=1815;y<1885;y++) water[idx(x,y)]=1;
   (world.tm=world.tm||[]).push(['// ground: water',performance.now()-t0|0]);
@@ -176,6 +177,10 @@ function genWorld(){
   for(const k of [2,6]) road('v',C1.xs[k],C1.Y1+1,459,RW,'city');
   road('h',460,103,600,RW,'city');                                                    // Albion Airport road
   for(const k of [1,5,9]) road('h',C1.ys[k],C1.X1+1,469,RW,'city'); road('v',470,C1.ys[0],459,RW,'city');   // docks
+  { // v14 port aisles: the city streets carry straight through the gate, two extra aisles tee off the boundary road, a quay road links them
+    const A=[C1.ys[5],Math.round((C1.ys[5]+C1.ys[7])/2),C1.ys[7],Math.round((C1.ys[7]+C1.ys[9])/2),C1.ys[9]];
+    for(const a of A) road('h',a,474,583,RW,'city'); road('v',584,A[0],A[4]+RW-1,RW,'city');
+    world.port={x0:474,x1:600,y0:PORT_Y0,y1:PORT_Y1,aisles:A,quayX:588,edge:600,hole:{x:477,y:A[3]+RW+3,w:22,h:17}}; }
   for(const k of [2,6,10]) road('h',SV.ys[k],SV.X1+1,1941,RW,'city');
   for(const k of [3,9]) road('v',SV.xs[k],103,SV.ys[0]-1,RW,'city');
   for(const k of [2,8]) road('v',SV.xs[k],SV.Y1+1,716,RW,'city');
@@ -341,8 +346,19 @@ function genWorld(){
       if(!ok||R()<0.25) continue;
       fill(x,y,6,2,T.CONT); objs.push({kind:'cont',x:x*TILE,y:y*TILE,w:6*TILE,h:2*TILE,c1:cols[(R()*8)|0],c2:cols[(R()*8)|0],c3:cols[(R()*8)|0],seed:(R()*1e9)|0}); }
   }
-  docks(474,145,720,455); for(let k=0;k<4;k++) world.overhead.push({kind:'crane',x:560*TILE,y:(182+k*68)*TILE});
-  building(490,150,30,8,'warehouse',30,{logo:'ALBION PORT'}); building(490,440,24,8,'warehouse',28,{logo:COMPANIES[2]});
+  { // v14 Albion container terminal: quay apron + 3 berths, neat stack rows between the aisles, gate, loading-bay terminal
+    const P=world.port; for(let y=P.y0;y<P.y1;y++) for(let x=P.x0;x<P.edge;x++){ const t=G[idx(x,y)]; if(t===T.GRASS||t===T.SAND||t===T.WALK||t===T.PGRASS||t===T.TREE) set(x,y,T.QUAY); }
+    const cols=['#c0392b','#2e86c1','#e67e22','#27ae60','#8e44ad','#d4ac0d','#7f8c8d','#16a085'], H=P.hole, A=P.aisles;
+    const inHole=(x,y)=>x+6>H.x-1&&x<H.x+H.w+1&&y+2>H.y-2&&y<H.y+H.h+1;
+    for(let i=0;i<A.length-1;i++){ for(let y=A[i]+RW+2;y+2<=A[i+1]-2;y+=3) for(let x=P.x0+4;x+6<=580;x+=8){ if(inHole(x,y)) continue; let ok=true; for(let k=0;k<6;k++) for(let q=0;q<2;q++) if(get(x+k,y+q)!==T.QUAY) ok=false; if(!ok) continue;
+      fill(x,y,6,2,T.CONT); objs.push({kind:'cont',x:x*TILE,y:y*TILE,w:6*TILE,h:2*TILE,c1:cols[(R()*8)|0],c2:cols[(R()*8)|0],c3:cols[(R()*8)|0],seed:(R()*1e9)|0}); } }
+    for(let y=A[4]+RW+2;y+2<=P.y1-2;y+=3) for(let x=P.x0+4;x+6<=580;x+=8){ let ok=true; for(let k=0;k<6;k++) for(let q=0;q<2;q++) if(get(x+k,y+q)!==T.QUAY) ok=false; if(ok){ fill(x,y,6,2,T.CONT); objs.push({kind:'cont',x:x*TILE,y:y*TILE,w:6*TILE,h:2*TILE,c1:cols[(R()*8)|0],c2:cols[(R()*8)|0],c3:cols[(R()*8)|0],seed:(R()*1e9)|0}); } }
+    for(let y=A[0]-10;y<A[0]-2;y++) for(let x=P.x0+4;x<580;x++) if(get(x,y)===T.QUAY){} 
+    building(P.x0+6,P.y0+2,14,A[0]-P.y0-5,'warehouse',24,{logo:'ALBION PORT'});
+    objs.push({kind:'paint',x:(P.x0+1)*TILE,y:(A[2]-3)*TILE,text:'PORT GATE',small:true});
+    world.port.berths=[0,1,2].map(i=>{ const L=(P.y1-P.y0)/3; return {i,y0:P.y0+i*L,y1:P.y0+(i+1)*L,ship:null}; });
+    world.port.cranes=[0,1,2,3].map(i=>({i,y:P.y0+18+i*(P.y1-P.y0-36)/3,ty:0,tr:0.5,ph:0,car:null}));
+  }
   docks(1404,1748,1800,1884); for(let k=0;k<4;k++) world.overhead.push({kind:'crane',x:(1478+k*80)*TILE,y:1812*TILE});
   // airports: concrete apron, runways, terminal, hangars
   function airport(name,x0,y0,x1,y1,rws,term){ for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++){ const t=G[idx(x,y)]; if(t!==T.ROAD&&t!==T.WATER&&t!==T.BRIDGE&&t!==T.WALK) set(x,y,T.CONC); }
@@ -440,7 +456,7 @@ function genWorld(){
   (world.tm=world.tm||[]).push(['world.labels=',performance.now()-t0|0]);
   world.labels=[['WESTMERE',330,1000,1],['THE SANDREACH',1200,450,1],['HIGHMOOR',1350,1250,1],['ALBION SOUND',cW(700),700,2],['SANDREACH STRAIT',1500,cE(1500),2],['GREYFELL INLET',560,1272,2],['OUTER SEA',1024,25,2],['OUTER SEA',1024,2028,2],
     ['PORT ALBION',300,290],['SANDVALE',1640,340],['KINGSBRIDGE',1580,1590],['Millford',300,830],['Dustwater',1035,455],['Coppermine',1635,625],['Redhill',1025,1195],['Fenwick',1535,1155],['Ashby',270,1130],['Wendwood',520,890],
-    ['Mount Greyfell',MTN.x,MTN.y-40],['River Moor',riverX(1500)+30,1500],['Albion Airport',400,560],['Sandvale Intl',1260,250],['Kingsbridge Field',1290,1830],['Albion Docks',600,300],['Kingsbridge Harbour',1600,1905],
+    ['Mount Greyfell',MTN.x,MTN.y-40],['River Moor',riverX(1500)+30,1500],['Albion Airport',400,560],['Sandvale Intl',1260,250],['Kingsbridge Field',1290,1830],['Albion Port',540,PORT_Y0-6],['Kingsbridge Harbour',1600,1905],
     ['M1',1000,94],['M1',1951,1300],['M1',94,1500],['M1',1400,1951],['M2',900,1054],['M2',1600,714],['M3',906,1650],['Moor Reservoir',1172,1540,2],['Greyfell Pass',395,1740],['Sound Coast Road',690,600],['Quarry',1170,590]];
   (world.tm=world.tm||[]).push(['// spatial index',performance.now()-t0|0]);
   // spatial index of ground objects per chunk

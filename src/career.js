@@ -16,6 +16,7 @@ const CARGOS=[
   {id:'froz', name:'Frozen food',          icon:'\u{1F9CA}',trl:'fridge', kg:[12000,18000],mult:1.30,tier:2,col:'#0288d1'},
   {id:'fresh',name:'Fresh produce',        icon:'\u{1F966}',trl:'fridge', kg:[9000,15000], mult:1.25,tier:2,col:'#43a047'},
   {id:'pharm',name:'Pharmacy supplies',    icon:'\u{1F48A}',trl:'fridge', kg:[4000,7000],  mult:1.45,tier:2,col:'#00897b'},
+  {id:'dockc',name:'Port container (40ft)',icon:'\u{1F6A2}',trl:'cont',kg:[16000,26000],mult:1.35,tier:2,col:'#0e6655',dock:true},
   {id:'cont', name:'Imported goods (40ft)',icon:'\u{1F4E6}',trl:'cont',   kg:[14000,22000],mult:1.30,tier:2,col:'#d84315'},
   {id:'fuel', name:'Forecourt diesel',     icon:'\u26FD',   trl:'tank',   kg:[20000,26000],mult:1.70,tier:3,col:'#455a64'},
   {id:'steel',name:'Shop-fit steelwork',   icon:'\u{1F3D7}',trl:'flat',   kg:[18000,26000],mult:1.60,tier:3,col:'#5d4037'},
@@ -101,9 +102,9 @@ function loadGame(){ const d=hasSave(); if(!d) return false;
 function resetGame(){ try{ career.noSave=1; localStorage.removeItem(saveKey()); if(!world.v2poi) localStorage.removeItem(SAVE_KEY_OLD); }catch(e){} location.reload(); }
 // ---------- jobs
 const R7=mulberry((Date.now()%1e9)|0);
-function pickupsFor(c){ const ds=world.depots.filter(d=>d.bays.length); const pref=c.trl==='cont'?ds.filter(d=>/Docks|Harbour|Freight/.test(d.name)):c.trl==='tank'?ds.filter(d=>/Quarry|Mine|Logistics|Harbour/.test(d.name)):c.trl==='fridge'?ds.filter(d=>/Agri|Farm|Distribution|Air/.test(d.name)):ds; return pref.length?pref:ds; }
+function pickupsFor(c){ if(c.dock){ const p=world.depots.filter(d=>d.code==='APT'&&d.bays.length); if(p.length) return p; } const ds=world.depots.filter(d=>d.bays.length); const pref=c.trl==='cont'?ds.filter(d=>/Docks|Harbour|Freight/.test(d.name)):c.trl==='tank'?ds.filter(d=>/Quarry|Mine|Logistics|Harbour/.test(d.name)):c.trl==='fridge'?ds.filter(d=>/Agri|Farm|Distribution|Air/.test(d.name)):ds; return pref.length?pref:ds; }
 function makeJob(tierWanted){ const tier=Math.max(1,Math.min(TIERS.length,tierWanted)); const cs=CARGOS.filter(c=>c.tier===tier); const c=cs[(R7()*cs.length)|0]; const T_=tierInfo(tier);
-  for(let tries=0;tries<40;tries++){ const pk=pickupsFor(c), from=pk[(R7()*pk.length)|0], to=world.malls[(R7()*world.malls.length)|0]; if(!from||!to) return null;
+  for(let tries=0;tries<40;tries++){ const pk=pickupsFor(c), from=pk[(R7()*pk.length)|0], dl=c.dock?world.depots.filter(d=>d!==from&&d.bays.length&&d.code!=='APT'):world.malls, to=dl[(R7()*dl.length)|0]; if(!from||!to) return null;
     const km=Math.hypot(to.entrance.x-from.entrance.x,to.entrance.y-from.entrance.y)*1.3/1000; if(km<1.0||km>T_.maxKm||(tier>1&&km<(tier-1)*2.2)) continue;
     const kg=Math.round((c.kg[0]+R7()*(c.kg[1]-c.kg[0]))/100)*100, TT=TRAILER_TYPES[c.trl];
     const pay=Math.round((240+175*km)*c.mult*T_.payMult*(0.85+kg/60000)/10)*10, xp=Math.round((55+38*km)*c.mult*(0.8+tier*0.35));
@@ -120,7 +121,7 @@ function acceptJob(j){ if(j.tier>career.tier) return false; if(career.active) ab
   if(!bay){ bay=dp.bays[(R7()*dp.bays.length)|0]; const old=bay.trailer; if(old){ const i=world.trailers.indexOf(old); if(i>=0) world.trailers.splice(i,1); bay.trailer=null; } }
   const c=j.cargo, tr=makeTrailer(c.trl,R7,{cargo:c.name,cargoKg:j.kg,weight:j.weight,reqLevel:j.tier,target:true,job:j.id});
   tr.x=bay.kx; tr.y=bay.ky; tr.th=bay.th; tr.bay=bay; tr.depot=dp; bay.trailer=tr; bay.target=true; world.trailers.push(tr);
-  const free=j.to.bays.filter(b=>!b.assigned&&!b.parked); const mb=(free.length?free:j.to.bays)[(R7()*(free.length||j.to.bays.length))|0]; mb.assigned=true;
+  const free=j.to.bays.filter(b=>!b.assigned&&!b.parked&&!b.trailer); const mb=(free.length?free:j.to.bays)[(R7()*(free.length||j.to.bays.length))|0]; mb.assigned=true;
   career.active={job:j,trailer:tr,pickBay:bay,bay:mb,phase:'pickup',t0:timeS,dmg0:truck.damage}; j.taken=true;
   setRoute(dp); BigRig.emit('jobAccepted',{job:j}); flash('Job accepted: '+c.name+' \u2192 '+j.to.name+' \u2022 sat nav set to '+dp.name); saveGame(); return true; }
 function abandonJob(silent){ const a=career.active; if(!a) return; a.bay.assigned=false; if(a.pickBay) a.pickBay.target=false; a.trailer.target=false; a.trailer.job=null; career.active=null; clearRoute(); if(!silent) flash('Job abandoned'); }
