@@ -59,7 +59,7 @@ function frame(ts){
   { const z=cam.z; updateAmbient(dt,[cam.x-VW/2/z,cam.y-VH/2/z,cam.x+VW/2/z,cam.y+VH/2/z]); }
   if(started&&!paused) updateNav(dt);
   if(truck.bump>0.05&&!truck._dmg){ truck.damage=Math.min(100,truck.damage+truck.bump*6); truck._dmg=true; } if(truck.bump<=0.01) truck._dmg=false;
-  updateBreakdown(dt);
+  updateBreakdown(dt); updateDayNight(dt,started&&!paused);
   // camera: look-ahead + zoom-out with speed
   const f=fwd(truck.h), sp=Math.abs(truck.v);
   const kp=kingpin(truck); const mid=[(truck.x-f[0]*1.9)*PPM, (truck.y-f[1]*1.9)*PPM];
@@ -91,10 +91,10 @@ function draw(){
   drawPortLow(vx0,vy0,vx1,vy1); drawFXLow(vx0,vy0,vx1,vy1); drawRemotePlayers(vx0,vy0,vx1,vy1); drawBreakdown();
   drawLorry(); drawFXHigh(); drawPortHigh(vx0,vy0,vx1,vy1);
   for(const o of world.overhead) if(o.x>vx0-400&&o.x<vx1+400&&o.y>vy0-400&&o.y<vy1+400) drawOverhead(o);
-  drawAmbientHigh(VR);
+  drawAmbientHigh(VR); drawNight(vx0,vy0,vx1,vy1,z);
   ctx.setTransform(1,0,0,1,0,0);
   drawHUD();
-  if(bigmap.open){ drawBigMap(); drawPadMapCursor(); }
+  if(bigmap.open){ drawBigMap(); dnMapShade(0,0,VW,VH,0.35); drawPadMapCursor(); }
 }
 function blit(art,mx,my,ang,dx=0,dy=0){ ctx.save(); ctx.translate(mx*PPM+dx,my*PPM+dy); ctx.rotate(ang); ctx.drawImage(art.c,-art.ox/ART_SCALE,-art.oy/ART_SCALE,art.W/ART_SCALE,art.H/ART_SCALE); ctx.restore(); }
 // coupled artic layering: tractor chassis + fifth wheel (behind the cab body) draw UNDER the trailer, cab body over the trailer nose
@@ -194,7 +194,7 @@ function drawOverhead(o){
 // ---------- HUD
 function drawHUD(){
   const s=truck, kmh=Math.abs(s.v)*3.6;
-  drawMinimap(); drawCoupleHUD(); drawFuelHUD(); drawIndHUD(); drawCareerHUD(); drawNavHUD();
+  drawMinimap(); dnMapShade(MM.x,MM.y,MM.w,MM.h); drawClockHUD(); drawCoupleHUD(); drawFuelHUD(); drawIndHUD(); drawCareerHUD(); drawNavHUD();
   // gauge panel
   const gx=14, gy=VH-150, gw=186, gh=136;
   ctx.fillStyle='rgba(10,14,22,0.72)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(gx,gy,gw,gh,16):ctx.rect(gx,gy,gw,gh); ctx.fill();

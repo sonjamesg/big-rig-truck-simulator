@@ -56,11 +56,12 @@ function drawCropWind(v){ const t=timeS;
     ctx.restore(); } }
 function drawAmbientLow(v){
   drawWaterFx(v); drawCropWind(v);
-  for(const b of world.boats){ const [x,y,h]=boatPos(b); if(!inView(x,y,600,v)) continue; const L=BOAT[b.kind][0]*PPM/2; let under=false; for(const k of [-1,0,1]){ if(get(Math.floor((x+Math.sin(h)*L*k)/TILE),Math.floor((y-Math.cos(h)*L*k)/TILE))===T.BRIDGE) under=true; } if(under){ b.hidden=true; continue; } b.hidden=false; drawBoat(b,x,y,h); }
+  for(const b of world.boats){ const [x,y,h]=boatPos(b); if(!inView(x,y,600,v)) continue; if(DN.dark>0.05){ const c=Math.cos(h),sn=Math.sin(h),L2=BOAT[b.kind][0]*PPM/2; dnLight(x+c*L2,y+sn*L2,22,'rgba(255,255,230,0.9)',0.9); dnLight(x-sn*8,y+c*8,18,'rgba(40,255,90,0.9)',0.8); dnLight(x+sn*8,y-c*8,18,'rgba(255,40,40,0.9)',0.8); } const L=BOAT[b.kind][0]*PPM/2; let under=false; for(const k of [-1,0,1]){ if(get(Math.floor((x+Math.sin(h)*L*k)/TILE),Math.floor((y-Math.cos(h)*L*k)/TILE))===T.BRIDGE) under=true; } if(under){ b.hidden=true; continue; } b.hidden=false; drawBoat(b,x,y,h); }
   for(const a of world.animals) if(inView(a.x,a.y,30,v)) drawAnimal(a);
 }
 function drawPlane(x,y,h,sc,alt,col){ const s=sc;
   ctx.save(); ctx.translate(x+alt*50,y+alt*50); ctx.rotate(h); ctx.fillStyle='rgba(10,15,25,'+(0.35-alt*0.12)+')'; planeShape(s); ctx.restore();
+  { const c=Math.cos(h),sn=Math.sin(h), wx=26*s; dnLight(x+c*wx,y+sn*wx,26,'rgba(40,255,90,0.9)',0.9); dnLight(x-c*wx,y-sn*wx,26,'rgba(255,40,40,0.9)',0.9); if((timeS*1.3%1)<0.15) dnLight(x,y,60,'rgba(255,255,255,0.9)',1); }
   ctx.save(); ctx.translate(x,y); ctx.rotate(h); ctx.fillStyle='#eef1f4'; planeShape(s); ctx.fillStyle=col; ctx.fillRect(-2*s,14*s,4*s,10*s); ctx.fillStyle='#2c3e50'; ctx.fillRect(-2.2*s,-26*s,4.4*s,3*s);
   if(Math.sin(timeS*6)>0.3){ ctx.fillStyle='#ff3030'; ctx.beginPath(); ctx.arc(-24*s,2*s,2*s,0,7); ctx.fill(); ctx.fillStyle='#30ff60'; ctx.beginPath(); ctx.arc(24*s,2*s,2*s,0,7); ctx.fill(); } ctx.restore(); }
 function planeShape(s){ ctx.beginPath(); ctx.moveTo(0,-30*s); ctx.quadraticCurveTo(4*s,-26*s,4*s,-18*s); ctx.lineTo(4*s,-4*s); ctx.lineTo(26*s,4*s); ctx.lineTo(26*s,8*s); ctx.lineTo(4*s,4*s); ctx.lineTo(3*s,20*s); ctx.lineTo(11*s,26*s); ctx.lineTo(11*s,29*s); ctx.lineTo(0,27*s); ctx.lineTo(-11*s,29*s); ctx.lineTo(-11*s,26*s); ctx.lineTo(-3*s,20*s); ctx.lineTo(-4*s,4*s); ctx.lineTo(-26*s,8*s); ctx.lineTo(-26*s,4*s); ctx.lineTo(-4*s,-4*s); ctx.lineTo(-4*s,-18*s); ctx.quadraticCurveTo(-4*s,-26*s,0,-30*s); ctx.fill(); }
