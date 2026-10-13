@@ -84,8 +84,7 @@ const mpArt={};
 function mpCab(m,c){ const k=m+'|'+c; if(!mpArt[k]){ const a=modelArt(modelById(m),c||modelById(m).cols[0]); mpArt[k]={a,sh:silhouette(a)}; } return mpArt[k]; }
 function mpTrl(tr){ const k=tr[1]+'|'+tr[2]+'|'+tr[3]; if(!mpArt[k]) mpArt[k]=tr[1]==='player'?{type:'player'}:{type:tr[1],art:trailerArt(TRAILER_TYPES[tr[1]]?tr[1]:'box',tr[2],tr[3])}; return mpArt[k]; }
 function drawRemotePlayers(vx0,vy0,vx1,vy1){ if(!MP.on) return; for(const id in MP.players){ const p=MP.players[id], r=p.cur; if(!p.has) continue; const X=r.x*PPM, Y=r.y*PPM; if(X<vx0-300||X>vx1+300||Y<vy0-300||Y>vy1+300) continue;
-    const cab=mpCab(r.m,r.c); if(r.tr){ const t=mpTrl(r.tr); drawTrailerAt(t,r.kx,r.ky,r.th,true); drawTrailerAt(t,r.kx,r.ky,r.th,false); }
-    blit(cab.sh,r.x,r.y,r.h,6,6); blit(cab.a,r.x,r.y,r.h);
+    const cab=mpCab(r.m,r.c); drawRig(cab.a,cab.sh,r.x,r.y,r.h,r.tr?mpTrl(r.tr):null,r.kx,r.ky,r.th,6);
     const f=fwd(r.h), rt=rgt(r.h), fl=r.fl|0, br=fl&1, rv=fl&2, ind=(fl>>2)&3, hz=fl&16;
     if(br||rv){ ctx.fillStyle=rv?'rgba(255,255,255,0.95)':'rgba(255,40,30,0.95)'; for(const sd of [-1,1]) ctx.fillRect((r.x-f[0]*1.3+rt[0]*sd*1.1)*PPM-2,(r.y-f[1]*1.3+rt[1]*sd*1.1)*PPM-2,4,4); }
     if((ind||hz)&&(timeS*2.5)%1<0.5){ ctx.fillStyle='#ffb020'; for(const sd of (hz?[-1,1]:[ind===1?-1:1])) for(const fb of [5.0,-1.3]) ctx.fillRect((r.x+f[0]*fb+rt[0]*sd*1.2)*PPM-2.5,(r.y+f[1]*fb+rt[1]*sd*1.2)*PPM-2.5,5,5); }
