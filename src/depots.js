@@ -168,8 +168,8 @@ function buildDepots(objs,R){
       const tryF=(nm,tx,ty,sep)=>{ for(const [w,h,b,f] of [[26,20,0,1],[26,20,1,.6],[18,12,1,.4]]){ const sp=findSpot(tx,ty,w,h,16,far(fs(),sep*f),!!b,MR); if(sp){ if(b) clrB(sp[0]-1,sp[1]-sp[2],w+2,h+sp[2]); (w===26?forecourt:fuelStation)(nm,sp[0],sp[1],sp[2],pr()); return true; } } return false; };
       const tryG=(nm,tx,ty,sep)=>{ for(const [w,h,b,f] of (world.v2?[[22,16,0,1],[22,16,1,.6],[16,14,1,.4]]:[[22,14,0,1],[22,14,1,.6],[14,10,1,.3]])){ const sp=findSpot(tx,ty,w,h,16,far(gs(),sep*f),!!b,MR); if(sp){ if(b) clrB(sp[0]-1,sp[1]-sp[2],w+2,h+sp[2]); garage(nm,sp[0],sp[1],sp[2],w,h); return true; } } return false; };
       const sep=Math.max(14,Math.min(hw,hh)*0.5);
-      for(let t=0;fs().length<4&&t<8;t++){ const [tx,ty]=tg[t]; if(!tryF(k+' '+Q[t%8]+(t>=8?' Road':'')+' Fuel',tx,ty,sep)) t+=0; }
-      for(let t=0;gs().length<4&&t<8;t++){ const [tx,ty]=tg[(t+2)%16]; tryG(k+' '+Q[(t+2)%8]+((t+2)%16>=8?' Road':'')+' Truck Repairs',tx,ty,sep); }
+      { let nf=0; for(let t=0;fs().length<4&&t<8&&nf<3;t++){ const [tx,ty]=tg[t]; if(tryF(k+' '+Q[t%8]+(t>=8?' Road':'')+' Fuel',tx,ty,sep)) nf=0; else nf++; } }
+      { let nf=0; for(let t=0;gs().length<4&&t<8&&nf<3;t++){ const [tx,ty]=tg[(t+2)%16]; if(tryG(k+' '+Q[(t+2)%8]+((t+2)%16>=8?' Road':'')+' Truck Repairs',tx,ty,sep)) nf=0; else nf++; } }
       world.cityPOI[k]={fuel:fs().length,garages:gs().length}; }
     console.log('[sites] per city fuel+garages',JSON.stringify(world.cityPOI)); }
 if(typeof buildCareerSites==='function') buildCareerSites({findSpot,access,clearObjs,region,R,objs,okT});
