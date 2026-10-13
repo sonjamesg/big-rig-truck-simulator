@@ -16,12 +16,202 @@ const RW_P=2.1, RW_F=-2.1, HUB_W=9, HUB_HALF=150, HUB_RAMP=80;
 function rlHash(n){ n=(n^61)^(n>>>16); n=n+(n<<3)|0; n^=n>>>4; n=Math.imul(n,0x27d4eb2d); n^=n>>>15; return (n>>>0)/4294967296; }
 function rlMod(a,L){ return ((a%L)+L)%L; }
 function rlSm(x){ x=Math.max(0,Math.min(1,x)); return x*x*(3-2*x); }
+// ---------- v29 router: the main line is laid by an A* over an 8 m grid (state = cell + heading) that hugs main roads / coast at
+// 8-12 m from the road edge, never enters buildings or functional sites, crosses roads only straight and at right angles, crosses
+// water straight (suspension bridges), and pays heavily for every heading change; the cell path is then string-pulled over open
+// land and every corner is filleted with the largest clear radius (no wiggles).
+const RR_C=2, RR_TURN=60, RR_DEV=28, RR_APP=7, RR_GR=25, RR_TAIL=8, RR_JR=60, RR_STR=9;
+function rlDT(src){ // approx-Euclidean distance (tiles) + nearest source index, 8-neighbour two-pass propagation
+  const N=MW*MH, D=new Float32Array(N).fill(1e9), NI=new Int32Array(N).fill(-1);
+  for(let i=0;i<N;i++) if(src[i]){ D[i]=0; NI[i]=i; }
+  const rel=(i,j)=>{ const s=NI[j]; if(s<0) return; const dx=(i%MW)-(s%MW), dy=((i/MW)|0)-((s/MW)|0), d=Math.sqrt(dx*dx+dy*dy); if(d<D[i]){ D[i]=d; NI[i]=s; } };
+  for(let y=0;y<MH;y++){ for(let x=0;x<MW;x++){ const i=y*MW+x; if(x>0) rel(i,i-1); if(y>0){ rel(i,i-MW); if(x>0) rel(i,i-MW-1); if(x<MW-1) rel(i,i-MW+1); } } for(let x=MW-2;x>=0;x--) rel(y*MW+x,y*MW+x+1); }
+  for(let y=MH-1;y>=0;y--){ for(let x=MW-1;x>=0;x--){ const i=y*MW+x; if(x<MW-1) rel(i,i+1); if(y<MH-1){ rel(i,i+MW); if(x<MW-1) rel(i,i+MW+1); if(x>0) rel(i,i+MW-1); } } for(let x=1;x<MW;x++) rel(y*MW+x,y*MW+x-1); }
+  return {D,NI}; }
+const RR_HARDT={[T.BLDG]:1,[T.CONC]:1,[T.LOT]:1,[T.PLAZA]:1,[T.TANK]:1,[T.PUMP]:1,[T.CONT]:1,[T.QUAY]:1,[T.PARK]:1,[T.PGRASS]:1};
+const RR_HARDO={bldg:1,tank:1,silo:1,turbine:1,mast:1,runway:1,lot:1,pump:1,canopy:1,mall:1,dealer:1,mallyard:1,dpad:1,yard:1,pond:1,fountain:1,dam:1,cont:1,pallets:1,awning:1,showtruck:1,tbay:1,hgvbay:1,hgvisland:1,drive:1};
+function railHardMask(objs){ const N=MW*MH, H=new Uint8Array(N);
+  for(let i=0;i<N;i++) if(RR_HARDT[G[i]]) H[i]=1;
+  const box=(x0,y0,x1,y1)=>{ for(let y=Math.max(0,Math.floor(y0));y<=Math.min(MH-1,Math.floor(y1));y++) for(let x=Math.max(0,Math.floor(x0));x<=Math.min(MW-1,Math.floor(x1));x++) H[y*MW+x]=1; };
+  for(const b of world.funcFP||[]) box(b[0],b[1],b[2],b[3]);
+  for(const o of objs){ if(!RR_HARDO[o.kind]||o._dead) continue; const r=o.r||0; if(o.w!==undefined) box(o.x/TILE,o.y/TILE,(o.x+o.w)/TILE,(o.y+o.h)/TILE); else box((o.x-r)/TILE,(o.y-r)/TILE,(o.x+r*2.2)/TILE,(o.y+r*2.2)/TILE); }
+  return H; }
+function railRoute(objs){ const t0=performance.now(), N=MW*MH;
+  const H=railHardMask(objs); RAIL.hard=H;
+  const RD=new Uint8Array(N), WT=new Uint8Array(N);
+  for(let i=0;i<N;i++){ const g=G[i]; if(g===T.ROAD||g===T.BRIDGE||g===T.WALK||g===T.ISLAND) RD[i]=1; if(g===T.WATER) WT[i]=1; }
+  for(const c of world.curves||[]) for(const [px,py] of c.pts) for(let dy=-2;dy<=2;dy++) for(let dx=-2;dx<=2;dx++){ const x=Math.floor(px+dx),y=Math.floor(py+dy); if(inb(x,y)&&Math.hypot(x+0.5-px,y+0.5-py)<=c.w/2+0.5) RD[y*MW+x]=1; }
+  for(const t of world.tapers||[]) for(const [px,py] of t.pts) for(let dy=-3;dy<=3;dy++) for(let dx=-3;dx<=3;dx++){ const x=Math.floor(px+dx),y=Math.floor(py+dy); if(inb(x,y)&&Math.hypot(x+0.5-px,y+0.5-py)<=t.wW/2+0.5) RD[y*MW+x]=1; }
+  const JM=new Uint8Array(N); for(const J of world.junctions||[]) for(let y=J.y;y<J.y+J.h;y++) for(let x=J.x;x<J.x+J.w;x++) if(inb(x,y)) JM[y*MW+x]=1;
+  if(world.jMask) for(let i=0;i<N;i++) if(world.jMask[i]) JM[i]=1;
+  const dH=rlDT(H), dR=rlDT(RD), dW=rlDT(WT), dJ=rlDT(JM);
+  // road orientation of the nearest road tile: 1 = h (cross with a vertical move), 2 = v, 0 = not crossable (junction, curve, bridge, roundabout)
+  const ori=i=>{ const g=G[i]; if(g===T.BRIDGE||(world.jMask&&world.jMask[i])||world.cornerAt&&world.cornerAt[i]>=0) return 0; const a=world.roadH[i]>=0, b=world.roadV[i]>=0; if(a===b) return 0; return a?1:2; };
+  // allowed crossing headings (bit d) for a cell over a road: local road axis by PCA of the road tiles nearby, cross within 23 deg of square
+  const crossMask=ti=>{ const ni=dR.NI[ti]; if(ni<0) return 0; const x0=ni%MW, y0=(ni/MW)|0; let n=0,sx=0,sy=0,sxx=0,syy=0,sxy=0;
+    for(let dy=-7;dy<=7;dy++) for(let dx=-7;dx<=7;dx++){ const x=x0+dx,y=y0+dy; if(!inb(x,y)) continue; const j=y*MW+x, gg=G[j];
+      if(gg===T.BRIDGE||JM[j]||(world.cornerAt&&world.cornerAt[j]>=0)) { if(Math.abs(dx)<=4&&Math.abs(dy)<=4) return 0; continue; }
+      if(gg!==T.ROAD) continue; n++; sx+=dx; sy+=dy; sxx+=dx*dx; syy+=dy*dy; sxy+=dx*dy; }
+    if(n<6) return 0; sx/=n; sy/=n; const a=sxx/n-sx*sx, b=syy/n-sy*sy, cc=sxy/n-sx*sy, tr=a+b, det=a*b-cc*cc, l1=tr/2+Math.sqrt(Math.max(0,tr*tr/4-det)), l2=tr-l1;
+    if(l1<3*Math.max(l2,0.05)) return 0; const phi=0.5*Math.atan2(2*cc,a-b); let m=0;
+    for(let d=0;d<8;d++){ const ang=d*Math.PI/4; let df=Math.abs(((ang-phi-Math.PI/2)%Math.PI+Math.PI*1.5)%Math.PI-Math.PI/2); if(df<0.4) m|=1<<d; } return m; };
+  const GW=MW/RR_C, GH=MH/RR_C, NC=GW*GH, CL=new Uint8Array(NC), CO=new Float32Array(NC), CR=new Uint8Array(NC);  // CL: 0 blocked 1 land 2 road(crossing) 3 water
+  const HUBT=RAIL_ST.find(s=>s[3]==='hub'), hubX=HUBT[1]/RR_C, hubY=HUBT[2]/RR_C;
+  for(let cy=0;cy<GH;cy++) for(let cx=0;cx<GW;cx++){ const c=cy*GW+cx, ti=(cy*RR_C+1)*MW+cx*RR_C+1;
+    if(cx<4||cy<4||cx>=GW-4||cy>=GH-4){ continue; }
+    const hm=dH.D[ti]*M_T-1.5, rm=dR.D[ti]*M_T-1.5, wm=dW.D[ti]*M_T-1.5, hub=Math.hypot(cx-hubX,cy-hubY)*RR_C*M_T<330;
+    if(hm<(hub?24:7.5)) continue;
+    if(rm<7){ if(hub) continue; const m=crossMask(ti); if(!m) continue; CL[c]=2; CR[c]=m; CO[c]=6; continue; }
+    { const tx=cx*RR_C+1, ty=cy*RR_C+1; if(tx>=470&&tx<810&&ty>=140&&ty<462&&(G[ti]===T.WATER||wm<12)) continue; }   // Port Albion basin + ship approach: no track over the berths
+    if(G[ti]===T.WATER||wm<3){ CL[c]=3; CO[c]=3; continue; }
+    if(hub&&rm<20) continue;
+    const e=rm; let k= e<8?2.5 : e<=13?0 : e<=40?0.3+(e-13)*0.08 : 2.6;
+    if(wm>=8&&wm<=25) k=Math.min(k,0.2);
+    if(G[ti]===T.ROCK) k+=0.6;
+    { const jm=dJ.D[ti]*M_T; if(jm<RR_JR) k+=2.2*(1-jm/RR_JR); }
+    CL[c]=1; CO[c]=1+k; }
+  // stations: nearest good corridor cell to each named spot
+  const used=new Uint8Array(NC);
+  const HINT={'Sound Coast':[840,330],'Albion Central':[110,540]};
+  const tgt=RAIL_ST.map(([name,tx,ty,kind])=>{ if(HINT[name]) [tx,ty]=HINT[name]; const X0=tx/RR_C, Y0=ty/RR_C; let best=-1,bs=1e18; const R=110;
+    for(let dy=-R;dy<=R;dy++) for(let dx=-R;dx<=R;dx++){ const cx=Math.round(X0+dx), cy=Math.round(Y0+dy); if(cx<0||cy<0||cx>=GW||cy>=GH) continue; const c=cy*GW+cx; if(CL[c]!==1) continue;
+      // platform needs a straight, open run around the cell
+      let open=0; for(let q=-6;q<=6;q++){ if(CL[c+q]===1) open++; } let openV=0; for(let q=-6;q<=6;q++){ const cc=c+q*GW; if(cc>=0&&cc<NC&&CL[cc]===1) openV++; }
+      { const ti=(cy*RR_C+1)*MW+cx*RR_C+1; if(kind==='hub'){ if(dH.D[ti]*M_T<30||dR.D[ti]*M_T<24||dR.D[ti]*M_T>110) continue; } else if(dR.D[ti]*M_T>40) continue; }
+      const sc=Math.hypot(dx,dy)+(CO[c]-1)*25+(13-Math.max(open,openV))*6; if(sc<bs){ bs=sc; best=c; } }
+    return {name,kind,c:best}; });
+  { const hb=tgt.find(t=>t.kind==='hub'), hx=hb.c%GW, hy=(hb.c/GW)|0, HR=Math.ceil(330/M_T/RR_C);   // hub throat: wide, clear and crossing-free
+    for(let dy=-HR;dy<=HR;dy++) for(let dx=-HR;dx<=HR;dx++){ if(dx*dx+dy*dy>HR*HR) continue; const cx=hx+dx, cy=hy+dy; if(cx<0||cy<0||cx>=GW||cy>=GH) continue; const c=cy*GW+cx, ti=(cy*RR_C+1)*MW+cx*RR_C+1;
+      if(CL[c]===2||dH.D[ti]*M_T-1.5<24||dR.D[ti]*M_T-1.5<20) CL[c]=0; } }
+  RAIL._CL=CL; RAIL._CO=CO; RAIL._tgt=tgt; RAIL._GW=GW;
+  // A*
+  const DX=[1,1,0,-1,-1,-1,0,1], DY=[0,1,1,1,0,-1,-1,-1], NS=NC*8, g=new Float32Array(NS), pv=new Int8Array(NS), stamp=new Uint16Array(NS);
+  let heap=new Int32Array(1<<20), hk=new Float32Array(1<<20), hn=0;
+  const push=(s,k)=>{ if(hn>=heap.length){ const a=new Int32Array(heap.length*2); a.set(heap); heap=a; const b=new Float32Array(hk.length*2); b.set(hk); hk=b; } let i=hn++; while(i>0){ const p=(i-1)>>1; if(hk[p]<=k) break; heap[i]=heap[p]; hk[i]=hk[p]; i=p; } heap[i]=s; hk[i]=k; };
+  const pop=()=>{ const top=heap[0]; hn--; if(hn>0){ const s=heap[hn], k=hk[hn]; let i=0; for(;;){ let l=2*i+1; if(l>=hn) break; if(l+1<hn&&hk[l+1]<hk[l]) l++; if(hk[l]>=k) break; heap[i]=heap[l]; hk[i]=hk[l]; i=l; } heap[i]=s; hk[i]=k; } return top; };
+  const legs=[]; let cur=null, stp=0; const startC=tgt[0].c;
+  let goalSet=null;
+  let strN=0;
+  const leg=(seeds,goalC,goalDir)=>{ for(const sn of [RR_STR]){ strN=sn; const r=leg1(seeds,goalC,goalDir); if(r) return r; } return null; };
+  const leg1=(seeds,goalC,goalDir)=>{ stp++; { goalSet=new Set(); const gx0=goalC%GW, gy0=(goalC/GW)|0; const GR_=(tgt.find(t=>t.kind==='hub')||{}).c===goalC?5:RR_GR; for(let dy=-GR_;dy<=GR_;dy++) for(let dx=-GR_;dx<=GR_;dx++) if(dx*dx+dy*dy<=GR_*GR_){ const q=(gy0+dy)*GW+gx0+dx; if(q>=0&&q<NC&&CL[q]===1) goalSet.add(q); } } hn=0; const gx=goalC%GW, gy=(goalC/GW)|0;
+    const h=c=>{ const dx=Math.abs(c%GW-gx), dy=Math.abs(((c/GW)|0)-gy); return (Math.max(dx,dy)+0.4142*Math.min(dx,dy)); };
+    const seed=(s,v)=>{ stamp[s]=stp; g[s]=v; pv[s]=9; push(s,v+h(s>>3)); };
+    for(const s0 of seeds) seed(s0,0);
+    let found=-1, it=0;
+    while(hn>0){ const s=pop(), c=s>>3, d=s&7; it++; const gs=g[s];
+      if(gs>0&&(closeSet?closeSet.has(s):goalSet.has(c))){ found=s; break; }
+      const cl=CL[c];
+      for(const dd of (cl===1?[0,-1,1]:[0])){ const nd=(d+dd+8)&7, nx=c%GW+DX[nd], ny=((c/GW)|0)+DY[nd]; if(nx<0||ny<0||nx>=GW||ny>=GH) continue; const nc=ny*GW+nx, ncl=CL[nc]; if(!ncl) continue;
+        if(used[nc]&&!(closeSet&&closeCells.has(nc))) continue;
+        if(ncl===2&&!(CR[nc]>>nd&1)) continue;
+        if(ncl!==1&&dd) continue;
+        let xp=0; if(dd&&strN){ let q=s, bad=false; for(let h2=0;h2<strN;h2++){ const pd_=pv[q]; if(pd_===9) break; if(pd_!==0){ bad=true; break; } const qc=q>>3, qd=q&7; q=(qc-DX[qd]-DY[qd]*GW)*8+qd; if(stamp[q]!==stp) break; } if(bad) xp=RR_TURN*1.5; }
+        if(dd){ let bad=false; const cx0=c%GW, cy0=(c/GW)|0; for(let q=1;q<=RR_APP&&!bad;q++){ const ax=cx0+DX[nd]*q, ay=cy0+DY[nd]*q, bx=cx0-DX[d]*(q-1), by=cy0-DY[d]*(q-1);
+            if(ax>=0&&ay>=0&&ax<GW&&ay<GH&&CL[ay*GW+ax]>=2) bad=true; if(bx>=0&&by>=0&&bx<GW&&by<GH&&CL[by*GW+bx]>=2) bad=true; } if(bad) continue; }
+        if(nd&1){ const a=CL[c+DX[nd]], b=CL[c+DY[nd]*GW]; if(a!==1&&b!==1&&ncl===1) continue; }
+        const ns=nc*8+nd, ng=gs+CO[nc]*((nd&1)?1.4142:1)+(dd?RR_TURN:0)+xp;
+        if(stamp[ns]!==stp||ng<g[ns]){ stamp[ns]=stp; g[ns]=ng; pv[ns]=dd; push(ns,ng+h(nc)); } } }
+    if(found<0) return null;
+    const path=[]; let s=found; while(true){ path.push(s); const dd=pv[s]; if(dd===9) break; const c=s>>3, d=s&7, pc=c-DX[d]-DY[d]*GW, pd=(d-dd+8)&7; s=pc*8+pd; }
+    return path.reverse(); };
+  const order=tgt.map((t,i)=>i);
+  let all=[], fail=[];
+  const markUsed=(path,keepStart)=>{ for(const s of path){ const c=s>>3, cx=c%GW, cy=(c/GW)|0; for(let dy=-3;dy<=3;dy++) for(let dx=-3;dx<=3;dx++){ const q=(cy+dy)*GW+cx+dx; if(q>=0&&q<NC) used[q]=1; } }
+    if(keepStart){ const sx=startC%GW, sy=(startC/GW)|0; for(let dy=-4;dy<=4;dy++) for(let dx=-4;dx<=4;dx++) used[(sy+dy)*GW+sx+dx]=0; } };
+  let prev=null, closeSet=null, closeCells=null;
+  for(let k=1;k<=tgt.length+1;k++){ const goal=k<=tgt.length?tgt[k%tgt.length].c:startC; const gd=-1;
+    let path;
+    if(k===1) path=leg([0,1,2,3,4,5,6,7].map(d=>startC*8+d),goal,-1);
+    else { // release the cells around the previous leg's end so we can continue out of it
+      const TB=Math.min(RR_TAIL,all.length-2), tail=all.slice(all.length-TB);
+      for(const ts of tail){ const ec=ts>>3, ex=ec%GW, ey=(ec/GW)|0; for(let dy=-3;dy<=3;dy++) for(let dx=-3;dx<=3;dx++) used[(ey+dy)*GW+ex+dx]=0; }
+      if(k===tgt.length+1){ closeSet=new Map(); closeCells=new Set(); for(let q=4;q<Math.min(all.length-1,90);q++){ closeSet.set(all[q],q); closeCells.add(all[q]>>3); }
+        for(let q=0;q<Math.min(all.length-1,90);q++){ const c=all[q]>>3, cx=c%GW, cy=(c/GW)|0; for(let dy=-3;dy<=3;dy++) for(let dx=-3;dx<=3;dx++) used[(cy+dy)*GW+cx+dx]=0; }
+        }
+      path=leg(k===tgt.length+1?[prev]:tail,goal,gd);
+      if(path){ const q=all.lastIndexOf(path[0]); if(q>=0) all.length=q+1; } }
+    if(!path){ RAIL.routeFail=tgt[k%tgt.length].name; RAIL._seen=new Uint8Array(NC); RAIL._used=used; for(let q=0;q<NS;q++) if(stamp[q]===stp) RAIL._seen[q>>3]=1; return null; }
+    if(k===1){ const mid=path.length>>1; all=path.slice(mid); used.fill(0); markUsed(all,false); }   // loop starts mid-way along leg 1, so the closing legs re-lay the Albion end freely
+    else { all=all.concat(path.slice(1)); markUsed(path,false); }
+    // re-block the immediate tail except the last cell (continuation)
+    prev=path[path.length-1]; }
+  { const j=closeSet.get(prev); all=all.slice(j); all.pop(); }  // loop closes onto the first leg at index j
+  RAIL.route={ms:Math.round(performance.now()-t0),cells:all.length,stations:tgt.map(t=>[t.name,t.c%GW*RR_C+1,((t.c/GW)|0)*RR_C+1])};
+  // polyline vertices at heading changes (metres)
+  const P=c=>[((c%GW)*RR_C+1)*M_T,(((c/GW)|0)*RR_C+1)*M_T];
+  { let best=0,bl=0,run=0; for(let i=0;i<all.length*2;i++){ const a=all[i%all.length]&7, b=all[(i+1)%all.length]&7; if(a===b){ run++; if(run>bl&&i<all.length+run){ bl=run; best=i-(run>>1); } } else run=0; } const r=((best%all.length)+all.length)%all.length; all=all.slice(r).concat(all.slice(0,r)); }
+  RAIL._all=all;
+  let V=[], VA=[], VK=[]; const n=all.length, stC=new Set(tgt.map(t=>t.c));
+  for(let i=0;i<n;i++){ const d1=all[(i+1)%n]&7, an=stC.has(all[i]>>3); if((all[i]&7)!==d1||i===0||an){ V.push(P(all[i]>>3)); VA.push(i===0); VK.push(i); } }
+  // string-pull: drop vertices when the shortcut stays on open land
+  const cellAtM=(x,y)=>{ const cx=Math.floor(x/M_T/RR_C), cy=Math.floor(y/M_T/RR_C); return cy*GW+cx; };
+  const clearLine=(a,b,okW)=>{ const L=Math.hypot(b[0]-a[0],b[1]-a[1]); for(let s=0;s<=L;s+=2){ const x=a[0]+(b[0]-a[0])*s/L, y=a[1]+(b[1]-a[1])*s/L, ti=Math.floor(y/M_T)*MW+Math.floor(x/M_T); if(dH.D[ti]*M_T<9||dR.D[ti]*M_T<9) return false; if(!okW&&dW.D[ti]*M_T<4) return false; } return true; };
+  const devOK=(k0,k1,a,b)=>{ const dx=b[0]-a[0], dy=b[1]-a[1], l=Math.hypot(dx,dy)||1; for(let k=k0;k<=k1;k++){ const p=P(all[k%n]>>3); if(Math.abs((p[0]-a[0])*dy-(p[1]-a[1])*dx)/l>RR_DEV) return false; } return true; };
+  const devOK2=(a,b,pts)=>{ const dx=b[0]-a[0], dy=b[1]-a[1], l=Math.hypot(dx,dy)||1; for(const p of pts) if(Math.abs((p[0]-a[0])*dy-(p[1]-a[1])*dx)/l>RR_DEV) return false; return true; };
+  RAIL._clearLine=clearLine; RAIL._dist={dH,dR,dW};
+  for(let pass=0;pass<3;pass++){ const out=[V[0]], oa=[true], ok_=[VK[0]]; let i=0; while(i<V.length){ let lim=i+1; while(lim<V.length&&!VA[lim]&&lim<i+14) lim++; let j=lim; for(;j>i+1;j--){ const b=V[j%V.length]; if(clearLine(V[i],b,false)&&devOK(VK[i],j<V.length?VK[j]:n,V[i],b)) break; } if(j<=i+1) j=i+1; if(j<V.length){ out.push(V[j]); oa.push(VA[j]); ok_.push(VK[j]); } i=j; } V=out; VA=oa; VK=ok_; }
+  // de-jog: drop S-bends (short segment between opposite turns) and merge two same-way turns into one corner, while clear
+  { const cl2=(a,b)=>{ const L=Math.hypot(b[0]-a[0],b[1]-a[1]); for(let q=0;q<=L;q+=1.5){ const x=a[0]+(b[0]-a[0])*q/L, y=a[1]+(b[1]-a[1])*q/L, ti=Math.floor(y/M_T)*MW+Math.floor(x/M_T); if(dH.D[ti]*M_T<9||dR.D[ti]*M_T<9||dW.D[ti]*M_T<3) return false; } return true; };
+    const crs=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);
+    for(let it=0;it<6;it++){ let ch=false;
+      for(let i=0;i<V.length&&V.length>8;i++){ const m=V.length, a=V[(i-1+m)%m], b=V[i], c=V[(i+1)%m], d=V[(i+2)%m], bc=Math.hypot(c[0]-b[0],c[1]-b[1]);
+        if(bc>90) continue; const s1=Math.sign(crs(a,b,c)), s2=Math.sign(crs(b,c,d));
+        if(s1&&s2&&s1!==s2){ if(cl2(a,d)&&devOK2(a,d,[b,c])){ V.splice((i+1)%m,1); V.splice(V.indexOf(b),1); ch=true; } continue; }
+        if(s1&&s1===s2){ const r=[b[0]-a[0],b[1]-a[1]], q=[d[0]-c[0],d[1]-c[1]], den=r[0]*q[1]-r[1]*q[0]; if(Math.abs(den)<1e-6) continue; const tt=((c[0]-a[0])*q[1]-(c[1]-a[1])*q[0])/den; if(tt<=0) continue;
+          const X=[a[0]+r[0]*tt,a[1]+r[1]*tt]; if(Math.hypot(X[0]-b[0],X[1]-b[1])>120) continue; if(cl2(a,X)&&cl2(X,d)){ const j=V.indexOf(c); V[i]=X; V.splice(j,1); ch=true; } } }
+      if(!ch) break; } }
+  // tight-corner cleanup: a corner that cannot take a 40 m+ radius is cut out when the chord across it stays clear (7 m margin)
+  { const clr=(a,b)=>{ const L=Math.hypot(b[0]-a[0],b[1]-a[1]); for(let q=0;q<=L;q+=1.5){ const x=a[0]+(b[0]-a[0])*q/L, y=a[1]+(b[1]-a[1])*q/L, ti=Math.floor(y/M_T)*MW+Math.floor(x/M_T); if(dH.D[ti]*M_T<7.5||(dR.D[ti]*M_T<7&&dR.D[ti]*M_T<Math.min(q,L-q))||dW.D[ti]*M_T<2) return false; } return true; };
+    const okArc=pts=>{ for(const [x,y] of pts){ const ti=Math.floor(y/M_T)*MW+Math.floor(x/M_T); if(dH.D[ti]*M_T<9||dR.D[ti]*M_T<9||dW.D[ti]*M_T<2) return false; } return true; };
+    const bestR=i=>{ const m=V.length, a=V[(i-1+m)%m], b=V[i], c=V[(i+1)%m]; const u=[b[0]-a[0],b[1]-a[1]], v=[c[0]-b[0],c[1]-b[1]], lu=Math.hypot(...u), lv=Math.hypot(...v); const th=Math.acos(Math.max(-1,Math.min(1,(u[0]*v[0]+u[1]*v[1])/(lu*lv)))); if(th<1e-3) return 1e9;
+      const un=[u[0]/lu,u[1]/lu], vn=[v[0]/lv,v[1]/lv]; for(const r of [200,110,60,40]){ const t=r*Math.tan(th/2); if(t>lu*0.5||t>lv*0.5) continue; const p0=[b[0]-un[0]*t,b[1]-un[1]*t], cr=un[0]*vn[1]-un[1]*vn[0], sg=cr>0?1:-1, C=[p0[0]-un[1]*sg*r,p0[1]+un[0]*sg*r], a0=Math.atan2(p0[1]-C[1],p0[0]-C[0]); const pts=[]; for(let k=0;k<=8;k++){ const aa=a0+sg*th*k/8; pts.push([C[0]+Math.cos(aa)*r,C[1]+Math.sin(aa)*r]); } if(okArc(pts)) return r; } return 0; };
+    const freeBack=(b,dir,max)=>{ for(let q=0;q<=max;q+=1){ const x=b[0]-dir[0]*q, y=b[1]-dir[1]*q, ti=Math.floor(y/M_T)*MW+Math.floor(x/M_T); if(dR.D[ti]*M_T<9||dW.D[ti]*M_T<3) return Math.max(0,q-10); } return max; };
+    const rOf=i=>{ const m=V.length, a=V[(i-1+m)%m], b=V[i], c=V[(i+1)%m]; const u=[b[0]-a[0],b[1]-a[1]], v=[c[0]-b[0],c[1]-b[1]], lu=Math.hypot(...u), lv=Math.hypot(...v); const th=Math.acos(Math.max(-1,Math.min(1,(u[0]*v[0]+u[1]*v[1])/(lu*lv)))); if(th<1e-3) return 1e9;
+      const un=[u[0]/lu,u[1]/lu], vn=[v[0]/lv,v[1]/lv], f0=freeBack(b,un,lu*0.5), f1=freeBack(b,[-vn[0],-vn[1]],lv*0.5);
+      for(const r of [200,110,60,40]){ const t=r*Math.tan(th/2); if(t>f0||t>f1) continue; const p0=[b[0]-un[0]*t,b[1]-un[1]*t], cr=un[0]*vn[1]-un[1]*vn[0], sg=cr>0?1:-1, C=[p0[0]-un[1]*sg*r,p0[1]+un[0]*sg*r], a0=Math.atan2(p0[1]-C[1],p0[0]-C[0]); const pts=[]; for(let k=0;k<=8;k++){ const aa=a0+sg*th*k/8; pts.push([C[0]+Math.cos(aa)*r,C[1]+Math.sin(aa)*r]); } if(okArc(pts)) return r; } return 0; };
+    const segOK=(a,b)=>{ const L=Math.hypot(b[0]-a[0],b[1]-a[1]); for(let q=0;q<=L;q+=1.5){ const x=a[0]+(b[0]-a[0])*q/L, y=a[1]+(b[1]-a[1])*q/L, ti=Math.floor(y/M_T)*MW+Math.floor(x/M_T); if(dH.D[ti]*M_T<7.5) return false; } return true; };
+    const segNR=(a,b)=>{ if(!segOK(a,b)) return false; const L=Math.hypot(b[0]-a[0],b[1]-a[1]); for(let q=0;q<=L;q+=1.5){ const x=a[0]+(b[0]-a[0])*q/L, y=a[1]+(b[1]-a[1])*q/L, ti=Math.floor(y/M_T)*MW+Math.floor(x/M_T); if(dR.D[ti]*M_T<9||dW.D[ti]*M_T<3) return false; } return true; };
+    for(let it=0;it<8;it++){ let ch=false; for(let i=0;i<V.length&&V.length>8;i++){ if(rOf(i)>=40) continue; const m=V.length; if(clr(V[(i-1+m)%m],V[(i+1)%m])){ V.splice(i,1); ch=true; i--; continue; }
+      // slide the corner (and the following segment) further along the incoming direction or back against the outgoing one
+      const a=V[(i-1+m)%m], b=V[i], c=V[(i+1)%m], d=V[(i+2)%m], e0=V[(i-2+m)%m]; const un=(()=>{const l=Math.hypot(b[0]-a[0],b[1]-a[1]);return [(b[0]-a[0])/l,(b[1]-a[1])/l];})(), vn=(()=>{const l=Math.hypot(c[0]-b[0],c[1]-b[1]);return [(c[0]-b[0])/l,(c[1]-b[1])/l];})();
+      let done=false; for(const dist of [15,30,45,60,80,100]){ for(const mode of [0,1]){ const sh=mode?[-vn[0]*dist,-vn[1]*dist]:[un[0]*dist,un[1]*dist]; const B=[b[0]+sh[0],b[1]+sh[1]];
+          const save=V.slice(); if(mode===0){ const C=[c[0]+sh[0],c[1]+sh[1]]; V[i]=B; V[(i+1)%m]=C; if(!(segOK(a,B)&&segOK(B,C)&&segNR(C,d)&&rOf(i)>=40&&rOf((i+1)%m)>=40)){ V=save; continue; } }
+          else { const A=[a[0]+sh[0],a[1]+sh[1]]; V[i]=B; V[(i-1+m)%m]=A; if(!(segNR(e0,A)&&segOK(A,B)&&segOK(B,c)&&rOf(i)>=40&&rOf((i-1+m)%m)>=40)){ V=save; continue; } }
+          done=true; ch=true; break; } if(!done){ // merge a short dog-leg: replace a and b by the intersection of lines e0-a and b-c
+          const r=[a[0]-e0[0],a[1]-e0[1]], q=[c[0]-b[0],c[1]-b[1]], den=r[0]*q[1]-r[1]*q[0];
+          if(Math.abs(den)>1e-6){ const tt=((b[0]-e0[0])*q[1]-(b[1]-e0[1])*q[0])/den, X=[e0[0]+r[0]*tt,e0[1]+r[1]*tt];
+            if(tt>0.3&&Math.hypot(X[0]-b[0],X[1]-b[1])<120&&segNR(e0,X)&&segNR(X,c)){ const save=V.slice(), ia=(i-1+m)%m; V[i]=X; V.splice(ia,1); done=true; ch=true; } } }
+ if(done) break; } } if(!ch) break; } RAIL.route.slid=1; }
+  // fillets
+  const raw=[]; const nV=V.length; const tl=new Float32Array(nV), Rv=new Float32Array(nV);
+  const geo=i=>{ const a=V[(i-1+nV)%nV], b=V[i], c=V[(i+1)%nV]; const u=[b[0]-a[0],b[1]-a[1]], v=[c[0]-b[0],c[1]-b[1]], lu=Math.hypot(u[0],u[1]), lv=Math.hypot(v[0],v[1]); const th=Math.acos(Math.max(-1,Math.min(1,(u[0]*v[0]+u[1]*v[1])/(lu*lv)))); return {a,b,c,u:[u[0]/lu,u[1]/lu],v:[v[0]/lv,v[1]/lv],lu,lv,th}; };
+  const arcPts=(G_,R)=>{ const t=R*Math.tan(G_.th/2), p0=[G_.b[0]-G_.u[0]*t,G_.b[1]-G_.u[1]*t], cr=G_.u[0]*G_.v[1]-G_.u[1]*G_.v[0], sg=cr>0?1:-1, nrm=[-G_.u[1]*sg,G_.u[0]*sg], C=[p0[0]+nrm[0]*R,p0[1]+nrm[1]*R];
+    const a0=Math.atan2(p0[1]-C[1],p0[0]-C[0]), pts=[]; const steps=Math.max(2,Math.ceil(R*G_.th/2)); for(let k=0;k<=steps;k++){ const a=a0+sg*G_.th*k/steps; pts.push([C[0]+Math.cos(a)*R,C[1]+Math.sin(a)*R]); } return pts; };
+  const arcOK=pts=>{ for(const [x,y] of pts){ const ti=Math.floor(y/M_T)*MW+Math.floor(x/M_T); if(dH.D[ti]*M_T<9||dR.D[ti]*M_T<9||dW.D[ti]*M_T<2) return false; } return true; };
+  const RS=[900,700,600,450,350,260,200,150,110,80,60,50,45,41,36,32,24,16];
+  const fit=(i,lim0,lim1)=>{ const G_=geo(i); if(G_.th<1e-3) return [0,0]; for(const r of RS){ const t=r*Math.tan(G_.th/2); if(t>lim0||t>lim1) continue; if(arcOK(arcPts(G_,r))) return [r,t]; } for(const r of [24,16,12,8,5,3]){ const t=r*Math.tan(G_.th/2); if(t>lim0||t>lim1) continue; if(arcOK(arcPts(G_,r))) return [r,t]; } return [0,0]; };
+  // free length at each end of every segment before its road crossing (fillets must not bend a crossing)
+  const fr0=new Float32Array(nV), fr1=new Float32Array(nV);   // segment i = V[i] -> V[i+1]
+  for(let i=0;i<nV;i++){ const a=V[i], b=V[(i+1)%nV], L=Math.hypot(b[0]-a[0],b[1]-a[1]); let f0=L, f1=L;
+    for(let s2=0;s2<=L;s2+=1){ const x=a[0]+(b[0]-a[0])*s2/L, y=a[1]+(b[1]-a[1])*s2/L, ti=Math.floor(y/M_T)*MW+Math.floor(x/M_T); if(dR.D[ti]*M_T<9||dW.D[ti]*M_T<3){ f0=Math.min(f0,s2); f1=Math.min(f1,L-s2); } }
+    fr0[i]=f0>=L?L:Math.max(0,f0-10); fr1[i]=f1>=L?L:Math.max(0,f1-10); }
+  for(let i=0;i<nV;i++){ const G_=geo(i), a=(i-1+nV)%nV; [Rv[i],tl[i]]=fit(i,Math.min(G_.lu*0.5,fr1[a]),Math.min(G_.lv*0.5,fr0[i])); }
+  for(let pass=0;pass<3;pass++) for(let i=0;i<nV;i++){ const G_=geo(i), a=(i-1+nV)%nV, b=(i+1)%nV; const [r,t]=fit(i,Math.min(G_.lu-tl[a]-1,fr1[a]),Math.min(G_.lv-tl[b]-1,fr0[i])); if(r>Rv[i]){ Rv[i]=r; tl[i]=t; } }
+  for(let i=0;i<nV;i++){ const G_=geo(i); if(tl[i]>0) for(const p of arcPts(G_,Rv[i])) raw.push(p); else raw.push(G_.b);
+    // straight to next arc start
+    const n2=(i+1)%nV, G2=geo(n2), e=raw[raw.length-1], s2=[G2.b[0]-G2.u[0]*tl[n2],G2.b[1]-G2.u[1]*tl[n2]], L=Math.hypot(s2[0]-e[0],s2[1]-e[1]); for(let s=2;s<L;s+=2) raw.push([e[0]+(s2[0]-e[0])*s/L,e[1]+(s2[1]-e[1])*s/L]); }
+  // curvature report (radius over 30 m chords)
+  { const m=raw.length; let mn=1e9; const st=15; for(let i=0;i<m;i++){ const a=raw[(i-st+m)%m], b=raw[i], c=raw[(i+st)%m]; const A2=Math.abs((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0])); if(A2<1e-6) continue; const R=Math.hypot(b[0]-a[0],b[1]-a[1])*Math.hypot(c[0]-b[0],c[1]-b[1])*Math.hypot(c[0]-a[0],c[1]-a[1])/(2*A2); if(R<mn) mn=R; } RAIL.route.minRsm=Math.round(mn); }
+  RAIL.route.verts=nV; RAIL.route.minR=Math.round(Math.min(...Array.from(Rv).filter(r=>r>0))); RAIL.route.radii=Array.from(Rv).map(Math.round); RAIL.route.small=V.map((v,i)=>[Math.round(v[0]/M_T),Math.round(v[1]/M_T),Math.round(Rv[i])]).filter(q=>q[2]>0&&q[2]<100);
+  RAIL.route.tgt=tgt; RAIL.route.ms=Math.round(performance.now()-t0);
+  return raw; }
 // ---------- geometry
 function railBuild(objs){
-  const W=RAIL_WP.map(p=>[p[0]*M_T,p[1]*M_T]), n=W.length, raw=[];
+  let raw=railRoute(objs);
+  if(!raw){ raw=[]; const W=RAIL_WP.map(p=>[p[0]*M_T,p[1]*M_T]), n=W.length; console.warn('rail router failed',RAIL.routeFail);   // fallback: legacy spline
   for(let i=0;i<n;i++){ const p0=W[(i-1+n)%n],p1=W[i],p2=W[(i+1)%n],p3=W[(i+2)%n], seg=Math.hypot(p2[0]-p1[0],p2[1]-p1[1]), k=Math.ceil(seg/2);
     for(let j=0;j<k;j++){ const t=j/k,t2=t*t,t3=t2*t; raw.push([0.5*((2*p1[0])+(-p0[0]+p2[0])*t+(2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*t2+(-p0[0]+3*p1[0]-3*p2[0]+p3[0])*t3),
-      0.5*((2*p1[1])+(-p0[1]+p2[1])*t+(2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*t2+(-p0[1]+3*p1[1]-3*p2[1]+p3[1])*t3)]); } }
+      0.5*((2*p1[1])+(-p0[1]+p2[1])*t+(2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*t2+(-p0[1]+3*p1[1]-3*p2[1]+p3[1])*t3)]); } } }
   // resample at exactly 1 m
   const cum=[0]; for(let i=1;i<=raw.length;i++){ const a=raw[i-1],b=raw[i%raw.length]; cum.push(cum[i-1]+Math.hypot(b[0]-a[0],b[1]-a[1])); }
   const L=Math.floor(cum[raw.length]); RAIL.L=L; const X=new Float32Array(L),Y=new Float32Array(L),NX=new Float32Array(L),NY=new Float32Array(L);
@@ -29,15 +219,17 @@ function railBuild(objs){
   for(let s=0;s<L;s++){ const a=(s-2+L)%L,b=(s+2)%L, tx=X[b]-X[a], ty=Y[b]-Y[a], l=Math.hypot(tx,ty)||1; NX[s]=ty/l; NY[s]=-tx/l; }   // left normal of +s travel
   Object.assign(RAIL,{X,Y,NX,NY});
   // stations
-  for(const [name,tx,ty,kind] of RAIL_ST){ let best=0,bd=1e18; for(let s=0;s<L;s++){ const d=(X[s]-tx*M_T)**2+(Y[s]-ty*M_T)**2; if(d<bd){ bd=d; best=s; } }
+  const STT=RAIL.route&&RAIL.route.stations?RAIL_ST.map((r,i)=>[r[0],RAIL.route.stations[i][1],RAIL.route.stations[i][2],r[3]]):RAIL_ST;
+  for(const [name,tx,ty,kind] of STT){ let best=0,bd=1e18; for(let s=0;s<L;s++){ const d=(X[s]-tx*M_T)**2+(Y[s]-ty*M_T)**2; if(d<bd){ bd=d; best=s; } }
     const len=kind==='hub'?HUB_HALF*2:kind==='city'?200:kind==='town'?160:120; RAIL.stations.push({name,kind,s:best,len,dwell:kind==='hub'?40:kind==='city'?30:20+Math.round(rlHash(best)*8)}); }
   // keep every platform on dry land (no water/bridge/road under it) with a road within reach; slide along the track to the nearest such spot
   { const wet=(i,w,rd)=>{ const tx=Math.floor((X[i]+NX[i]*w)/M_T), ty=Math.floor((Y[i]+NY[i]*w)/M_T), g=get(tx,ty); return g===T.WATER||g===T.BRIDGE||rd&&g===T.ROAD; };
     const dry=(c,st)=>{ const h=st.len/2+6; for(let s=c-h;s<=c+h;s+=2){ const i=rlMod(Math.round(s),L); for(let w=-12;w<=12;w+=2) if(wet(i,w,0)) return false; } return true; };
-    const okAt=(c,st)=>{ const h=st.len/2+12, W=st.kind==='hub'?22:12; for(let s=c-h;s<=c+h;s+=2){ const i=rlMod(Math.round(s),L); for(let w=-W;w<=W;w+=2) if(wet(i,w,1)) return false; }
+    const okAt=(c,st)=>{ const h=st.len/2+12, hub=st.kind==='hub'; for(let s=c-h;s<=c+h;s+=2){ const i=rlMod(Math.round(s),L); for(let w=hub?-14:-3;w<=(hub?19:7.5);w+=1.5) if(wet(i,w,1)) return false; }
       for(const o of RAIL.stations) if(o!==st&&o._ok&&Math.abs(rlMod(o.s-c+L/2,L)-L/2)<(o.len+st.len)/2+150) return false;
-      const tx=Math.floor(X[c]/M_T), ty=Math.floor(Y[c]/M_T), R=Math.ceil(70/M_T); for(let dy=-R;dy<=R;dy++) for(let dx=-R;dx<=R;dx++){ const g=get(tx+dx,ty+dy); if(g===T.ROAD) return true; } return false; };
-    for(const st of RAIL.stations){ if(dry(st.s,st)){ st._ok=1; continue; } for(let d=4;d<3000;d+=4){ let hit=-1; for(const c of [st.s+d,st.s-d]){ const cc=rlMod(c,L); if(okAt(cc,st)){ hit=cc; break; } } if(hit>=0){ if(hit!==st.s) RAIL.moved=(RAIL.moved||[]).concat([[st.name,hit-st.s]]); st.s=hit; break; } } st._ok=1; } }
+      const tx=Math.floor(X[c]/M_T), ty=Math.floor(Y[c]/M_T), R=Math.ceil((st.kind==='hub'?130:70)/M_T); for(let dy=-R;dy<=R;dy++) for(let dx=-R;dx<=R;dx++){ const g=get(tx+dx,ty+dy); if(g===T.ROAD) return true; } return false; };
+    for(const st of RAIL.stations){ if(okAt(st.s,st)){ st._ok=1; continue; } const ox=X[st.s], oy=Y[st.s]; let hit=-1, hd=1e18; for(let c=0;c<L;c+=4){ const d=(X[c]-ox)**2+(Y[c]-oy)**2; if(d<hd&&d<1500*1500&&okAt(c,st)){ hd=d; hit=c; } }
+      if(hit>=0){ RAIL.moved=(RAIL.moved||[]).concat([[st.name,Math.round(Math.sqrt(hd))]]); st.s=hit; } st._ok=1; } }
   RAIL.stations.sort((a,b)=>a.s-b.s); RAIL.hub=RAIL.stations.find(s=>s.kind==='hub');
   // tracks (lateral offset functions)
   const H=RAIL.hub.s, hb=(s,half,ramp)=>{ const d=Math.abs(rlMod(s-H+L/2,L)-L/2); return d<half?1:d<half+ramp?rlSm(1-(d-half)/ramp):0; };
