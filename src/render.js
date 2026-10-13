@@ -29,7 +29,7 @@ function drawRoadTile(g,tx,ty,px,py){
   const i=idx(tx,ty), h=world.roadH[i], v=world.roadV[i];
   g.drawImage(TEX.asph[(hash2(tx,ty)*4)|0],px,py);
   const hs= h>=0?world.segs[h]:null, vs= v>=0?world.segs[v]:null;
-  if((hs&&vs)||(!hs&&!vs)) return;        // junction / kerb corner: plain asphalt
+  if((hs&&vs)||(!hs&&!vs)||(world.jMask&&world.jMask[idx(tx,ty)])) return;        // junction / kerb corner: plain asphalt
   const s=hs||vs; const horiz=!!hs;
   const off = horiz? ty-s.a : tx-s.a;       // lane index across the road
   const along = horiz? tx : ty;

@@ -101,7 +101,7 @@ const G = world.ground;
 const idx=(x,y)=>y*MW+x;
 const inb=(x,y)=>x>=0&&y>=0&&x<MW&&y<MH;
 function get(x,y){ return inb(x,y)?G[idx(x,y)]:T.WATER; }
-function set(x,y,t){ if(inb(x,y)) G[idx(x,y)]=t; }
+function set(x,y,t){ if(!inb(x,y)) return; const i=idx(x,y); if(world.roadLock&&(world.roadH[i]!==-1||world.roadV[i]!==-1)&&t!==T.ROAD&&t!==T.BRIDGE) return; G[i]=t; }   // v24: once the road net is laid, nothing paints over it
 function fill(x0,y0,w,h,t){ for(let y=y0;y<y0+h;y++) for(let x=x0;x<x0+w;x++) set(x,y,t); }
 function isSolidTile(tx,ty){ return !inb(tx,ty) || SOLID[G[idx(tx,ty)]]===1; }
 const SHOPS=['CAFE','PIZZA','BAKERY','FISH & CHIPS','PHARMACY','BOOKS','NEWS','BARBER','FLORIST','TOOLS','DINER','KEBAB','BANK','GYM','PUB','TESCOMART'];
@@ -242,7 +242,7 @@ function genWorld(){
     return legs.map(l=>l.sg); }
   const jit=(n,p)=>{ const j=[0]; for(let k=1;k<n-1;k++) j.push(Math.round((R()-0.5)*p*0.36)); j.push(0); return j; };
   const grid=(x0,y0,nx,ny,p)=>{ const xs=[],ys=[], jx=jit(nx,p), jy=jit(ny,p); for(let k=0;k<nx;k++) xs.push(x0+k*p+jx[k]); for(let k=0;k<ny;k++) ys.push(y0+k*p+jy[k]); return {xs,ys,X1:xs[nx-1]+RW-1,Y1:ys[ny-1]+RW-1}; };
-  function gridRoads(g,type,walk){ if(walk) fill(g.xs[0]-1,g.ys[0]-1,g.X1-g.xs[0]+3,g.Y1-g.ys[0]+3,T.WALK); g.rows=[]; g.cols=[];
+  function gridRoads(g,type,walk){ if(walk){ for(let y=g.ys[0]-1;y<=g.Y1+1;y++) for(let x=g.xs[0]-1;x<=g.X1+1;x++){ if(!inb(x,y)) continue; const i=idx(x,y); if(world.roadH[i]!==-1||world.roadV[i]!==-1) continue; G[i]=T.WALK; } } g.rows=[]; g.cols=[];   // v24: never pave over a road that is already there (was leaving pavement strips across the Kingsbridge dual carriageways)
     for(const y of g.ys) g.rows.push(road('h',y,g.xs[0],g.X1,RW,type)); for(const x of g.xs) g.cols.push(road('v',x,g.ys[0],g.Y1,RW,type)); }
   // --- cities (corners of the landmasses) & towns
   const C1=grid(150,140,11,11,28), SV=grid(1460,170,13,12,30), KB=grid(1560,1560,6,5,22);   // v17 Kingsbridge downtown core (inside the loop)
@@ -282,6 +282,12 @@ function genWorld(){
   for(const k of [1,3]){ road('h',KB.ys[k],1533,KB.xs[0]-1,RW,'city'); road('h',KB.ys[k],KB.X1+1,1701,RW,'city'); }
   for(const k of [1,4]){ road('v',KB.xs[k],1533,KB.ys[0]-1,RW,'city'); road('v',KB.xs[k],KB.Y1+1,1676,RW,'city'); }
   const KD={NG:grid(1404,1400,5,5,26),CH:grid(1545,1398,7,4,30),RM:grid(1768,1404,5,4,40),RS:grid(1768,1545,5,4,38),WM:grid(1408,1540,4,4,36),OH:grid(1408,1697,4,4,34),MK:grid(1545,1697,6,4,34)};
+  { // v24: snap district streets that nearly line up with a street across the loop/radials (no 1-8 tile doglegs at the dual carriageways)
+    const anc={xs:[KB.xs[1],KB.xs[4]],ys:[KB.ys[1],KB.ys[3]]};
+    for(const g of Object.values(KD)){ for(const ax of ['xs','ys']){ const v=g[ax]; for(let k=0;k<v.length;k++){ let best=null; for(const a of anc[ax]){ const d=Math.abs(a-v[k]); if(d>0&&d<=8&&(best===null||d<Math.abs(best-v[k]))) best=a; }
+          if(best!==null&&(k===0||best-v[k-1]>=14)&&(k===v.length-1||v[k+1]-best>=14)) v[k]=best; }
+        for(const x of v) anc[ax].push(x); }
+      g.X1=g.xs[g.xs.length-1]+RW-1; g.Y1=g.ys[g.ys.length-1]+RW-1; } }
   for(const g of Object.values(KD)) gridRoads(g,'city',true);
   // stitch each district grid to its neighbours: extend edge streets outward to the first straight road (bridging the channel where needed)
   { const hit=(x,y)=>inb(x,y)&&(world.roadH[idx(x,y)]>=0||world.roadV[idx(x,y)]>=0);
@@ -292,9 +298,16 @@ function genWorld(){
   link('city',RW,KD.RM.cols[1],0,KD.RM.cols[3],0,[[KD.RM.xs[2]+2,1384]],8,'Royal Crescent');
   link('city',RW,KD.OH.cols[0],1,KD.OH.cols[2],1,[[KD.OH.xs[1]+2,KD.OH.Y1+22]],8,'Harbour Crescent');
   // diagonal avenues along district edges (curves; drivable + routable)
-  pending.push(()=>{ curve('city',RW,crSpline([[1716,1700],[1722,1706],[1745,1740],[1800,1800],[1840,1858],[1845,1870]],0.5),null,null,'Channel Diagonal');
-    curve('city',RW,crSpline([[1514,1516],[1508,1510],[1490,1500],[1450,1470],[1410,1440],[1400,1430]],0.5),null,null,'Northgate Diagonal'); });
+  pending.push(()=>{ curve('city',RW,crSpline([[1716,1700],[1722,1706],[1745,1740],[1800,1800],[1840,1858],[1845,1870]],0.5),null,null,'Channel Diagonal'); });
   world.kbDistricts=KD;
+  { // v24 Northgate Diagonal: a staircase avenue across the Northgate grid. Each street it crosses is crossed mid-block on a short straight
+    // stub (a real signalised crossroads), the stubs are joined by drivable curves, and both ends T into the grid — so AI and sat nav use it.
+    const N=KD.NG, xs=N.xs, ys=N.ys, L=3, mid=(a,b)=>Math.round((a+RW+b)/2-RW/2);
+    const H=(k,j)=>road('h',mid(ys[j],ys[j+1]),xs[k]-L,xs[k]+RW-1+L,RW,'city'), V=(k,j)=>road('v',mid(xs[j],xs[j+1]),ys[k]-L,ys[k]+RW-1+L,RW,'city');
+    const st=road('v',mid(xs[3],xs[4]),ys[4]-6,ys[4]-1,RW,'city'), en=road('v',mid(xs[0],xs[1]),ys[1]+RW,ys[1]+RW+5,RW,'city');
+    const chain=[st,H(3,3),V(3,2),H(2,2),V(2,1),H(1,1),en]; for(const sg of chain) sg.name='Northgate Diagonal';
+    for(let i=0;i<chain.length-1;i++) link('city',RW,chain[i],0,chain[i+1],1,[],4,'Northgate Diagonal');
+    world.kbDiag=chain; }
   const rbN=road('v',1359,1300,1380-RBT-1,2,'rural');
   wind('h',1784,903,1399,RW,'city',30,'Airport Way');                     // curved bridge over the River Moor                                             // Kingsbridge Airport road (over the River Moor)
   wind('h',MF.ys[2],103,MF.xs[0]-1,RW,'town',14,'Millford Road'); wind('v',MF.xs[1],MF.Y1+1,976,RW,'town',10,'Millford South Road');
@@ -332,6 +345,23 @@ function genWorld(){
   (world.tm=world.tm||[]).push(['for(const f of pendi',performance.now()-t0|0]);
   for(const f of pending) f();
   world.curveConflicts=conflicts;
+  { // v24: side streets meeting a dual carriageway from both sides in line become ONE street running through it (a real crossroads, one junction, one set of lights)
+    const S=world.segs, kill=new Map();
+    for(const D of S){ if(D.type!=='dual') continue; for(const P of S){ if(P===D||kill.has(P)||P.dir===D.dir||P.type==='dual'||P.b1!==D.a-1) continue; if(P.a<D.b0||P.a+P.w-1>D.b1) continue;
+        const Q=S.find(q=>q!==P&&!kill.has(q)&&q.dir===P.dir&&q.a===P.a&&q.w===P.w&&q.type===P.type&&q.b0===D.a+D.w); if(!Q) continue;
+        for(let i=P.b1+1;i<=Q.b1;i++) for(let k=0;k<P.w;k++){ const x=P.dir==='h'?i:P.a+k, y=P.dir==='h'?P.a+k:i; if(!inb(x,y)) continue; if(P.dir==='h') world.roadH[idx(x,y)]=P.id; else world.roadV[idx(x,y)]=P.id; }
+        P.b1=Q.b1; if(Q.cv1) P.cv1=Q.cv1; if(Q.name&&!P.name) P.name=Q.name; kill.set(Q,P); } }
+    // ...and any two in-line streets of the same width/type that simply butt end to end become one street (one junction per crossing, not two
+    // half-junctions with separate lights)
+    const live=S.filter(q=>!kill.has(q)&&q.type!=='hwy'&&q.type!=='dual'), byK=new Map(); for(const q of live){ const k=q.dir+q.a+','+q.w+q.type; if(!byK.has(k)) byK.set(k,[]); byK.get(k).push(q); }
+    for(const arr of byK.values()){ arr.sort((a,b)=>a.b0-b.b0); for(let i=0;i<arr.length-1;i++){ const P=arr[i], Q=arr[i+1]; if(Q.b0!==P.b1+1||P.cv1||Q.cv0||P.rbEnd||Q.dam||P.dam) continue;
+        for(let b=Q.b0;b<=Q.b1;b++) for(let k=0;k<Q.w;k++){ const x=Q.dir==='h'?b:Q.a+k, y=Q.dir==='h'?Q.a+k:b; if(!inb(x,y)) continue; if(Q.dir==='h'){ if(world.roadH[idx(x,y)]===Q.id) world.roadH[idx(x,y)]=P.id; } else if(world.roadV[idx(x,y)]===Q.id) world.roadV[idx(x,y)]=P.id; }
+        P.b1=Q.b1; if(Q.cv1) P.cv1=Q.cv1; if(Q.name&&!P.name) P.name=Q.name; kill.set(Q,P); arr[i+1]=P; } }
+    if(kill.size){ const map=new Int32Array(S.length).fill(-1); const keep=S.filter(q=>!kill.has(q)); keep.forEach((q,i)=>{ map[q.id]=i; });
+      for(const [q,P] of kill){ let r=P; while(kill.has(r)) r=kill.get(r); map[q.id]=map[r.id]; }
+      for(const arr of [world.roadH,world.roadV]) for(let i=0;i<arr.length;i++) if(arr[i]>=0) arr[i]=map[arr[i]];
+      for(const cv of world.curves) for(const E of [cv.A,cv.B]) if(E) E.seg=map[E.seg];
+      keep.forEach((q,i)=>{ q.id=i; }); world.segs=keep; world.kbMerged=kill.size; } }
   buildFlyovers();
   (world.tm=world.tm||[]).push(['// segment continuat',performance.now()-t0|0]);
   // segment continuations (same direction, abutting) -> lane drops / gains
@@ -369,13 +399,18 @@ function genWorld(){
     const tp=taper(W,end,N.w,path,URB(W.type),null,off); if(tp) (W.tap=W.tap||{})[end]=tp; }
   (world.tm=world.tm||[]).push(['// ---------------- ',performance.now()-t0|0]);
   // ---------------- junctions & lorry-friendly kerb radii ----------------
-  const reserved=new Uint8Array(MW*MH); world.reserved=reserved; world.cornerAt=new Int32Array(MW*MH).fill(-1);
+  const reserved=new Uint8Array(MW*MH); world.reserved=reserved; world.jMask=new Uint8Array(MW*MH); world.cornerAt=new Int32Array(MW*MH).fill(-1);
   const S=world.segs;
   for(const hs of S){ if(hs.dir!=='h') continue; for(const vs of S){ if(vs.dir!=='v') continue;
     if(vs.a+vs.w-1<hs.b0-1||vs.a>hs.b1+1||hs.a+hs.w-1<vs.b0-1||hs.a>vs.b1+1) continue;
+    { // v24: a stub that merely abuts a road another in-line street of the same width already crosses would make a duplicate junction
+      const ov=(lo,hi,a0,a1)=>!(hi<a0||lo>a1), same=(q,sg)=>q>=0&&q!==sg.id&&S[q].a===sg.a&&S[q].w===sg.w;
+      if(!ov(vs.b0,vs.b1,hs.a,hs.a+hs.w-1)&&same(world.roadV[idx(vs.a,hs.a)],vs)) continue;
+      if(!ov(hs.b0,hs.b1,vs.a,vs.a+vs.w-1)&&same(world.roadH[idx(vs.a,hs.a)],hs)) continue; }
     const jx=vs.a, jy=hs.a, jw=vs.w, jh=hs.w;
+    { let rbT=false; for(let y=jy;y<jy+jh&&!rbT;y++) for(let x=jx-1;x<=jx+jw;x++) if(inb(x,y)&&(world.roadH[idx(x,y)]===-2||world.roadV[idx(x,y)]===-2)){ rbT=true; break; } if(rbT&&(hs.type==='dual'||vs.type==='dual')) continue; }   // v24: street meeting a dual right at its roundabout is a roundabout arm, not a second junction
     const kr= (hs.type==='res'||vs.type==='res'||hs.type==='lane'||vs.type==='lane')?2 : (hs.type==='rural'||vs.type==='rural')?3 : (hs.type==='town'||vs.type==='town')?5 : 6;
-    const lights = (hs.type==='city'||hs.type==='town'||hs.type==='hwy') && (vs.type==='city'||vs.type==='town'||vs.type==='hwy');
+    const LT=t=>t==='city'||t==='town'||t==='hwy'||t==='dual', lights = LT(hs.type)&&LT(vs.type)&&(hs.type!=='hwy'||vs.type!=='dual')&&(vs.type!=='hwy'||hs.type!=='dual') || (jx>=1385&&jy>=1370&&hs.type!=='hwy'&&vs.type!=='hwy'&&(LT(hs.type)||LT(vs.type)));   // v24: every Kingsbridge junction is signalised
     const J={id:world.junctions.length,x:jx,y:jy,w:jw,h:jh,hs:hs.id,vs:vs.id,phase:hash2(jx,jy)*16,corners:[],lights,occ:[]};
     for(const [px,py,dx,dy] of [[jx,jy,-1,-1],[jx+jw,jy,1,-1],[jx,jy+jh,-1,1],[jx+jw,jy+jh,1,1]]){
       const tA=get(px+(dx<0?-1:0),py+(dy<0?-1:0)); if(tA===T.ROAD||tA===T.BRIDGE||tA===T.WATER) continue;
@@ -387,6 +422,7 @@ function genWorld(){
       const ext=kr>2?1:0;
       for(let k=0;k<kr+ext;k++) for(let q=0;q<kr+ext;q++){ const tx=px+(dx<0?-1-k:k), ty=py+(dy<0?-1-q:q); if(inb(tx,ty)){ reserved[idx(tx,ty)]=1; if(k<kr&&q<kr) world.cornerAt[idx(tx,ty)]=ci; } }
     }
+    for(let y=jy;y<jy+jh;y++) for(let x=jx;x<jx+jw;x++) if(inb(x,y)) world.jMask[idx(x,y)]=1;
     world.junctions.push(J); hs.js.push(J); vs.js.push(J);
   } }
   for(const rb of world.rbs){ for(const sg of S){
@@ -396,8 +432,10 @@ function genWorld(){
   (world.tm=world.tm||[]).push(['// ---------------- ',performance.now()-t0|0]);
   // ---------------- buildings & landmarks ----------------
   const objs=world.objects;
+  world.roadLock=true;
+  const fillNR=(x0,y0,w,h,t)=>{ for(let y=y0;y<y0+h;y++) for(let x=x0;x<x0+w;x++){ if(!inb(x,y)) continue; const i=idx(x,y); if(world.roadH[i]!==-1||world.roadV[i]!==-1) continue; set(x,y,t); } };   // v24: parks/plazas never paint over a road
   function building(x,y,w,h,style,height,extra){
-    const hit=(x,y,w,h)=>{ for(let j=y;j<y+h;j++) for(let i=x;i<x+w;i++) if(!inb(i,j)||reserved[idx(i,j)]||G[idx(i,j)]===T.ROAD||G[idx(i,j)]===T.WATER) return true; return false; };
+    const hit=(x,y,w,h)=>{ for(let j=y;j<y+h;j++) for(let i=x;i<x+w;i++) if(!inb(i,j)||reserved[idx(i,j)]||world.roadH[idx(i,j)]!==-1||world.roadV[idx(i,j)]!==-1||G[idx(i,j)]===T.ROAD||G[idx(i,j)]===T.WATER) return true; return false; };
     let guard=0; while(hit(x,y,w,h) && guard++<14){ if(hit(x,y,1,h)&&w>3){ x++; w--; } else if(hit(x+w-1,y,1,h)&&w>3){ w--; } else if(hit(x,y,w,1)&&h>3){ y++; h--; } else if(hit(x,y+h-1,w,1)&&h>3){ h--; } else break; }
     if(hit(x,y,w,h)||w<2||h<2) return null;
     fill(x,y,w,h,T.BLDG); const o=Object.assign({kind:'bldg',x:x*TILE,y:y*TILE,w:w*TILE,h:h*TILE,style,height,seed:(R()*1e9)|0},extra||{}); objs.push(o); return o;
@@ -405,7 +443,7 @@ function genWorld(){
   function tree(px,py,r,solid=true,sp=0){ const tx=Math.floor(px/TILE),ty=Math.floor(py/TILE); if(reserved[idx(tx,ty)]) return; objs.push({kind:'tree',x:px,y:py,r,sp,seed:(R()*1e9)|0}); if(solid) set(tx,ty,T.TREE); }
   function lot(x,y,w,h){ fill(x,y,w,h,T.LOT); objs.push({kind:'lot',x:x*TILE,y:y*TILE,w:w*TILE,h:h*TILE,seed:(R()*1e9)|0}); }
   function park(x,y,w,h){
-    fill(x,y,w,h,T.PGRASS); const mx=x+(w>>1), my=y+(h>>1); fill(x,my,w,1,T.PLAZA); fill(mx,y,1,h,T.PLAZA);
+    fillNR(x,y,w,h,T.PGRASS); const mx=x+(w>>1), my=y+(h>>1); fillNR(x,my,w,1,T.PLAZA); fillNR(mx,y,1,h,T.PLAZA);
     if(w>=10&&h>=10&&R()<0.6){ const pw=(w>>1)-3, ph=(h>>1)-3; objs.push({kind:'pond',x:(x+2)*TILE,y:(y+2)*TILE,w:pw*TILE,h:ph*TILE}); fill(x+2,y+2,pw,ph,T.WATER); }
     objs.push({kind:'fountain',x:(mx+0.5)*TILE,y:(my+0.5)*TILE});
     for(let i=0;i<w*h*0.2;i++){ const tx=x+((R()*w)|0), ty=y+((R()*h)|0); if(G[idx(tx,ty)]===T.PGRASS && !reserved[idx(tx,ty)]) tree((tx+0.5)*TILE+(R()-0.5)*10,(ty+0.5)*TILE+(R()-0.5)*10,10+R()*8); }
@@ -449,7 +487,7 @@ function genWorld(){
   function townBlocks(xs,ys,mode,skip){ const dtm0=mode==='dt'; if(dtm0) mode='city';
     for(let i=0;i<xs.length-1;i++) for(let j=0;j<ys.length-1;j++){ if(skip===i+','+j) continue;
       const x0=xs[i]+RW+1, y0=ys[j]+RW+1, w=xs[i+1]-x0-1, h=ys[j+1]-y0-1; if(w<4||h<4) continue; const r=R();
-      if(mode==='res'){ fill(x0,y0,w,h,T.PGRASS); for(let hx=x0;hx+4<=x0+w;hx+=5) for(const top of [true,false]){ const hh=3+(R()<0.5?1:0), yy=top?y0:y0+h-hh; if(R()<0.85){ const b=building(hx,yy,4,hh,'house',12+R()*6); if(b){ const gy=top?yy+hh+1.2:yy-1.2; if(R()<0.6) objs.push({kind:'tree',x:(hx+1+R()*2)*TILE,y:gy*TILE,r:8+R()*5,sp:(R()*3)|0,seed:(R()*1e9)|0}); if(R()<0.5) objs.push({kind:'hedge',x:(hx+3.6)*TILE,y:(top?yy+hh+0.5:yy-0.5)*TILE,seed:(R()*1e9)|0}); } if(b&&R()<0.9) objs.push({kind:'drive',x:(hx+0.3)*TILE,y:(top?yy+hh:yy-1)*TILE,seed:(R()*1e9)|0,top}); } } continue; }
+      if(mode==='res'){ fillNR(x0,y0,w,h,T.PGRASS); for(let hx=x0;hx+4<=x0+w;hx+=5) for(const top of [true,false]){ const hh=3+(R()<0.5?1:0), yy=top?y0:y0+h-hh; if(R()<0.85){ const b=building(hx,yy,4,hh,'house',12+R()*6); if(b){ const gy=top?yy+hh+1.2:yy-1.2; if(R()<0.6) objs.push({kind:'tree',x:(hx+1+R()*2)*TILE,y:gy*TILE,r:8+R()*5,sp:(R()*3)|0,seed:(R()*1e9)|0}); if(R()<0.5) objs.push({kind:'hedge',x:(hx+3.6)*TILE,y:(top?yy+hh+0.5:yy-0.5)*TILE,seed:(R()*1e9)|0}); } if(b&&R()<0.9) objs.push({kind:'drive',x:(hx+0.3)*TILE,y:(top?yy+hh:yy-1)*TILE,seed:(R()*1e9)|0,top}); } } continue; }
       const dtm=dtm0; const centre= dtm || (mode==='city' && i>=2&&i<=3&&j>=1&&j<=3);
       if(r<(dtm?0.05:0.1)){ park(x0,y0,w,h); continue; }
       if(r<0.18){ lot(x0+3,y0+2,w-6,h>>1); splitBuildings(x0,y0+(h>>1)+2,w,h-(h>>1)-2,['brick','office'],14,24,0.6); continue; }
@@ -464,7 +502,7 @@ function genWorld(){
 dense(KB.xs,KB.ys,['office','glass','tower','solar','office','glass'],45,140);
   const greenUp=(xs,ys)=>{ const free=(x,y,w,h)=>{ for(let j=y;j<y+h;j++) for(let i=x;i<x+w;i++){ if(!inb(i,j)) return false; const t=G[idx(i,j)]; if(t!==T.PLAZA&&t!==T.SAND&&t!==T.GRASS) return false; } return true; };
     for(let i=0;i<xs.length-1;i++) for(let j=0;j<ys.length-1;j++){ const x0=xs[i]+RW+1,y0=ys[j]+RW+1,x1=xs[i+1]-1,y1=ys[j+1]-1;
-      for(let y=y0;y+4<=y1;y+=4) for(let x=x0;x+4<=x1;x+=4){ if(!free(x,y,4,4)) continue; fill(x,y,4,4,T.PGRASS); const k=R();
+      for(let y=y0;y+4<=y1;y+=4) for(let x=x0;x+4<=x1;x+=4){ if(!free(x,y,4,4)) continue; fillNR(x,y,4,4,T.PGRASS); const k=R();
         if(k<0.3){ fill(x,y+1,4,1,T.PLAZA); fill(x+1,y,1,4,T.PLAZA); objs.push({kind:'fountain',x:(x+1.5)*TILE,y:(y+1.5)*TILE}); }
         for(const [a,b] of [[0.6,0.6],[3.4,0.6],[0.6,3.4],[3.4,3.4]]) if(R()<0.85) objs.push({kind:'tree',x:(x+a)*TILE,y:(y+b)*TILE,r:9+R()*5,sp:(R()*3)|0,seed:(R()*1e9)|0}); } } };
   greenUp(KB.xs,KB.ys);
@@ -734,7 +772,7 @@ function drawRoadTile(g,tx,ty,px,py){
   const i=idx(tx,ty), h=world.roadH[i], v=world.roadV[i];
   g.drawImage(TEX.asph[(hash2(tx,ty)*4)|0],px,py);
   const hs= h>=0?world.segs[h]:null, vs= v>=0?world.segs[v]:null;
-  if((hs&&vs)||(!hs&&!vs)) return;        // junction / kerb corner: plain asphalt
+  if((hs&&vs)||(!hs&&!vs)||(world.jMask&&world.jMask[idx(tx,ty)])) return;        // junction / kerb corner: plain asphalt
   const s=hs||vs; const horiz=!!hs;
   const off = horiz? ty-s.a : tx-s.a;       // lane index across the road
   const along = horiz? tx : ty;
