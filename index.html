@@ -87,6 +87,7 @@ const PPM = 8;              // px per metre
 const MW = 2048, MH = 2048;   // map size in tiles
 const T = { GRASS:0, ROAD:1, WALK:2, WATER:3, BRIDGE:4, PARK:5, CONC:6, BLDG:7, PGRASS:8, GRAVEL:9, TREE:10, QUAY:11, CONT:12, SAND:13, PLAZA:14, LOT:15, TANK:16, PUMP:17, FIELD:18, ISLAND:19, HEDGE:20, ROCK:21 };
 const PORT_Y0=262, PORT_Y1=414;   // v14 compact Albion container terminal (tiles)
+const M_TILE = TILE/PPM; // metres per tile
 const SOLID = new Uint8Array(32); [T.WATER,T.BLDG,T.TREE,T.CONT,T.TANK,T.PUMP,T.HEDGE].forEach(t=>SOLID[t]=1);
 function mulberry(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 function hash2(x,y){ let h=(x*374761393+y*668265263)|0; h=(h^(h>>>13))*1274126177|0; return ((h^(h>>>16))>>>0)/4294967296; }
@@ -633,6 +634,33 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
     ['M1',1000,94],['M1',1951,1300],['M1',94,1500],['M1',1400,1951],['M2',900,1054],['M2',1600,714],['M3',906,1650],['Moor Reservoir',1172,1540,2],['Greyfell Pass',395,1740],['Sound Coast Road',690,600],['Quarry',1170,590]];
   (world.tm=world.tm||[]).push(['// spatial index',performance.now()-t0|0]);
   if(typeof railBuild==='function') railBuild(objs);
+  // v25: keep every solid decoration (trees, bushes, rocks, hedges, cacti, scrub) >=3 m clear of any road surface or railway.
+  // Exact-ish distance field (two-pass 8-neighbour Euclidean propagation) from every ROAD/BRIDGE tile (straights, diagonals,
+  // curves, tapers, junctions, roundabouts) plus the rail polyline; then a sweep removes anything overlapping that clearance.
+  { const N=MW*MH, NX=new Int16Array(N).fill(-1), NY=new Int16Array(N), D=new Float32Array(N).fill(1e9);
+    const src=(x,y)=>{ if(!inb(x,y)) return; const i=idx(x,y); NX[i]=x; NY[i]=y; D[i]=0; };
+    for(let i=0;i<N;i++){ const t=G[i]; if(t===T.ROAD||t===T.BRIDGE){ NX[i]=i%MW; NY[i]=(i/MW)|0; D[i]=0; } }
+    // curve / taper centre-lines: every tile under the polyline's full width counts as road even where the tile grid kept another type
+    const poly=(pts,hw)=>{ for(const [px,py] of pts) for(let ty=Math.floor(py-hw);ty<=py+hw;ty++) for(let tx=Math.floor(px-hw);tx<=px+hw;tx++) if(Math.hypot(tx+0.5-px,ty+0.5-py)<=hw+0.5) src(tx,ty); };
+    for(const c of world.curves) poly(c.pts,c.w/2); for(const t of world.tapers||[]) poly(t.pts,t.wW/2);
+    if(typeof RAIL!=='undefined'&&RAIL.X&&RAIL.L){ for(let s2=0;s2<RAIL.L;s2++){ const cx=RAIL.X[s2]/M_TILE, cy=RAIL.Y[s2]/M_TILE; for(let oy=-1;oy<=1;oy++) for(let ox=-1;ox<=1;ox++) src(Math.floor(cx+ox*0.5),Math.floor(cy+oy*0.5)); } }
+    const relax=(i,j)=>{ if(NX[j]<0) return; const x=i%MW,y=(i/MW)|0, dx=x-NX[j], dy=y-NY[j], d=dx*dx+dy*dy; if(d<D[i]){ D[i]=d; NX[i]=NX[j]; NY[i]=NY[j]; } };
+    for(let y=0;y<MH;y++){ for(let x=0;x<MW;x++){ const i=idx(x,y); if(x>0) relax(i,i-1); if(y>0){ relax(i,i-MW); if(x>0) relax(i,i-MW-1); if(x<MW-1) relax(i,i-MW+1); } } for(let x=MW-2;x>=0;x--) relax(idx(x,y),idx(x,y)+1); }
+    for(let y=MH-1;y>=0;y--){ for(let x=MW-1;x>=0;x--){ const i=idx(x,y); if(x<MW-1) relax(i,i+1); if(y<MH-1){ relax(i,i+MW); if(x<MW-1) relax(i,i+MW+1); if(x>0) relax(i,i+MW-1); } } for(let x=1;x<MW;x++) relax(idx(x,y),idx(x,y)-1); }
+    // clearance in tiles from a point (tile units) to the nearest road/rail tile's square edge
+    const clear=(px,py)=>{ const tx=Math.floor(px),ty=Math.floor(py); if(!inb(tx,ty)) return 0; const i=idx(tx,ty); if(NX[i]<0) return 1e9; const qx=NX[i],qy=NY[i];
+      const ex=Math.max(qx-px,0,px-(qx+1)), ey=Math.max(qy-py,0,py-(qy+1)); return Math.max(0,Math.hypot(ex,ey)-0.35); };   // -0.35: slack for the neighbour approximation
+    const MARGIN=3/M_TILE; world.roadClear=clear;
+    const SOLIDDEC={tree:1,bush:1,rock:1,hedge:1,cactus:1,scrub:1}; let removed=0, removedTrees=0, tiles=0;
+    for(const o of objs){ if(!SOLIDDEC[o.kind]||o._dead) continue; const r=(o.r||(o.kind==='hedge'?TILE*0.5:o.kind==='cactus'?TILE*0.4:8))/TILE;
+      const cx=o.x/TILE, cy=o.y/TILE; const ct=get(Math.floor(cx),Math.floor(cy));
+      // urban street trees on pavements / medians are planted by design next to kerbs: only require their canopy stays off the asphalt
+      const need=(o.street||ct===T.WALK||ct===T.ISLAND)? r*0.55 : r+MARGIN;
+      if(clear(cx,cy)<need){ o._dead=1; removed++; if(o.kind==='tree') removedTrees++; } }
+    for(let i=0;i<N;i++){ if(G[i]!==T.TREE&&G[i]!==T.HEDGE&&G[i]!==T.ROCK) continue; const x=i%MW,y=(i/MW)|0; if(clear(x+0.5,y+0.5)<0.5+MARGIN && G[i]!==T.ROCK){ G[i]=T.GRASS; tiles++; } }
+    // tree tiles whose tree was removed are no longer solid
+    for(const o of objs) if(o._dead&&o.kind==='tree'){ const tx=Math.floor(o.x/TILE),ty=Math.floor(o.y/TILE); if(get(tx,ty)===T.TREE){ set(tx,ty,T.GRASS); tiles++; } }
+    world.roadSweep={removed,removedTrees,tiles}; }
   // spatial index of ground objects per chunk
   world.chunkObjs=new Map();
   if(world.animals) world.animals=world.animals.filter(a=>!a._dead);
