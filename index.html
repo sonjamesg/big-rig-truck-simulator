@@ -916,17 +916,21 @@ function hitTest(s){
   return typeof trailerHitTest==='function'?trailerHitTest(s):null;
 }
 function surfaceAt(s){ const f=fwd(s.h); const t=get(Math.floor((s.x-f[0]*2)*PPM/TILE),Math.floor((s.y-f[1]*2)*PPM/TILE)); return t; }
-function stepTruck(s,inp,dt){
+function stepTruck(s,inp,dt){ if(typeof FX!=='undefined'&&FX.boom){ s.v=0; s.throttle=0; s.brake=1; s.skid=false; return; }
   // ----- driver input -> throttle / brake / reverse selection
   const solo=!s.trl, M=solo?7600:7600+s.trl.weight; s.mass=M;
   // keyboard (digital) and gamepad triggers (analog) work together: take the stronger of the two
   const aUp=Math.max(inp.up?1:0,inp.padThr||0), aDn=Math.max(inp.down?1:0,inp.padBrk||0); const up=aUp>0.05, down=aDn>0.05; let thr=0, brk=0;
-  if(s.mode==='D'){ thr=aUp; brk=aDn;
+  s.kbBrk=inp.down?Math.min(1,(s.kbBrk||0)+dt*1.3):0;
+  if(s.mode==='D'){ thr=aUp; brk=Math.max(inp.padBrk||0, inp.down?0.3+0.7*s.kbBrk:0);
     if(down && Math.abs(s.v)<0.3){ s.brakeHold+=dt; if(s.brakeHold>0.45){ s.mode='R'; s.brakeHold=0; } } else if(!down) s.brakeHold=0;
   } else { thr=aDn; brk=aUp; if(up && Math.abs(s.v)<0.3){ s.mode='D'; s.gear=1; } }
   if(s.fuel!==undefined && s.fuel<=0) thr=0;
   if(inp.hand) brk=Math.max(brk,1.4);
   s.throttle+= (thr-s.throttle)*Math.min(1,dt*3); s.brake=brk;
+  // v14 wheel lock: a hard stamp on the brakes at speed locks the wheels -> long skid, little steering, trailer sway
+  if(s.mode==='D'&&brk>0.92&&Math.abs(s.v)>15) s.lockT=(s.lockT||0)+dt; else s.lockT=0;
+  s.skid=(s.skid?brk>0.6:s.lockT>0.15)&&Math.abs(s.v)>3;
   // ----- surface
   const surf=surfaceAt(s); s.offroad=(surf===T.GRASS||surf===T.PGRASS||surf===T.SAND||surf===T.GRAVEL);
   // ----- gearbox & engine
@@ -949,7 +953,7 @@ function stepTruck(s,inp,dt){
   const roll=(s.offroad?0.06:0.008)*M*9.81, air=0.5*1.2*6.5*0.7*s.v*s.v;
   F -= Math.sign(s.v)*(roll+air);
   // brakes
-  const bF=s.brake*(solo?0.6:0.5)*M*9.81;
+  const bF=(s.skid?(solo?0.42:0.36):s.brake*(solo?0.6:0.5))*M*9.81;
   let a=F/M; let nv=s.v+a*dt;
   if(s.brake>0){ const dv=bF/M*dt; if(Math.abs(nv)<=dv) nv=0; else nv-=Math.sign(nv)*dv; }
   if(Math.abs(nv)<0.05 && s.throttle<0.05) nv=0;
@@ -964,7 +968,7 @@ function stepTruck(s,inp,dt){
   if(Math.abs(s.steer)>maxSteer) s.steer=Math.sign(s.steer)*maxSteer;
   // ----- kinematics (bicycle model) + trailer non-holonomic constraint
   const prev={x:s.x,y:s.y,h:s.h,th:s.th};
-  const om=s.v*Math.tan(s.steer)/CAB.wheelbase;
+  const om=s.v*Math.tan(s.steer)/CAB.wheelbase*(s.skid?0.22:1);
   const k0=kingpin(s);
   s.h+=om*dt; const f=fwd(s.h); s.x+=f[0]*s.v*dt; s.y+=f[1]*s.v*dt;
   const k1=kingpin(s);
@@ -972,12 +976,13 @@ function stepTruck(s,inp,dt){
   const ft=fwd(s.th); let ax=k0[0]-ft[0]*TRL.axle, ay=k0[1]-ft[1]*TRL.axle;
   const d=(k1[0]-k0[0])*ft[0]+(k1[1]-k0[1])*ft[1]; ax+=ft[0]*d; ay+=ft[1]*d;      // axle moves only along trailer heading
   s.th=Math.atan2(k1[0]-ax,-(k1[1]-ay));
+  if(s.skid){ const sv=Math.min(1,Math.abs(s.v)/20); s.th+=(Math.sin(timeS*4.3)*0.16+Math.sin(timeS*1.7)*0.08)*sv*dt; }
   let rel=Math.atan2(Math.sin(s.h-s.th),Math.cos(s.h-s.th)); const JK=1.35;
   if(Math.abs(rel)>JK){ s.th=s.h-Math.sign(rel)*JK; if(s.v<0) s.v*=0.5; }
   }
   // ----- collisions
   const hit=hitTest(s)||(typeof trafficHitTruck==='function'&&trafficHitTruck(s)?'veh':null);
-  if(hit){ const imp=Math.abs(s.v); Object.assign(s,prev); s.v=-s.v*0.25; if(Math.abs(s.v)<0.3) s.v=0; s.throttle=0;
+  if(hit){ const imp=Math.abs(s.v); if(imp>FX_CRASH_V&&typeof fxExplode==='function'){ Object.assign(s,prev); fxExplode(hit); return; } Object.assign(s,prev); s.v=-s.v*0.25; if(Math.abs(s.v)<0.3) s.v=0; s.throttle=0;
     if(imp>1.2){ s.bump=Math.min(1,imp/10); s.lastHit=hit; }
     if(hitTest(s)){ // still stuck after revert (e.g. steering into wall) -> straighten
       s.steer*=0.5; }
@@ -2189,7 +2194,7 @@ const TRUCK_MODELS=[
   {id:'atlas',   name:'Atlas CX 440',       price:24000, hp:440,power:1.18,vmax:25.0,tank:520,econ:0.92,style:{roof:'high',skirts:1,visor:1},          cols:['#1c2833','#ecf0f1','#2e86c1','#7d3c98','#c0392b'],blurb:'High-roof sleeper, aero skirts, frugal.'},
   {id:'northline',name:'Northline 520 Long-Nose',price:48000,hp:520,power:1.35,vmax:25.0,tank:650,econ:1.08,style:{roof:'std',nose:1.6,stacks:1},  cols:['#7b241c','#f39c12','#145a32','#17202a','#d0d3d4'],blurb:'Classic bonneted hauler with chrome stacks.'},
   {id:'volta',   name:'Volta E-Hybrid',     price:72000, hp:450,power:1.28,vmax:25.0,tank:380,econ:0.62,style:{roof:'aero',stripe:'#33e0ff',skirts:1},  cols:['#f4f6f7','#17a589','#1b2631','#a569bd'],blurb:'Hybrid drive: cheapest per mile.'},
-  {id:'kestrel', name:'Kestrel Sport 600',  price:92000, hp:600,power:1.50,vmax:26.4,tank:600,econ:0.95,style:{roof:'aero',stripe:'#ffcc00',skirts:1,visor:1},cols:['#c0392b','#111111','#2471a3','#f1c40f'],blurb:'Fast, sharp and surprisingly thrifty.'},
+  {id:'kestrel', name:'Kestrel Sport 600',  price:92000, hp:600,power:1.50,vmax:26.4,tank:600,econ:0.95,style:{roof:'aero',stripe:'#ffcc00',skirts:1,visor:1,stacks:1},cols:['#c0392b','#111111','#2471a3','#f1c40f'],blurb:'Fast, sharp and surprisingly thrifty.'},
   {id:'titan',   name:'Titan V8 750',       price:135000,hp:750,power:1.75,vmax:27.8,tank:800,econ:1.30,style:{roof:'high',nose:2.0,stacks:1,lightbar:1,visor:1},cols:['#0b0b0b','#b03a2e','#f1c40f','#2874a6','#ffffff'],blurb:'The king of the road. 100 km/h limiter.'}];
 const career={depotLatch:true,xp:0,tier:1,owned:['rigger'],cur:'rigger',colors:{},jobs:[],active:null,done:0,earned:0,unload:null,ui:null,lastSave:0,boardSeq:1,uiOpen:null};
 const SAVE_KEY_OLD='bigrig.save.v7'; const saveKey=()=>'bigrig.save.'+(world.v2poi?'v2':'main'); const SETTINGS={vol:0.7};
@@ -2320,7 +2325,7 @@ function updateCareer(dt){ const a=career.active;
   if(inPad&&Math.abs(s.v)<0.2&&!career.padLatch&&!career.uiOpen){ career.padLatch=true; openDealer(inPad); } if(!inPad) career.padLatch=false;
   // depot: stopping inside a yard with no job opens the board once
   let inDepot=null; for(const d of world.depots){ const x0=d.x*M_T,y0=d.y*M_T; if(s.x>x0&&s.x<x0+d.w*M_T&&s.y>y0&&s.y<y0+d.h*M_T) inDepot=d; }
-  if(inDepot&&!career.active&&Math.abs(s.v)<0.1&&!career.depotLatch&&!career.uiOpen&&started&&timeS>3){ career.depotT=(career.depotT||0)+dt; if(career.depotT>1.2){ career.depotLatch=true; openBoard(); } } else career.depotT=0; if(!inDepot) career.depotLatch=false;
+  if(inDepot&&!(typeof FX!=='undefined'&&FX.boom)&&!career.active&&Math.abs(s.v)<0.1&&!career.depotLatch&&!career.uiOpen&&started&&timeS>3){ career.depotT=(career.depotT||0)+dt; if(career.depotT>1.2){ career.depotLatch=true; openBoard(); } } else career.depotT=0; if(!inDepot) career.depotLatch=false;
   if(timeS-career.lastSave>10&&started&&!career.noSave) saveGame(); }
 // ---------- world-space drawing (bay highlight, ghost, dock doors)
 function drawCareerWorld(vx0,vy0,vx1,vy1){ const a=career.active;
@@ -3227,6 +3232,32 @@ function indYield(v,v0,acc){ const s=truck; if(!IND.side||IND.haz&&!IND.side) re
   return acc; }
 
 'use strict';
+// ===================== v14 FX: exhaust puffs, wheel-lock skid marks/smoke, crash explosions =====================
+const FX_CRASH_V=19;   // m/s (~68 km/h) impact speed that destroys the rig
+const FX={p:[],marks:[],lastThr:0,puffT:0,skT:0,boom:null};
+function fxEmit(x,y,vx,vy,r,life,col,grow,fire){ if(FX.p.length>500) FX.p.shift(); FX.p.push({x,y,vx,vy,r,life,t:0,col,grow,fire}); }
+function updateFX(dt){ const s=truck, f=fwd(s.h), r=rgt(s.h); const st=(modelById(career.cur).style)||{};
+  if(st.stacks&&!FX.boom&&started){ FX.puffT-=dt; const acc=s.throttle>0.45&&(s.throttle-FX.lastThr>0.01||s.shiftT>0.25||Math.abs(s.v)<5);
+    if(acc&&FX.puffT<=0){ FX.puffT=0.08+Math.random()*0.1; for(const sd of [-1,1]) fxEmit(s.x+f[0]*2.9+r[0]*sd*1.0,s.y+f[1]*2.9+r[1]*sd*1.0,-f[0]*1.2+(Math.random()-.5)*0.8+s.v*f[0]*0.5,-f[1]*1.2+(Math.random()-.5)*0.8+s.v*f[1]*0.5,0.3,1.0,'55,55,58',1.2); } }
+  FX.lastThr=s.throttle;
+  if(s.skid){ const pts=[[s.x-f[0]*0.2,s.y-f[1]*0.2,s.h]]; if(s.trl){ const k=kingpin(s), ft=fwd(s.th); pts.push([k[0]-ft[0]*10.6,k[1]-ft[1]*10.6,s.th]); }
+    for(const [x,y,h] of pts){ const rr=rgt(h); for(const sd of [-1,1]) FX.marks.push({x:x+rr[0]*sd*1.0,y:y+rr[1]*sd*1.0,t:timeS}); if(Math.random()<0.5) fxEmit(x,y,(Math.random()-.5)*2,(Math.random()-.5)*2,0.6,0.9,'235,235,235',2.2); }
+    if(FX.marks.length>1600) FX.marks.splice(0,FX.marks.length-1600);
+    FX.skT-=dt; if(FX.skT<=0){ FX.skT=0.22; try{ noiseBurst(0.26,2600,5,0.12); }catch(e){} } }
+  for(const p of FX.p){ p.t+=dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.vx*=0.97; p.vy*=0.97; p.r+=p.grow*dt; } FX.p=FX.p.filter(p=>p.t<p.life);
+  const b=FX.boom; if(b){ b.t+=dt; if(b.t<1.6&&Math.random()<0.8) fxEmit(b.x+(Math.random()-.5)*3,b.y+(Math.random()-.5)*3,(Math.random()-.5)*3,(Math.random()-.5)*3,0.8,1.2,'40,40,40',2.4);
+    if(Math.random()<0.6) fxEmit(b.x+(Math.random()-.5)*4,b.y+(Math.random()-.5)*4,(Math.random()-.5),(Math.random()-.5),0.6,0.5,'255,140,30',1.4,1);
+    if(b.t>3.0){ FX.boom=null; const o=BREAKDOWN.options.find(o=>o.id==='respawn'); if(o) o.run(); flash('\u{1F4A5} Rig destroyed \u2014 towed to the nearest garage'); } } }
+function fxExplode(hit){ const s=truck; if(FX.boom) return; if(career.uiOpen&&typeof closeUI==='function') closeUI(); const k=kingpin(s); FX.boom={t:0,x:s.x,y:s.y}; s.v=0; s.damage=Math.min(s.damage,99); s.skid=false;
+  for(let i=0;i<70;i++){ const a=Math.random()*7, v=4+Math.random()*14; fxEmit(s.x,s.y,Math.cos(a)*v,Math.sin(a)*v,0.6+Math.random()*0.8,0.6+Math.random()*0.7,i%3?'255,'+(120+(Math.random()*100|0))+',20':'255,240,180',2.5,1); }
+  for(let i=0;i<25;i++){ const a=Math.random()*7, v=2+Math.random()*5; fxEmit(s.x,s.y,Math.cos(a)*v,Math.sin(a)*v,1.2,2.2,'30,30,30',3); }
+  try{ thump(1); noiseBurst(1.2,120,0.7,1.2,'lowpass'); }catch(e){} cam.shake=16; BigRig.emit('explode',{hit,x:s.x,y:s.y}); }
+function drawFXLow(vx0,vy0,vx1,vy1){ if(!FX.marks.length) return; ctx.fillStyle='rgba(20,20,20,0.35)'; const now=timeS; for(const m of FX.marks){ const a=1-(now-m.t)/40; if(a<=0) continue; const x=m.x*PPM, y=m.y*PPM; if(x<vx0||x>vx1||y<vy0||y>vy1) continue; ctx.globalAlpha=a; ctx.fillRect(x-2,y-2,4,4); } ctx.globalAlpha=1; }
+function drawFXHigh(){ const b=FX.boom; if(b){ const x=b.x*PPM, y=b.y*PPM, fl=Math.max(0,1-b.t/0.5); if(fl>0){ const g=ctx.createRadialGradient(x,y,4,x,y,220*(0.5+b.t)); g.addColorStop(0,'rgba(255,250,210,'+fl+')'); g.addColorStop(0.4,'rgba(255,150,40,'+fl*0.7+')'); g.addColorStop(1,'rgba(255,80,0,0)'); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,220*(0.5+b.t),0,7); ctx.fill(); }
+    ctx.fillStyle='rgba(20,15,10,0.45)'; ctx.beginPath(); ctx.ellipse(x,y,70,40,truck.h,0,7); ctx.fill(); }
+  for(const p of FX.p){ const a=Math.max(0,1-p.t/p.life); ctx.fillStyle='rgba('+p.col+','+(p.fire?a:a*0.45)+')'; ctx.beginPath(); ctx.arc(p.x*PPM,p.y*PPM,p.r*PPM,0,7); ctx.fill(); } }
+
+'use strict';
 // ===================== MAIN =====================
 const VW=960, VH=600;
 const cv=document.getElementById('game'), ctx=cv.getContext('2d');
@@ -3283,7 +3314,7 @@ function frame(ts){
     if(truck.bump>0.01 && !truck._bumped){ thump(truck.bump); cam.shake=truck.bump*10; truck._bumped=true; } if(truck.bump<=0.01) truck._bumped=false;
     updateAudio(truck,inp,timeS);
   }
-  if(!paused){ updateTraffic(dt); updateFuel(dt); updateForecourts(dt); if(started) updateCareer(dt); if(started) updateIndicators(dt); }
+  if(!paused){ updateTraffic(dt); updateFuel(dt); updateForecourts(dt); if(started) updateCareer(dt); if(started) updateIndicators(dt); updateFX(dt); }
   { const z=cam.z; updateAmbient(dt,[cam.x-VW/2/z,cam.y-VH/2/z,cam.x+VW/2/z,cam.y+VH/2/z]); }
   if(started&&!paused) updateNav(dt);
   if(truck.bump>0.05&&!truck._dmg){ truck.damage=Math.min(100,truck.damage+truck.bump*6); truck._dmg=true; } if(truck.bump<=0.01) truck._dmg=false;
@@ -3316,8 +3347,8 @@ function draw(){
   drawCareerWorld(vx0,vy0,vx1,vy1);
   drawParkedTrailers(vx0,vy0,vx1,vy1);
   drawTraffic(vx0,vy0,vx1,vy1);
-  drawRemotePlayers(vx0,vy0,vx1,vy1); drawBreakdown();
-  drawLorry();
+  drawFXLow(vx0,vy0,vx1,vy1); drawRemotePlayers(vx0,vy0,vx1,vy1); drawBreakdown();
+  drawLorry(); drawFXHigh();
   for(const o of world.overhead) if(o.x>vx0-400&&o.x<vx1+400&&o.y>vy0-400&&o.y<vy1+400) drawOverhead(o);
   drawAmbientHigh(VR);
   ctx.setTransform(1,0,0,1,0,0);
