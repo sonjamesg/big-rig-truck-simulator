@@ -420,7 +420,7 @@ function stepVeh(v,dt,pbs){
       const st=sigState(m.J,m.key,'R'); let wait=false; if(st==='g'&&sigFilter(m.J,m.key,'R')&&sigOncoming(v,m.J,m.opp)) wait=true;
       if(wait){ v.filtering=gap<4; acc=Math.min(acc,idmAcc(v,v0,Math.max(0.1,gap),0)); } else if(gap<2){ m.go=true; v.filtering=false; } }
     else if(m.kind==='light'||m.kind==='gw'||m.kind==='rb'){
-      const gap=m.d-front-0.8; if(gap<-0.5||m.go) continue; if(gap>70) continue;
+      const gap=m.d-front-(m.kind==='rb'?0.8:2.0); if(gap<-0.5||m.go) continue; if(gap>70) continue;   // v25 audit: hold 2 m behind the stop line so long vehicles sweeping round the corner clear the waiting cars
       let stop=false;
       if(m.kind==='light'){ const ls=sigState(m.J,m.key,m.move); if(ls==='r'||ls==='ra') stop=true; else if(ls==='a') stop= gap> v.v*v.v/(2*3.5)+1;
         if(!stop&&gap<12&&boxBlocked(v,m)) stop=true;            // never enter unless the exit is clear
