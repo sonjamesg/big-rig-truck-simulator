@@ -91,7 +91,7 @@ function v2Apply(objs,Rnd){ const t0=performance.now(); const water=world.water;
   world.segs=[]; world.curves=[]; world.rbs=[]; world.junctions=[]; world.corners=[]; world.overhead=[]; world.susp=[]; world.districts=[]; world.airports=[]; world.cities=[];
   const keep=objs.filter(o=>o.kind==='tree'&&!o.inCity||o.kind==='rock'||o.kind==='cactus'||o.kind==='scrub'); objs.length=0; for(const o of keep) objs.push(o);
   // 2. graph
-  const g=v2Graph(); world.v2=g; world.v2poi=L.poi;
+  const g=v2Graph(); world.v2=g; world.v2poi=L.poi; world.v2grids=L.grids;
   { const E2=[]; for(const e of g.E){ if(e.type!=='res'){ E2.push(e); continue; } let run=[]; const flush=()=>{ if(run.length>=3) E2.push(Object.assign({},e,{pts:run,bulb:e.bulb&&run[run.length-1]===e.pts[e.pts.length-1]})); run=[]; };
       for(const q of e.pts){ const tx=Math.floor(q[0]),ty=Math.floor(q[1]); let wet=!inb(tx,ty); for(let dy=-2;dy<=2&&!wet;dy++) for(let dx=-2;dx<=2;dx++) if(inb(tx+dx,ty+dy)&&(water[idx(tx+dx,ty+dy)]||G[idx(tx+dx,ty+dy)]===T.WATER)){ wet=true; break; } if(wet) flush(); else run.push(q); } flush(); } g.E=E2; } const edges=[]; const PL=planarise(g.E,g.RBS); g.P=PL.P; g.N=PL.N; g.E=PL.P.filter(p=>!p.dead);
   const order={dirt:0,res:1,rural:2,town:3,city:4,dual:5,ramp:6,hwy:7};
