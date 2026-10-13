@@ -7,7 +7,7 @@ function dnSmooth(a,b,x){ const t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*
 function updateDayNight(dt,run){ if(run) gameT=(gameT+dt*24/DAY_LEN)%24; const h=gameT;
   DN.dark= h<12 ? 1-dnSmooth(4.8,6.6,h) : dnSmooth(18.6,20.4,h);
   DN.dusk= h<12 ? Math.max(0,1-Math.abs(h-5.7)/1.3) : Math.max(0,1-Math.abs(h-19.3)/1.3);
-  if(typeof MP!=='undefined'&&MP.on&&MP.host){ DN.sendT-=dt; if(DN.sendT<=0){ DN.sendT=5; try{ mpSendAll({t:'clock',g:gameT}); }catch(e){} } } }
+  if(typeof MP!=='undefined'&&MP.on&&MP.host){ DN.sendT-=dt; if(DN.sendT<=0){ DN.sendT=5; try{ mpSendAll({t:'clock',g:gameT,w:WX.st,wt:WX.timer}); }catch(e){} } } }
 function dnClock(){ const m=Math.floor(gameT*60)%1440; return String((m/60)|0).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
 function dnSprite(r,stops){ const c=document.createElement('canvas'); c.width=c.height=r*2; const g=c.getContext('2d'), gr=g.createRadialGradient(r,r,0,r,r,r); for(const [o,col] of stops) gr.addColorStop(o,col); g.fillStyle=gr; g.fillRect(0,0,r*2,r*2); return c; }
 function dnGlow(col){ return DN.glow[col]||(DN.glow[col]=dnSprite(32,[[0,col],[0.35,col.replace(/[\d.]+\)$/,'0.35)')],[1,col.replace(/[\d.]+\)$/,'0)')]])); }

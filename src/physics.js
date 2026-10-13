@@ -37,7 +37,7 @@ function stepTruck(s,inp,dt){ if(typeof FX!=='undefined'&&FX.boom){ s.v=0; s.thr
   if(inp.hand) brk=Math.max(brk,1.4);
   s.throttle+= (thr-s.throttle)*Math.min(1,dt*3); s.brake=brk;
   // v14 wheel lock: a hard stamp on the brakes at speed locks the wheels -> long skid, little steering, trailer sway
-  if(s.mode==='D'&&brk>0.92&&Math.abs(s.v)>15) s.lockT=(s.lockT||0)+dt; else s.lockT=0;
+  if(s.mode==='D'&&brk>(typeof WX!=='undefined'&&WX.wet>0.5?0.8:0.92)&&Math.abs(s.v)>15) s.lockT=(s.lockT||0)+dt; else s.lockT=0;
   s.skid=(s.skid?brk>0.6:s.lockT>0.15)&&Math.abs(s.v)>3;
   // ----- surface
   const surf=surfaceAt(s); s.offroad=(surf===T.GRASS||surf===T.PGRASS||surf===T.SAND||surf===T.GRAVEL);
@@ -61,7 +61,7 @@ function stepTruck(s,inp,dt){ if(typeof FX!=='undefined'&&FX.boom){ s.v=0; s.thr
   const roll=(s.offroad?0.06:0.008)*M*9.81, air=0.5*1.2*6.5*0.7*s.v*s.v;
   F -= Math.sign(s.v)*(roll+air);
   // brakes
-  const bF=(s.skid?(solo?0.42:0.36):s.brake*(solo?0.6:0.5))*M*9.81;
+  const bF=(s.skid?(solo?0.42:0.36):s.brake*(solo?0.6:0.5))*M*9.81*(typeof WX!=='undefined'?WX.grip:1);
   let a=F/M; let nv=s.v+a*dt;
   if(s.brake>0){ const dv=bF/M*dt; if(Math.abs(nv)<=dv) nv=0; else nv-=Math.sign(nv)*dv; }
   if(Math.abs(nv)<0.05 && s.throttle<0.05) nv=0;

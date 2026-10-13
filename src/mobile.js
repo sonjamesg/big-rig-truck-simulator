@@ -9,7 +9,9 @@ body.touch #frame{position:fixed;padding:0;border:none;background:#000;box-shado
 body.touch canvas{border-radius:6px}
 body.touch #overlay,body.touch #ui{position:fixed;inset:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);border-radius:0;z-index:20}
 body.touch #ui{pointer-events:none} body.touch #hudbtns{display:none}
-body.touch #overlay{overflow:auto;justify-content:flex-start;padding:16px 10px}
+body.touch #overlay{overflow:auto;justify-content:safe center;align-items:center;padding:16px 14px;box-sizing:border-box}
+body.touch #overlay p:not(#loading){display:none} body.touch #overlay #logo{max-width:78vw!important;max-height:26vh!important} body.touch #overlay .go{max-width:92vw;font-size:18px;box-sizing:border-box}
+body.touch #overlay button,body.touch #overlay input{max-width:100%;box-sizing:border-box} body.touch #lobby,body.touch #wbCard{width:min(92vw,420px)!important;box-sizing:border-box} body.touch #lobby{align-items:stretch} body.touch #lobby .row{flex-direction:column;align-items:stretch;align-self:stretch;gap:8px} body.touch:has(#overlay:not(.hidden)) #mob,body.touch:has(#overlay:not(.hidden)) #deck{display:none!important} body.touch #lobby .row>*{width:100%!important;margin:0!important}
 body.touch #overlay h1{font-size:40px;margin-top:4px} body.touch #overlay h2{font-size:15px;letter-spacing:5px;margin:4px 0 12px} body.touch #overlay p{font-size:12px;margin-top:10px}
 body.touch #lobby .row{flex-wrap:wrap;justify-content:center} body.touch #lobby input{font-size:16px}
 #mob{display:none;position:fixed;inset:0;z-index:5;pointer-events:none;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -28,7 +30,7 @@ body.touch #mob{display:block}
 #deck{display:none;position:fixed;left:0;right:0;bottom:0;pointer-events:none;background:linear-gradient(180deg,#c9cdd6,#aeb3be 60%,#9aa0ac);border-radius:28px 28px 0 0;box-shadow:inset 0 3px 0 rgba(255,255,255,.6),inset 0 -2px 0 rgba(0,0,0,.2),0 -6px 24px rgba(0,0,0,.45)}
 body.touch.portrait #deck{display:block}
 #deck .brand{position:absolute;left:50%;transform:translateX(-50%);top:10px;font:italic 900 15px system-ui;letter-spacing:2px;color:#3b3f86;white-space:nowrap} #deck .brand b{color:#b0282c}
-#deck .grille{position:absolute;right:26px;bottom:calc(18px + env(safe-area-inset-bottom));width:70px;height:46px;transform:rotate(-28deg);background:repeating-linear-gradient(90deg,rgba(60,60,70,.55) 0 5px,transparent 5px 12px);border-radius:4px}
+#deck .grille{position:absolute;right:16px;bottom:calc(10px + env(safe-area-inset-bottom));width:44px;height:30px;transform:rotate(-28deg);background:repeating-linear-gradient(90deg,rgba(60,60,70,.55) 0 5px,transparent 5px 12px);border-radius:4px}
 body.portrait #mob .dp{background:#2a2d33;border:none;border-radius:6px;box-shadow:0 3px 0 #111,inset 0 1px 0 rgba(255,255,255,.15);color:#aab}
 body.portrait #mob .dpc{background:#2a2d33;border:none;border-radius:0;box-shadow:none}
 body.portrait #mob .ab{border-radius:50%;background:radial-gradient(circle at 35% 30%,#d9446b,#9b1f45);border:none;box-shadow:0 4px 0 #5c1028,inset 0 1px 0 rgba(255,255,255,.35);font-size:22px}
@@ -50,8 +52,9 @@ function mobBtn(id,html,cls,k){ const b=document.createElement('div'); b.classNa
 MOB.nav={ left:()=>padNav('l'), right:()=>padNav('r'), up:()=>padNav('u'), down:()=>padNav('d'),
   okA:()=>{ const el=padFocusEl(); if(el){ el.click(); setTimeout(()=>padNav(null),40); } else padNav(null); }, back:()=>{ if(career.uiOpen==='result'){ const k=document.querySelector('#ui #keep'); if(k) k.click(); } else closeUI(); } };
 const act=f=>()=>{ if(!started){ startGame(); return; } f(); };
-function mobInit(){ if(!document.body.classList.contains('touch')) return; MOB.on=true;
-  const st=document.createElement('style'); st.textContent=MOBCSS; document.head.appendChild(st);
+function mobCSS(){ if(MOB.css) return; MOB.css=1; const st=document.createElement('style'); st.textContent=MOBCSS; document.head.appendChild(st); }
+if(('ontouchstart' in window)||navigator.maxTouchPoints>0){ document.body.classList.add('touch'); mobCSS(); }
+function mobInit(){ if(!document.body.classList.contains('touch')) return; MOB.on=true; mobCSS();
   const vp=document.querySelector('meta[name=viewport]'); if(vp) vp.content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover';
   const m=document.createElement('div'); m.id='mob'; document.body.appendChild(m); const dk=document.createElement('div'); dk.id='deck'; dk.innerHTML='<div class="brand">BIG RIG <b>BOY</b></div><div class="grille"></div>'; document.body.insertBefore(dk,m);
   // driving
@@ -88,12 +91,12 @@ function mobLayout(){ if(!MOB.on) return; const W=innerWidth, H=innerHeight, por
     p=row(0,0,1); place('mCouple',p[0],p[1],sb,sb); p=row(0,1,1); place('mFuel',p[0],p[1],sb,sb); p=row(1,0,1); place('mUnload',p[0],p[1],sb*2+pad,sb); p=row(2,0,1); place('mIndL',p[0],p[1],sb,sb); p=row(2,1,1); place('mIndR',p[0],p[1],sb,sb); p=row(3,0,1); place('mHaz',p[0],p[1],sb*2+pad,sb*0.7);
     for(const id of ['mLeft','mRight','mUp','mDown','mCen','mA','mB']) place(id,0,0,0,0,false);
   } else { // portrait: handheld — screen on top, deck below
-    const top=sa('--sat'); cw=W-16; ch=cw/1.6; cx=8; cy=8+Math.max(0,top); const deckTop=cy+ch+10; const dk=document.getElementById('deck'); dk.style.top=deckTop+'px';
-    const DH=H-deckTop, u=Math.min(W/412,DH/520); const S=v=>v*u;
-    const dcx=S(92), dcy=deckTop+DH*0.36, k=S(46); place('mUp',dcx-k/2,dcy-k*1.5,k,k); place('mDown',dcx-k/2,dcy+k/2,k,k); place('mLeft',dcx-k*1.5,dcy-k/2,k,k); place('mRight',dcx+k/2,dcy-k/2,k,k); place('mCen',dcx-k/2,dcy-k/2,k,k);
-    const ab=S(70); place('mB',W-S(170),dcy-ab*0.1,ab,ab); place('mA',W-S(88),dcy-ab*0.75,ab,ab);
-    const fy=deckTop+DH*0.64, fw=Math.min(S(64),(W-40)/5-8), gap=(W-5*fw)/6; ['mCouple','mFuel','mUnload','mHand','mHorn'].forEach((id,i)=>place(id,gap+i*(fw+gap),fy,fw,fw*0.86)); ['mIndL','mHaz','mIndR'].forEach((id,i)=>place(id,gap+(i*2)*(fw+gap),fy+fw*0.95,fw,fw*0.6));
-    const py=deckTop+DH*0.84; place('mMap',W/2-S(96),py,S(74),S(26)); place('mJobs',W/2+S(10),py,S(74),S(26)); place('mChat',S(16),py-S(6),S(52),S(40),MP.on);
+    const top=sa('--sat'); cw=Math.min(W-12,H*0.56); ch=cw; cx=(W-cw)/2; cy=6+Math.max(0,top); const deckTop=cy+ch+6; const dk=document.getElementById('deck'); dk.style.top=deckTop+'px';
+    const DH=H-deckTop, u=Math.min(W/412,DH/330); const S=v=>v*u;
+    const dcx=S(78), dcy=deckTop+S(98), k=S(38); place('mUp',dcx-k/2,dcy-k*1.5,k,k); place('mDown',dcx-k/2,dcy+k/2,k,k); place('mLeft',dcx-k*1.5,dcy-k/2,k,k); place('mRight',dcx+k/2,dcy-k/2,k,k); place('mCen',dcx-k/2,dcy-k/2,k,k);
+    const ab=S(58); place('mB',W-S(150),dcy-ab*0.2,ab,ab); place('mA',W-S(78),dcy-ab*0.85,ab,ab);
+    const fy=deckTop+S(178), fw=Math.min(S(56),(W-40)/5-8), gap=(W-5*fw)/6; ['mCouple','mFuel','mUnload','mHand','mHorn'].forEach((id,i)=>place(id,gap+i*(fw+gap),fy,fw,fw*0.78)); ['mIndL','mHaz','mIndR'].forEach((id,i)=>place(id,gap+(i*2)*(fw+gap),fy+fw*0.84,fw,fw*0.5));
+    const py=fy+fw*1.48; place('mMap',W/2-S(86),py,S(66),S(24)); place('mJobs',W/2+S(14),py,S(66),S(24)); place('mChat',S(14),py-S(6),S(48),S(36),MP.on);
     for(const id of ['mSteer','mGas','mBrk']) place(id,0,0,0,0,false);
   }
   cv.style.width=cw+'px'; cv.style.height=ch+'px'; fr.style.left=cx+'px'; fr.style.top=cy+'px'; fr.style.width=cw+'px'; fr.style.height=ch+'px';
