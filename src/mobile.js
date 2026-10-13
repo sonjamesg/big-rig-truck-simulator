@@ -44,7 +44,7 @@ body.touch.portrait .modal,body.touch .modal{width:min(916px,96vw)!important;hei
 @media (max-width:760px){ #ui .grid{grid-template-columns:minmax(0,1fr)!important} #ui .bar{flex-wrap:wrap} #ui .mh .sub{display:none} #ui .detail{flex-wrap:wrap} #ui .btn.start{width:100%} #ui .show{flex-direction:column;overflow:auto} #ui .tl{width:auto;flex-direction:row;overflow-x:auto;border-right:none} #ui .ti{flex:none} .result{width:94vw!important} }
 body.touch.ovl #mob,body.touch.ovl #deck{display:none!important} body.touch.ovl #frame{z-index:40}
 body.touch.ovl #ui{inset:0!important;z-index:41}
-body.touch #ui .mback{pointer-events:auto} body.touch #ui .chip{white-space:nowrap} @media (max-height:460px){ #ui .mh .sub{display:none} #ui .bar{flex-wrap:wrap;gap:6px} }
+body.touch #ui .mback{pointer-events:auto} body.touch.ovl,body.touch.ovl #frame,body.touch.ovl #ui{touch-action:auto} body.touch.ovl #ui .mback{overscroll-behavior:contain} body.touch #ui .grid,body.touch #ui .show,body.touch #ui .tl,body.touch #ui .side{overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;overscroll-behavior:contain} body.touch #ui .tl{touch-action:pan-x pan-y} body.touch #ui .chip{white-space:nowrap} @media (max-height:460px){ #ui .mh .sub{display:none} #ui .bar{flex-wrap:wrap;gap:6px} }
 @media (max-width:560px) and (orientation:portrait){ body.touch #ui .modal{width:100vw!important;height:100%!important;max-height:100dvh;border-radius:0;border:none;padding-top:env(safe-area-inset-top)}
  #ui .mh{flex-wrap:wrap;gap:6px 10px;padding:10px 12px 8px;position:relative} #ui .mh>div:first-child{font-size:22px!important} #ui .mh h2{font-size:18px;letter-spacing:1px;white-space:nowrap} #ui .mh .sp{display:none}
  #ui .mh>div[style*="text-align:right"]{order:5;flex-basis:100%;text-align:left!important;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px} #ui .mh>div[style*="text-align:right"] br{display:none} #ui .mh .xpb{width:90px}
@@ -81,7 +81,7 @@ function mobInit(){ if(!document.body.classList.contains('touch')) return; MOB.o
   mobBtn('mCouple','\u{1F517}<small>COUPLE</small>','fn ctx',act(()=>toggleCouple())); mobBtn('mFuel','\u26FD<small>REFUEL</small>','fn ctx',act(()=>toggleRefuel())); mobBtn('mUnload','\u{1F4E6}<small>UNLOAD</small>','fn ctx',act(()=>tryUnload()));
   mobBtn('mJobs','\u{1F4CB}<small>JOBS</small>','fn pill',act(()=>{ if(career.uiOpen) closeUI(); else openBoard(); })); mobBtn('mMap','\u{1F5FA}<small>MAP</small>','fn pill',act(()=>{ bigmap.open?closeMap():openMap(); }));
   mobBtn('mChat','\u{1F4AC}<small>CHAT</small>','fn',()=>{ if(!MP.on) return; const ci=document.getElementById('mpChatIn'); ci.style.display='block'; setTimeout(()=>ci.focus(),0); });
-  document.getElementById('frame').addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
+  document.getElementById('frame').addEventListener('touchmove',e=>{ if(e.target.closest&&e.target.closest('#ui .mback,#ui .celebrate,#bdPanel')) return; e.preventDefault(); },{passive:false});
   addEventListener('resize',mobLayout); addEventListener('orientationchange',()=>setTimeout(mobLayout,200)); mobLayout(); setInterval(mobContext,250); }
 function mobSteer(el){ const knob=el.querySelector('.knob');
   const upd=e=>{ const r=el.getBoundingClientRect(); const u=Math.max(-1,Math.min(1,(e.clientX-(r.left+r.width/2))/(r.width/2-30))); input.padSteer=Math.abs(u)<0.06?0:u; knob.style.left=(50+u*(50-30/r.width*100))+'%'; };
