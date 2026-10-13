@@ -3312,6 +3312,18 @@ body.portrait #mob .fn.on,body.portrait #mob .ab.on,body.portrait #mob .dp.on{tr
 body.portrait #mob .fn.ctxon{background:#c98a10;box-shadow:0 3px 0 #6d4a06}
 body.touch.portrait .modal,body.touch .modal{width:min(916px,96vw)!important;height:min(552px,94vh)!important}
 @media (max-width:760px){ #ui .grid{grid-template-columns:minmax(0,1fr)!important} #ui .bar{flex-wrap:wrap} #ui .mh .sub{display:none} #ui .detail{flex-wrap:wrap} #ui .btn.start{width:100%} #ui .show{flex-direction:column;overflow:auto} #ui .tl{width:auto;flex-direction:row;overflow-x:auto;border-right:none} #ui .ti{flex:none} .result{width:94vw!important} }
+body.touch.ovl #mob,body.touch.ovl #deck{display:none!important} body.touch.ovl #frame{z-index:40}
+body.touch.ovl #ui{inset:0!important;z-index:41}
+body.touch #ui .mback{pointer-events:auto} body.touch #ui .chip{white-space:nowrap} @media (max-height:460px){ #ui .mh .sub{display:none} #ui .bar{flex-wrap:wrap;gap:6px} }
+@media (max-width:560px) and (orientation:portrait){ body.touch #ui .modal{width:100vw!important;height:100%!important;max-height:100dvh;border-radius:0;border:none;padding-top:env(safe-area-inset-top)}
+ #ui .mh{flex-wrap:wrap;gap:6px 10px;padding:10px 12px 8px;position:relative} #ui .mh>div:first-child{font-size:22px!important} #ui .mh h2{font-size:18px;letter-spacing:1px;white-space:nowrap} #ui .mh .sp{display:none}
+ #ui .mh>div[style*="text-align:right"]{order:5;flex-basis:100%;text-align:left!important;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px} #ui .mh>div[style*="text-align:right"] br{display:none} #ui .mh .xpb{width:90px}
+ #ui .mh .x{position:absolute;top:8px;right:10px;width:44px;height:44px;font-size:20px}
+ #ui .bar{gap:6px;padding:6px 12px} #ui .bar>div[style*="flex:1"]{flex-basis:100%;height:0} #ui .bar .chip{padding:5px 9px;font-size:12px} #ui .bar .lbl{font-size:10px}
+ #ui .body{overflow:hidden} #ui .grid{padding:4px 10px 10px!important;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y}
+ #ui .card .ill{width:64px;height:64px} #ui .card .cn{font-size:14px;padding-right:74px}
+ #ui .detail{position:sticky;bottom:0;padding:8px 12px calc(8px + env(safe-area-inset-bottom));min-height:0;gap:8px;z-index:2;background:#151c29} #ui .detail .btn.start{min-height:48px;font-size:16px}
+ #ui .foot{flex-wrap:wrap;gap:4px 10px;padding:6px 12px;font-size:11px} }
 @media (max-height:460px){ #ui .mh{padding:8px 12px} #ui .bar{padding:6px 12px} #ui .stage .floor{height:150px} }
 `;
 function mobBtn(id,html,cls,k){ const b=document.createElement('div'); b.className='b '+(cls||''); b.id=id; b.innerHTML=html; document.getElementById('mob').appendChild(b);
@@ -3378,6 +3390,8 @@ function mobContext(){ if(!MOB.on) return; const a=career.active; const s=truck;
   const por=MOB.mode==='portrait'; const set=(id,on)=>{ const b=document.getElementById(id); if(!b) return; if(por){ b.classList.remove('hide'); b.classList.toggle('ctxon',on); b.classList.toggle('dim',!on); } else { b.classList.toggle('hide',!on); } };
   set('mCouple',cpl); set('mFuel',fuel); set('mUnload',unl); const c=document.getElementById('mChat'); if(c) c.style.display=MP.on?'flex':'none';
   const cb=document.getElementById('mCouple'); if(cb) cb.querySelector('small').textContent=s.trl?'UNCOUPLE':'COUPLE'; }
+
+(function ovlWatch(){ const f=()=>{ const ov=document.getElementById('overlay'); const on=!!(typeof career!=='undefined'&&career.uiOpen)||!!document.getElementById('bdPanel')||!!document.querySelector('#ui .celebrate')||!!(ov&&!ov.classList.contains('hidden')&&ov.offsetParent!==null); document.body.classList.toggle('ovl',on); }; setInterval(f,150); })();
 
 'use strict';
 // ===================== v12 BREAKDOWN at 100% damage =====================
