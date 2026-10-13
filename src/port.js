@@ -13,11 +13,15 @@ function portInit(P){ if(P.ready) return; P.ready=1; P.landed=0;
   P.stock=Math.floor(P.slots.length*0.35); P.cap=P.slots.length; P.loadT=4; P.aiT=8+Math.random()*8;
   P.depot=world.depots.find(d=>d.code===P.dep); }
 const PL=(P,u,v)=>[(P.O[0]+P.U[0]*u+P.V[0]*v),(P.O[1]+P.U[1]*u+P.V[1]*v)];   // local (tiles) -> world tiles
-function portSegNear(P){ const dp=P.depot; if(!dp) return null; const s=navSnap(dp.entrance.x/M_T,dp.entrance.y/M_T,12); if(!s) return null; const i=idx(s[0],s[1]); const sid=world.roadH[i]>=0?world.roadH[i]:world.roadV[i]; if(sid<0) return null; const sg=world.segs[sid]; return {sg,along:(sg.dir==='h'?s[0]:s[1])+0.5}; }
-function portSpawn(P,kind,toward){ const q=portSegNear(P); if(!q) return null; const {sg,along}=q;
+function portSegNear(P,dp){ dp=dp||P.depot; if(!dp) return null; const s=navSnap(dp.entrance.x/M_T,dp.entrance.y/M_T,12); if(!s) return null; const i=idx(s[0],s[1]); const sid=world.roadH[i]>=0?world.roadH[i]:world.roadV[i]; if(sid<0) return null; const sg=world.segs[sid]; return {sg,along:(sg.dir==='h'?s[0]:s[1])+0.5}; }
+function portSpawn(P,kind,toward,dp){ const q=portSegNear(P,dp); if(!q) return null; const {sg,along}=q;
   for(const off of [-12,12,-9,9,-15,15]){ const a=toward?along+off:along+Math.sign(off)*6; if(a<sg.b0+3||a>sg.b1-3) continue; const dir=toward?(off<0?1:-1):(off<0?-1:1);
     const p=lanePt(sg,dir,0,a); const v=spawnVehicle(p[0],p[1],true,{kind,dir,along:a,seg:sg.id}); if(v){ v.port=P; v.pinT=timeS+90; return v; } }
   return null; }
+// goal-directed AI: A* tile path -> idx->progress map that traffic.planPiece uses to pick turns
+function aiGoal(v,dp){ const s=navSnap(v.x/M_T,v.y/M_T,12), g=navSnap(dp.entrance.x/M_T,dp.entrance.y/M_T,14); if(!s||!g) return false; const path=navAStar(s[0],s[1],g[0],g[1]); if(!path) return false;
+  const m=new Map(); path.forEach((i,k)=>{ for(let dy=-3;dy<=3;dy++) for(let dx=-3;dx<=3;dx++){ const j=i+dx+dy*MW; if(!(m.get(j)>=k)) m.set(j,k); } }); v.gk=m; v.goal=dp; v.pinT=timeS+900; return true; }
+function aiDepot(P){ const e=P.depot.entrance, L=world.depots.filter(d=>d!==P.depot&&d.bays&&d.bays.some(b=>!b.trailer&&!b.assigned)).sort((a,b)=>Math.hypot(a.entrance.x-e.x,a.entrance.y-e.y)-Math.hypot(b.entrance.x-e.x,b.entrance.y-e.y)).slice(0,4); return L.length?L[(Math.random()*L.length)|0]:null; }
 function updatePort(dt){ for(const P of portList()) updateOnePort(P,dt); }
 function updateOnePort(P,dt){ if(!P.berths) return; portInit(P); const laneU=16, dockU=5;
   for(const b of P.berths){ const yc=(b.y0+b.y1)/2; let s=b.ship;
@@ -42,13 +46,23 @@ function updateOnePort(P,dt){ if(!P.berths) return; portInit(P); const laneU=16,
     if(bay&&P.stock>0){ P.stock--; const tr=makeTrailer('cont',Math.random); tr.x=bay.kx; tr.y=bay.ky; tr.th=bay.th; tr.bay=bay; tr.depot=dp; tr.portLoad=P; bay.trailer=tr; world.trailers.push(tr); } }
   // AI hauliers: a cab drives in, couples a loaded box and leaves on the network (max 2 per port in play)
   for(let k=PORTSIM.ai.length-1;k>=0;k--){ const a=PORTSIM.ai[k]; if(a.P!==P) continue; a.t+=dt; const v=a.v, e=dp.entrance;
-    if(!traffic.vs.includes(v)){ PORTSIM.ai.splice(k,1); continue; }
+    if(!a.virt&&!traffic.vs.includes(v)){ if(a.st==='ret'){ a.virt=1; a.eta=a.t+30; continue; } if(a.st==='haul'){ a.virt=1; a.eta=a.t+Math.hypot(v.x-a.gd.entrance.x,v.y-a.gd.entrance.y)/9; } else { PORTSIM.ai.splice(k,1); continue; } }
     if(a.st==='in'&&(Math.hypot(v.x-e.x,v.y-e.y)<14||a.t>45)){ const tr=dp.bays.map(b=>b.trailer).find(t=>t&&t.portLoad&&!t.target&&!t.coupled);
       const i=traffic.vs.indexOf(v); if(i>=0) traffic.vs.splice(i,1); PORTSIM.ai.splice(k,1);
-      if(tr){ const j=world.trailers.indexOf(tr); if(j>=0) world.trailers.splice(j,1); if(tr.bay) tr.bay.trailer=null; tr.bay=null; const out=portSpawn(P,'lorry',false); if(out){ out.portOut=1; P.hauled=(P.hauled||0)+1; } } } }
+      if(tr){ const j=world.trailers.indexOf(tr); if(j>=0) world.trailers.splice(j,1); if(tr.bay) tr.bay.trailer=null; tr.bay=null; const out=portSpawn(P,'lorry',false); if(out){ out.portOut=1; P.hauled=(P.hauled||0)+1; const gd=aiDepot(P); if(gd&&aiGoal(out,gd)) PORTSIM.ai.push({P,v:out,st:'haul',t:0,gd}); } } continue; }
+    if(a.st==='haul'&&!a.virt&&Math.hypot(v.x-truck.x,v.y-truck.y)>220&&Math.hypot(v.x-a.gd.entrance.x,v.y-a.gd.entrance.y)>220){ const i=traffic.vs.indexOf(v); if(i>=0) traffic.vs.splice(i,1); a.virt=1; a.eta=a.t+Math.hypot(v.x-a.gd.entrance.x,v.y-a.gd.entrance.y)*1.3/12; }   // off-screen: finish the trip on the clock
+    if(a.st==='haul'){ const g=a.gd.entrance; if((a.virt?a.t>a.eta:Math.hypot(v.x-g.x,v.y-g.y)<22)||a.t>(a.eta||420)+60){ const i=traffic.vs.indexOf(v); if(i>=0) traffic.vs.splice(i,1); PORTSIM.ai.splice(k,1);
+        const bay=a.gd.bays.find(b=>!b.trailer&&!b.assigned); if(bay){ const tr=makeTrailer('cont',Math.random); tr.x=bay.kx; tr.y=bay.ky; tr.th=bay.th; tr.bay=bay; tr.depot=a.gd; tr.aiDrop=timeS; bay.trailer=tr; world.trailers.push(tr); P.dropped=(P.dropped||0)+1; }
+        const far=Math.hypot(truck.x-a.gd.entrance.x,truck.y-a.gd.entrance.y)>220, c=far?null:portSpawn(P,'cab',false,a.gd);
+        if(c&&aiGoal(c,P.depot)) PORTSIM.ai.push({P,v:c,st:'ret',t:0}); else PORTSIM.ai.push({P,v:null,st:'ret',t:0,virt:1,eta:Math.hypot(a.gd.entrance.x-e.x,a.gd.entrance.y-e.y)*1.3/12}); } continue; }
+    if(a.st==='ret'&&a.virt){ if(a.t>a.eta){ PORTSIM.ai.splice(k,1); if(Math.hypot(truck.x-e.x,truck.y-e.y)<280){ const c=portSpawn(P,'cab',true); if(c) PORTSIM.ai.push({P,v:c,st:'in',t:0}); } } continue; }
+    if(a.st==='ret'&&Math.hypot(v.x-truck.x,v.y-truck.y)>220&&Math.hypot(v.x-e.x,v.y-e.y)>220){ const i=traffic.vs.indexOf(v); if(i>=0) traffic.vs.splice(i,1); a.virt=1; a.eta=a.t+Math.hypot(v.x-e.x,v.y-e.y)*1.3/12; continue; }
+    if(a.st==='ret'&&(Math.hypot(v.x-e.x,v.y-e.y)<22||a.t>420)){ a.st='in'; a.t=0; v.gk=null; if(Math.hypot(v.x-e.x,v.y-e.y)>=22){ const i=traffic.vs.indexOf(v); if(i>=0) traffic.vs.splice(i,1); PORTSIM.ai.splice(k,1); } } }
+  // AI-dropped boxes at destination depots get collected after a while (keeps bays free)
+  for(let i=world.trailers.length-1;i>=0;i--){ const t=world.trailers[i]; if(t.aiDrop&&!t.coupled&&timeS-t.aiDrop>240&&Math.hypot(truck.x-t.x,truck.y-t.y)>120){ if(t.bay) t.bay.trailer=null; world.trailers.splice(i,1); } }
   P.aiT-=dt; const nAI=PORTSIM.ai.filter(a=>a.P===P).length;
   if(P.aiT<=0){ P.aiT=10+Math.random()*6; const near=Math.hypot(truck.x-dp.entrance.x,truck.y-dp.entrance.y)<280;
-    if(near&&nAI<2&&dp.bays.some(b=>b.trailer&&b.trailer.portLoad&&!b.trailer.target)){ const v=portSpawn(P,'cab',true); if(v) PORTSIM.ai.push({P,v,st:'in',t:0}); } }
+    if(near&&nAI<3&&dp.bays.some(b=>b.trailer&&b.trailer.portLoad&&!b.trailer.target)){ const v=portSpawn(P,'cab',true); if(v) PORTSIM.ai.push({P,v,st:'in',t:0}); } }
   // player side job prompt
   if(!career.active&&!truck.trl&&Math.abs(truck.v)<3&&Math.hypot(truck.x-dp.entrance.x,truck.y-dp.entrance.y)<90&&timeS>(P.hintT||0)){ const has=dp.bays.some(b=>b.trailer&&b.trailer.portLoad);
     if(has){ P.hintT=timeS+12; flash('Port container ready \u2022 reverse onto a loaded skeletal trailer and couple (T / pad A) for a bonus delivery job'); } } }
@@ -83,10 +97,10 @@ function drawSTS(P,c,sh){ const T_=TILE, y=c.y*T_, uL=P.legL*T_, uW=-1*T_, uB0=(
   const st=sh?'rgba(0,0,0,0.22)':null, red='#c0392b', wht='#ecf0f1', dk='#7b241c', blue='#2c3e50';
   ctx.save(); if(sh) ctx.translate(2.2*T_,2.2*T_);
   // portal: sill beams along the rails + bogies
-  ctx.fillStyle=st||dk; for(const u of [uL,uW]) ctx.fillRect(u-5,y-gap-6,10,2*gap+12);
+  ctx.fillStyle=st||dk; for(const u of [uL,uW]) ctx.fillRect(u-9,y-gap-8,18,2*gap+16); ctx.fillStyle=st||red; for(const u of [uL,uW]) for(const dv of [-gap,gap]) ctx.fillRect(u-12,y+dv-12,24,24); if(!sh){ ctx.fillStyle='rgba(255,255,255,0.35)'; for(const u of [uL,uW]) for(const dv of [-gap,gap]) ctx.fillRect(u-12,y+dv-12,24,5); }
   if(!sh){ ctx.fillStyle='#222'; for(const u of [uL,uW]) for(const dv of [-gap-6,gap+2]) ctx.fillRect(u-7,y+dv,14,4); }
   // portal cross beams + X bracing
-  ctx.strokeStyle=st||red; ctx.lineWidth=7; ctx.beginPath(); for(const dv of [-gap,gap]){ ctx.moveTo(uL,y+dv); ctx.lineTo(uW,y+dv); } ctx.stroke();
+  ctx.strokeStyle=st||red; ctx.lineWidth=12; ctx.beginPath(); for(const dv of [-gap,gap]){ ctx.moveTo(uL,y+dv); ctx.lineTo(uW,y+dv); } ctx.stroke();
   ctx.lineWidth=3; ctx.strokeStyle=st||wht; ctx.beginPath(); for(const dv of [-gap,gap]){ ctx.moveTo(uL,y+dv-4); ctx.lineTo(uW,y+dv+4); ctx.moveTo(uL,y+dv+4); ctx.lineTo(uW,y+dv-4); } ctx.stroke();
   // boom (two chords + lattice) from backreach to outreach
   ctx.fillStyle=st||red; ctx.fillRect(uB0,y-bw/2,uB1-uB0,bw);

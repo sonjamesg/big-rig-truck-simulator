@@ -166,6 +166,7 @@ function planPiece(v,r){
     let opts=o.opts; const distT=Math.abs(lineA-P.pos);
     if(lanes && distT<5){ const f=opts.filter(op=>lanes[P.lane]&&lanes[P.lane].indexOf(op[0])>=0); if(f.length) opts=f; }
     let tw=0; for(const q of opts) tw+=q[3]; let x=r()*tw, ch=opts[0]; for(const q of opts){ x-=q[3]; if(x<=0){ ch=q; break; } }
+    if(v.gk){ let bk=-1; for(const q of opts){ const e=q[0]==='S'?lanePt(sg,d,P.lane,exitA):lanePt(q[1],q[2],0,q[2]>0?o.ce:o.cs); const k=v.gk.get(idx(Math.floor(e[0]/M_T),Math.floor(e[1]/M_T))); if(k!==undefined&&k>bk){ bk=k; ch=q; } } }
     let tl=P.lane;
     if(lanes && !(lanes[tl]&&lanes[tl].indexOf(ch[0])>=0)){ let bd=99; for(let i=0;i<lanes.length;i++) if(lanes[i].indexOf(ch[0])>=0 && Math.abs(i-P.lane)<bd){ bd=Math.abs(i-P.lane); tl=i; } }
     if(tl!==P.lane){ laneChange(v,sg,d,P.lane,tl,P.pos,lineA); P.lane=tl; }

@@ -343,7 +343,12 @@ function genWorld(){
     } }
   // other cities: stadium + downtown towers via townBlocks; mark a stadium block first
   function cityFill(g,si,sj){ const x0=g.xs[si]+RW+1, y0=g.ys[sj]+RW+1, w=g.xs[si+1]-x0-1, h=g.ys[sj+1]-y0-1; stadium(x0,y0,w,h); g.skip=si+','+sj; townBlocks(g.xs,g.ys,'city',g.skip); }
-  cityFill(SV,9,8); townBlocks(KB.xs,KB.ys,'dt'); for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y>=KB.ys[0]*TILE&&o.y<KB.Y1*TILE) o.cyber=true; { const K=world.kbDistricts; cityFill(K.MK,2,1); for(const k of ['NG','CH','RS']) townBlocks(K[k].xs,K[k].ys,'city'); townBlocks(K.RM.xs,K.RM.ys,'town'); townBlocks(K.WM.xs,K.WM.ys,'res'); townBlocks(K.OH.xs,K.OH.ys,'town'); for(let k=0;k<3;k++) ind(1772+k*18,1736,15,22); for(let k=0;k<3;k++) ind(1772+k*18,1764,15,22); }
+  cityFill(SV,9,8); townBlocks(KB.xs,KB.ys,'dt'); const dense=(xs,ys,st,h0,h1)=>{ for(let i=0;i<xs.length-1;i++) for(let j=0;j<ys.length-1;j++){ const x0=xs[i]+RW+1,y0=ys[j]+RW+1,x1=xs[i+1]-1,y1=ys[j+1]-1;
+  for(let y=y0;y+4<=y1;y+=5) for(let x=x0;x+4<=x1;x+=5){ const w=Math.min(4+(R()<0.4?1:0),x1-x),h=Math.min(4+(R()<0.4?1:0),y1-y); let ok=true; for(let q=-1;q<=h&&ok;q++) for(let k=-1;k<=w;k++){ if(!inb(x+k,y+q)){ok=false;break;} const t=G[idx(x+k,y+q)]; const edge=q<0||k<0||q===h||k===w; if(t===T.BLDG&&!edge||t===T.ROAD&&!edge||t===T.WATER||t===T.BRIDGE||t===T.BLDG){ok=false;break;} }
+    if(ok){ fill(x,y,w,h,T.BLDG); objs.push({kind:'bldg',x:x*TILE,y:y*TILE,w:w*TILE,h:h*TILE,style:st[(R()*st.length)|0],height:h0+R()*(h1-h0),seed:(R()*1e9)|0}); } } } };
+dense(KB.xs,KB.ys,['office','glass','tower','solar','office','glass'],45,140); for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y>=KB.ys[0]*TILE&&o.y<KB.Y1*TILE) o.cyber=true; { const K=world.kbDistricts; cityFill(K.MK,2,1); for(const k of ['NG','CH','RS']) townBlocks(K[k].xs,K[k].ys,'city'); for(const k of ['NG','CH','RS']) dense(K[k].xs,K[k].ys,['office','brick','flat','glass','gravel'],22,60); townBlocks(K.RM.xs,K.RM.ys,'town'); townBlocks(K.WM.xs,K.WM.ys,'res'); townBlocks(K.OH.xs,K.OH.ys,'town'); for(let k=0;k<3;k++) ind(1772+k*18,1736,15,22); for(let k=0;k<3;k++) ind(1772+k*18,1764,15,22); } { const SH=['FRESH FISH','CHANDLERY','DOCK CAFE','TOOLS','MARINE','PARTS','KEBAB','BAIT & TACKLE']; let n=0;   // Portside shops + warehouses
+  for(let y=1780;y+6<=1862;y+=7) for(let x=1690;x+7<=1850;x+=8){ let ok=true; for(let q=-1;q<=6&&ok;q++) for(let k=-1;k<=7;k++){ const t=get(x+k,y+q); if(t!==T.GRASS&&t!==T.PGRASS&&t!==T.SAND&&t!==T.CONC&&t!==T.WALK&&t!==T.PLAZA){ ok=false; break; } }
+    if(ok){ const wh=R()<0.5, w=wh?7:5, h=wh?6:4; fill(x,y,w,h,T.BLDG); objs.push(Object.assign({kind:'bldg',x:x*TILE,y:y*TILE,w:w*TILE,h:h*TILE,style:wh?'warehouse':'shop',height:wh?16+R()*8:9+R()*5,seed:(R()*1e9)|0},wh?{logo:COMPANIES[(R()*COMPANIES.length)|0]}:{sign:SH[(n++)%SH.length]})); } } }
   for(const g of [MF,DW,CM,RH,FW]) townBlocks(g.xs,g.ys,'town'); townBlocks(AB.xs,AB.ys,'res');
   for(let k=0;k<6;k++) building(505+k*6,906,4,4,'house',12);  building(490,906,6,4,'church',22);        // Wendwood hamlet
   for(let k=0;k<4;k++) building(MTN.x-12+k*6,1592,4,3,'house',10);                                      // summit cafe & viewpoint
@@ -381,7 +386,7 @@ function genWorld(){
   }
   docks(1540,1846,1750,1884);
   { // v18 Kingsbridge container quay (faces south onto the harbour): local u = towards the water, v = along the quay (east)
-    const L=(1745-1552)/3; world.kbPort={O:[0,1885],U:[0,1],V:[1,0],vIn:1436,vOut:1800,dep:'KHT',legL:-12,asg:[0,1,2],off:[0,0,0],qy0:1548,qy1:1748,
+    const L=(1745-1552)/3; world.kbPort={O:[0,1885],U:[0,1],V:[1,0],vIn:1436,vOut:1800,dep:'KHT',legL:-9,asg:[0,1,2],off:[0,0,0],qy0:1548,qy1:1748,
       berths:[0,1,2].map(i=>({i,y0:1552+i*L,y1:1552+(i+1)*L,ship:null})), cranes:[0,1,2].map(i=>({i,y:1552+L*(i+0.5),ty:0,tr:0.5,ph:0,car:null}))}; }
   // airports: concrete apron, runways, terminal, hangars
   function airport(name,x0,y0,x1,y1,rws,term){ for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++){ const t=G[idx(x,y)]; if(t!==T.ROAD&&t!==T.WATER&&t!==T.BRIDGE&&t!==T.WALK) set(x,y,T.CONC); }
