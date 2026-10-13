@@ -92,7 +92,7 @@ function draw(){
   drawPortLow(vx0,vy0,vx1,vy1); drawFXLow(vx0,vy0,vx1,vy1); drawRemotePlayers(vx0,vy0,vx1,vy1); drawBreakdown();
   drawLorry(); if(!truck.foLay&&world.foZ&&world.foZ[idx(Math.floor(truck.x/M_T),Math.floor(truck.y/M_T))]) drawFlyovers(vx0,vy0,vx1,vy1,0.72); drawRail(vx0,vy0,vx1,vy1); drawFXHigh(); drawPortHigh(vx0,vy0,vx1,vy1);
   for(const o of world.overhead) if(o.x>vx0-400&&o.x<vx1+400&&o.y>vy0-400&&o.y<vy1+400) drawOverhead(o);
-  drawAmbientHigh(VR); drawWeather(vx0,vy0,vx1,vy1,z); drawNight(vx0,vy0,vx1,vy1,z); drawStreetLamps(vx0,vy0,vx1,vy1); drawSigNight();
+  drawAmbientHigh(VR); drawWeather(vx0,vy0,vx1,vy1,z); drawNight(vx0,vy0,vx1,vy1,z); drawStreetLamps(vx0,vy0,vx1,vy1); drawSigNight(); drawPortNight(vx0,vy0,vx1,vy1);
   ctx.setTransform(1,0,0,1,0,0);
   drawHUD();
   if(bigmap.open){ drawBigMap(); dnMapShade(0,0,VW,VH,0.35); drawPadMapCursor(); }
@@ -276,7 +276,7 @@ function drawBigMap(){
   const BX=t=>VW/2+(t-bigmap.cx)*z, BY=t=>VH/2+10+(t-bigmap.cy)*z;
   if(z>0.8) for(const v of traffic.vs){ ctx.fillStyle=v.heavy?'#ff9f1a':'#fff'; ctx.fillRect(BX(v.x/4)-1.5,BY(v.y/4)-1.5,3,3); }
   for(const t of world.trailers){ if(t.coupled) continue; if(z<0.8&&!t.target) continue; ctx.fillStyle=t.target?'#ffd600':'#4fd1ff'; ctx.fillRect(BX(t.x/4)-2,BY(t.y/4)-2,4,4); }
-  const IR=mapIconR(z); MAPLBL.length=0; railBigMap(BX,BY,z,IR);
+  const IR=mapIconR(z); MAPLBL.length=0; railBigMap(BX,BY,z,IR); portBigMap(BX,BY,z);
   navLine(m=>BX(m/4),m=>BY(m/4),4,'#ff3df0');
   drawPOIs(m=>BX(m/4),m=>BY(m/4),z>0.6,IR);
   mpDrawMap(m=>BX(m/4),m=>BY(m/4),true);

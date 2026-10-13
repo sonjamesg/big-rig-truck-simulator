@@ -61,7 +61,8 @@ function genWorld(){
   for(const [x0,y0,x1,y1] of [[145,135,720,655],[1060,150,1830,515],[1395,1375,1800,1884],[995,1785,1385,1905],[240,775,355,885],[235,1095,300,1162]]) for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++) water[idx(x,y)]=0;
   for(let y=145;y<456;y++) for(let x=478;x<800;x++) if(!(x<600&&y>=PORT_Y0&&y<PORT_Y1)) water[idx(x,y)]=1;   // v14 Port Albion: compact terminal, open water around it
   for(let y=1885;y<1936;y++) for(let x=1430;x<1790;x++) water[idx(x,y)]=1; for(let y=1850;y<1885;y++) for(let x=1478;x<1528;x++) water[idx(x,y)]=1; for(let y=1394;y<1885;y++) for(let x=1752;x<1760;x++) water[idx(x,y)]=1;   // Kingsbridge harbour + inlet + Kingsbridge Channel                                             // Kingsbridge harbour
-  for(let k=0;k<4;k++) for(let x=1480+k*80;x<1496+k*80;x++) for(let y=1815;y<1885;y++) water[idx(x,y)]=1;
+  for(let k=0;k<4;k++) for(let x=1480+k*80;x<1496+k*80;x++) for(let y=1815;y<1866;y++) water[idx(x,y)]=1;   // v26: inlets stop short of the quay so the apron is continuous
+  for(let y=1930;y<MH;y++) for(let x=1738;x<1783;x++) water[idx(x,y)]=1;   // v26 Kingsbridge ship channel: harbour -> Outer Sea (M1 crosses on a tall bridge)
   (world.tm=world.tm||[]).push(['// ground: water',performance.now()-t0|0]);
   const CW=new Float32Array(MH); for(let y=0;y<MH;y++) CW[y]=cW(y);
   // ground: water / desert sand / mountain rock / grass
@@ -475,6 +476,9 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
   { // v18 Kingsbridge container quay (faces south onto the harbour): local u = towards the water, v = along the quay (east)
     const L=(1745-1552)/3; world.kbPort={O:[0,1885],U:[0,1],V:[1,0],vIn:1436,vOut:1800,dep:'KHT',legL:-9,asg:[0,1,2],off:[0,0,0],qy0:1548,qy1:1748,
       berths:[0,1,2].map(i=>({i,y0:1552+i*L,y1:1552+(i+1)*L,ship:null})), cranes:[0,1,2].map(i=>({i,y:1552+L*(i+0.5),ty:0,tr:0.5,ph:0,car:null}))}; }
+  // v26: keep the crane portal strip clear for the lorry lane, stack blocks and tractor loop (both ports)
+  for(const [x0,y0,x1,y1] of [[1546,1874,1752,1885],[586,260,600,416]]){ for(let i=objs.length-1;i>=0;i--){ const o=objs[i]; if(o.kind!=='cont') continue; const ox=o.x/TILE, oy=o.y/TILE; if(ox+o.w/TILE>x0&&ox<x1&&oy+o.h/TILE>y0&&oy<y1) objs.splice(i,1); }
+    for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++) if(get(x,y)===T.CONT) set(x,y,T.QUAY); }
   // airports: concrete apron, runways, terminal, hangars
   function airport(name,x0,y0,x1,y1,rws,term){ for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++){ const t=G[idx(x,y)]; if(t!==T.ROAD&&t!==T.WATER&&t!==T.BRIDGE&&t!==T.WALK) set(x,y,T.CONC); }
     const ap={name,rw:[]}; for(const [rx,ry,rw] of rws){ objs.push({kind:'runway',x:rx*TILE,y:ry*TILE,w:rw*TILE,h:12*TILE}); ap.rw.push({x:rx*TILE,y:(ry+6)*TILE,len:rw*TILE}); for(let k=0;k<rw;k+=10) world.beacons.push({x:(rx+k)*TILE,y:(ry-0.5)*TILE,col:'#ffd23f',ph:k*0.05,run:1}); }
