@@ -1518,12 +1518,21 @@ function initParked(){
 }
 // ---------------- pedestrians ----------------
 const WALKABLE=new Uint8Array(32); [T.WALK,T.PLAZA,T.PARK].forEach(t=>WALKABLE[t]=1);
+// v15: footprints of solid objects (containers, buildings, cranes...) and the port yard are never walkable, whatever tile lies beneath
+const PED_SOLID={cont:1,bldg:1,tank:1,silo:1,canopy:1,pump:1,stower:1,mast:1,turbine:1,pallets:1,tree:1,rock:1,hedge:1,susp:1,fountain:1,pond:1,runway:1};
+let pedBlk=null;
+function pedMask(){ if(pedBlk) return pedBlk; 
+  const blk=new Set(); const mark=(x0,y0,x1,y1)=>{ for(let y=Math.floor(y0);y<Math.ceil(y1);y++) for(let x=Math.floor(x0);x<Math.ceil(x1);x++) blk.add(x*65536+y); };
+  for(const o of world.objects){ if(!PED_SOLID[o.kind]||o.w==null||o.h==null) continue; mark(o.x/TILE-0.3,o.y/TILE-0.3,(o.x+o.w)/TILE+0.3,(o.y+o.h)/TILE+0.3); }
+  const P=world.port; if(P) mark(P.x0+4,P.y0-1,P.edge+3,P.y1+1); // whole yard/quay/crane rails except the gate strip
+  return pedBlk=blk; }
+function pedOk(tx,ty){ return WALKABLE[get(tx,ty)]&&!pedMask().has(tx*65536+ty); }
 const PED_COLS=['#c0392b','#2980b9','#27ae60','#f1c40f','#8e44ad','#ecf0f1','#2c3e50','#e67e22','#16a085','#7f8c8d'];
 function updatePeds(dt){
   const P=truck, ps=traffic.peds;
   const want= traffic.target>20?34:traffic.target>10?18:6;
   for(let t=0;t<12&&ps.length<want;t++){ const a=tRand()*6.283, d=30+tRand()*90; const x=P.x+Math.cos(a)*d, y=P.y+Math.sin(a)*d; const tx=Math.floor(x/M_T), ty=Math.floor(y/M_T);
-    if(!WALKABLE[get(tx,ty)]||onScreen(x,y,6)) continue; const dirs=[[1,0],[-1,0],[0,1],[0,-1]]; const dd=dirs[(tRand()*4)|0];
+    if(!pedOk(tx,ty)||onScreen(x,y,6)) continue; const dirs=[[1,0],[-1,0],[0,1],[0,-1]]; const dd=dirs[(tRand()*4)|0];
     ps.push({x:(tx+0.2+tRand()*0.6)*M_T,y:(ty+0.2+tRand()*0.6)*M_T,dx:dd[0],dy:dd[1],sp:1.1+tRand()*0.6,col:PED_COLS[(tRand()*PED_COLS.length)|0],hair:['#2b1d0e','#000','#8a5a2b','#d9c27a','#777'][(tRand()*5)|0],ph:tRand()*6,flee:0,down:0}); }
   const pb=playerBoxes();
   for(let k=ps.length-1;k>=0;k--){ const p=ps[k]; const d=Math.hypot(p.x-P.x,p.y-P.y);
@@ -1535,8 +1544,8 @@ function updatePeds(dt){
     if(close<7 && Math.abs(P.v)>2){ p.flee=1.5; const ax=p.x-pb[0].x, ay=p.y-pb[0].y; if(Math.abs(ax)>Math.abs(ay)){ p.dx=Math.sign(ax); p.dy=0; } else { p.dx=0; p.dy=Math.sign(ay); } }
     if(p.flee>0){ p.flee-=dt; sp=4.2; }
     const nx=p.x+p.dx*sp*dt, ny=p.y+p.dy*sp*dt; const t=get(Math.floor((nx+p.dx*0.6)/M_T),Math.floor((ny+p.dy*0.6)/M_T));
-    if(WALKABLE[t]){ p.x=nx; p.y=ny; if(tRand()<dt*0.05){ const o=[[p.dy,p.dx],[-p.dy,-p.dx]][(tRand()*2)|0]; p.dx=o[0]; p.dy=o[1]; } }
-    else { const dirs=[[1,0],[-1,0],[0,1],[0,-1]].filter(q=>WALKABLE[get(Math.floor((p.x+q[0]*1.2)/M_T),Math.floor((p.y+q[1]*1.2)/M_T))]&&!(q[0]===p.dx&&q[1]===p.dy)); if(dirs.length){ const q=dirs[(tRand()*dirs.length)|0]; p.dx=q[0]; p.dy=q[1]; } else { p.dx=-p.dx; p.dy=-p.dy; } }
+    if(pedOk(Math.floor((nx+p.dx*0.6)/M_T),Math.floor((ny+p.dy*0.6)/M_T))){ p.x=nx; p.y=ny; if(tRand()<dt*0.05){ const o=[[p.dy,p.dx],[-p.dy,-p.dx]][(tRand()*2)|0]; p.dx=o[0]; p.dy=o[1]; } }
+    else { const dirs=[[1,0],[-1,0],[0,1],[0,-1]].filter(q=>pedOk(Math.floor((p.x+q[0]*1.2)/M_T),Math.floor((p.y+q[1]*1.2)/M_T))&&!(q[0]===p.dx&&q[1]===p.dy)); if(dirs.length){ const q=dirs[(tRand()*dirs.length)|0]; p.dx=q[0]; p.dy=q[1]; } else { p.dx=-p.dx; p.dy=-p.dy; } }
     p.ph+=dt*sp*5;
   }
 }
