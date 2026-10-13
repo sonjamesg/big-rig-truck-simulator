@@ -55,7 +55,7 @@ function frame(ts){
     if(truck.bump>0.01 && !truck._bumped){ thump(truck.bump); cam.shake=truck.bump*10; truck._bumped=true; } if(truck.bump<=0.01) truck._bumped=false;
     updateAudio(truck,inp,timeS);
   }
-  if(!paused){ updateTraffic(dt); updateFuel(dt); updateForecourts(dt); if(started) updateCareer(dt); if(started) updateIndicators(dt); }
+  if(!paused){ updateTraffic(dt); updateFuel(dt); updateForecourts(dt); if(started) updateCareer(dt); if(started) updateIndicators(dt); updateFX(dt); }
   { const z=cam.z; updateAmbient(dt,[cam.x-VW/2/z,cam.y-VH/2/z,cam.x+VW/2/z,cam.y+VH/2/z]); }
   if(started&&!paused) updateNav(dt);
   if(truck.bump>0.05&&!truck._dmg){ truck.damage=Math.min(100,truck.damage+truck.bump*6); truck._dmg=true; } if(truck.bump<=0.01) truck._dmg=false;
@@ -88,8 +88,8 @@ function draw(){
   drawCareerWorld(vx0,vy0,vx1,vy1);
   drawParkedTrailers(vx0,vy0,vx1,vy1);
   drawTraffic(vx0,vy0,vx1,vy1);
-  drawRemotePlayers(vx0,vy0,vx1,vy1); drawBreakdown();
-  drawLorry();
+  drawFXLow(vx0,vy0,vx1,vy1); drawRemotePlayers(vx0,vy0,vx1,vy1); drawBreakdown();
+  drawLorry(); drawFXHigh();
   for(const o of world.overhead) if(o.x>vx0-400&&o.x<vx1+400&&o.y>vy0-400&&o.y<vy1+400) drawOverhead(o);
   drawAmbientHigh(VR);
   ctx.setTransform(1,0,0,1,0,0);

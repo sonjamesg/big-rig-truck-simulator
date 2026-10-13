@@ -24,17 +24,21 @@ function hitTest(s){
   return typeof trailerHitTest==='function'?trailerHitTest(s):null;
 }
 function surfaceAt(s){ const f=fwd(s.h); const t=get(Math.floor((s.x-f[0]*2)*PPM/TILE),Math.floor((s.y-f[1]*2)*PPM/TILE)); return t; }
-function stepTruck(s,inp,dt){
+function stepTruck(s,inp,dt){ if(typeof FX!=='undefined'&&FX.boom){ s.v=0; s.throttle=0; s.brake=1; s.skid=false; return; }
   // ----- driver input -> throttle / brake / reverse selection
   const solo=!s.trl, M=solo?7600:7600+s.trl.weight; s.mass=M;
   // keyboard (digital) and gamepad triggers (analog) work together: take the stronger of the two
   const aUp=Math.max(inp.up?1:0,inp.padThr||0), aDn=Math.max(inp.down?1:0,inp.padBrk||0); const up=aUp>0.05, down=aDn>0.05; let thr=0, brk=0;
-  if(s.mode==='D'){ thr=aUp; brk=aDn;
+  s.kbBrk=inp.down?Math.min(1,(s.kbBrk||0)+dt*1.3):0;
+  if(s.mode==='D'){ thr=aUp; brk=Math.max(inp.padBrk||0, inp.down?0.3+0.7*s.kbBrk:0);
     if(down && Math.abs(s.v)<0.3){ s.brakeHold+=dt; if(s.brakeHold>0.45){ s.mode='R'; s.brakeHold=0; } } else if(!down) s.brakeHold=0;
   } else { thr=aDn; brk=aUp; if(up && Math.abs(s.v)<0.3){ s.mode='D'; s.gear=1; } }
   if(s.fuel!==undefined && s.fuel<=0) thr=0;
   if(inp.hand) brk=Math.max(brk,1.4);
   s.throttle+= (thr-s.throttle)*Math.min(1,dt*3); s.brake=brk;
+  // v14 wheel lock: a hard stamp on the brakes at speed locks the wheels -> long skid, little steering, trailer sway
+  if(s.mode==='D'&&brk>0.92&&Math.abs(s.v)>15) s.lockT=(s.lockT||0)+dt; else s.lockT=0;
+  s.skid=(s.skid?brk>0.6:s.lockT>0.15)&&Math.abs(s.v)>3;
   // ----- surface
   const surf=surfaceAt(s); s.offroad=(surf===T.GRASS||surf===T.PGRASS||surf===T.SAND||surf===T.GRAVEL);
   // ----- gearbox & engine
@@ -57,7 +61,7 @@ function stepTruck(s,inp,dt){
   const roll=(s.offroad?0.06:0.008)*M*9.81, air=0.5*1.2*6.5*0.7*s.v*s.v;
   F -= Math.sign(s.v)*(roll+air);
   // brakes
-  const bF=s.brake*(solo?0.6:0.5)*M*9.81;
+  const bF=(s.skid?(solo?0.42:0.36):s.brake*(solo?0.6:0.5))*M*9.81;
   let a=F/M; let nv=s.v+a*dt;
   if(s.brake>0){ const dv=bF/M*dt; if(Math.abs(nv)<=dv) nv=0; else nv-=Math.sign(nv)*dv; }
   if(Math.abs(nv)<0.05 && s.throttle<0.05) nv=0;
@@ -72,7 +76,7 @@ function stepTruck(s,inp,dt){
   if(Math.abs(s.steer)>maxSteer) s.steer=Math.sign(s.steer)*maxSteer;
   // ----- kinematics (bicycle model) + trailer non-holonomic constraint
   const prev={x:s.x,y:s.y,h:s.h,th:s.th};
-  const om=s.v*Math.tan(s.steer)/CAB.wheelbase;
+  const om=s.v*Math.tan(s.steer)/CAB.wheelbase*(s.skid?0.22:1);
   const k0=kingpin(s);
   s.h+=om*dt; const f=fwd(s.h); s.x+=f[0]*s.v*dt; s.y+=f[1]*s.v*dt;
   const k1=kingpin(s);
@@ -80,12 +84,13 @@ function stepTruck(s,inp,dt){
   const ft=fwd(s.th); let ax=k0[0]-ft[0]*TRL.axle, ay=k0[1]-ft[1]*TRL.axle;
   const d=(k1[0]-k0[0])*ft[0]+(k1[1]-k0[1])*ft[1]; ax+=ft[0]*d; ay+=ft[1]*d;      // axle moves only along trailer heading
   s.th=Math.atan2(k1[0]-ax,-(k1[1]-ay));
+  if(s.skid){ const sv=Math.min(1,Math.abs(s.v)/20); s.th+=(Math.sin(timeS*4.3)*0.16+Math.sin(timeS*1.7)*0.08)*sv*dt; }
   let rel=Math.atan2(Math.sin(s.h-s.th),Math.cos(s.h-s.th)); const JK=1.35;
   if(Math.abs(rel)>JK){ s.th=s.h-Math.sign(rel)*JK; if(s.v<0) s.v*=0.5; }
   }
   // ----- collisions
   const hit=hitTest(s)||(typeof trafficHitTruck==='function'&&trafficHitTruck(s)?'veh':null);
-  if(hit){ const imp=Math.abs(s.v); Object.assign(s,prev); s.v=-s.v*0.25; if(Math.abs(s.v)<0.3) s.v=0; s.throttle=0;
+  if(hit){ const imp=Math.abs(s.v); if(imp>FX_CRASH_V&&typeof fxExplode==='function'){ Object.assign(s,prev); fxExplode(hit); return; } Object.assign(s,prev); s.v=-s.v*0.25; if(Math.abs(s.v)<0.3) s.v=0; s.throttle=0;
     if(imp>1.2){ s.bump=Math.min(1,imp/10); s.lastHit=hit; }
     if(hitTest(s)){ // still stuck after revert (e.g. steering into wall) -> straighten
       s.steer*=0.5; }

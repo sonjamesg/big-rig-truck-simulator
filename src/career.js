@@ -26,7 +26,7 @@ const TRUCK_MODELS=[
   {id:'atlas',   name:'Atlas CX 440',       price:24000, hp:440,power:1.18,vmax:25.0,tank:520,econ:0.92,style:{roof:'high',skirts:1,visor:1},          cols:['#1c2833','#ecf0f1','#2e86c1','#7d3c98','#c0392b'],blurb:'High-roof sleeper, aero skirts, frugal.'},
   {id:'northline',name:'Northline 520 Long-Nose',price:48000,hp:520,power:1.35,vmax:25.0,tank:650,econ:1.08,style:{roof:'std',nose:1.6,stacks:1},  cols:['#7b241c','#f39c12','#145a32','#17202a','#d0d3d4'],blurb:'Classic bonneted hauler with chrome stacks.'},
   {id:'volta',   name:'Volta E-Hybrid',     price:72000, hp:450,power:1.28,vmax:25.0,tank:380,econ:0.62,style:{roof:'aero',stripe:'#33e0ff',skirts:1},  cols:['#f4f6f7','#17a589','#1b2631','#a569bd'],blurb:'Hybrid drive: cheapest per mile.'},
-  {id:'kestrel', name:'Kestrel Sport 600',  price:92000, hp:600,power:1.50,vmax:26.4,tank:600,econ:0.95,style:{roof:'aero',stripe:'#ffcc00',skirts:1,visor:1},cols:['#c0392b','#111111','#2471a3','#f1c40f'],blurb:'Fast, sharp and surprisingly thrifty.'},
+  {id:'kestrel', name:'Kestrel Sport 600',  price:92000, hp:600,power:1.50,vmax:26.4,tank:600,econ:0.95,style:{roof:'aero',stripe:'#ffcc00',skirts:1,visor:1,stacks:1},cols:['#c0392b','#111111','#2471a3','#f1c40f'],blurb:'Fast, sharp and surprisingly thrifty.'},
   {id:'titan',   name:'Titan V8 750',       price:135000,hp:750,power:1.75,vmax:27.8,tank:800,econ:1.30,style:{roof:'high',nose:2.0,stacks:1,lightbar:1,visor:1},cols:['#0b0b0b','#b03a2e','#f1c40f','#2874a6','#ffffff'],blurb:'The king of the road. 100 km/h limiter.'}];
 const career={depotLatch:true,xp:0,tier:1,owned:['rigger'],cur:'rigger',colors:{},jobs:[],active:null,done:0,earned:0,unload:null,ui:null,lastSave:0,boardSeq:1,uiOpen:null};
 const SAVE_KEY_OLD='bigrig.save.v7'; const saveKey=()=>'bigrig.save.'+(world.v2poi?'v2':'main'); const SETTINGS={vol:0.7};
@@ -157,7 +157,7 @@ function updateCareer(dt){ const a=career.active;
   if(inPad&&Math.abs(s.v)<0.2&&!career.padLatch&&!career.uiOpen){ career.padLatch=true; openDealer(inPad); } if(!inPad) career.padLatch=false;
   // depot: stopping inside a yard with no job opens the board once
   let inDepot=null; for(const d of world.depots){ const x0=d.x*M_T,y0=d.y*M_T; if(s.x>x0&&s.x<x0+d.w*M_T&&s.y>y0&&s.y<y0+d.h*M_T) inDepot=d; }
-  if(inDepot&&!career.active&&Math.abs(s.v)<0.1&&!career.depotLatch&&!career.uiOpen&&started&&timeS>3){ career.depotT=(career.depotT||0)+dt; if(career.depotT>1.2){ career.depotLatch=true; openBoard(); } } else career.depotT=0; if(!inDepot) career.depotLatch=false;
+  if(inDepot&&!(typeof FX!=='undefined'&&FX.boom)&&!career.active&&Math.abs(s.v)<0.1&&!career.depotLatch&&!career.uiOpen&&started&&timeS>3){ career.depotT=(career.depotT||0)+dt; if(career.depotT>1.2){ career.depotLatch=true; openBoard(); } } else career.depotT=0; if(!inDepot) career.depotLatch=false;
   if(timeS-career.lastSave>10&&started&&!career.noSave) saveGame(); }
 // ---------- world-space drawing (bay highlight, ghost, dock doors)
 function drawCareerWorld(vx0,vy0,vx1,vy1){ const a=career.active;
