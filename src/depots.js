@@ -83,16 +83,16 @@ function buildDepots(objs,R){
   const sd=world.startDepot; const D0=makeDepot('Big Rig Haulage HQ','HQ',1,sd.x0,sd.y0,sd.w,sd.h,{keep:true,entrance:world.v2?{x:(sd.x0+sd.w/2)*M_T,y:(sd.y0-1)*M_T}:{x:(sd.x0+sd.w)*M_T,y:(sd.y0+15)*M_T}});
   // other depots: find open grass next to a (non-motorway) road
   const okT=t=>t===T.GRASS||t===T.TREE||t===T.SAND||t===T.QUAY||t===T.FIELD||t===T.HEDGE||t===T.GRAVEL||t===T.WALK||(t===T.PGRASS&&!world.v2)||t===T.ROCK||t===T.CONC;
-  function findSpot(tx,ty,w,h,maxGap){
+  function findSpot(tx,ty,w,h,maxGap,rej,allowB,maxR){ const okB=allowB?(t=>okT(t)||t===T.BLDG||t===T.LOT||t===T.PLAZA):okT, soft=t=>allowB&&(t===T.WALK||t===T.PLAZA||t===T.PGRASS||t===T.BLDG||t===T.LOT);
     // summed-area table of unusable tiles over the search window (fast rectangle tests)
     const RAD=162, X0=Math.max(0,tx-RAD-2), Y0=Math.max(0,ty-RAD-2), X1=Math.min(MW-1,tx+RAD+w+3), Y1=Math.min(MH-1,ty+RAD+h+3), SW=X1-X0+2, sat=new Int32Array(SW*(Y1-Y0+2));
-    for(let j=Y0;j<=Y1;j++){ let row=0; const o=(j-Y0+1)*SW, op=(j-Y0)*SW; for(let i=X0;i<=X1;i++){ const k=idx(i,j); row+=(!okT(G[k])||world.reserved[k])?1:0; sat[o+i-X0+1]=sat[op+i-X0+1]+row; } }
+    for(let j=Y0;j<=Y1;j++){ let row=0; const o=(j-Y0+1)*SW, op=(j-Y0)*SW; for(let i=X0;i<=X1;i++){ const k=idx(i,j); row+=(!okB(G[k])||(world.reserved[k]&&!soft(G[k])))?1:0; sat[o+i-X0+1]=sat[op+i-X0+1]+row; } }
     const badIn=(x,y,ww,hh)=>{ if(x<X0||y<Y0||x+ww-1>X1||y+hh-1>Y1) return true; const a=x-X0, b=y-Y0, c=a+ww, d=b+hh; return sat[d*SW+c]-sat[b*SW+c]-sat[d*SW+a]+sat[b*SW+a]>0; };
-    for(let rad=0;rad<160;rad+=2) for(let dy=-rad;dy<=rad;dy+=2) for(let dx=-rad;dx<=rad;dx+=2){ if(Math.max(Math.abs(dx),Math.abs(dy))!==rad) continue;
+    for(let rad=0;rad<(maxR||160);rad+=2) for(let dy=-rad;dy<=rad;dy+=2) for(let dx=-rad;dx<=rad;dx+=2){ if(Math.max(Math.abs(dx),Math.abs(dy))!==rad) continue;
       const x=tx+dx, y=ty+dy; if(x<2||y<4||x+w>MW-2||y+h>MH-2) continue;
-      if(badIn(x-1,y,w+2,h+1)) continue;
+      if(badIn(x-1,y,w+2,h+1)) continue; if(rej&&rej(x,y)) continue;
       for(let gap=1;gap<=(maxGap||8);gap++){ const j=y-1-gap; let road=0; for(let i=x+w/2-2;i<x+w/2+2;i++){ const sid=world.roadH[idx(i,j)]; if((get(i,j)===T.ROAD||get(i,j)===T.BRIDGE)&&((sid>=0&&world.segs[sid].type!=='hwy'&&world.roadV[idx(i,j)]<0)||(sid===-3&&world.v2hw&&!world.v2hw[idx(i,j)]))) road++; }
-        if(road===4){ let clear=true; for(let jj=y-gap;jj<y;jj++) for(let i=x+w/2-3;i<x+w/2+3;i++) if((!okT(get(i,jj))&&get(i,jj)!==T.WALK)||world.reserved[idx(i,jj)]) clear=false; if(clear) return [x,y,gap]; } }
+        if(road===4){ let clear=true; for(let jj=y-gap;jj<y;jj++) for(let i=x+w/2-3;i<x+w/2+3;i++) if((!okB(get(i,jj))&&get(i,jj)!==T.WALK)||(world.reserved[idx(i,jj)]&&!soft(get(i,jj)))) clear=false; if(clear) return [x,y,gap]; } }
     } return null; }
   const region=(x,y)=> world.regionAt(x,y);
   const plan=[['Albion Docks Freight','ADF',3,520,470],['Albion Airport Cargo','AAC',3,620,470],['Millford Agri Depot','MAD',1,300,900],['Ashby Farm Supplies','AFS',1,280,1170],['Greyfell Quarry','GQY',4,120,1610],
@@ -145,13 +145,33 @@ function buildDepots(objs,R){
   const tf0=performance.now(); for(const [n,tx,ty] of fplan2){ let s=findSpot(tx,ty,26,20); if(s){ forecourt(n,s[0],s[1],s[2],+(1.49+R()*0.25).toFixed(2)); continue; }
     s=findSpot(tx,ty,18,12); if(!s){ console.warn('no fuel spot',n); continue; } fuelStation(n,s[0],s[1],s[2],+(1.49+R()*0.25).toFixed(2)); }
   // ---- repair garages (stub for later: damage repairs)
-  function garage(name,x,y,gap){ const w=22,h=16, M=v=>v*M_T; access(x,y,w,gap); clearObjs(x,y,w,h); fill(x,y,w,h,T.CONC); for(let j=y;j<y+h;j++) for(let i=x;i<x+w;i++) world.reserved[idx(i,j)]=1;
-    fill(x+1,y+h-6,20,6,T.BLDG); objs.push({kind:'workshop',x:(x+1)*TILE,y:(y+h-6)*TILE,w:20*TILE,h:6*TILE,height:20,doors:3,name});
-    const bays=[]; for(let k=0;k<3;k++){ const bx=x+2+k*6.6; const b={x0:M(bx),x1:M(bx+4.6),y0:M(y+1),y1:M(y+h-6),id:k+1}; bays.push(b); objs.push({kind:'rbay',x:b.x0*PPM,y:b.y0*PPM,w:(b.x1-b.x0)*PPM,h:(b.y1-b.y0)*PPM,n:k+1}); }
+  function garage(name,x,y,gap,w=22,h=16){ const M=v=>v*M_T, nd=Math.max(1,Math.floor((w-2)/6.6)); access(x,y,w,gap); clearObjs(x,y,w,h); fill(x,y,w,h,T.CONC); for(let j=y;j<y+h;j++) for(let i=x;i<x+w;i++) world.reserved[idx(i,j)]=1;
+    fill(x+1,y+h-6,w-2,6,T.BLDG); objs.push({kind:'workshop',x:(x+1)*TILE,y:(y+h-6)*TILE,w:(w-2)*TILE,h:6*TILE,height:20,doors:nd,name});
+    const bays=[]; for(let k=0;k<nd;k++){ const bx=x+2+k*6.6; const b={x0:M(bx),x1:M(bx+4.6),y0:M(y+1),y1:M(y+h-6),id:k+1}; bays.push(b); objs.push({kind:'rbay',x:b.x0*PPM,y:b.y0*PPM,w:(b.x1-b.x0)*PPM,h:(b.y1-b.y0)*PPM,n:k+1}); }
     for(let k=0;k<4;k++) objs.push({kind:'tyres',x:(x+0.5+(k%2)*0.9)*TILE,y:(y+2+k*1.3)*TILE,w:TILE,h:TILE,n:3+(k%3)});
     objs.push({kind:'paint',x:(x+8)*TILE,y:(y+0.4)*TILE,text:'REPAIRS',small:true});
     world.garages.push({id:'G'+(world.garages.length+1),name,x:(x+w/2)*M_T,y:(y+h/2)*M_T,bays,bay:{x:(x+w/2)*M_T,y:(y+2.5)*M_T},ratePerPct:45,region:region(x,y)}); }
   for(const [n,tx,ty] of world.v2poi?world.v2poi.filter(p=>p.kind==='garage').map(p=>[p.name,p.x,p.y]):[['Albion Truck Repairs',420,470],['Millford Motors',360,900],['Sandvale Heavy Repairs',1700,520],['Dustwater Garage',1000,520],['Kingsbridge Commercial',1600,1760],['Redhill Garage',980,1260]]){ const s=findSpot(tx,ty,22,16); if(s) garage(n,s[0],s[1],s[2]); }
+  // v13: every city gets 4 fuel stations (HGV bays + car pumps) and 4 artic-friendly repair garages, spread over its districts
+  { const CN={C1:'Albion',SV:'Sandvale',KB:'Kingsbridge',MF:'Millford',DW:'Dustwater',CM:'Coppermine',RH:'Redhill',FW:'Fenwick',AB:'Ashby'}, Q=['North','East','South','West','Central','Park','Ring','Bridge'];
+    world.cityPOI={};
+    const CB=[]; if(world.v2grids){ const grp={'Albion Downtown':'Albion','Quayside':'Albion','Westgate':'Albion','Sandvale Downtown':'Sandvale','Mesa Heights':'Sandvale','Sandvale East Industrial':'Sandvale','Kingsbridge Centre':'Kingsbridge','Old Town':'Kingsbridge','Harbourside':'Kingsbridge'}; const bx={};
+      for(const g of world.v2grids){ const n=grp[g.name]||(g.kind==='town'?g.name:null); if(!n) continue; const W=g.xs[g.xs.length-1]+14, H=g.ys[g.ys.length-1]+14, b=bx[n]||(bx[n]={n,x0:1e9,y0:1e9,x1:-1e9,y1:-1e9}); b.x0=Math.min(b.x0,g.ox); b.y0=Math.min(b.y0,g.oy); b.x1=Math.max(b.x1,g.ox+W); b.y1=Math.max(b.y1,g.oy+H); }
+      CB.push({n:'Albion',x0:170,y0:150,x1:520,y1:450},{n:'Sandvale',x0:1475,y0:175,x1:1850,y1:580},{n:'Kingsbridge',x0:1410,y0:1445,x1:1790,y1:1790},...Object.values(bx)); } else for(const k in CN){ const c=world.cities[k]; if(c) CB.push({n:k,x0:c.xs[0],y0:c.ys[0],x1:c.X1,y1:c.Y1}); }
+    for(const cb of CB){ const k=cb.n; const x0=cb.x0, y0=cb.y0, x1=cb.x1, y1=cb.y1, cx=(x0+x1)/2, cy=(y0+y1)/2, hw=(x1-x0)/2, hh=(y1-y0)/2, mg=Math.max(hw,hh)<40?130:Math.max(hw,hh)<90?80:40;
+      const inC=p=>{ const tx=p.x/M_T, ty=p.y/M_T; return tx>x0-mg&&tx<x1+mg&&ty>y0-mg&&ty<y1+mg; };
+      const tg=[[0,-.55],[.55,0],[0,.55],[-.55,0],[-.5,-.5],[.5,-.5],[.5,.5],[-.5,.5]].map(([a,b])=>[Math.round(cx+a*hw),Math.round(cy+b*hh)]); for(const [a,b] of [[0,-1.3],[1.3,0],[0,1.3],[-1.3,0],[1,-1],[1,1],[-1,1],[-1,-1]]) tg.push([Math.round(cx+a*hw),Math.round(cy+b*hh)]);
+      const far=(list,d)=>(x,y)=>x<x0-mg||x>x1+mg-20||y<y0-mg||y>y1+mg-16||list.some(p=>Math.hypot(p.x/M_T-x,p.y/M_T-y)<d);
+      const clrB=(x,y,w,h)=>{ const X0=x*TILE,Y0=y*TILE,X1=(x+w)*TILE,Y1=(y+h)*TILE; for(const o of objs){ if(o._dead||!(o.kind==='bldg'||o.kind==='lot'||o.kind==='awning')||o.w===undefined) continue; if(o.x<X1&&o.x+o.w>X0&&o.y<Y1&&o.y+o.h>Y0){ o._dead=1; if(o.kind!=='awning'){ const a=Math.floor(o.x/TILE),b=Math.floor(o.y/TILE); for(let j=b;j<b+Math.ceil(o.h/TILE);j++) for(let i=a;i<a+Math.ceil(o.w/TILE);i++) if(!world.reserved[idx(i,j)]&&(get(i,j)===T.BLDG||get(i,j)===T.LOT||get(i,j)===T.PLAZA)) set(i,j,T.PGRASS); } } } };
+      const spotB=(tx,ty,w,h,rej)=>{ const sp=findSpot(tx,ty,w,h,8,rej,true); if(sp){ clrB(sp[0]-1,sp[1]-sp[2],w+2,h+sp[2]); } return sp; };
+      const fs=()=>world.fuel.filter(inC), gs=()=>world.garages.filter(inC), MR=Math.round(Math.max(hw,hh)+mg), pr=()=>+(1.49+R()*0.25).toFixed(2);
+      const tryF=(nm,tx,ty,sep)=>{ for(const [w,h,b,f] of [[26,20,0,1],[26,20,1,.6],[18,12,1,.4]]){ const sp=findSpot(tx,ty,w,h,16,far(fs(),sep*f),!!b,MR); if(sp){ if(b) clrB(sp[0]-1,sp[1]-sp[2],w+2,h+sp[2]); (w===26?forecourt:fuelStation)(nm,sp[0],sp[1],sp[2],pr()); return true; } } return false; };
+      const tryG=(nm,tx,ty,sep)=>{ for(const [w,h,b,f] of (world.v2?[[22,16,0,1],[22,16,1,.6],[16,14,1,.4]]:[[22,14,0,1],[22,14,1,.6],[14,10,1,.3]])){ const sp=findSpot(tx,ty,w,h,16,far(gs(),sep*f),!!b,MR); if(sp){ if(b) clrB(sp[0]-1,sp[1]-sp[2],w+2,h+sp[2]); garage(nm,sp[0],sp[1],sp[2],w,h); return true; } } return false; };
+      const sep=Math.max(14,Math.min(hw,hh)*0.5);
+      for(let t=0;fs().length<4&&t<8;t++){ const [tx,ty]=tg[t]; if(!tryF(k+' '+Q[t%8]+(t>=8?' Road':'')+' Fuel',tx,ty,sep)) t+=0; }
+      for(let t=0;gs().length<4&&t<8;t++){ const [tx,ty]=tg[(t+2)%16]; tryG(k+' '+Q[(t+2)%8]+((t+2)%16>=8?' Road':'')+' Truck Repairs',tx,ty,sep); }
+      world.cityPOI[k]={fuel:fs().length,garages:gs().length}; }
+    console.log('[sites] per city fuel+garages',JSON.stringify(world.cityPOI)); }
 if(typeof buildCareerSites==='function') buildCareerSites({findSpot,access,clearObjs,region,R,objs,okT});
   // fill bays with parked trailers
   const types=['curtain','curtain','fridge','cont','flat','tank'];

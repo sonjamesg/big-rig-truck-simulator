@@ -7,7 +7,7 @@ function initAudio(){
   if(audio.ctx) { if(audio.ctx.state==='suspended') audio.ctx.resume(); return; }
   const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return;
   const ctx=new AC(); audio.ctx=ctx;
-  const master=ctx.createGain(); master.gain.value=0.7; master.connect(ctx.destination); audio.master=master;
+  const master=ctx.createGain(); master.gain.value=(typeof SETTINGS!=='undefined'?SETTINGS.vol:0.7); master.connect(ctx.destination); audio.master=master;
   // engine sample
   const eng=ctx.createGain(); eng.gain.value=0; const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=1800; eng.connect(lp); lp.connect(master); audio.eng=eng; audio.engLP=lp;
   // synth rumble layer (firing frequency of a 6-cylinder: rpm/20 Hz)
