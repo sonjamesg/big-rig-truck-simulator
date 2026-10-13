@@ -30,7 +30,7 @@ function bdPanel(){ let p=document.getElementById('bdPanel'); if(!p){ p=document
 // focus the first option so pad A / Enter / Space pick it straight away
 function bdFocus(){ setTimeout(()=>{ if(typeof padNav==='function') padNav(null); },0); }
 function updateBreakdown(dt){ if(!started) return; if(!BREAKDOWN.active&&truck.damage>=100) bdStart(); if(!BREAKDOWN.active) return; BREAKDOWN.t+=dt;
-  const f=fwd(truck.h); BREAKDOWN.smoke.x=(truck.x+f[0]*4.2)*PPM; BREAKDOWN.smoke.y=(truck.y+f[1]*4.2)*PPM; if(navigator.vibrate&&BREAKDOWN.t<0.05) try{ navigator.vibrate(200); }catch(e){} }
+  const f=fwd(truck.h); BREAKDOWN.smoke.x=(truck.x+f[0]*4.2)*PPM; BREAKDOWN.smoke.y=(truck.y+f[1]*4.2)*PPM; }
 function drawBreakdown(){ if(!BREAKDOWN.active||((timeS*1.6)%1)>0.55) return; const f=fwd(truck.h), r=[-f[1],f[0]]; ctx.save();
   const pts=[[5.2,1.15],[5.2,-1.15],[-1.4,1.2],[-1.4,-1.2]]; if(truck.trl){ const t=truck.trl, tf=fwd(t.th||0), tr=[-tf[1],tf[0]]; for(const s of [1,-1]){ const x=t.x-tf[0]*11.8+tr[0]*s*1.25, y=t.y-tf[1]*11.8+tr[1]*s*1.25; ctx.fillStyle='rgba(255,170,0,0.35)'; ctx.beginPath(); ctx.arc(x*PPM,y*PPM,9,0,7); ctx.fill(); ctx.fillStyle='#ffb000'; ctx.beginPath(); ctx.arc(x*PPM,y*PPM,3,0,7); ctx.fill(); } }
   for(const [a,b] of pts){ const x=(truck.x+f[0]*a+r[0]*b)*PPM, y=(truck.y+f[1]*a+r[1]*b)*PPM; ctx.fillStyle='rgba(255,170,0,0.35)'; ctx.beginPath(); ctx.arc(x,y,9,0,7); ctx.fill(); ctx.fillStyle='#ffb000'; ctx.beginPath(); ctx.arc(x,y,3,0,7); ctx.fill(); }
