@@ -7,8 +7,8 @@ function mpName(){ return (document.getElementById('lbName')||{}).value||localSt
 // [ 'p', id, t_ms, x, y, h, v, model, colour, flags, gid|0, trlType, trlCol, trlLogo, trlTh, kx, ky ]
 const R2=v=>Math.round(v*100)/100, R3=v=>Math.round(v*1000)/1000;
 function mpGid(tr){ if((!tr.gid||tr.gid.startsWith('me:'))) tr.gid=(MP.myId||'me')+':'+tr.id; return tr.gid; }
-function mpSelfPose(){ const s=truck, tr=s.trl; const ind=(input.left&&s.v>0.5)?1:(input.right&&s.v>0.5)?2:(input.padSteer<-0.5?1:input.padSteer>0.5?2:0);
-  const fl=((s.brake||0)>0.1?1:0)|(s.mode==='R'?2:0)|(ind<<2)|(input.hand?16:0); const P=['p',MP.myId,Math.round(performance.now()),R2(s.x),R2(s.y),R3(s.h),R2(s.v),career.cur,career.colors[career.cur]||'',fl];
+function mpSelfPose(){ const s=truck, tr=s.trl; const ind=IND.side;
+  const fl=((s.brake||0)>0.1?1:0)|(s.mode==='R'?2:0)|(ind<<2)|(input.hand?16:0)|(IND.haz?32:0); const P=['p',MP.myId,Math.round(performance.now()),R2(s.x),R2(s.y),R3(s.h),R2(s.v),career.cur,career.colors[career.cur]||'',fl];
   if(tr){ const k=kingpin(s); P.push(mpGid(tr),tr.type,tr.col||'',tr.logo||'',R3(tr.th),R2(k[0]),R2(k[1])); } else P.push(0); return P; }
 // ---------- network
 function mpSendAll(msg,except,pose){ const d=JSON.stringify(msg); for(const id in MP.conns){ if(id===except) continue; const c=(pose&&MP.pconns[id]&&MP.pconns[id].open)?MP.pconns[id]:MP.conns[id]; if(c&&c.open) try{ c.send(d); }catch(e){} } }
@@ -85,9 +85,9 @@ function mpCab(m,c){ const k=m+'|'+c; if(!mpArt[k]){ const a=modelArt(modelById(
 function mpTrl(tr){ const k=tr[1]+'|'+tr[2]+'|'+tr[3]; if(!mpArt[k]) mpArt[k]=tr[1]==='player'?{type:'player'}:{type:tr[1],art:trailerArt(TRAILER_TYPES[tr[1]]?tr[1]:'box',tr[2],tr[3])}; return mpArt[k]; }
 function drawRemotePlayers(vx0,vy0,vx1,vy1){ if(!MP.on) return; for(const id in MP.players){ const p=MP.players[id], r=p.cur; if(!p.has) continue; const X=r.x*PPM, Y=r.y*PPM; if(X<vx0-300||X>vx1+300||Y<vy0-300||Y>vy1+300) continue;
     const cab=mpCab(r.m,r.c); drawRig(cab.a,cab.sh,r.x,r.y,r.h,r.tr?mpTrl(r.tr):null,r.kx,r.ky,r.th,6);
-    const f=fwd(r.h), rt=rgt(r.h), fl=r.fl|0, br=fl&1, rv=fl&2, ind=(fl>>2)&3, hz=fl&16;
+    const f=fwd(r.h), rt=rgt(r.h), fl=r.fl|0, br=fl&1, rv=fl&2, ind=(fl>>2)&3, hz=fl&32;
     if(br||rv){ ctx.fillStyle=rv?'rgba(255,255,255,0.95)':'rgba(255,40,30,0.95)'; for(const sd of [-1,1]) ctx.fillRect((r.x-f[0]*1.3+rt[0]*sd*1.1)*PPM-2,(r.y-f[1]*1.3+rt[1]*sd*1.1)*PPM-2,4,4); }
-    if((ind||hz)&&(timeS*2.5)%1<0.5){ ctx.fillStyle='#ffb020'; for(const sd of (hz?[-1,1]:[ind===1?-1:1])) for(const fb of [5.0,-1.3]) ctx.fillRect((r.x+f[0]*fb+rt[0]*sd*1.2)*PPM-2.5,(r.y+f[1]*fb+rt[1]*sd*1.2)*PPM-2.5,5,5); }
+    if(ind||hz) indLampsAt(r.x,r.y,r.h,!!r.tr,r.kx,r.ky,r.th,ind,hz);
     ctx.font='bold 13px system-ui,sans-serif'; ctx.textAlign='center'; const w=ctx.measureText(p.n).width+14; ctx.fillStyle='rgba(8,12,20,0.75)'; ctx.beginPath(); ctx.roundRect(X-w/2,Y-62,w,20,10); ctx.fill(); ctx.fillStyle='#7fd8ff'; ctx.fillText(p.n,X,Y-48); } }
 function mpDrawMap(X,Y,labels){ if(!MP.on) return; ctx.save(); ctx.font='bold 10px system-ui,sans-serif'; ctx.textAlign='left';
   for(const id in MP.players){ const p=MP.players[id]; if(!p.has) continue; const r=p.cur; const x=X(r.x), y=Y(r.y); ctx.fillStyle='#29b6ff'; ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(x,y,4.5,0,7); ctx.fill(); ctx.stroke();

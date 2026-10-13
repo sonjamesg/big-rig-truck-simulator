@@ -47,7 +47,8 @@ function padUpdate(dt){
   if(!started) return;
   if(hit(12)&&MP.on) mpToggleList();
   if(hit(0)) toggleCouple(); if(hit(2)) toggleRefuel(); if(hit(3)) tryUnload();
-  if(hit(8)) openMap(); if(hit(9)) openBoard(); if(hit(5)&&NAV.route){ clearRoute(); flash('Route cancelled'); }
+  if(hit(14)) indToggle(1); if(hit(15)) indToggle(2); if((hit(4)&&now[5])||(hit(5)&&now[4])){ hazToggle(); input.horn=false; }
+  if(hit(8)) openMap(); if(hit(9)) openBoard(); if(hit(5)&&!now[4]&&NAV.route){ clearRoute(); flash('Route cancelled'); }
 }
 // ---- spatial focus navigation for the DOM panels
 function padFocusables(){ const root=document.querySelector('#bdPanel')||document.querySelector('#ui .mback, #ui .celebrate'); if(!root) return [];
@@ -59,7 +60,7 @@ function padNav(dir){ const els=padFocusables(); if(!els.length) return; let cur
     for(const e of els){ if(e===cur) continue; const q=e.getBoundingClientRect(), ex=q.left+q.width/2, ey=q.top+q.height/2, dx=ex-cx, dy=ey-cy;
       const along=dir==='r'?dx:dir==='l'?-dx:dir==='d'?dy:-dy, side=(dir==='r'||dir==='l')?Math.abs(dy):Math.abs(dx); if(along<=4) continue; const sc=along+side*2.2; if(sc<bs){ bs=sc; best=e; } }
     if(best) cur=best; }
-  for(const e of document.querySelectorAll('.padfocus')) e.classList.remove('padfocus'); pad.focus=cur; cur.classList.add('padfocus'); const gr=cur.closest('.grid,.tl'); if(gr){ const q=cur.getBoundingClientRect(), r2=gr.getBoundingClientRect(); if(q.top<r2.top) gr.scrollTop-=r2.top-q.top+8; else if(q.bottom>r2.bottom) gr.scrollTop+=q.bottom-r2.bottom+8; } }
+  for(const e of document.querySelectorAll('.padfocus')) e.classList.remove('padfocus'); pad.focus=cur; cur.classList.add('padfocus'); if(dir&&cur.classList.contains('ti')) cur.click(); const gr=cur.closest('.grid,.tl'); if(gr){ const q=cur.getBoundingClientRect(), r2=gr.getBoundingClientRect(); if(q.top<r2.top) gr.scrollTop-=r2.top-q.top+8; else if(q.bottom>r2.bottom) gr.scrollTop+=q.bottom-r2.bottom+8; } }
 // ---- glyphs: when the pad is the active device, key hints in canvas prompts become controller buttons
 function padGlyphs(t){ if(!pad.active||typeof t!=='string') return t;
   return t.replace(/Press F to/g,'Press '+GLYPH.X+' to').replace(/\(F to stop\)/g,'('+GLYPH.X+' to stop)').replace(/Press T to/g,'Press '+GLYPH.A+' to').replace(/\bT: (couple|uncouple)/g,GLYPH.A+': $1')

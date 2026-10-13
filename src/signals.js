@@ -56,7 +56,7 @@ function lightState(J,ns){ const S=sigOf(J); let best='r'; for(const m of S.mvs)
 function sigOncoming(v,J,oppKey){ for(const o of traffic.vs){ if(o===v) continue; for(const mk of o.mk){ if(mk.kind!=='light'||mk.J!==J||mk.key!==oppKey||mk.move==='R') continue; const front=o.s+o.L/2, gap=mk.d-front;
       if(gap<-(mk.dEnd-mk.d)-1) continue; if(gap<0) return true; if(gap<38&&o.v>1.5&&sigState(J,oppKey,mk.move)!=='r') return true; if(gap<3&&mk.go) return true; } }
   // the player coming the other way
-  const t=truck, cx=(J.x+J.w/2)*M_T, cy=(J.y+J.h/2)*M_T, d=Math.hypot(t.x-cx,t.y-cy); if(d<45&&Math.abs(t.v)>1){ const f=fwd(t.h), fv=fwd(v.h||0); if((cx-t.x)*f[0]+(cy-t.y)*f[1]>0&&f[0]*fv[0]+f[1]*fv[1]<-0.6) return true; }
+  const t=truck, cx=(J.x+J.w/2)*M_T, cy=(J.y+J.h/2)*M_T, d=Math.hypot(t.x-cx,t.y-cy); if(d<45&&Math.abs(t.v)>1&&!(typeof IND!=='undefined'&&IND.side===2)){ const f=fwd(t.h), fv=fwd(v.h||0); if((cx-t.x)*f[0]+(cy-t.y)*f[1]>0&&f[0]*fv[0]+f[1]*fv[1]<-0.6) return true; }
   return false; }
 // vehicles (AI or the player) already inside the junction on a crossing heading
 function jBusy(v,J){ const x0=J.x*M_T-1, y0=J.y*M_T-1, x1=(J.x+J.w)*M_T+1, y1=(J.y+J.h)*M_T+1, fv=fwd(v.h||0);

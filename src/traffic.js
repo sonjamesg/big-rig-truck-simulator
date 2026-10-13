@@ -411,6 +411,7 @@ function stepVeh(v,dt,pbs){
         if(!stop&&gap<3){ m.go=true; m.goT=timeS; if(traffic.goLog) traffic.goLog.push({J:m.J.id,key:m.key,mv:m.move,t:timeS,st:ls,veh:v.id}); } }
       else if(m.kind==='gw'){ if(gap<18){ if(!giveWayBusy(v,m.J)||v.stopT>10) { if(gap<2.5) m.go=true; } else stop=true; } }
       else { if(gap<14){ let busy=false; for(const o of traffic.vs){ if(o===v||o.ring!==m.rb) continue; const a=Math.atan2(o.y-m.rb.cy*M_T,o.x-m.rb.cx*M_T); const df=mod2pi(m.ang-a); if(df<1.5&&df>0.05){ busy=true; break; } }
+          if(!busy){ const t=truck, dr=Math.hypot(t.x-m.rb.cx*M_T,t.y-m.rb.cy*M_T); if(dr<(m.rb.rout+1)*M_T&&Math.abs(t.v)>0.8){ const a=Math.atan2(t.y-m.rb.cy*M_T,t.x-m.rb.cx*M_T), df=mod2pi(m.ang-a); if(df<1.6&&df>0.05) busy=true; } }
           if(!busy||v.stopT>5) m.go=true; else stop=true; } }
       if(stop) acc=Math.min(acc,idmAcc(v,v0,Math.max(0.1,gap),0));
     }
@@ -427,6 +428,7 @@ function stepVeh(v,dt,pbs){
       if(lgap<1e8) break; } }
   if(lgap<1e8) acc=Math.min(acc,idmAcc(v,v0,lgap,lvel));
   acc=Math.min(acc,idmAcc(v,v0,1e9,0));
+  if(typeof indYield==='function') acc=indYield(v,v0,acc);
   if(v.shakeT>0){ v.shakeT-=dt; v.v=0; acc=0; }
   acc=Math.max(-9,acc);
   const pv=v.v; v.v=Math.max(0,v.v+acc*dt); if(lgap<0.6) v.v=Math.min(v.v,0.2);
