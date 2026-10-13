@@ -58,11 +58,15 @@ function v2Graph(){ const E=[], CS=buildCities(), BLK=[], PARKS=[], STAD=[], JN=
   const FW=L.fwy.map(f=>[f,CRv(f.pts,0.5,!!f.closed)]);
   for(const [f,S] of FW) E.push({type:'hwy',w:6,pts:S,name:f.name,cls:'M'});
   const tmp=[]; for(const J of L.inter) interchange(J,FW,tmp); for(const o of tmp){ if(o.jn) JN.push(o.jn); else if(o.rb) RBS.push(o); else E.push(o); }
+  if(world.port&&!L._port){ L._port=1; const A=world.port.aisles; for(const a of A) L.roads.push({name:'Port Aisle',cls:'B',pts:[[466,a+2],[586,a+2]]}); L.roads.push({name:'Quay Road',cls:'B',pts:[[586,A[0]+2],[586,A[4]+2]]}); }
   for(const r of L.roads){ const S=CRv(r.pts,0.5); E.push({type:r.cls==='A'?'rural':r.cls==='B'?'rural':'dirt',w:r.cls==='D'?3:4,pts:S,name:r.name,cls:r.cls,dam:r.dam}); }
   CS.forEach((cc,ci)=>{ const big=cc.blob.map(p=>[cc.C.c[0]+(p[0]-cc.C.c[0])*1.05,cc.C.c[1]+(p[1]-cc.C.c[1])*1.05]);
     for(const [n,P,sty] of (cc.C.art||[])){ const S=CRv(P,0.5); let run=[]; const flush=()=>{ if(run.length>6) E.push({type:sty==='blvd'?'dual':'city',w:sty==='blvd'?6:4,pts:run,name:n,cls:'art'}); run=[]; }; for(const p of S){ if(inPoly(big,p[0],p[1])) run.push(p); else flush(); } flush(); }
     for(const p of (cc.C.parks||[])) PARKS.push(p); if(cc.C.stadium) STAD.push(cc.C.stadium);
     cc.ds.forEach(D=>district(D,ci,E,BLK)); });
+  if(world.port){ const P=world.port, inP=q=>q[0]>P.x0-1&&q[0]<P.edge+2&&q[1]>P.y0-1&&q[1]<P.y1+1, keep=[]; // v14: the container terminal owns its rectangle (only port aisles inside)
+    for(const e of E){ if(e.name==='Port Aisle'||e.name==='Quay Road'||e.type==='hwy'){ keep.push(e); continue; } let run=[]; const fl=()=>{ if(run.length>1) keep.push(Object.assign({},e,{pts:run})); run=[]; }; for(const q of e.pts){ if(inP(q)) fl(); else run.push(q); } fl(); }
+    E.length=0; for(const e of keep) E.push(e); for(let i=BLK.length-1;i>=0;i--){ const q=BLK[i].q; if(q.some(inP)) BLK.splice(i,1); } }
   return {E,CS,BLK,PARKS,STAD,JN,RBS}; }
 function runsIn(P,pts){ const out=[]; let run=[]; for(const p of pts){ if(inPoly(P,p[0],p[1])) run.push(p); else { if(run.length>1) out.push(run); run=[]; } } if(run.length>1) out.push(run); return out; }
 function district(D,ci,E,BLK){ const P=D.poly,o=D.seed,a=D.ang; let mnx=1e9,mny=1e9,mxx=-1e9,mxy=-1e9; for(const p of P){ const q=R2([p[0]-o[0],p[1]-o[1]],[0,0],-a); mnx=Math.min(mnx,q[0]); mxx=Math.max(mxx,q[0]); mny=Math.min(mny,q[1]); mxy=Math.max(mxy,q[1]); }
@@ -142,6 +146,11 @@ function v2Apply(objs,Rnd){ const t0=performance.now(); const water=world.water;
     for(let ty=Math.floor(y-Math.max(rx,ry));ty<=y+Math.max(rx,ry);ty++) for(let tx=Math.floor(x-Math.max(rx,ry));tx<=x+Math.max(rx,ry);tx++){ if(!inb(tx,ty)) continue; const i=idx(tx,ty); if(G[i]===T.ROAD||G[i]===T.BRIDGE) continue; if(inPoly(P,tx+0.5,ty+0.5)){ if(objs.length&&G[i]===T.BLDG) continue; G[i]=T.PGRASS; if(vrnd(tx,ty,9)<0.05) objs.push({kind:'tree',x:tx*TILE,y:ty*TILE,r:10+vrnd(ty,tx,4)*7,seed:(tx*7919+ty)|0}); } } }
   // 4. landmarks: airports + docks surfaces
   for(const lm of L.landmarks){ const P=lm.poly; for(let y=P[0][1];y<P[2][1];y++) for(let x=P[0][0];x<P[1][0];x++){ if(!inb(x,y)) continue; const i=idx(x,y); if(water[i]||G[i]===T.ROAD||G[i]===T.BRIDGE) continue; G[i]=lm.kind==='docks'?T.QUAY:T.CONC; }
+    if(lm.kind==='docks'&&world.port&&lm.name==='Albion Docks'){ const P=world.port, H=P.hole, cols=['#c0392b','#2e86c1','#e67e22','#27ae60','#8e44ad','#d4ac0d','#7f8c8d','#16a085'];
+      for(let k=objs.length-1;k>=0;k--){ const o=objs[k]; if(o.kind==='cont'&&o.x/TILE>=P.x0-1&&o.x/TILE<=P.edge&&o.y/TILE>=P.y0-1&&o.y/TILE<=P.y1) objs.splice(k,1); }
+      const free=(x,y,w,h)=>{ for(let q=y-1;q<y+h+1;q++) for(let k=x-1;k<x+w+1;k++) if(G[idx(k,q)]!==T.QUAY) return false; return true; };
+      for(let y=P.y0+2;y+2<=P.y1-2;y+=3) for(let x=P.x0+4;x+6<=580;x+=8){ if(x+6>H.x-2&&x<H.x+H.w+2&&y+2>H.y-5&&y<H.y+H.h+1) continue; if(!free(x,y,6,2)) continue; for(let q=y;q<y+2;q++) for(let k=x;k<x+6;k++) G[idx(k,q)]=T.CONT;
+        objs.push({kind:'cont',x:x*TILE,y:y*TILE,w:6*TILE,h:2*TILE,c1:cols[(vrnd(x,y,41)*8)|0],c2:cols[(vrnd(x,y,42)*8)|0],c3:cols[(vrnd(x,y,43)*8)|0],seed:(x*131+y)|0}); } }
     if(lm.kind==='airport') for(const r of lm.rw) objs.push({kind:'runway',x:r[0]*TILE,y:r[1]*TILE,w:(r[2]-r[0])*TILE,h:(r[3]-r[1])*TILE,v2:true}); }
   // scenery cleanup: no legacy trees on roads / in the cities (parks re-plant their own)
   { const inCity=new Uint8Array(MW*MH); for(const cc of g.CS){ const B=cc.blob; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(const p of B){ x0=Math.min(x0,p[0]); y0=Math.min(y0,p[1]); x1=Math.max(x1,p[0]); y1=Math.max(y1,p[1]); }

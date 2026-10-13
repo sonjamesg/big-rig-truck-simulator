@@ -7,7 +7,7 @@ function GRD(name,ox,oy,ang,xs,ys,o){ o=o||{}; L.grids.push({name,ox,oy,ang,xs,y
 GRD('Albion Downtown',192,168,0,[0,17,33,50,64,80,97,113,128,146],[0,15,32,47,63,80,95,111,128,144,160],{land:{'2,3':'park','3,3':'park','6,6':'stadium','1,1':'hq','0,6':'hospital','4,8':'mall','7,1':'civic','8,4':'plaza'}});
 GRD('Quayside',372,186,0.33,[0,18,34,52,70],[0,16,30,46,64,80,98,116],{kind:'ind',land:{'1,3':'depot','2,6':'super'}});
 GRD('Westgate',178,352,-0.22,[0,16,34,50,68,86,104],[0,16,30,46,62,78],{kind:'res',land:{'2,2':'park','4,3':'fuel'}});
-L.landmarks.push({kind:'docks',name:'Albion Docks',poly:[[474,145],[720,145],[720,455],[474,455]]});
+L.landmarks.push({kind:'docks',name:'Albion Docks',poly:[[474,262],[600,262],[600,414],[474,414]]});
 L.landmarks.push({kind:'airport',name:'Albion Airport',poly:[[165,478],[640,478],[640,655],[165,655]],rw:[[190,500,590,512],[230,606,600,618]],term:[300,540,380,560]});
 // ---------------- SANDVALE (NE) ----------------
 GRD('Sandvale Downtown',1478,182,0,[0,16,31,48,62,79,95,110,128,144,160],[0,17,33,48,66,82,98,115,132],{land:{'3,2':'park','4,2':'park','7,5':'stadium','1,6':'mall','8,1':'civic','5,4':'plaza','9,7':'hospital'}});
@@ -62,11 +62,11 @@ R('Quarry Track','D',[[1060,500],[1100,560],[1160,600]]);
 R('Fen Forest Track','D',[[1700,1260],[1760,1230],[1800,1180]]);
 R('Moor Forest Track','D',[[700,1420],[760,1500],[820,1560],[880,1600]]);
 // ---------------- rail (red) ----------------
-L.rail.push({name:'Albion–Kingsbridge Line',pts:[[520,200],[480,420],[360,700],[320,900],[420,1080],[700,1110],[1000,1130],[1180,1280],[1300,1460],[1420,1560],[1560,1700]]});
+L.rail.push({name:'Albion–Kingsbridge Line',pts:[[440,200],[452,430],[360,700],[320,900],[420,1080],[700,1110],[1000,1130],[1180,1280],[1300,1460],[1420,1560],[1560,1700]]});
 L.rail.push({name:'Northern Line',pts:[[1000,1130],[1090,980],[1200,860],[1320,760],[1500,640],[1560,500],[1600,330]]});
 // ---------------- POIs (trucking) ----------------
 const P=(kind,name,x,y)=>L.poi.push({kind,name,x,y});
-P('depot','Big Rig Haulage HQ',230,190); P('depot','Albion Docks Terminal',600,300); P('depot','Albion Air Cargo',420,640); P('depot','Quayside Freight',430,290); P('depot','Millford Agri Depot',300,830);
+P('depot','Big Rig Haulage HQ',230,190); P('depot','Albion Air Cargo',420,640); P('depot','Quayside Freight',430,290); P('depot','Millford Agri Depot',300,830);
 P('depot','Ashby Timber Yard',268,1120); P('depot','Dustwater Mining Co',1030,470); P('depot','Sandvale Air Cargo',1350,330); P('depot','Sandvale East Freight',1790,540); P('depot','Coppermine Smelter',1620,630);
 P('depot','Redhill Distribution',1020,1220); P('depot','Fenwick Cold Store',1530,1150); P('depot','Kingsbridge Container Port',1560,1800); P('depot','Harbourside Logistics',1700,1800); P('depot','Kingsbridge Field Cargo',1240,1830); P('depot','Quarry',1160,600);
 P('mall','Albion Central Mall',260,300); P('mall','Sandvale Galleria',1500,300); P('mall','Kingsbridge Shopping Centre',1490,1470); P('mall','Moor Cross Retail Park',940,1100);
