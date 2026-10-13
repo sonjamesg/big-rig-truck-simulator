@@ -1293,6 +1293,7 @@ function stepTruck(s,inp,dt){ if(typeof FX!=='undefined'&&FX.boom){ s.v=0; s.thr
   if(Math.abs(nv)<0.05 && s.throttle<0.05) nv=0;
   if(Math.sign(nv)!==Math.sign(s.v) && s.v!==0 && !(s.mode==='R'&&nv<0) && !(s.mode==='D'&&nv>0)) nv=0;
   if(s.offroad && Math.abs(nv)>8) nv*=0.995;
+  if(s.jkLimit && Math.abs(nv)>1.2) nv*=1-0.6*dt;   // scrub at jackknife limit, never below walking pace
   s.v=nv;
   // ----- steering with inertia and self-centring
   const vabs=Math.abs(s.v), maxSteer=(solo?0.7:0.62)/(1+vabs*vabs/(solo?140:90)); const SR=solo?1.6:1;
@@ -1311,8 +1312,10 @@ function stepTruck(s,inp,dt){ if(typeof FX!=='undefined'&&FX.boom){ s.v=0; s.thr
   const d=(k1[0]-k0[0])*ft[0]+(k1[1]-k0[1])*ft[1]; ax+=ft[0]*d; ay+=ft[1]*d;      // axle moves only along trailer heading
   s.th=Math.atan2(k1[0]-ax,-(k1[1]-ay));
   if(s.skid){ const sv=Math.min(1,Math.abs(s.v)/20); s.th+=(Math.sin(timeS*4.3)*0.16+Math.sin(timeS*1.7)*0.08)*sv*dt; }
-  let rel=Math.atan2(Math.sin(s.h-s.th),Math.cos(s.h-s.th)); const JK=1.35;
-  if(Math.abs(rel)>JK){ s.th=s.h-Math.sign(rel)*JK; if(s.v<0) s.v*=0.5; }
+  // max articulation ~87 deg: at the limit the cab pushes the trailer round (angle held) instead of freezing.
+  // (old code halved reverse speed every frame here, which stalled the rig on full-lock reversing)
+  let rel=Math.atan2(Math.sin(s.h-s.th),Math.cos(s.h-s.th)); const JK=1.52;
+  if(Math.abs(rel)>JK){ s.th=s.h-Math.sign(rel)*JK; s.jkLimit=true; } else s.jkLimit=false;
   }
   // ----- collisions
   const hit=hitTest(s)||(typeof trafficHitTruck==='function'&&trafficHitTruck(s)?'veh':null)||(typeof railBarrierHit==='function'&&railBarrierHit(s,prev)?'barrier':null);
