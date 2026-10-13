@@ -19,7 +19,7 @@ AUDIT=r"""(()=>{ const R=__bigrig.RAIL, W=__bigrig.world, L=R.L, fail=[], H=R.ha
   for(const st of R.stations){ const plat=st.kind==='hub'?[[3.6,7.5],[12.7,16.6]]:[[3.6,7.4]];
     for(let s=st.s-st.len/2;s<=st.s+st.len/2;s+=2){ const i0=((Math.round(s)%L)+L)%L; for(const [a,b] of plat) for(let w=a;w<=b;w+=1){ const x=R.X[i0]+R.NX[i0]*w, y=R.Y[i0]+R.NY[i0]*w, tx=Math.floor(x/M_T), ty=Math.floor(y/M_T), i=ty*MW+tx;
       if(H&&H[i]) hit('bldg',x,y,s,'plat:'+st.name); else if(inFP(tx,ty)) hit('func',x,y,s,'plat:'+st.name); if(RD(G[i])||G[i]===T.WATER) hit('road',x,y,s,'plat:'+st.name); } }
-    let near=1e9; const cx=Math.floor(R.X[st.s]/M_T), cy=Math.floor(R.Y[st.s]/M_T); const RW=st.kind==='hub'?35:20; for(let dy=-RW;dy<=RW;dy++) for(let dx=-RW;dx<=RW;dx++){ const g=get(cx+dx,cy+dy); if(g===T.ROAD) near=Math.min(near,Math.hypot(dx,dy)*M_T); }
+    let near=1e9; const RW=st.kind==='hub'?35:20; for(let q=-st.len/2;q<=st.len/2;q+=20){ const i1=((Math.round(st.s+q)%L)+L)%L, cx=Math.floor(R.X[i1]/M_T), cy=Math.floor(R.Y[i1]/M_T); for(let dy=-RW;dy<=RW;dy++) for(let dx=-RW;dx<=RW;dx++){ const g=get(cx+dx,cy+dy); if(g===T.ROAD) near=Math.min(near,Math.hypot(dx,dy)*M_T); } }   // nearest road to any point of the platform (station access)
     if(near>(st.kind==='hub'?140:100)) fail.push('station far from road '+st.name+' '+Math.round(near)); }
   for(const k in bad) if(bad[k]) fail.push(k+' overlaps: '+bad[k]);
   // crossings are near-square: road axis by PCA of road tiles around the crossing vs track tangent

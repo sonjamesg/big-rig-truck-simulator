@@ -195,6 +195,19 @@ function railRoute(objs){ const t0=performance.now(), N=MW*MH;
   for(let i=0;i<nV;i++){ const a=V[i], b=V[(i+1)%nV], L=Math.hypot(b[0]-a[0],b[1]-a[1]); let f0=L, f1=L;
     for(let s2=0;s2<=L;s2+=1){ const x=a[0]+(b[0]-a[0])*s2/L, y=a[1]+(b[1]-a[1])*s2/L, ti=Math.floor(y/M_T)*MW+Math.floor(x/M_T); if(dR.D[ti]*M_T<9||dW.D[ti]*M_T<3){ f0=Math.min(f0,s2); f1=Math.min(f1,L-s2); } }
     fr0[i]=f0>=L?L:Math.max(0,f0-10); fr1[i]=f1>=L?L:Math.max(0,f1-10); }
+  // station reservations: keep (platform/2 + 35 m) of straight either side of every station point lying on a segment
+  { const SP=tgt.map(t=>({p:P(t.c),h:(t.kind==='hub'?HUB_HALF*2:t.kind==='city'?200:t.kind==='town'?160:120)/2+35}));
+    const seg=i=>{ const a=V[i], b=V[(i+1)%nV], L=Math.hypot(b[0]-a[0],b[1]-a[1]); return {a,L,ux:(b[0]-a[0])/L,uy:(b[1]-a[1])/L}; };
+    const HINT2={'Sound Coast':[840,330],'Albion Central':[110,540]};
+    const RO=new Uint8Array(MW*MH); for(let i=0;i<MW*MH;i++) if(G[i]===T.ROAD) RO[i]=1; const dRO=rlDT(RO);
+    RAIL.route.resv=[]; SP.forEach((q,k)=>{ if(!({'Coppermine':1,'Greyfell Sands':1,'Albion Central':1})[RAIL_ST[k][0]]) return; const r=RAIL_ST[k], O=(HINT2[r[0]]||[r[1],r[2]]).map(v=>v*M_T); let best=null, bd=1e18;
+      const MG=r[0]==='Coppermine'?0:r[0]==='Sandvale Parkway'?25:45; for(let i=0;i<nV;i++){ const S=seg(i); if(S.L<2*q.h+2*MG) continue;
+        for(let t=q.h+MG;t<=S.L-q.h-MG;t+=8){ const cx=S.a[0]+S.ux*t, cy=S.a[1]+S.uy*t, d=Math.hypot(cx-O[0],cy-O[1]); if(d>=bd) continue;
+          let ok=true, near=1e9; for(let u=-q.h+20;u<=q.h-20;u+=4){ const x=cx+S.ux*u, y=cy+S.uy*u, ti=Math.floor(y/M_T)*MW+Math.floor(x/M_T), dr=dR.D[ti]*M_T; if(dr<11||dW.D[ti]*M_T<6||dH.D[ti]*M_T<7){ ok=false; break; } near=Math.min(near,dRO.D[ti]*M_T); }
+          if(ok&&near<70){ bd=d; best=[i,t]; } } }
+      if(!best){ RAIL.route.resv.push([r[0],'none']); return; }
+      const [bi,t0]=best, S=seg(bi); fr0[bi]=Math.min(fr0[bi],Math.max(0,t0-q.h)); fr1[bi]=Math.min(fr1[bi],Math.max(0,S.L-t0-q.h));
+      RAIL.route.resv.push([r[0],Math.round(bd)]); RAIL.route.stations[k]=[r[0],(S.a[0]+S.ux*t0)/M_T,(S.a[1]+S.uy*t0)/M_T]; (RAIL.route.resOK=RAIL.route.resOK||{})[r[0]]=1; }); }
   for(let i=0;i<nV;i++){ const G_=geo(i), a=(i-1+nV)%nV; [Rv[i],tl[i]]=fit(i,Math.min(G_.lu*0.5,fr1[a]),Math.min(G_.lv*0.5,fr0[i])); }
   for(let pass=0;pass<3;pass++) for(let i=0;i<nV;i++){ const G_=geo(i), a=(i-1+nV)%nV, b=(i+1)%nV; const [r,t]=fit(i,Math.min(G_.lu-tl[a]-1,fr1[a]),Math.min(G_.lv-tl[b]-1,fr0[i])); if(r>Rv[i]){ Rv[i]=r; tl[i]=t; } }
   for(let i=0;i<nV;i++){ const G_=geo(i); if(tl[i]>0) for(const p of arcPts(G_,Rv[i])) raw.push(p); else raw.push(G_.b);
@@ -221,12 +234,13 @@ function railBuild(objs){
   // stations
   const STT=RAIL.route&&RAIL.route.stations?RAIL_ST.map((r,i)=>[r[0],RAIL.route.stations[i][1],RAIL.route.stations[i][2],r[3]]):RAIL_ST;
   for(const [name,tx,ty,kind] of STT){ let best=0,bd=1e18; for(let s=0;s<L;s++){ const d=(X[s]-tx*M_T)**2+(Y[s]-ty*M_T)**2; if(d<bd){ bd=d; best=s; } }
-    const len=kind==='hub'?HUB_HALF*2:kind==='city'?200:kind==='town'?160:120; RAIL.stations.push({name,kind,s:best,len,dwell:kind==='hub'?40:kind==='city'?30:20+Math.round(rlHash(best)*8)}); }
+    const len=kind==='hub'?HUB_HALF*2:kind==='city'?200:kind==='town'?160:120; RAIL.stations.push({name,kind,s:best,s0:best,res:!!(RAIL.route&&RAIL.route.resOK&&RAIL.route.resOK[name]),len,dwell:kind==='hub'?40:kind==='city'?30:20+Math.round(rlHash(best)*8)}); }
   // keep every platform on dry land (no water/bridge/road under it) with a road within reach; slide along the track to the nearest such spot
   { const wet=(i,w,rd)=>{ const tx=Math.floor((X[i]+NX[i]*w)/M_T), ty=Math.floor((Y[i]+NY[i]*w)/M_T), g=get(tx,ty); return g===T.WATER||g===T.BRIDGE||rd&&g===T.ROAD; };
     const dry=(c,st)=>{ const h=st.len/2+6; for(let s=c-h;s<=c+h;s+=2){ const i=rlMod(Math.round(s),L); for(let w=-12;w<=12;w+=2) if(wet(i,w,0)) return false; } return true; };
     const okAt=(c,st)=>{ const h=st.len/2+12, hub=st.kind==='hub'; for(let s=c-h;s<=c+h;s+=2){ const i=rlMod(Math.round(s),L); for(let w=hub?-14:-3;w<=(hub?19:7.5);w+=1.5) if(wet(i,w,1)) return false; }
       for(const o of RAIL.stations) if(o!==st&&o._ok&&Math.abs(rlMod(o.s-c+L/2,L)-L/2)<(o.len+st.len)/2+150) return false;
+      if(st.res&&Math.abs(rlMod(c-st.s0+L/2,L)-L/2)<=30) return true;   // router-reserved straight, road-adjacent spot
       const tx=Math.floor(X[c]/M_T), ty=Math.floor(Y[c]/M_T), R=Math.ceil((st.kind==='hub'?130:70)/M_T); for(let dy=-R;dy<=R;dy++) for(let dx=-R;dx<=R;dx++){ const g=get(tx+dx,ty+dy); if(g===T.ROAD) return true; } return false; };
     const straight=(c,st)=>{ const h=st.len/2+30, m2=rlMod(Math.round(c),L); for(let q=-h;q<=h;q+=8){ const a=rlMod(Math.round(c+q),L); if(NX[a]*NX[m2]+NY[a]*NY[m2]<0.9992) return false; } return true; };
     for(const st of RAIL.stations){ if(st.kind!=='hub'&&okAt(st.s,st)&&!straight(st.s,st)){ for(let d=4;d<=600;d+=4){ let hit=-1; for(const c of [st.s+d,st.s-d]){ const cc=rlMod(c,L); if(okAt(cc,st)&&straight(cc,st)){ hit=cc; break; } } if(hit>=0){ RAIL.moved=(RAIL.moved||[]).concat([[st.name+' (straight)',d]]); st.s=hit; break; } } } }
