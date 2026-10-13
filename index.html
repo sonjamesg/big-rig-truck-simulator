@@ -2924,9 +2924,12 @@ const isRoadT=i=>{ const t=G[i]; return (t===T.ROAD||t===T.BRIDGE) && !(world.ro
 function navSnap(tx,ty,rmax){ tx=Math.round(tx); ty=Math.round(ty); for(let r=0;r<=(rmax||60);r++) for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){ if(Math.max(Math.abs(dx),Math.abs(dy))!==r) continue; const x=tx+dx,y=ty+dy; if(inb(x,y)&&isRoadT(idx(x,y))) return [x,y]; } return null; }
 // v14: snap the route start to the road the truck is actually on (never a nearby motorway / overpass it isn't using)
 function navSnapTruck(){ const t=truck, f=fwd(t.h); for(const d of [0,2,-2,4]){ const x=Math.floor((t.x+f[0]*d)/M_T), y=Math.floor((t.y+f[1]*d)/M_T); if(inb(x,y)&&isRoadT(idx(x,y))) return [x,y]; }
-  const tx=t.x/M_T, ty=t.y/M_T, onH=(()=>{ const i=idx(Math.floor(tx),Math.floor(ty)); const ti=navTileInfo(i); return ti&&ti[0]==='hwy'; })(); let best=null,bs=1e9,found=-1;
-  for(let r=1;r<=40;r++){ if(found>=0&&r>found+6) break; for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){ if(Math.max(Math.abs(dx),Math.abs(dy))!==r) continue; const x=Math.floor(tx)+dx,y=Math.floor(ty)+dy; if(!inb(x,y)) continue; const i=idx(x,y); if(!isRoadT(i)) continue; if(found<0) found=r;
-    const ti=navTileInfo(i), hw=ti&&(ti[0]==='hwy'||ti[0]==='ramp'), dd=Math.hypot(dx,dy), fw=(dx*f[0]+dy*f[1])/(dd||1); const sc=dd+(hw&&!onH?30:0)+(G[i]===T.BRIDGE?8:0)-fw*1.5; if(sc<bs){ bs=sc; best=[x,y]; } } }
+  // v15: breadth-first over drivable ground (no water/buildings/containers) to the nearest road tile the truck can actually reach
+  const sx=Math.floor(t.x/M_T), sy=Math.floor(t.y/M_T); if(!inb(sx,sy)) return null; const seen=new Map(), q=[[sx,sy,0]]; seen.set(sx*65536+sy,1); let best=null,bs=1e9;
+  for(let h=0;h<q.length&&h<20000;h++){ const [x,y,d]=q[h]; if(best&&d>bs+3) break;
+    for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){ const nx=x+dx, ny=y+dy, k=nx*65536+ny; if(!inb(nx,ny)||seen.has(k)) continue; seen.set(k,1); const i=idx(nx,ny);
+      if(isRoadT(i)){ const ti=navTileInfo(i), hw=ti&&(ti[0]==='hwy'||ti[0]==='ramp'), fw=(dx*f[0]+dy*f[1]); const sc=d+1+(hw?30:0)+(G[i]===T.BRIDGE?8:0)-fw*0.5; if(sc<bs){ bs=sc; best=[nx,ny]; } continue; }
+      if(SOLID[G[i]]||d>40) continue; q.push([nx,ny,d+1]); } }
   return best; }
 function navAStar(sx,sy,gx,gy){
   const N=MW*MH; if(!navG){ navG=new Float32Array(N); navStamp=new Int32Array(N); navFrom=new Int32Array(N); navClosed=new Int32Array(N); }
@@ -2963,7 +2966,7 @@ function setRoute(target){
   const tgt={x:tx*M_T,y:ty*M_T,name,ref:target};
   const st=navSnapTruck(), en=navSnap(tx,ty,70);
   if(!st||!en){ NAV.fail=!st?'snapStart':'snapEnd'; flash('Sat nav: no road route found'); return null; }
-  const t0=performance.now(); const p=navAStar(st[0],st[1],en[0],en[1]); if(!p){ NAV.fail='astar'; flash('Sat nav: no road route found'); NAV.route=null; return null; }
+  const t0=performance.now(); const p=navAStar(st[0],st[1],en[0],en[1]); if(!p){ NAV.fail='astar'; flash('Sat nav: no road route found'); return null; }
   NAV.route=navBuild(p,tgt); NAV.route.ms=performance.now()-t0; NAV.offT=0; NAV.lastCalc=timeS;
   BigRig.emit('route',{target:tgt,length:NAV.route.len,ms:NAV.route.ms}); return NAV.route; }
 function clearRoute(){ NAV.route=null; }
@@ -2981,7 +2984,7 @@ function navRaw(R,k){ const n=R.P.length, a=R.P[Math.max(0,k-2)], b=R.P[Math.min
 function navOff(R,k){ if(!R.off){ R.off=new Float32Array(R.P.length).fill(NaN); } if(isNaN(R.off[k])){ let s=0,c=0; for(let q=k-4;q<=k+4;q++){ if(q<0||q>=R.P.length) continue; if(!R.raw) R.raw=new Float32Array(R.P.length).fill(NaN); if(isNaN(R.raw[q])) R.raw[q]=navRaw(R,q); s+=R.raw[q]; c++; } R.off[k]=s/c; }
   const n=R.P.length, a=R.P[Math.max(0,k-2)], b=R.P[Math.min(n-1,k+2)], l=Math.hypot(b[0]-a[0],b[1]-a[1])||1, o=R.off[k]; return [R.P[k][0]+(b[1]-a[1])/l*o, R.P[k][1]-(b[0]-a[0])/l*o]; }
 function navLine(px,py,w,col){ const R=NAV.route; if(!R) return; ctx.save(); ctx.lineJoin='round'; ctx.lineCap='round'; ctx.strokeStyle='rgba(0,0,0,0.55)'; ctx.lineWidth=w+3; ctx.beginPath();
-  ctx.moveTo(px(truck.x),py(truck.y)); for(let k=R.idx;k<R.P.length;k+=2){ const Q=(k-R.idx<400)?navOff(R,k):R.P[k]; ctx.lineTo(px(Q[0]),py(Q[1])); } const e=R.P[R.P.length-1]; ctx.lineTo(px(e[0]),py(e[1])); ctx.stroke(); ctx.strokeStyle=col; ctx.lineWidth=w; ctx.stroke();
+  { const S=R.P[Math.min(R.idx,R.P.length-1)]; if(Math.hypot(S[0]-truck.x,S[1]-truck.y)<=15) ctx.moveTo(px(truck.x),py(truck.y)); else ctx.moveTo(px(S[0]),py(S[1])); } for(let k=R.idx;k<R.P.length;k+=2){ const Q=(k-R.idx<400)?navOff(R,k):R.P[k]; ctx.lineTo(px(Q[0]),py(Q[1])); } const e=R.P[R.P.length-1]; ctx.lineTo(px(e[0]),py(e[1])); ctx.stroke(); ctx.strokeStyle=col; ctx.lineWidth=w; ctx.stroke();
   ctx.fillStyle='#ff3df0'; ctx.strokeStyle='#000'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(px(R.target.x),py(R.target.y),6,0,7); ctx.fill(); ctx.stroke(); ctx.restore(); }
 function drawNavWorld(){ const R=NAV.route; if(!R) return; const end=Math.min(R.P.length-5,R.idx+100);
   for(let k=R.idx+3;k<end;k+=5){ const p=navOff(R,k), q=navOff(R,k+3); const h=Math.atan2(q[0]-p[0],-(q[1]-p[1])); const a=0.55*Math.min(1,(k-R.idx)/10);
