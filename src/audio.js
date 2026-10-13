@@ -42,3 +42,22 @@ function updateAudio(s,inp,time){
   audio.horn.gain.setTargetAtTime(inp.horn?0.22:0,t,0.02);
   audio.beep.gain.setTargetAtTime(s.mode==='R' && (time%1)<0.5 ? 0.09:0,t,0.005);
 }
+// ---- v22: tyre screech, area ambience (city hum / birds / gulls / wind), volume control ----
+function audioLoop(freq,q,type){ const ctx=audio.ctx, s=ctx.createBufferSource(); s.buffer=audio.noise; s.loop=true; const f=ctx.createBiquadFilter(); f.type=type||'bandpass'; f.frequency.value=freq; f.Q.value=q; const g=ctx.createGain(); g.gain.value=0; s.connect(f); f.connect(g); g.connect(audio.master); s.start(); return {g,f}; }
+function chirp(f0,f1,dur,gain,type){ const ctx=audio.ctx; if(!ctx) return; const t=ctx.currentTime, o=ctx.createOscillator(), g=ctx.createGain(); o.type=type||'sine'; o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(f1,t+dur); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(gain,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); o.connect(g); g.connect(audio.master); o.start(t); o.stop(t+dur+0.05); }
+const AMB={t:0,city:0,green:0,water:0,birdT:0};
+function updateAudioExtra(s,dt){ const ctx=audio.ctx; if(!ctx||!audio.noise) return; const t=ctx.currentTime;
+  if(!audio.scr){ audio.scr=audioLoop(2600,4); audio.hum=audioLoop(260,0.6,'lowpass'); audio.wind=audioLoop(700,0.4,'bandpass'); }
+  const slip=s.skid?1:Math.min(1,Math.max(0,(Math.abs(s.v)-12)/10)*Math.max(0,Math.abs(s.steer||0)-0.55)*3);
+  audio.scr.g.gain.setTargetAtTime(slip*0.22,t,0.05); audio.scr.f.frequency.setTargetAtTime(2200+Math.abs(s.v)*25,t,0.1);
+  AMB.t-=dt; if(AMB.t<=0){ AMB.t=1; const cx=Math.floor(s.x/M_T), cy=Math.floor(s.y/M_T); let b=0,gr=0,w=0,n=0; for(let dy=-24;dy<=24;dy+=4) for(let dx=-24;dx<=24;dx+=4){ const tt=get(cx+dx,cy+dy); n++; if(tt===T.BLDG||tt===T.PLAZA) b++; else if(tt===T.GRASS||tt===T.PGRASS||tt===T.PARK||tt===T.TREE) gr++; else if(tt===T.WATER) w++; } AMB.city=b/n; AMB.green=gr/n; AMB.water=w/n; }
+  const night=(typeof DN!=='undefined')?DN.dark:0;
+  audio.hum.g.gain.setTargetAtTime(Math.min(0.09,AMB.city*0.18)*(1-night*0.5),t,0.5);
+  audio.wind.g.gain.setTargetAtTime(0.012+0.03*Math.max(0,AMB.green-0.5)+Math.min(0.05,Math.abs(s.v)*0.0015),t,0.5);
+  AMB.birdT-=dt; if(AMB.birdT<=0){ AMB.birdT=0.6+Math.random()*2.5;
+    if(AMB.water>0.25&&Math.random()<0.6) { chirp(1400,700,0.35,0.03,'triangle'); setTimeout(()=>chirp(1300,650,0.3,0.025,'triangle'),380); }   // gulls
+    else if(AMB.green>0.3&&night<0.5&&Math.random()<0.8){ const f=2800+Math.random()*1800; chirp(f,f*1.25,0.07,0.02); setTimeout(()=>chirp(f*1.1,f*0.9,0.06,0.018),110); }   // songbirds
+    else if(night>0.6&&AMB.green>0.3&&Math.random()<0.3) chirp(4200,4300,0.05,0.008); } }   // crickets
+function setVolume(v){ SETTINGS.vol=Math.max(0,Math.min(1,v)); if(audio.master) audio.master.gain.setTargetAtTime(SETTINGS.vol,audio.ctx.currentTime,0.03); const el=document.getElementById('vol'); if(el) el.value=Math.round(SETTINGS.vol*100); try{ saveGame(); }catch(e){} }
+addEventListener('keydown',e=>{ if(e.target&&e.target.tagName==='INPUT') return; if(e.key==='-'||e.key==='='||e.key==='+'){ setVolume((SETTINGS.vol||0)+(e.key==='-'?-0.1:0.1)); if(typeof flash==='function') flash('Volume '+Math.round(SETTINGS.vol*100)+'%'); } });
+addEventListener('load',()=>{ const tb=document.querySelector('#titlebar small'); if(tb){ tb.innerHTML='&#x1F50A; <input id="vol" type="range" min="0" max="100" style="width:110px;vertical-align:middle;accent-color:#1d1406">'; const el=document.getElementById('vol'); el.value=Math.round((SETTINGS.vol??0.7)*100); el.addEventListener('input',()=>setVolume(el.value/100)); el.addEventListener('keydown',e=>e.stopPropagation()); } });

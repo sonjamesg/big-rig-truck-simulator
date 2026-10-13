@@ -53,7 +53,7 @@ function frame(ts){
     // air brake hiss on release after a firm stop / handbrake
     const braking=truck.brake>0; if(braking) wasBraking+=dt; else { if(wasBraking>0.6 && Math.abs(truck.v)<6) airHiss(); wasBraking=0; }
     if(truck.bump>0.01 && !truck._bumped){ thump(truck.bump); cam.shake=truck.bump*10; truck._bumped=true; } if(truck.bump<=0.01) truck._bumped=false;
-    updateAudio(truck,inp,timeS);
+    updateAudio(truck,inp,timeS); updateAudioExtra(truck,dt);
   }
   if(!paused){ updateTraffic(dt); updateFuel(dt); updateForecourts(dt); if(started) updateCareer(dt); if(started) updateIndicators(dt); updateFX(dt); } updatePort(dt);
   { const z=cam.z; updateAmbient(dt,[cam.x-VW/2/z,cam.y-VH/2/z,cam.x+VW/2/z,cam.y+VH/2/z]); }
