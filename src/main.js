@@ -92,7 +92,7 @@ function draw(){
   drawPortLow(vx0,vy0,vx1,vy1); drawFXLow(vx0,vy0,vx1,vy1); drawRemotePlayers(vx0,vy0,vx1,vy1); drawBreakdown();
   drawLorry(); if(!truck.foLay&&world.foZ&&world.foZ[idx(Math.floor(truck.x/M_T),Math.floor(truck.y/M_T))]) drawFlyovers(vx0,vy0,vx1,vy1,0.72); drawRail(vx0,vy0,vx1,vy1); drawFXHigh(); drawPortHigh(vx0,vy0,vx1,vy1);
   for(const o of world.overhead) if(o.x>vx0-400&&o.x<vx1+400&&o.y>vy0-400&&o.y<vy1+400) drawOverhead(o);
-  drawAmbientHigh(VR); drawWeather(vx0,vy0,vx1,vy1,z); drawNight(vx0,vy0,vx1,vy1,z); drawStreetLamps(vx0,vy0,vx1,vy1);
+  drawAmbientHigh(VR); drawWeather(vx0,vy0,vx1,vy1,z); drawNight(vx0,vy0,vx1,vy1,z); drawStreetLamps(vx0,vy0,vx1,vy1); drawSigNight();
   ctx.setTransform(1,0,0,1,0,0);
   drawHUD();
   if(bigmap.open){ drawBigMap(); dnMapShade(0,0,VW,VH,0.35); drawPadMapCursor(); }
@@ -168,6 +168,7 @@ function drawOverhead(o){
       // full green disc for ahead/left and filtering rights; green arrows only for protected (arrow / early cut-off / left filter) movements
       let disc=false; const arrows=[]; for(const mv of mvs){ if(ss[mv]!=='g') continue; if(sigArrow(o.J,key,mv)) arrows.push(mv); else disc=true; }
       if(disc) lamp(-8,true,'#36e05a','#10240f'); else { ctx.fillStyle='#10240f'; ctx.beginPath(); ctx.arc(-8,0,3.3,0,7); ctx.fill(); }
+      if(DN.dark>0.01) (DN.sig||(DN.sig=[])).push({x:hx,y:hy,a:Math.atan2(f[1],f[0]),f,red,amb,disc,arrows:arrows.slice(),P});
       if(arrows.length){ const ax=disc?-15:-8; if(disc){ ctx.fillStyle='#e8b923'; ctx.fillRect(-23,-5,9,10); ctx.fillStyle='#17191c'; ctx.fillRect(-22,-4,7,8); }
         ctx.fillStyle='#36e05a50'; ctx.beginPath(); ctx.arc(ax-(disc?3.5:0),0,6,0,7); ctx.fill(); ctx.strokeStyle='#5dff7a'; ctx.lineWidth=1.6; ctx.lineCap='round';
         for(const mv of arrows){ ctx.save(); ctx.translate(ax-(disc?3.5:0),0); ctx.rotate(mv==='S'?0:mv==='L'?-Math.PI/2:Math.PI/2); ctx.beginPath(); ctx.moveTo(-3,0); ctx.lineTo(3,0); ctx.moveTo(0.6,-2.2); ctx.lineTo(3,0); ctx.lineTo(0.6,2.2); ctx.stroke(); ctx.restore(); } }
