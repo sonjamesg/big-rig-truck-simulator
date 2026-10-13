@@ -2910,8 +2910,7 @@ const mpArt={};
 function mpCab(m,c){ const k=m+'|'+c; if(!mpArt[k]){ const a=modelArt(modelById(m),c||modelById(m).cols[0]); mpArt[k]={a,sh:silhouette(a)}; } return mpArt[k]; }
 function mpTrl(tr){ const k=tr[1]+'|'+tr[2]+'|'+tr[3]; if(!mpArt[k]) mpArt[k]=tr[1]==='player'?{type:'player'}:{type:tr[1],art:trailerArt(TRAILER_TYPES[tr[1]]?tr[1]:'box',tr[2],tr[3])}; return mpArt[k]; }
 function drawRemotePlayers(vx0,vy0,vx1,vy1){ if(!MP.on) return; for(const id in MP.players){ const p=MP.players[id], r=p.cur; if(!p.has) continue; const X=r.x*PPM, Y=r.y*PPM; if(X<vx0-300||X>vx1+300||Y<vy0-300||Y>vy1+300) continue;
-    const cab=mpCab(r.m,r.c); if(r.tr){ const t=mpTrl(r.tr); drawTrailerAt(t,r.kx,r.ky,r.th,true); drawTrailerAt(t,r.kx,r.ky,r.th,false); }
-    blit(cab.sh,r.x,r.y,r.h,6,6); blit(cab.a,r.x,r.y,r.h);
+    const cab=mpCab(r.m,r.c); drawRig(cab.a,cab.sh,r.x,r.y,r.h,r.tr?mpTrl(r.tr):null,r.kx,r.ky,r.th,6);
     const f=fwd(r.h), rt=rgt(r.h), fl=r.fl|0, br=fl&1, rv=fl&2, ind=(fl>>2)&3, hz=fl&16;
     if(br||rv){ ctx.fillStyle=rv?'rgba(255,255,255,0.95)':'rgba(255,40,30,0.95)'; for(const sd of [-1,1]) ctx.fillRect((r.x-f[0]*1.3+rt[0]*sd*1.1)*PPM-2,(r.y-f[1]*1.3+rt[1]*sd*1.1)*PPM-2,4,4); }
     if((ind||hz)&&(timeS*2.5)%1<0.5){ ctx.fillStyle='#ffb020'; for(const sd of (hz?[-1,1]:[ind===1?-1:1])) for(const fb of [5.0,-1.3]) ctx.fillRect((r.x+f[0]*fb+rt[0]*sd*1.2)*PPM-2.5,(r.y+f[1]*fb+rt[1]*sd*1.2)*PPM-2.5,5,5); }
@@ -3211,10 +3210,14 @@ function draw(){
   if(bigmap.open){ drawBigMap(); drawPadMapCursor(); }
 }
 function blit(art,mx,my,ang,dx=0,dy=0){ ctx.save(); ctx.translate(mx*PPM+dx,my*PPM+dy); ctx.rotate(ang); ctx.drawImage(art.c,-art.ox/ART_SCALE,-art.oy/ART_SCALE,art.W/ART_SCALE,art.H/ART_SCALE); ctx.restore(); }
+// coupled artic layering: tractor chassis + fifth wheel (behind the cab body) draw UNDER the trailer, cab body over the trailer nose
+function cabLayers(a){ if(a.rear) return a; const Ys=Math.round(a.oy-1.0*PPM*ART_SCALE); const mk=(top)=>{ const c=mkCanvas(a.W,a.H), g=c.getContext('2d'); g.save(); g.beginPath(); top?g.rect(0,0,a.W,Ys):g.rect(0,Ys,a.W,a.H-Ys); g.clip(); g.drawImage(a.c,0,0); g.restore(); return {c,W:a.W,H:a.H,ox:a.ox,oy:a.oy}; };
+  a.front=mk(true); a.rear=mk(false); return a; }
+function drawRig(art,sh,x,y,h,trl,kx,ky,th,shOff){ if(!trl){ blit(sh,x,y,h,shOff,shOff); blit(art,x,y,h); return; } const L=cabLayers(art);
+  drawTrailerAt(trl,kx,ky,th,true); blit(sh,x,y,h,shOff,shOff); blit(L.rear,x,y,h); drawTrailerAt(trl,kx,ky,th,false); blit(L.front,x,y,h); }
 function drawLorry(){
   const s=truck, k=kingpin(s);
-  if(s.trl) drawTrailerAt(s.trl,k[0],k[1],s.th,true); blit(CABSH,s.x,s.y,s.h,5,5);
-  if(s.trl) drawTrailerAt(s.trl,k[0],k[1],s.th,false);
+  if(s.trl){ drawTrailerAt(s.trl,k[0],k[1],s.th,true); blit(CABSH,s.x,s.y,s.h,5,5); blit(cabLayers(CABART).rear,s.x,s.y,s.h); drawTrailerAt(s.trl,k[0],k[1],s.th,false); } else blit(CABSH,s.x,s.y,s.h,5,5);
   // brake / reverse lights
   const ft=fwd(s.th), rt=rgt(s.th);
   if(s.trl && (s.brake>0 || s.mode==='R')){ const rx=(k[0]-ft[0]*12.45)*PPM, ry=(k[1]-ft[1]*12.45)*PPM; ctx.fillStyle= s.mode==='R'&&s.brake===0 ? 'rgba(255,255,230,0.55)':'rgba(255,40,30,0.6)';
@@ -3222,7 +3225,7 @@ function drawLorry(){
   // front wheels (steered)
   const f=fwd(s.h), r=rgt(s.h); const fx=s.x+f[0]*CAB.wheelbase, fy=s.y+f[1]*CAB.wheelbase;
   for(const sd of [-1,1]){ ctx.save(); ctx.translate((fx+r[0]*sd*1.12)*PPM,(fy+r[1]*sd*1.12)*PPM); ctx.rotate(s.h+s.steer); ctx.fillStyle='#141414'; ctx.fillRect(-2.2,-4.5,4.4,9); ctx.restore(); }
-  blit(CABART,s.x,s.y,s.h);
+  blit(s.trl?cabLayers(CABART).front:CABART,s.x,s.y,s.h);
   // headlight beams at night? (daytime build) - small DRL dots
   ctx.fillStyle='rgba(255,250,220,0.9)'; for(const sd of [-1,1]){ const hx=(s.x+f[0]*5.0+r[0]*sd*1.0)*PPM, hy=(s.y+f[1]*5.0+r[1]*sd*1.0)*PPM; ctx.fillRect(hx-1.5,hy-1.5,3,3); }
 }
