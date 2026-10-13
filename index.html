@@ -429,7 +429,7 @@ function genWorld(){
   for(let y=y0;y+4<=y1;y+=5) for(let x=x0;x+4<=x1;x+=5){ const w=Math.min(4+(R()<0.4?1:0),x1-x),h=Math.min(4+(R()<0.4?1:0),y1-y); let ok=true; for(let q=-1;q<=h&&ok;q++) for(let k=-1;k<=w;k++){ if(!inb(x+k,y+q)){ok=false;break;} const t=G[idx(x+k,y+q)]; const edge=q<0||k<0||q===h||k===w; if(t===T.BLDG&&!edge||t===T.ROAD&&!edge||t===T.WATER||t===T.BRIDGE||t===T.BLDG){ok=false;break;} }
     if(ok){ fill(x,y,w,h,T.BLDG); objs.push({kind:'bldg',x:x*TILE,y:y*TILE,w:w*TILE,h:h*TILE,style:st[(R()*st.length)|0],height:h0+R()*(h1-h0),seed:(R()*1e9)|0}); } else if(R()<0.55){ const t=get(x+2,y+2); if(t===T.PLAZA||t===T.SAND||t===T.CONC) tree((x+2.5)*TILE,(y+2.5)*TILE,10+R()*4); } } } };
 dense(KB.xs,KB.ys,['office','glass','tower','solar','office','glass'],45,140);
-  const greenUp=(xs,ys)=>{ const free=(x,y,w,h)=>{ for(let j=y;j<y+h;j++) for(let i=x;i<x+w;i++){ if(!inb(i,j)) return false; const t=G[idx(i,j)]; if(t!==T.PLAZA&&t!==T.SAND&&t!==T.CONC&&t!==T.GRASS) return false; } return true; };
+  const greenUp=(xs,ys)=>{ const free=(x,y,w,h)=>{ for(let j=y;j<y+h;j++) for(let i=x;i<x+w;i++){ if(!inb(i,j)) return false; const t=G[idx(i,j)]; if(t!==T.PLAZA&&t!==T.SAND&&t!==T.GRASS) return false; } return true; };
     for(let i=0;i<xs.length-1;i++) for(let j=0;j<ys.length-1;j++){ const x0=xs[i]+RW+1,y0=ys[j]+RW+1,x1=xs[i+1]-1,y1=ys[j+1]-1;
       for(let y=y0;y+4<=y1;y+=4) for(let x=x0;x+4<=x1;x+=4){ if(!free(x,y,4,4)) continue; fill(x,y,4,4,T.PGRASS); const k=R();
         if(k<0.3){ fill(x,y+1,4,1,T.PLAZA); fill(x+1,y,1,4,T.PLAZA); objs.push({kind:'fountain',x:(x+1.5)*TILE,y:(y+1.5)*TILE}); }
@@ -582,6 +582,19 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
           let ok=true; for(const s of [-2,-1,1,2]) if(G[idx(x+px*s,y+py*s)]!==T.WALK||G[idx(x+px*s+dx,y+py*s+dy)]!==T.ROAD) ok=false;
           if(ok) objs.push({kind:'tree',x:(x+0.5-dx*0.15)*TILE,y:(y+0.5-dy*0.15)*TILE,r:8+R()*3,sp:(R()*3)|0,seed:(R()*1e9)|0,street:1}); break; } }
       else if(t===T.ISLAND&&(x+y)%3===0){ const h=G[idx(x-1,y)]===T.ISLAND&&G[idx(x+1,y)]===T.ISLAND, v=G[idx(x,y-1)]===T.ISLAND&&G[idx(x,y+1)]===T.ISLAND; if(h!==v) objs.push(R()<0.5?{kind:'hedge',x:(x+0.5)*TILE,y:(y+0.5)*TILE,seed:(R()*1e9)|0}:{kind:'tree',x:(x+0.5)*TILE,y:(y+0.5)*TILE,r:7+R()*2,sp:(R()*3)|0,seed:(R()*1e9)|0}); } } }
+  // v24: functional areas stay paved: no trees/parks/fountains/ponds/hedges inside depots, fuel, garages, dealers, malls, port
+  { const FP=[], M=v=>v/M_T; const box=(x0,y0,x1,y1)=>FP.push([Math.min(x0,x1),Math.min(y0,y1),Math.max(x0,x1),Math.max(y0,y1)]);
+    for(const d of world.depots||[]){ if(d.w!==undefined) box(d.x-1,d.y-1,d.x+d.w+1,d.y+d.h+1); const e=d.entrance; if(e) box(M(e.x)-4,M(e.y)-4,M(e.x)+4,M(e.y)+4); for(const b of d.bays||[]) box(M(b.kx)-5,M(b.ky)-5,M(b.kx)+5,M(b.ky)+5); }
+    for(const f of world.fuel||[]){ if(f.v7) box(M(f.x0)-1,M(f.y0)-(f.gap||0)-1,M(f.x0)+27,M(f.y0)+21); else box(M(f.x)-10,M(f.y)-7,M(f.x)+10,M(f.y)+7); }
+    for(const g of world.garages||[]) box(M(g.x)-12,M(g.y)-8,M(g.x)+12,M(g.y)+8);
+    for(const d of world.dealers||[]) box(M(d.x)-14,M(d.y)-12,M(d.x)+14,M(d.y)+12);
+    for(const m of world.malls||[]) if(m.tx!==undefined) box(m.tx-1,m.ty-1,m.tx+m.w+1,m.ty+m.h+1); else box(M(m.x)-16,M(m.y)-14,M(m.x)+16,M(m.y)+14);
+    if(world.port) box(world.port.x0,world.port.y0,world.port.x1,world.port.y1);
+    if(world.cityFuel){ const c=world.cityFuel; box(c.x0,c.y0,c.x0+c.w,c.y0+c.h); }
+    world.funcFP=FP; const DEC={tree:1,fountain:1,pond:1,hedge:1};
+    const inFP=(tx,ty)=>FP.some(b=>tx>=b[0]&&tx<=b[2]&&ty>=b[1]&&ty<=b[3]);
+    for(const o of objs){ if(!DEC[o.kind]||o._dead) continue; const cx=(o.x+(o.w||0)/2)/TILE, cy=(o.y+(o.h||0)/2)/TILE; if(inFP(cx,cy)) o._dead=1; }
+    for(const b of FP) for(let y=Math.floor(b[1]);y<=b[3];y++) for(let x=Math.floor(b[0]);x<=b[2];x++){ if(!inb(x,y)) continue; const t=G[idx(x,y)]; if(t===T.PGRASS||t===T.TREE||(t===T.WATER&&!world.port)||t===T.PARK) set(x,y,T.CONC); } }
   (world.tm=world.tm||[]).push(['world.labels=',performance.now()-t0|0]);
   world.labels=[['WESTMERE',330,1000,1],['THE SANDREACH',1200,450,1],['HIGHMOOR',1350,1250,1],['ALBION SOUND',cW(700),700,2],['SANDREACH STRAIT',1500,cE(1500),2],['GREYFELL INLET',560,1272,2],['OUTER SEA',1024,25,2],['OUTER SEA',1024,2028,2],
     ['PORT ALBION',300,290],['SANDVALE',1640,340],['KINGSBRIDGE',1580,1590],['Millford',300,830],['Dustwater',1035,455],['Coppermine',1635,625],['Redhill',1025,1195],['Fenwick',1535,1155],['Ashby',270,1130],['Wendwood',520,890],
