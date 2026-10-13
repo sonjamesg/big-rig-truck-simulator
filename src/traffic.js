@@ -216,10 +216,12 @@ function planCurve(v,sg,d,E,cref){
   const p=lanePt(sg,d,P.lane,E); pathLine(v,p[0],p[1]);
   const dv=dirVec(sg,d), c=sg.dir==='h'?[E*M_T,(sg.a+sg.w/2)*M_T]:[(sg.a+sg.w/2)*M_T,E*M_T];
   const o=(p[0]-c[0])*(-dv[1])+(p[1]-c[1])*dv[0]; const d0=pathEnd(v), n=pts.length;
-  const tpc=cv.tap&&cv.tap[cref.start?'A':'B'], oT=tpc?Math.sign(o)*Math.min(Math.abs(o),(cv.w/2-0.5)*M_T):o; let sa=0, o2=o;
+  const foR={}; const tpc=cv.tap&&cv.tap[cref.start?'A':'B'], oT=tpc?Math.sign(o)*Math.min(Math.abs(o),(cv.w/2-0.5)*M_T):o; let sa=0, o2=o;
   if(tpc&&oT!==o) v.mk.push({kind:'sig',d0:d0-20,d1:d0+tpc.L*M_T,side:1});
   for(let i=2;i<n-1;i+=2){ const a=pts[i-1], b=pts[i+1]; let tx=b[0]-a[0], ty=b[1]-a[1]; const l=Math.hypot(tx,ty)||1; tx/=l; ty/=l; sa+=Math.hypot(pts[i][0]-pts[i-2][0],pts[i][1]-pts[i-2][1]);
-    if(tpc){ const u=Math.min(1,sa/tpc.L), e=u*u*(3-2*u); o2=o+(oT-o)*e; } pathPush(v,pts[i][0]*M_T-ty*o2, pts[i][1]*M_T+tx*o2); }
+    if(tpc){ const u=Math.min(1,sa/tpc.L), e=u*u*(3-2*u); o2=o+(oT-o)*e; } pathPush(v,pts[i][0]*M_T-ty*o2, pts[i][1]*M_T+tx*o2);
+    if(cv.fo){ const j=cref.start?i:n-1-i; for(const fo of cv.fo){ if(j>=fo.a&&j<=fo.b){ const dd=pathEnd(v); if(!foR[fo.id]) foR[fo.id]=[dd,dd]; else foR[fo.id][1]=dd; } } } }
+  for(const k in foR) v.mk.push({kind:'fo',d0:foR[k][0]-1,d1:foR[k][1]+1,fo:+k});
   const Q=world.segs[other.seg], qd=other.end===0?1:-1, qpos=other.end===0?Q.b0:Q.b1+1;
   const qv=dirVec(Q,qd), qc=Q.dir==='h'?[qpos*M_T,(Q.a+Q.w/2)*M_T]:[(Q.a+Q.w/2)*M_T,qpos*M_T];
   let best=0,bd=1e9; for(let l=0;l<nLanes(Q);l++){ const q=lanePt(Q,qd,l,qpos); const oo=(q[0]-qc[0])*(-qv[1])+(q[1]-qc[1])*qv[0]; if(Math.abs(oo-o2)<bd){ bd=Math.abs(oo-o2); best=l; } }
@@ -314,9 +316,12 @@ function pathAt(v,s){ const pd=v.pd; if(s<=pd[0]){ return [v.px[0],v.py[0]]; } l
   const t=Math.max(0,Math.min(1,(s-pd[i])/((pd[i+1]-pd[i])||1))); return [v.px[i]+(v.px[i+1]-v.px[i])*t, v.py[i]+(v.py[i+1]-v.py[i])*t]; }
 function trimPath(v){ if(v.i<40) return; const cut=v.i-30; v.px.splice(0,cut); v.py.splice(0,cut); v.pd.splice(0,cut); v.i-=cut; }
 // obstacle boxes: {x,y,h,L,W,vel,veh,player}
-function boxesOf(v){ const b=[{x:v.x,y:v.y,h:v.h,L:v.L,W:v.W,vel:v.v,veh:v}]; if(v.trl) b.push({x:v.trl.x,y:v.trl.y,h:v.trl.h,L:13.6,W:2.55,vel:v.v,veh:v}); return b; }
+function boxesOf(v){ const b=[{x:v.x,y:v.y,h:v.h,L:v.L,W:v.W,vel:v.v,veh:v,lay:v.layer|0}]; if(v.trl) b.push({x:v.trl.x,y:v.trl.y,h:v.trl.h,L:13.6,W:2.55,vel:v.v,veh:v,lay:v.layer|0}); return b; }
 function playerBoxes(){ const s=truck, f=fwd(s.h), k=kingpin(s), ft=fwd(s.th);
-  const out=[{x:s.x+f[0]*1.9,y:s.y+f[1]*1.9,h:s.h,L:6.2,W:CAB.w,vel:s.v,player:true}]; if(s.trl) out.push({x:k[0]-ft[0]*5.6,y:k[1]-ft[1]*5.6,h:s.th,L:13.6,W:TRL.w,vel:s.v,player:true}); return out; }
+  const L=s.foLay|0; const out=[{x:s.x+f[0]*1.9,y:s.y+f[1]*1.9,h:s.h,L:6.2,W:CAB.w,vel:s.v,player:true,lay:L}]; if(s.trl) out.push({x:k[0]-ft[0]*5.6,y:k[1]-ft[1]*5.6,h:s.th,L:13.6,W:TRL.w,vel:s.v,player:true,lay:L}); return out; }
+// v20 flyovers: the player's layer is set by the road they drove into the flyover zone from (curve deck = upper, straight road = lower)
+function foPlayerLayer(s){ if(!world.foZ) return; const tx=Math.floor(s.x/M_T), ty=Math.floor(s.y/M_T); if(!inb(tx,ty)) return; const i=idx(tx,ty);
+  if(world.foZ[i]){ s.foLay=s.foFrom==='cv'?1:0; return; } s.foLay=0; const h=world.roadH[i], vv=world.roadV[i]; if(h===-3) s.foFrom='cv'; else if(h>=0||vv>=0||h===-2) s.foFrom='seg'; }
 const HC=24; const hkey=(x,y)=>(Math.floor(x/HC)+4096)*8192+Math.floor(y/HC)+4096;
 function hashAdd(b){ const k=hkey(b.x,b.y); let a=traffic.hash.get(k); if(!a){ a=[]; traffic.hash.set(k,a); } a.push(b); }
 function ptBoxDist(px,py,b){ const f=fwd(b.h), r=rgt(b.h), dx=px-b.x, dy=py-b.y; const lf=dx*f[0]+dy*f[1], lr=dx*r[0]+dy*r[1];
@@ -332,7 +337,7 @@ function obbMTV(A,B){ // returns [nx,ny,depth] pushing B away from A, or null
 // called from the lorry physics (120 Hz): heavy AI vehicles behave like walls; light ones get shoved
 function trafficHitTruck(s){
   if(!traffic.vs.length && !traffic.parked.length) return false;
-  const pb=playerBoxes(); let solid=false;
+  foPlayerLayer(s); const pb=playerBoxes(); let solid=false;
   const test=(v,boxes)=>{ for(const b of boxes){ for(const p of pb){ if(Math.abs(b.x-p.x)>12||Math.abs(b.y-p.y)>12) continue; const m=obbMTV(p,b); if(!m) continue;
       if(v.heavy){ solid=true; v.hitT=timeS; return; }
       v.offX+=m[0]*(m[2]+0.05); v.offY+=m[1]*(m[2]+0.05); v.x+=m[0]*(m[2]+0.05); v.y+=m[1]*(m[2]+0.05); if(v.trl){ v.trl.x+=m[0]*(m[2]+0.05); v.trl.y+=m[1]*(m[2]+0.05); }
@@ -340,7 +345,7 @@ function trafficHitTruck(s){
       v.h+=(Math.random()-0.5)*0.04*Math.min(1,Math.abs(s.v)/5);
       if(!v.hitCool||timeS-v.hitCool>0.6){ v.hitCool=timeS; const imp=Math.abs(s.v); s.v*=0.85; if(imp>1.5){ s.bump=Math.min(1,imp/16); } }
       return; } } };
-  for(const v of traffic.vs){ if(Math.abs(v.x-s.x)>40||Math.abs(v.y-s.y)>40) continue; test(v,boxesOf(v)); if(solid) return true; }
+  for(const v of traffic.vs){ if(Math.abs(v.x-s.x)>40||Math.abs(v.y-s.y)>40) continue; if(foApart(v.layer,v.x,v.y,s.foLay,s.x,s.y)) continue; test(v,boxesOf(v)); if(solid) return true; }
   const k=Math.floor(s.x/64)+','+Math.floor(s.y/64);
   for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++){ const a=traffic.parkedIdx.get((Math.floor(s.x/64)+dx)+','+(Math.floor(s.y/64)+dy)); if(a) for(const v of a) test(v,[{x:v.x,y:v.y,h:v.h,L:v.L,W:v.W}]); }
   return solid;
@@ -399,7 +404,7 @@ function stepVeh(v,dt,pbs){
   const r=v.r; while(pathEnd(v)-v.s<90) if(!planPiece(v,r)) break;
   const sg=world.segs[v.plan.seg]; let v0=(SPEED[sg.type]||12)*v.drv; if(v.heavy) v0=Math.min(v0,v.kind==='bus'?14:22);
   const front=v.s+v.L/2;
-  let acc=1e9, sig=0; v.ring=null;
+  let acc=1e9, sig=0; v.ring=null; v.layer=0;
   for(let k=v.mk.length-1;k>=0;k--){ const m=v.mk[k];
     const end=m.d1!==undefined?m.d1:(m.dEnd!==undefined?m.dEnd:m.d);
     if(v.s-v.L/2-(v.kind==='lorry'?14:0)>end+1){ if(m.kind==='gw'&&v.jHeld===m.J) releaseJ(v); v.mk.splice(k,1); continue; }
@@ -407,6 +412,7 @@ function stepVeh(v,dt,pbs){
     else if(m.kind==='sig'){ if(v.s>m.d0&&v.s<m.d1) sig=m.side; }
     else if(m.kind==='ring'){ if(v.s>m.d0&&v.s<m.d1){ v.ring=m.rb; } }
     else if(m.kind==='major'){ }
+    else if(m.kind==='fo'){ if(v.s+v.L/2>m.d0&&v.s-v.L/2<m.d1) v.layer=1; }
     else if(m.kind==='filter'){ const gap=m.d-front; if(gap<-1.5||m.go) { v.filtering=false; continue; } if(gap>14) continue;
       // UK filtering right turn: pull forward into the junction, wait for a gap in oncoming traffic; when the stage ends, clear the junction
       const st=sigState(m.J,m.key,'R'); let wait=false; if(st==='g'&&sigFilter(m.J,m.key,'R')&&sigOncoming(v,m.J,m.opp)) wait=true;
@@ -431,7 +437,7 @@ function stepVeh(v,dt,pbs){
   let lgap=1e9, lvel=0, lplayer=false; const cands=[];
   const kx=Math.floor(v.x/HC), ky=Math.floor(v.y/HC);
   for(let dx=-2;dx<=2;dx++) for(let dy=-2;dy<=2;dy++){ const a=traffic.hash.get((kx+dx+4096)*8192+ky+dy+4096); if(!a) continue;
-    for(const b of a){ if(b.veh===v) continue; if(v.ghostT>0&&!b.player) continue; if(Math.abs(b.x-v.x)>48||Math.abs(b.y-v.y)>48) continue; cands.push(b); } }
+    for(const b of a){ if(b.veh===v) continue; if(v.ghostT>0&&!b.player) continue; if(Math.abs(b.x-v.x)>48||Math.abs(b.y-v.y)>48) continue; if(foApart(v.layer,v.x,v.y,b.lay,b.x,b.y)) continue; cands.push(b); } }
   if(cands.length){ const half=v.W/2+0.35;
     for(let k=0;k<17;k++){ const sd=front+0.4+k*2.5; const p=pathAt(v,sd); const px=p[0]+v.offX, py=p[1]+v.offY;
       for(const b of cands){ if(ptBoxDist(px,py,b)<half){ const g=sd-front; if(g<lgap){ lgap=g; const rel=Math.cos(b.h-v.h); lvel=Math.max(0,(b.vel||0)*rel); lplayer=!!b.player; } } }
@@ -524,6 +530,8 @@ function drawTraffic(vx0,vy0,vx1,vy1){
     ctx.fillStyle='#2b2b33'; ctx.fillRect(-2.2,-1+sw,1.6,3.2); ctx.fillRect(0.6,-1-sw,1.6,3.2);
     ctx.fillStyle=p.col; ctx.beginPath(); ctx.ellipse(0,0,3.4,2.1,0,0,7); ctx.fill();
     ctx.fillStyle=p.hair; ctx.beginPath(); ctx.arc(0,0.2,1.7,0,7); ctx.fill(); ctx.restore(); }
+  const lo=list.filter(v=>!v.layer), hi=list.filter(v=>v.layer);
+  const drawL=list=>{
   for(const v of list){ blitV(v.art.body.sh,v.x,v.y,v.h,v.L,v.W,4,4); if(v.trl) blitV(v.art.trl.sh,v.trl.x,v.trl.y,v.trl.h,13.6,2.55,6,6); }
   const blink=(timeS%0.8)<0.4;
   for(const v of list){
@@ -535,4 +543,6 @@ function drawTraffic(vx0,vy0,vx1,vy1){
     if(v.sig&&blink){ lampsOf(v.x,v.y,v.h,v.L,v.W,'rgba(255,170,0,0.95)',true,[v.sig],2.4); lampsOf(rx.x,rx.y,rx.h,rL,rW,'rgba(255,170,0,0.95)',false,[v.sig],2.4); }
     if(v.honking>0){ ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=1.5; const f=fwd(v.h); const X=(v.x+f[0]*(v.L/2+1))*PPM, Y=(v.y+f[1]*(v.L/2+1))*PPM; for(let k=1;k<=2;k++){ ctx.beginPath(); ctx.arc(X,Y,k*5+(1-v.honking*2)*4,v.h-Math.PI/2-0.6,v.h-Math.PI/2+0.6); ctx.stroke(); } }
   }
+  };
+  drawL(lo); if(typeof drawFlyovers==='function') drawFlyovers(vx0,vy0,vx1,vy1); if(hi.length) drawL(hi);
 }

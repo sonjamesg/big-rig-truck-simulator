@@ -3,7 +3,7 @@
 const NAV={route:null,reroutes:0,offT:0,lastCalc:-9,hover:null};
 const NAV_COST={hwy:0.55,dual:0.7,rural:0.9,city:1.0,town:1.0,res:1.7,lane:3.2,dirt:2.6};      // lorry-legal: narrow lanes / estates heavily penalised
 const NAV_SPEED={hwy:25,dual:20,rural:15,city:11,town:11,res:8,lane:7,dirt:7};
-let navClosed=null, navG=null, navStamp=null, navFrom=null, navGen=1;
+let navUp=null, navClosed=null, navG=null, navStamp=null, navFrom=null, navGen=1;
 function navTileInfo(i){ const h=world.roadH[i], v=world.roadV[i]; if(h===-1&&v===-1) return null;
   if(h===-2) return ['rb',0.8,8]; if(h===-3) return ['curve',0.7,20]; const s=world.segs[h>=0?h:v]; return [s.type,NAV_COST[s.type]||1,NAV_SPEED[s.type]||11]; }
 const isRoadT=i=>{ const t=G[i]; return (t===T.ROAD||t===T.BRIDGE) && !(world.roadH[i]===-1&&world.roadV[i]===-1); };
@@ -18,17 +18,18 @@ function navSnapTruck(){ const t=truck, f=fwd(t.h); for(const d of [0,2,-2,4]){ 
       if(SOLID[G[i]]||d>40) continue; q.push([nx,ny,d+1]); } }
   return best; }
 function navAStar(sx,sy,gx,gy){
-  const N=MW*MH; if(!navG){ navG=new Float32Array(N); navStamp=new Int32Array(N); navFrom=new Int32Array(N); navClosed=new Int32Array(N); }
+  const N=MW*MH; if(!navG){ navG=new Float32Array(N); navStamp=new Int32Array(N); navFrom=new Int32Array(N); navClosed=new Int32Array(N); } if(!navUp) navUp=new Uint8Array(N); const FF=world.foF;
   const gen=++navGen, S=idx(sx,sy), Gl=idx(gx,gy); const hx=i=>(Math.abs((i%MW)-gx)+Math.abs(((i/MW)|0)-gy))*0.9;
   let hp=[], hf=[]; const push=(i,f)=>{ hp.push(i); hf.push(f); let k=hp.length-1; while(k>0){ const p=(k-1)>>1; if(hf[p]<=hf[k]) break; {const a=hp[p];hp[p]=hp[k];hp[k]=a;const b=hf[p];hf[p]=hf[k];hf[k]=b;} k=p; } };
   const pop=()=>{ const top=hp[0], li=hp.pop(), lf=hf.pop(); if(hp.length){ hp[0]=li; hf[0]=lf; let k=0; for(;;){ const l=2*k+1, r=l+1; let m=k; if(l<hp.length&&hf[l]<hf[m]) m=l; if(r<hp.length&&hf[r]<hf[m]) m=r; if(m===k) break; {const a=hp[m];hp[m]=hp[k];hp[k]=a;const b=hf[m];hf[m]=hf[k];hf[k]=b;} k=m; } } return top; };
-  navStamp[S]=gen; navG[S]=0; navFrom[S]=-1; push(S,hx(S)); let it=0;
+  navStamp[S]=gen; navG[S]=0; navFrom[S]=-1; navUp[S]=0; push(S,hx(S)); let it=0;
   while(hp.length){ const i=pop(); if(navClosed[i]===gen) continue; navClosed[i]=gen; if(i===Gl) break; if(++it>4000000){ NAV.lastIt=it; return null; } const gi=navG[i], ci=navTileInfo(i)[1];
     for(const d of [1,-1,MW,-MW]){ let j=i+d, k=1; if(j<0||j>=N) continue;
       // small gaps (roundabout aprons, junction mouths drawn as kerb/grass): hop up to 5 tiles straight across
       if(!isRoadT(j)){ if(world.roadH[i]===-1&&world.roadV[i]===-1) continue; for(k=2;k<=6;k++){ j=i+d*k; if(j<0||j>=N||Math.abs((j%MW)-(i%MW))>6) { j=-1; break; } if(isRoadT(j)) break; } if(j<0||k>6||!isRoadT(j)) continue; const Gj=G[i+d]; if(Gj===T.WATER||Gj===T.BLDG) continue; }
+      let up=0; if(FF&&(FF[i]||FF[j])){ const r=foNavStep(i,j,d,k,FF); if(r<0) continue; up=r; }
       const nc=gi+(ci+navTileInfo(j)[1])*0.5*k+(k>1?k*0.6:0);
-      if(navClosed[j]!==gen&&(navStamp[j]!==gen||nc<navG[j])){ navStamp[j]=gen; navG[j]=nc; navFrom[j]=i; push(j,nc+hx(j)); } } }
+      if(navClosed[j]!==gen&&(navStamp[j]!==gen||nc<navG[j])){ navStamp[j]=gen; navG[j]=nc; navFrom[j]=i; navUp[j]=up; push(j,nc+hx(j)); } } }
   NAV.lastIt=it; if(navStamp[Gl]!==gen) return null; const rp=[]; for(let i=Gl;i!==-1;i=navFrom[i]) rp.push(i); rp.reverse(); const path=[rp[0]]; for(let k=1;k<rp.length;k++){ const a=rp[k-1], b=rp[k], d=b-a, st=Math.abs(d)<MW?Math.sign(d):Math.sign(d)*MW; if(Math.abs(d)!==1&&Math.abs(d)!==MW) for(let j=a+st;j!==b;j+=st) path.push(j); path.push(b); } return path; }
 function navBuild(path,target){
   const P=path.map(i=>[((i%MW)+0.5)*M_T,(((i/MW)|0)+0.5)*M_T]), n=P.length, cum=new Float32Array(n), eta=new Float32Array(n);
@@ -140,3 +141,10 @@ function fastTravel(dp){ const s=truck; const why=ftBlock(dp); if(why){ flash(wh
 BigRig.fastTravel=fastTravel;
 // tooltip button hit-boxes (set when drawn)
 let FT_BTN=null, NAV_BTN=null;
+
+// v20 flyovers: tiles of the lower road under a deck (FF) carry two roads that don't connect. Returns -1 (move not allowed), 0 (lower) or 1 (on the deck).
+function foNavStep(i,j,d,k,FF){ if(k>1) return -1; const along=t=>{ const h=world.roadH[t], v=world.roadV[t]; return (h>=0&&Math.abs(d)===1)||(v>=0&&Math.abs(d)===MW); };
+  const cv=t=>world.roadH[t]===-3;
+  if(!FF[i]){ if(cv(i)) return 1; return along(j)?0:-1; }                  // entering: from the curve onto the deck, or straight along the lower road
+  if(navUp[i]){ return FF[j]?1:(cv(j)?0:-1); }                             // on the deck: stay on it until it lands back on the curve
+  if(cv(j)) return -1; return along(j)&&along(i)?0:-1; }                  // under it: straight along the lower road only

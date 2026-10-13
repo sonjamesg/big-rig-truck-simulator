@@ -109,11 +109,11 @@ function genWorld(){
     if(A) world.segs[A.seg]['cv'+A.end]={cv:cv.id,start:true};
     if(B) world.segs[B.seg]['cv'+B.end]={cv:cv.id,start:false};
     const hw=w/2; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; let wet=0;
-    for(const [px,py] of pts){ x0=Math.min(x0,px); y0=Math.min(y0,py); x1=Math.max(x1,px); y1=Math.max(y1,py);
+    for(let pi=0;pi<pts.length;pi++){ const px=pts[pi][0],py=pts[pi][1]; x0=Math.min(x0,px); y0=Math.min(y0,py); x1=Math.max(x1,px); y1=Math.max(y1,py);
       for(let ty=Math.floor(py-hw-1);ty<=py+hw+1;ty++) for(let tx=Math.floor(px-hw-1);tx<=px+hw+1;tx++){ if(!inb(tx,ty)) continue;
         if(Math.hypot(tx+0.5-px,ty+0.5-py)>hw+0.05) continue; const i=idx(tx,ty);
-        if(world.roadH[i]!==-1||world.roadV[i]!==-1){ if(world.roadH[i]>=0||world.roadV[i]>=0){ const e0=Math.hypot(px-pts[0][0],py-pts[0][1]), e1=Math.hypot(px-pts[pts.length-1][0],py-pts[pts.length-1][1]); if(Math.min(e0,e1)>w+1){ conflicts++; (world.cflog=world.cflog||[]).push([name||type,tx,ty,world.roadH[i],world.roadV[i]]); } } continue; }
-        world.under[i]=G[i]; const wt=water[i]||G[i]===T.WATER; if(wt) wet++; G[i]=wt?T.BRIDGE:T.ROAD; world.roadH[i]=-3; world.roadV[i]=-3; } }
+        if(world.roadH[i]!==-1||world.roadV[i]!==-1){ if(world.roadH[i]>=0||world.roadV[i]>=0){ const e0=Math.hypot(px-pts[0][0],py-pts[0][1]), e1=Math.hypot(px-pts[pts.length-1][0],py-pts[pts.length-1][1]); if(Math.min(e0,e1)>w+1){ conflicts++; (world.cflog=world.cflog||[]).push([name||type,tx,ty,world.roadH[i],world.roadV[i]]); (cv.cfI=cv.cfI||[]).push(pi); (cv.cfT=cv.cfT||new Set()).add(i); } } continue; }
+        (world.cvOwn||(world.cvOwn=new Int16Array(MW*MH).fill(-1)))[i]=cv.id; world.under[i]=G[i]; const wt=water[i]||G[i]===T.WATER; if(wt) wet++; G[i]=wt?T.BRIDGE:T.ROAD; world.roadH[i]=-3; world.roadV[i]=-3; } }
     cv.bridge=wet>0;
     // tightest radius -> advisory speed
     let rmin=1e9; for(let i=4;i<pts.length-4;i+=2){ const a=pts[i-4],b=pts[i],c=pts[i+4]; const A2=Math.abs((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0])); const la=Math.hypot(b[0]-a[0],b[1]-a[1]),lb=Math.hypot(c[0]-b[0],c[1]-b[1]),lc=Math.hypot(c[0]-a[0],c[1]-a[1]); if(A2>1e-6) rmin=Math.min(rmin,la*lb*lc/(2*A2)); }
@@ -250,6 +250,7 @@ function genWorld(){
   (world.tm=world.tm||[]).push(['for(const f of pendi',performance.now()-t0|0]);
   for(const f of pending) f();
   world.curveConflicts=conflicts;
+  buildFlyovers();
   (world.tm=world.tm||[]).push(['// segment continuat',performance.now()-t0|0]);
   // segment continuations (same direction, abutting) -> lane drops / gains
   for(const a of world.segs) for(const b of world.segs){ if(a===b||a.dir!==b.dir||b.b0!==a.b1+1) continue;
@@ -603,3 +604,19 @@ function onRoadM(mx,my){
   if(ci>=0){ const c=world.corners[ci]; return Math.hypot(px/TILE-c.cx,py/TILE-c.cy)>c.R; }
   const t=G[idx(tx,ty)]; return t===T.ROAD||t===T.BRIDGE;
 }
+
+// v20: flyovers — a curved major road (motorway / dual / rural link with real ends) that crosses a straight road mid-span, with no junction,
+// is grade-separated: raised deck drawn over the lower road, traffic layers (upper never meets lower), sat nav keeps them unconnected.
+// City/town curves with no tied ends (diagonal avenues) are meant as at-grade streets and are left alone.
+function buildFlyovers(){ world.flyovers=[]; const Z=world.foZ=new Uint8Array(MW*MH), F=world.foF=new Uint8Array(MW*MH);
+  for(const cv of world.curves){ if(!cv.cfI||!cv.cfI.length) continue; if(!(cv.A&&cv.B) && (cv.type==='city'||cv.type==='town'||cv.type==='res')) continue;
+    const I=[...new Set(cv.cfI)].sort((a,b)=>a-b); const groups=[]; let g=[I[0],I[0]];
+    for(const i of I.slice(1)){ if(i-g[1]<=8) g[1]=i; else { groups.push(g); g=[i,i]; } } groups.push(g);
+    for(const [a0,b0] of groups){ const pad=Math.ceil(cv.w*2)+4, a=Math.max(0,a0-pad), b=Math.min(cv.pts.length-1,b0+pad);
+      const fo={id:world.flyovers.length,cv:cv.id,a,b,a0,b0,lower:new Set()}; world.flyovers.push(fo); (cv.fo=cv.fo||[]).push(fo);
+      const hw=cv.w/2+4; for(let k=a;k<=b;k++){ const [px,py]=cv.pts[k]; for(let ty=Math.floor(py-hw);ty<=py+hw;ty++) for(let tx=Math.floor(px-hw);tx<=px+hw;tx++){ if(!inb(tx,ty)) continue; if(Math.hypot(tx+0.5-px,ty+0.5-py)<=hw) Z[idx(tx,ty)]=fo.id+1; } } } }
+  for(const cv of world.curves) if(cv.fo&&cv.cfT) for(const i of cv.cfT){ F[i]=1; const s=world.roadH[i]>=0?world.roadH[i]:world.roadV[i]; for(const fo of cv.fo) if(Z[i]===fo.id+1) fo.lower.add(s); }
+  for(const fo of world.flyovers) fo.lower=[...fo.lower];
+}
+// layer test for any two boxes (AI or player): different layers inside the same flyover zone never interact
+function foApart(la,xa,ya,lb,xb,yb){ if((la|0)===(lb|0)||!world.foZ) return false; const za=world.foZ[idx(Math.floor(xa/M_T),Math.floor(ya/M_T))], zb=world.foZ[idx(Math.floor(xb/M_T),Math.floor(yb/M_T))]; return za>0&&za===zb; }

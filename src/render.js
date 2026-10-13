@@ -256,13 +256,14 @@ function drawTaper(g,tp){ const P=tp.pts, n=P.length, T_=TILE;
       g.beginPath(); g.moveTo(a[0],a[1]); g.lineTo(b[0],b[1]); g.lineTo(c[0]-ux*8,c[1]-uy*8); g.stroke();
       g.beginPath(); g.moveTo(c[0]+ux*4,c[1]+uy*4); g.lineTo(c[0]-ux*12-uy*7,c[1]-uy*12+ux*7); g.lineTo(c[0]-ux*12+uy*7,c[1]-uy*12-ux*7); g.closePath(); g.fill(); } }
   g.restore(); }
-function drawCurve(g,cv){
+function drawCurve(g,cv,rng){
   if(!cv.px) cv.px=cv.pts.map(p=>[p[0]*TILE,p[1]*TILE]); const P=cv.px, W=cv.w*TILE, n=P.length;
   // only the part of the curve inside this chunk (plus margin)
-  let i0=0,i1=n-1; if(CUR_CHUNK){ const [x0,y0,x1,y1]=CUR_CHUNK, m=W+60; i0=n; i1=-1; for(let i=0;i<n;i++){ const p=P[i]; if(p[0]>x0-m&&p[0]<x1+m&&p[1]>y0-m&&p[1]<y1+m){ if(i<i0) i0=i; i1=i; } } if(i1<0) return; i0=Math.max(0,i0-1); i1=Math.min(n-1,i1+1); }
+  let i0=0,i1=n-1; if(rng){ i0=rng[0]; i1=rng[1]; } else if(CUR_CHUNK){ const [x0,y0,x1,y1]=CUR_CHUNK, m=W+60; i0=n; i1=-1; for(let i=0;i<n;i++){ const p=P[i]; if(p[0]>x0-m&&p[0]<x1+m&&p[1]>y0-m&&p[1]<y1+m){ if(i<i0) i0=i; i1=i; } } if(i1<0) return; i0=Math.max(0,i0-1); i1=Math.min(n-1,i1+1); }
   g.save(); g.lineCap='butt'; g.lineJoin='round';
   const wet=i=>{ const tx=Math.floor(cv.pts[i][0]),ty=Math.floor(cv.pts[i][1]); return get(tx,ty)===T.BRIDGE; };
-  if(cv.bridge){ let a=-1; for(let i=i0;i<=i1+1;i++){ const w=i<=i1&&wet(i); if(w&&a<0) a=i; if(!w&&a>=0){ const b=Math.min(i1,i+2), s=Math.max(i0,a-2);
+  if(cv.fo&&!rng) for(const fo of cv.fo){ const a=Math.max(i0,fo.a), b=Math.min(i1,fo.b); if(a<b) foUnder(g,cv,P,a,b,fo); }
+  if(cv.bridge&&!rng){ let a=-1; for(let i=i0;i<=i1+1;i++){ const w=i<=i1&&wet(i); if(w&&a<0) a=i; if(!w&&a>=0){ const b=Math.min(i1,i+2), s=Math.max(i0,a-2);
         g.save(); g.translate(18,18); curvePath(g,P,s,b,0); g.strokeStyle='rgba(5,25,45,0.35)'; g.lineWidth=W+18; g.stroke(); g.restore();
         curvePath(g,P,s,b,0); g.strokeStyle='#a4a8ad'; g.lineWidth=W+16; g.stroke();
         for(const sd of [-1,1]){ curvePath(g,P,s,b,sd*(W/2+5)); g.strokeStyle='#dfe2e6'; g.lineWidth=4; g.stroke(); curvePath(g,P,s,b,sd*(W/2+5)); g.strokeStyle='#6d7178'; g.lineWidth=4; g.setLineDash([2,10]); g.stroke(); g.setLineDash([]); }
@@ -279,7 +280,30 @@ function drawCurve(g,cv){
   else if(cv.type==='dual'){ line(0,'#8f9188',14); line(0,'#6a8f45',9); }
   else line(0,'#ececec',2,[24,24]);
   for(let k=1;k<half;k++) for(const sd of [-1,1]) line(sd*k*TILE,'#ececec',2,[24,24]);
+  if(cv.fo) for(const fo of cv.fo){ const a=Math.max(i0,fo.a), b=Math.min(i1,fo.b); if(a<b) foParapet(g,cv,P,a,b); }
   g.restore(); }
+// v20 flyover deck: drop shadow on the lower road, concrete piers either side of it, deck slab and parapets (chunk pass);
+// the live pass (drawFlyovers) repaints the deck over lower-layer traffic so cars visibly pass underneath
+function foUnder(g,cv,P,a,b,fo){ const W=cv.w*TILE; g.save();
+  g.save(); g.translate(16,22); curvePath(g,P,a,b,0); g.strokeStyle='rgba(10,14,22,0.38)'; g.lineWidth=W+14; g.stroke(); g.restore();
+  // piers: pairs of columns at intervals, skipped where they'd stand in a lower carriageway
+  for(let k=a+2;k<=b-2;k+=6){ const p=P[k], q=P[Math.min(P.length-1,k+1)], tx=q[0]-p[0], ty=q[1]-p[1], l=Math.hypot(tx,ty)||1, nx=-ty/l, ny=tx/l;
+    for(const sd of [-1,1]){ const x=p[0]+nx*sd*(W/2+2), y=p[1]+ny*sd*(W/2+2), ti=idx(Math.floor(x/TILE),Math.floor(y/TILE)); if(world.foF&&world.foF[ti]) continue;
+      g.fillStyle='rgba(10,14,22,0.35)'; g.beginPath(); g.arc(x+20,y+28,9,0,7); g.fill(); g.fillStyle='#9ea2a6'; g.beginPath(); g.arc(x+14,y+20,8,0,7); g.fill(); g.strokeStyle='#6c7075'; g.lineWidth=2; g.stroke(); } }
+  curvePath(g,P,a,b,0); g.strokeStyle='#b7babd'; g.lineWidth=W+16; g.stroke(); g.restore(); }
+function foParapet(g,cv,P,a,b){ const W=cv.w*TILE; g.save(); g.lineCap='butt';
+  for(const sd of [-1,1]){ curvePath(g,P,a,b,sd*(W/2+5)); g.strokeStyle='#e4e6e8'; g.lineWidth=6; g.stroke(); curvePath(g,P,a,b,sd*(W/2+5)); g.strokeStyle='#5f6368'; g.lineWidth=2; g.setLineDash([3,9]); g.stroke(); g.setLineDash([]);
+    curvePath(g,P,a,b,sd*(W/2+8.5)); g.strokeStyle='rgba(30,32,36,0.55)'; g.lineWidth=1.5; g.stroke(); }
+  // expansion joints at the deck ends
+  for(const k of [a,b]){ const p=P[k], q=P[Math.min(P.length-1,k+1)], o=P[Math.max(0,k-1)], tx=q[0]-o[0], ty=q[1]-o[1], l=Math.hypot(tx,ty)||1, nx=-ty/l*(W/2+8), ny=tx/l*(W/2+8);
+    g.strokeStyle='rgba(40,40,44,0.7)'; g.lineWidth=3; g.beginPath(); g.moveTo(p[0]-nx,p[1]-ny); g.lineTo(p[0]+nx,p[1]+ny); g.stroke(); }
+  g.restore(); }
+function drawFlyovers(vx0,vy0,vx1,vy1,alpha){ if(!world.flyovers||!world.flyovers.length) return;
+  for(const fo of world.flyovers){ const cv=world.curves[fo.cv]; if(!cv.px) cv.px=cv.pts.map(p=>[p[0]*TILE,p[1]*TILE]); const P=cv.px;
+    if(!fo.bb){ let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9; for(let k=fo.a;k<=fo.b;k++){ x0=Math.min(x0,P[k][0]); y0=Math.min(y0,P[k][1]); x1=Math.max(x1,P[k][0]); y1=Math.max(y1,P[k][1]); } fo.bb=[x0-100,y0-100,x1+100,y1+100]; }
+    const B=fo.bb; if(B[2]<vx0||B[0]>vx1||B[3]<vy0||B[1]>vy1) continue;
+    ctx.save(); if(alpha!==undefined) ctx.globalAlpha=alpha; drawCurve(ctx,cv,[fo.a,fo.b]); ctx.restore(); } }
+
 function isParkNear(tx,ty){ return get(tx+1,ty)===T.PGRASS||get(tx-1,ty)===T.PGRASS||get(tx,ty+1)===T.PGRASS||get(tx,ty-1)===T.PGRASS; }
 function getChunk(cx,cy,allowRender){
   const k=cx+','+cy; let c=chunkCache.get(k);
