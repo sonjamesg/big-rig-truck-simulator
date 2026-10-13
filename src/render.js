@@ -225,6 +225,7 @@ function renderChunk(cx,cy){
   const list=world.chunkObjs.get(cx+','+cy)||[];
   for(const o of list) drawObject(g,o);
   CUR_CHUNK=null; g.restore();
+  if(typeof railChunk==='function') railChunk(g,ox,oy,true);
   return c;
 }
 function hillElev(tx,ty){ let e=0; for(const h of world.hills){ const d=Math.hypot(tx-h.x,ty-h.y); if(d<h.r*1.15) e=Math.max(e,1-d/(h.r*1.1)); } return e; }

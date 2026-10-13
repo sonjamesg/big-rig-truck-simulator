@@ -885,6 +885,7 @@ function renderChunk(cx,cy){
   const list=world.chunkObjs.get(cx+','+cy)||[];
   for(const o of list) drawObject(g,o);
   CUR_CHUNK=null; g.restore();
+  if(typeof railChunk==='function') railChunk(g,ox,oy,true);
   return c;
 }
 function hillElev(tx,ty){ let e=0; for(const h of world.hills){ const d=Math.hypot(tx-h.x,ty-h.y); if(d<h.r*1.15) e=Math.max(e,1-d/(h.r*1.1)); } return e; }
@@ -3878,7 +3879,7 @@ function railBuild(objs){
       for(let cy=Math.floor((py-m)/CHUNK);cy<=Math.floor((py+m)/CHUNK);cy++) for(let cx=Math.floor((px-m)/CHUNK);cx<=Math.floor((px+m)/CHUNK);cx++){ const key=cx+','+cy; let a=RAIL.chunkRuns.get(key); if(!a) RAIL.chunkRuns.set(key,a=[]);
         const last=a[a.length-1]; if(last&&last[0]===ti&&last[2]===i-1) last[2]=i; else a.push([ti,i,i]); } } }
   for(const st of RAIL.stations){ const i=st.s; const key=Math.floor(X[i]*PPM/CHUNK)+','+Math.floor(Y[i]*PPM/CHUNK); }
-  railTimetable(); RAIL.ready=true;
+  railBridges(); railTimetable(); RAIL.ready=true;
 }
 function roadSegAt(tx,ty){ if(!inb(tx,ty)) return null; const i=idx(tx,ty), a=world.roadH[i], b=world.roadV[i]; const k=a>=0?a:b>=0?b:-1; return k>=0?world.segs[k]:null; }
 // ---------- timetable (pure functions of t in [0,cyc))
@@ -3953,29 +3954,72 @@ function railBarrierHit(s,prev){ if(!RAIL.ready) return false; let near=null; fo
     if(Math.abs(ua)<c.half+0.5&&Math.abs(wb)>=AW&&Math.abs(wa)<AW) return true; }
   return false; }
 // ---------- baked track (chunk cache)
-function railChunk(g,ox,oy){ if(!RAIL.ready) return; const runs=RAIL.chunkRuns.get(Math.floor(ox/CHUNK)+','+Math.floor(oy/CHUNK)); if(!runs) return; const S=PPM;
+function railChunk(g,ox,oy,top){ if(!RAIL.ready) return; const runs=RAIL.chunkRuns.get(Math.floor(ox/CHUNK)+','+Math.floor(oy/CHUNK)); if(!runs) return; const S=PPM;
   g.save(); g.translate(-ox,-oy); g.lineCap='butt'; g.lineJoin='round';
   const path=(P,i0,i1,w)=>{ g.beginPath(); for(let i=i0;i<=i1;i++){ const p=P[i]; const x=(p.x+p.nx*w)*S, y=(p.y+p.ny*w)*S; i===i0?g.moveTo(x,y):g.lineTo(x,y); } };
   const sub=(P,i0,i1,test,fn)=>{ let a=-1; for(let i=i0;i<=i1+1;i++){ const ok=i<=i1&&test(P[i].k); if(ok&&a<0) a=Math.max(i0,i-1); if(!ok&&a>=0){ fn(a,Math.min(i1,i)); a=-1; } } };
+  const rails=(P,a,b)=>{ for(const w of [-0.75,0.75]){ path(P,a,b,w); g.strokeStyle='rgba(0,0,0,0.6)'; g.lineWidth=0.46*S; g.stroke(); g.strokeStyle='#8e959e'; g.lineWidth=0.3*S; g.stroke(); g.strokeStyle='#f6f9fc'; g.lineWidth=0.11*S; g.stroke(); } };
+  const outer=ti=>ti===1||ti===3||ti===4?-1:1;
+  if(top){ // level-crossing panels + rails redrawn above road markings / junction paint
+    for(const [ti,i0,i1] of runs){ const P=RAIL.tracks[ti].P;
+      sub(P,i0,i1,k=>k===4,(a,b)=>{ path(P,a,b,0); g.strokeStyle='#3b3d41'; g.lineWidth=3.8*S; g.stroke(); g.strokeStyle='#55585e'; g.lineWidth=3.3*S; g.stroke();
+        g.strokeStyle='#d9d4c6'; g.lineWidth=0.16*S; for(const w of [-1.85,1.85]){ path(P,a,b,w); g.stroke(); }
+        for(let i=a;i<b;i++){ const p=P[i]; g.fillStyle='rgba(0,0,0,0.28)'; for(const w of [-1.25,0,1.25]) g.fillRect((p.x+p.nx*w)*S-1,(p.y+p.ny*w)*S-1,2,2); }
+        rails(P,a,b); }); }
+    g.restore(); return; }
   for(const [ti,i0,i1] of runs){ const P=RAIL.tracks[ti].P;
-    sub(P,i0,i1,k=>k===0,(a,b)=>{ path(P,a,b,0); g.strokeStyle='#7b766d'; g.lineWidth=4.0*S; g.stroke(); g.strokeStyle='#958f84'; g.lineWidth=3.2*S; g.stroke(); });
-    sub(P,i0,i1,k=>k===2,(a,b)=>{ path(P,a,b,0); g.strokeStyle='rgba(0,0,0,0.28)'; g.lineWidth=4.6*S; g.save(); g.translate(10,12); g.stroke(); g.restore(); g.strokeStyle='#4c5159'; g.lineWidth=4.6*S; g.stroke(); g.strokeStyle='#6f7680'; g.lineWidth=3.4*S; g.stroke();
-      g.strokeStyle='#c43d2c'; g.lineWidth=0.35*S; for(const w of [-2.15,2.15]){ path(P,a,b,w); g.stroke(); } });
-    sub(P,i0,i1,k=>k===4,(a,b)=>{ path(P,a,b,0); g.strokeStyle='#3a3c40'; g.lineWidth=3.3*S; g.stroke(); g.strokeStyle='#d8d4c8'; g.lineWidth=0.18*S; for(const w of [-1.6,1.6]){ path(P,a,b,w); g.stroke(); } }); }
+    sub(P,i0,i1,k=>k===0,(a,b)=>{ path(P,a,b,0); g.strokeStyle='#463f38'; g.lineWidth=5.0*S; g.stroke(); g.strokeStyle='#5f564d'; g.lineWidth=4.2*S; g.stroke(); g.strokeStyle='#6a6056'; g.lineWidth=3.0*S; g.stroke(); });
+    sub(P,i0,i1,k=>k===2,(a,b)=>{ path(P,a,b,0); g.strokeStyle='rgba(0,0,0,0.4)'; g.lineWidth=5.6*S; g.save(); g.translate(22,30); g.stroke(); g.restore(); g.strokeStyle='#4a5058'; g.lineWidth=5.6*S; g.stroke(); g.strokeStyle='#6b7179'; g.lineWidth=4.4*S; g.stroke();
+      const o=outer(ti); path(P,a,b,o*2.55); g.strokeStyle='#2c3036'; g.lineWidth=0.5*S; g.stroke(); g.strokeStyle='#cfd4da'; g.lineWidth=0.22*S; g.stroke();
+      for(let i=a;i<=b;i+=3){ const p=P[i]; g.fillStyle='#2c3036'; g.fillRect((p.x+p.nx*o*2.55)*S-1.5,(p.y+p.ny*o*2.55)*S-1.5,3,3); } });
+    sub(P,i0,i1,k=>k===4,(a,b)=>{ path(P,a,b,0); g.strokeStyle='#3b3d41'; g.lineWidth=3.8*S; g.stroke(); }); }
   for(const [ti,i0,i1] of runs){ const P=RAIL.tracks[ti].P;
     // ballast stones + sleepers
     for(let i=i0;i<=i1;i++){ const p=P[i]; if(p.k!==0&&p.k!==2) continue; const tx=-p.ny, ty=p.nx;
-      if(p.k===0) for(let q=0;q<7;q++){ const h=rlHash((p.s*13+q)*7919+ti*97), h2=rlHash(h*1e9|0), w=(h-0.5)*3.4, u=h2-0.5; const x=(p.x+p.nx*w+tx*u)*S, y=(p.y+p.ny*w+ty*u)*S; g.fillStyle=q%3?'#6c675f':q%2?'#b3ada2':'#585249'; g.fillRect(x,y,2+(q&1),2); }
-      for(let k2=0;k2<3;k2++){ const u=k2*0.333; if(i===P.length-1) break; const q=P[i+1]; const cx=(p.x+(q.x-p.x)*u)*S, cy=(p.y+(q.y-p.y)*u)*S, hx=p.nx*1.3*S, hy=p.ny*1.3*S, ax=tx*0.13*S, ay=ty*0.13*S;
-        g.fillStyle=p.k===2?'#3d3a36':'#b9b3a7'; g.beginPath(); g.moveTo(cx-hx-ax,cy-hy-ay); g.lineTo(cx+hx-ax,cy+hy-ay); g.lineTo(cx+hx+ax,cy+hy+ay); g.lineTo(cx-hx+ax,cy-hy+ay); g.fill();
-        g.fillStyle='rgba(0,0,0,0.25)'; g.fillRect(cx+hx*0.55-1,cy+hy*0.55-1,2,2); g.fillRect(cx-hx*0.55-1,cy-hy*0.55-1,2,2); } }
-    // bridge piers
-    for(let i=i0;i<=i1;i++){ const p=P[i]; if(p.k===2&&p.s%28===0){ g.fillStyle='rgba(0,0,0,0.3)'; g.fillRect(p.x*S-8+14,p.y*S-8+16,16,16); } }
-    // rails: dark base, steel body, bright running surface
-    sub(P,i0,i1,k=>k!==3,(a,b)=>{ for(const w of [-0.72,0.72]){ path(P,a,b,w); g.strokeStyle='rgba(0,0,0,0.45)'; g.lineWidth=0.30*S; g.stroke(); g.strokeStyle='#7d8189'; g.lineWidth=0.2*S; g.stroke(); g.strokeStyle='#eef3f8'; g.lineWidth=0.07*S; g.stroke(); } }); }
+      if(p.k===0) for(let q=0;q<14;q++){ const h=rlHash((p.s*13+q)*7919+ti*97), h2=rlHash(h*1e9|0), w=(h-0.5)*4.4, u=h2-0.5; const x=(p.x+p.nx*w+tx*u)*S, y=(p.y+p.ny*w+ty*u)*S; g.fillStyle=['#7d7266','#4b433b','#8e8478','#5a5148','#9c9286','#3f3832'][q%6]; g.fillRect(x,y,1.5+(q&1)*1.2,1.5+(q%3===0?1:0)); }
+      for(let k2=0;k2<2;k2++){ const u=k2*0.5; if(i===P.length-1) break; const q=P[i+1]; const cx=(p.x+(q.x-p.x)*u)*S, cy=(p.y+(q.y-p.y)*u)*S, hx=p.nx*1.35*S, hy=p.ny*1.35*S, ax=tx*0.15*S, ay=ty*0.15*S;
+        g.fillStyle='rgba(0,0,0,0.35)'; g.beginPath(); g.moveTo(cx-hx-ax+1,cy-hy-ay+1.5); g.lineTo(cx+hx-ax+1,cy+hy-ay+1.5); g.lineTo(cx+hx+ax+1,cy+hy+ay+1.5); g.lineTo(cx-hx+ax+1,cy-hy+ay+1.5); g.fill();
+        g.fillStyle=p.k===2?'#26282b':'#2f2721'; g.beginPath(); g.moveTo(cx-hx-ax,cy-hy-ay); g.lineTo(cx+hx-ax,cy+hy-ay); g.lineTo(cx+hx+ax,cy+hy+ay); g.lineTo(cx-hx+ax,cy-hy+ay); g.fill();
+        g.fillStyle='#55473b'; g.fillRect(cx-hx*0.9-0.5,cy-hy*0.9-0.5,1,1); g.fillStyle='#5a5048'; g.fillRect(cx+hx*0.55-1,cy+hy*0.55-1,2,2); g.fillRect(cx-hx*0.55-1,cy-hy*0.55-1,2,2); } }
+    sub(P,i0,i1,k=>k!==3,(a,b)=>rails(P,a,b)); }
+  // suspension-bridge tower + cable shadows on the water (static, baked once per chunk)
+  for(const br of RAIL.bridges||[]){ if(br.cx*S<ox-1500||br.cx*S>ox+CHUNK+1500||br.cy*S<oy-1500||br.cy*S>oy+CHUNK+1500) continue; const sh=(x,y,h)=>[x*S+h*S*0.55,y*S+h*S*0.75];
+    g.strokeStyle='rgba(0,20,40,0.28)'; g.lineCap='round';
+    for(const sd of [-1,1]){ g.lineWidth=0.8*S; g.beginPath(); br.cab.forEach(([s,h],k)=>{ const d=railPt(s,sd*BR_LAT), q=sh(d[0],d[1],h); k?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]); }); g.stroke(); }
+    g.fillStyle='rgba(0,20,40,0.32)'; for(const sT of br.tw){ for(const sd of [-1,1]){ const b=railPt(sT,sd*BR_TW); g.lineWidth=2.4*S; g.beginPath(); g.moveTo(b[0]*S,b[1]*S); const q=sh(b[0],b[1],BR_H); g.lineTo(q[0],q[1]); g.stroke(); }
+      for(const f of [0.5,0.78,0.98]){ const l=railPt(sT,-BR_TW), r=railPt(sT,BR_TW), a1=sh(l[0],l[1],BR_H*f), a2=sh(r[0],r[1],BR_H*f); g.lineWidth=1.4*S; g.beginPath(); g.moveTo(a1[0],a1[1]); g.lineTo(a2[0],a2[1]); g.stroke(); } }
+    g.lineCap='butt'; }
   // stations (platforms, shelters, canopies, signs)
   for(const st of RAIL.stations){ const px=RAIL.X[st.s]*S, py=RAIL.Y[st.s]*S; if(px<ox-2600||px>ox+CHUNK+2600||py<oy-2600||py>oy+CHUNK+2600) continue; railBakeStation(g,st); }
   g.restore(); }
+// ---------- Golden-Gate-style suspension bridges (grey steel). Geometry precomputed once in railBridges(); towers/cables lean with height (parallax)
+const BR_H=58, BR_TW=7.2, BR_LAT=6.6, BR_PAR=0.008;
+function railBridges(){ const P=RAIL.tracks[0].P, out=[]; let a=-1;
+  for(let i=0;i<=P.length;i++){ const w=i<P.length&&P[i].k===2; if(w&&a<0) a=i; if(!w&&a>=0){ if(i-a>=40) out.push([a-6,i+6]); a=-1; } }
+  RAIL.bridges=out.map(([sA,sB])=>{ const Lb=sB-sA, c=railPt((sA+sB)/2,0), t1=sA+Lb*(Lb>160?0.2:0.12), t2=sB-Lb*(Lb>160?0.2:0.12), cab=[], hang=[];
+    const hAt=s=>{ if(s<t1){ const u=(s-sA)/(t1-sA); return 2+(BR_H-3-2)*u*u; } if(s>t2){ const u=(sB-s)/(sB-t2); return 2+(BR_H-3-2)*u*u; } const u=(s-(t1+t2)/2)/((t2-t1)/2); return 3.5+(BR_H-3-3.5)*u*u; };
+    for(let s=sA;s<=sB;s+=4){ cab.push([s,hAt(s)]); if(Math.abs(s-t1)>3&&Math.abs(s-t2)>3&&s>sA+2&&s<sB-2) hang.push([s,hAt(s)]); } cab.push([sB,hAt(sB)]);
+    return {sA,sB,cx:c[0],cy:c[1],tw:[t1,t2],cab,hang}; }); }
+function railLift(x,y,h){ const px=x*PPM, py=y*PPM, k=h*BR_PAR; return [px+(px-cam.x)*k, py+(py-cam.y)*k]; }
+function drawRailBridges(vx0,vy0,vx1,vy1){ const S=PPM;
+  for(const br of RAIL.bridges||[]){ const a=railPt(br.sA,0), b=railPt(br.sB,0); if(Math.max(a[0],b[0])*S<vx0-900||Math.min(a[0],b[0])*S>vx1+900||Math.max(a[1],b[1])*S<vy0-900||Math.min(a[1],b[1])*S>vy1+900) continue;
+    ctx.save(); ctx.lineCap='round'; ctx.lineJoin='round';
+    // hangers then main cables
+    for(const sd of [-1,1]){ ctx.strokeStyle='rgba(205,210,216,0.85)'; ctx.lineWidth=Math.max(1,0.16*S); ctx.beginPath();
+      for(const [s,h] of br.hang){ const d=railPt(s,sd*BR_LAT), p0=railLift(d[0],d[1],1.2), p1=railLift(d[0],d[1],h); ctx.moveTo(p0[0],p0[1]); ctx.lineTo(p1[0],p1[1]); } ctx.stroke();
+      const cab=()=>{ ctx.beginPath(); br.cab.forEach(([s,h],k)=>{ const d=railPt(s,sd*BR_LAT), q=railLift(d[0],d[1],h); k?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1]); }); };
+      cab(); ctx.strokeStyle='#3e444b'; ctx.lineWidth=0.95*S; ctx.stroke(); ctx.strokeStyle='#a9b0b8'; ctx.lineWidth=0.6*S; ctx.stroke(); ctx.strokeStyle='rgba(255,255,255,0.7)'; ctx.lineWidth=0.18*S; ctx.stroke(); }
+    // towers: twin legs, portal beams with arches, caps
+    for(const sT of br.tw){ const L0=railPt(sT,-BR_TW), R0=railPt(sT,BR_TW);
+      const leg=(B)=>{ const p0=railLift(B[0],B[1],0), p1=railLift(B[0],B[1],BR_H); ctx.lineCap='butt'; ctx.strokeStyle='#353a41'; ctx.lineWidth=3.6*S; ctx.beginPath(); ctx.moveTo(p0[0],p0[1]); ctx.lineTo(p1[0],p1[1]); ctx.stroke();
+        ctx.strokeStyle="#7d858e"; ctx.lineWidth=2.9*S; ctx.stroke(); ctx.strokeStyle='#a7aeb6'; ctx.lineWidth=0.7*S; ctx.stroke(); return p1; };
+      ctx.fillStyle='#4d535b'; for(const B of [L0,R0]){ const q=railLift(B[0],B[1],0); ctx.fillRect(q[0]-2*S,q[1]-2*S,4*S,4*S); }
+      leg(L0); leg(R0);
+      for(const f of [0.42,0.68,0.9]){ const l=railLift(L0[0],L0[1],BR_H*f), r=railLift(R0[0],R0[1],BR_H*f), lu=railLift(L0[0],L0[1],BR_H*(f-0.09)), ru=railLift(R0[0],R0[1],BR_H*(f-0.09)), m=[(lu[0]+ru[0])/2,(lu[1]+ru[1])/2], mt=[(l[0]+r[0])/2,(l[1]+r[1])/2];
+        ctx.beginPath(); ctx.moveTo(l[0],l[1]); ctx.lineTo(r[0],r[1]); ctx.lineTo(ru[0],ru[1]); ctx.quadraticCurveTo(mt[0]+(m[0]-mt[0])*0.2,mt[1]+(m[1]-mt[1])*0.2,lu[0],lu[1]); ctx.closePath(); ctx.fillStyle='#6f777f'; ctx.fill(); ctx.strokeStyle='#353a41'; ctx.lineWidth=0.35*S; ctx.stroke(); }
+      for(const B of [L0,R0]){ const q=railLift(B[0],B[1],BR_H+1); ctx.fillStyle='#353a41'; ctx.fillRect(q[0]-1.7*S,q[1]-1.7*S,3.4*S,3.4*S); ctx.fillStyle='#b9c0c7'; ctx.fillRect(q[0]-1.3*S,q[1]-1.3*S,2.6*S,2.6*S);
+        if(DN.dark>0.2){ ctx.fillStyle='#ff3b2a'; ctx.beginPath(); ctx.arc(q[0],q[1],0.5*S,0,7); ctx.fill(); dnLight(q[0],q[1],24,'rgba(255,50,30,0.9)',0.8); } } }
+    ctx.restore(); } }
 function railQuad(g,s0,s1,w0,w1,wf){ const L=RAIL.L; g.beginPath(); for(let s=s0;s<=s1;s+=2){ const i=rlMod(Math.round(s),L), w=wf?wf(s,w0):w0; const x=(RAIL.X[i]+RAIL.NX[i]*w)*PPM, y=(RAIL.Y[i]+RAIL.NY[i]*w)*PPM; s===s0?g.moveTo(x,y):g.lineTo(x,y); }
   for(let s=s1;s>=s0;s-=2){ const i=rlMod(Math.round(s),L), w=wf?wf(s,w1):w1; g.lineTo((RAIL.X[i]+RAIL.NX[i]*w)*PPM,(RAIL.Y[i]+RAIL.NY[i]*w)*PPM); } g.closePath(); }
 function railPt(s,w){ const L=RAIL.L, sf=rlMod(s,L), i=Math.floor(sf), j=(i+1)%L, f=sf-i; const x=RAIL.X[i]+(RAIL.X[j]-RAIL.X[i])*f, y=RAIL.Y[i]+(RAIL.Y[j]-RAIL.Y[i])*f; return [x+RAIL.NX[i]*w,y+RAIL.NY[i]*w]; }
@@ -4076,7 +4120,8 @@ function drawRail(vx0,vy0,vx1,vy1){ if(!RAIL.ready) return; railFrame(); const t
   for(const st of RAIL.stations){ const p0=railPt(st.s,5); if(!inV(p0[0],p0[1],st.len*S)) continue; railDrawPeds(st,t);
     if(DN.dark>0.05) for(let s=st.s-st.len/2+10;s<st.s+st.len/2;s+=25){ const p=railPt(s,6.8); dnLight(p[0]*S,p[1]*S,60,'rgba(255,230,170,0.6)',0.6); } }
   // level crossings: posts, red flashers, barrier arms
-  for(const c of RAIL.cross){ if(c.over||!inV(c.mx,c.my,500)) continue; railDrawCrossing(c,t); } }
+  for(const c of RAIL.cross){ if(c.over||!inV(c.mx,c.my,500)) continue; railDrawCrossing(c,t); }
+  drawRailBridges(vx0,vy0,vx1,vy1); }
 function railBlit(c,x,y,ang,lit){ const sp=railSprite(c,lit), S=PPM; ctx.save(); ctx.translate(x*S,y*S); ctx.rotate(ang);
   ctx.fillStyle='rgba(10,15,25,0.3)'; ctx.fillRect(-c.L*S/2+5,-sp.W/12*S/2*1+6,c.L*S,2.9*S); ctx.drawImage(sp.c,-c.L*S/2-2*S/sp.S,-2.9*S/2-2*S/sp.S,sp.c.width*S/sp.S,sp.c.height*S/sp.S); ctx.restore(); }
 function railDrawPeds(st,t){ const S=PPM; let dw=null, trn=null; for(const tr of RAIL.trains){ if(!tr.pax) continue; const d=railDwelling(tr,t); if(d&&d.st===st){ dw=d; trn=tr; break; } }
