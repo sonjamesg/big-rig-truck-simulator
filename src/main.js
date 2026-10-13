@@ -50,7 +50,7 @@ function frame(ts){
     if(truck.bump>0.01 && !truck._bumped){ thump(truck.bump); cam.shake=truck.bump*10; truck._bumped=true; } if(truck.bump<=0.01) truck._bumped=false;
     updateAudio(truck,inp,timeS);
   }
-  if(!paused){ updateTraffic(dt); updateFuel(dt); updateForecourts(dt); if(started) updateCareer(dt); }
+  if(!paused){ updateTraffic(dt); updateFuel(dt); updateForecourts(dt); if(started) updateCareer(dt); if(started) updateIndicators(dt); }
   { const z=cam.z; updateAmbient(dt,[cam.x-VW/2/z,cam.y-VH/2/z,cam.x+VW/2/z,cam.y+VH/2/z]); }
   if(started&&!paused) updateNav(dt);
   if(truck.bump>0.05&&!truck._dmg){ truck.damage=Math.min(100,truck.damage+truck.bump*6); truck._dmg=true; } if(truck.bump<=0.01) truck._dmg=false;
@@ -108,6 +108,7 @@ function drawLorry(){
   const f=fwd(s.h), r=rgt(s.h); const fx=s.x+f[0]*CAB.wheelbase, fy=s.y+f[1]*CAB.wheelbase;
   for(const sd of [-1,1]){ ctx.save(); ctx.translate((fx+r[0]*sd*1.12)*PPM,(fy+r[1]*sd*1.12)*PPM); ctx.rotate(s.h+s.steer); ctx.fillStyle='#141414'; ctx.fillRect(-2.2,-4.5,4.4,9); ctx.restore(); }
   blit(s.trl?cabLayers(CABART).front:CABART,s.x,s.y,s.h);
+  indLampsAt(s.x,s.y,s.h,!!s.trl,k[0],k[1],s.th,IND.side,IND.haz);
   // headlight beams at night? (daytime build) - small DRL dots
   ctx.fillStyle='rgba(255,250,220,0.9)'; for(const sd of [-1,1]){ const hx=(s.x+f[0]*5.0+r[0]*sd*1.0)*PPM, hy=(s.y+f[1]*5.0+r[1]*sd*1.0)*PPM; ctx.fillRect(hx-1.5,hy-1.5,3,3); }
 }
@@ -188,7 +189,7 @@ function drawOverhead(o){
 // ---------- HUD
 function drawHUD(){
   const s=truck, kmh=Math.abs(s.v)*3.6;
-  drawMinimap(); drawCoupleHUD(); drawFuelHUD(); drawCareerHUD(); drawNavHUD();
+  drawMinimap(); drawCoupleHUD(); drawFuelHUD(); drawIndHUD(); drawCareerHUD(); drawNavHUD();
   // gauge panel
   const gx=14, gy=VH-150, gw=186, gh=136;
   ctx.fillStyle='rgba(10,14,22,0.72)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(gx,gy,gw,gh,16):ctx.rect(gx,gy,gw,gh); ctx.fill();

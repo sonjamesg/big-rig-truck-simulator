@@ -2,7 +2,7 @@ import os, zipfile, shutil
 d=os.path.dirname(os.path.abspath(__file__)); s=os.path.join(d,'src')
 js=open(os.path.join(s,'peerjs.min.js')).read()+"\n;\n"+"const ENGINE_WAV_B64='"+open(os.path.join(s,'engine_b64.txt')).read().strip()+"';\n"
 js_v2='(function(){\n'+open(os.path.join(s,'v2','layout.js')).read()+'\n'+open(os.path.join(s,'v2','cities2.js')).read()+'\n'+open(os.path.join(s,'v2','v2graph.js')).read()+'\n'+open(os.path.join(s,'v2','v2world.js')).read()+'\n})();\n'
-for f in ['keyguard.js','world.js','render.js','lorry.js','physics.js','audio.js','traffic.js','markings.js','signals.js','roadgraph.js','depots.js','fuel.js','sites.js','career.js','ui.js','ambient.js','satnav.js','gamepad.js','mp.js','mobile.js','breakdown.js','main.js']:
+for f in ['keyguard.js','world.js','render.js','lorry.js','physics.js','audio.js','traffic.js','markings.js','signals.js','roadgraph.js','depots.js','fuel.js','sites.js','career.js','ui.js','ambient.js','satnav.js','gamepad.js','mp.js','mobile.js','breakdown.js','indicators.js','main.js']:
     if f=='main.js': js+=js_v2+open(os.path.join(s,'v2','v2render.js')).read()+'\n'+open(os.path.join(s,'v2','v2nav.js')).read()+'\n'
     js+=open(os.path.join(s,f)).read()+"\n"
 html=open(os.path.join(s,'template.html')).read().replace('/*SCRIPT*/',js)

@@ -12,8 +12,8 @@ body{background:radial-gradient(ellipse at top,#2b3a55 0%,#141b2a 55%,#0b0f18 10
 #titlebar small{font-weight:700;letter-spacing:1px;font-size:12px;opacity:.8}
 #frame{position:relative;width:984px;padding:12px;background:#1b2130;border:3px solid #0d0f14;border-radius:0 0 14px 14px;box-shadow:0 18px 50px rgba(0,0,0,0.55), inset 0 0 0 2px #2c3548}
 #frame:fullscreen{width:100vw;height:100vh;border-radius:0;display:flex;align-items:center;justify-content:center;background:#000;padding:0}
-#frame:fullscreen canvas{width:min(100vw,160vh);height:auto}
-canvas{display:block;width:960px;height:600px;border-radius:6px;background:#5d9b3a;image-rendering:auto}
+#frame:fullscreen #game{width:min(100vw,160vh);height:auto}
+#game{display:block;width:960px;height:600px;border-radius:6px;background:#5d9b3a;image-rendering:auto}
 #fs{position:absolute;top:20px;right:20px;z-index:5;background:rgba(10,14,22,0.6);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer}
 #fs:hover{background:rgba(232,163,23,0.8);color:#000}
 #overlay{position:absolute;inset:12px;border-radius:6px;background:rgba(8,12,20,0.78);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;z-index:4;text-align:center}

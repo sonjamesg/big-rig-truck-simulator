@@ -62,7 +62,7 @@ function mobInit(){ if(!document.body.classList.contains('touch')) return; MOB.o
   mobBtn('mA','A<small>GAS</small>','ab',()=>{ if(career.uiOpen) MOB.nav.okA(); else { if(!started) startGame(); input.up=true; } });
   mobBtn('mB','B<small>BRAKE</small>','ab',()=>{ if(career.uiOpen) MOB.nav.back(); else input.down=true; });
   for(const id of ['mA','mB']){ const el=document.getElementById(id); const off=()=>{ input[id==='mA'?'up':'down']=false; }; el.addEventListener('pointerup',off); el.addEventListener('pointercancel',off); el.addEventListener('pointerleave',off); }
-  mobBtn('mHand','P<small>HANDBRAKE</small>','fn','hand'); mobBtn('mHorn','\u{1F4E3}<small>HORN</small>','fn','horn');
+  mobBtn('mIndL','\u2B05<small>IND</small>','fn',act(()=>indToggle(1))); mobBtn('mIndR','\u27A1<small>IND</small>','fn',act(()=>indToggle(2))); mobBtn('mHaz','\u26A0<small>HAZ</small>','fn',act(()=>hazToggle())); mobBtn('mHand','P<small>HANDBRAKE</small>','fn','hand'); mobBtn('mHorn','\u{1F4E3}<small>HORN</small>','fn','horn');
   mobBtn('mCouple','\u{1F517}<small>COUPLE</small>','fn ctx',act(()=>toggleCouple())); mobBtn('mFuel','\u26FD<small>REFUEL</small>','fn ctx',act(()=>toggleRefuel())); mobBtn('mUnload','\u{1F4E6}<small>UNLOAD</small>','fn ctx',act(()=>tryUnload()));
   mobBtn('mJobs','\u{1F4CB}<small>JOBS</small>','fn pill',act(()=>{ if(career.uiOpen) closeUI(); else openBoard(); })); mobBtn('mMap','\u{1F5FA}<small>MAP</small>','fn pill',act(()=>{ bigmap.open?closeMap():openMap(); }));
   mobBtn('mChat','\u{1F4AC}<small>CHAT</small>','fn',()=>{ if(!MP.on) return; const ci=document.getElementById('mpChatIn'); ci.style.display='block'; setTimeout(()=>ci.focus(),0); });
@@ -85,14 +85,14 @@ function mobLayout(){ if(!MOB.on) return; const W=innerWidth, H=innerHeight, por
     const sb=Math.min(58,(g-3*pad)/2), row=(i,j,side)=>[side?W-g+pad+j*(sb+pad):pad+j*(sb+pad),pad+i*(sb+pad)];
     let p=row(0,0,0); place('mHand',p[0],p[1],sb,sb); p=row(0,1,0); place('mHorn',p[0],p[1],sb,sb); p=row(1,0,0); place('mJobs',p[0],p[1],sb,sb); p=row(1,1,0); place('mMap',p[0],p[1],sb,sb);
     p=row(2,0,0); place('mChat',p[0],p[1],sb,sb,MP.on);
-    p=row(0,0,1); place('mCouple',p[0],p[1],sb,sb); p=row(0,1,1); place('mFuel',p[0],p[1],sb,sb); p=row(1,0,1); place('mUnload',p[0],p[1],sb*2+pad,sb);
+    p=row(0,0,1); place('mCouple',p[0],p[1],sb,sb); p=row(0,1,1); place('mFuel',p[0],p[1],sb,sb); p=row(1,0,1); place('mUnload',p[0],p[1],sb*2+pad,sb); p=row(2,0,1); place('mIndL',p[0],p[1],sb,sb); p=row(2,1,1); place('mIndR',p[0],p[1],sb,sb); p=row(3,0,1); place('mHaz',p[0],p[1],sb*2+pad,sb*0.7);
     for(const id of ['mLeft','mRight','mUp','mDown','mCen','mA','mB']) place(id,0,0,0,0,false);
   } else { // portrait: handheld — screen on top, deck below
     const top=sa('--sat'); cw=W-16; ch=cw/1.6; cx=8; cy=8+Math.max(0,top); const deckTop=cy+ch+10; const dk=document.getElementById('deck'); dk.style.top=deckTop+'px';
     const DH=H-deckTop, u=Math.min(W/412,DH/520); const S=v=>v*u;
     const dcx=S(92), dcy=deckTop+DH*0.36, k=S(46); place('mUp',dcx-k/2,dcy-k*1.5,k,k); place('mDown',dcx-k/2,dcy+k/2,k,k); place('mLeft',dcx-k*1.5,dcy-k/2,k,k); place('mRight',dcx+k/2,dcy-k/2,k,k); place('mCen',dcx-k/2,dcy-k/2,k,k);
     const ab=S(70); place('mB',W-S(170),dcy-ab*0.1,ab,ab); place('mA',W-S(88),dcy-ab*0.75,ab,ab);
-    const fy=deckTop+DH*0.64, fw=Math.min(S(64),(W-40)/5-8), gap=(W-5*fw)/6; ['mCouple','mFuel','mUnload','mHand','mHorn'].forEach((id,i)=>place(id,gap+i*(fw+gap),fy,fw,fw*0.86));
+    const fy=deckTop+DH*0.64, fw=Math.min(S(64),(W-40)/5-8), gap=(W-5*fw)/6; ['mCouple','mFuel','mUnload','mHand','mHorn'].forEach((id,i)=>place(id,gap+i*(fw+gap),fy,fw,fw*0.86)); ['mIndL','mHaz','mIndR'].forEach((id,i)=>place(id,gap+(i*2)*(fw+gap),fy+fw*0.95,fw,fw*0.6));
     const py=deckTop+DH*0.84; place('mMap',W/2-S(96),py,S(74),S(26)); place('mJobs',W/2+S(10),py,S(74),S(26)); place('mChat',S(16),py-S(6),S(52),S(40),MP.on);
     for(const id of ['mSteer','mGas','mBrk']) place(id,0,0,0,0,false);
   }
