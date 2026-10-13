@@ -253,7 +253,7 @@ function drawMapDetail(X0,Y0,z,x0,y0,x1,y1){   // X0/Y0: screen pos of tile 0,0;
   return miss; }
 function mapFitZ(){ return Math.min((VW-40)/MW,(VH-60)/MH); }
 const LOCAL_Z=(VW-40)/250;   // ~1 km (250 tiles) across
-function mapClamp(){ const z=bigmap.z, hw=(VW-40)/2/z, hh=(VH-60)/2/z; bigmap.cx=MW<2*hw?MW/2:Math.max(hw,Math.min(MW-hw,bigmap.cx)); bigmap.cy=MH<2*hh?MH/2:Math.max(hh,Math.min(MH-hh,bigmap.cy)); }
+function mapClamp(){ bigmap.cx=Math.max(0,Math.min(MW,bigmap.cx)); bigmap.cy=Math.max(0,Math.min(MH,bigmap.cy)); }   // v26: free pan; any point of the world can reach the screen centre (ocean beyond the edge)
 function mapCentreTruck(){ bigmap.cx=truck.x*PPM/TILE; bigmap.cy=truck.y*PPM/TILE; bigmap.anchor=null; mapClamp(); }
 function mapZoomTo(zt,mx,my){ bigmap.zt=Math.max(mapFitZ(),Math.min(14,zt)); bigmap.anchor=(mx===undefined)?[VW/2,VH/2+10]:[mx,my]; }
 function openMap(){ if(!started) return; bigmap.open=true; bigmap.z=bigmap.zt=bigmap.saved||LOCAL_Z; mapCentreTruck(); }
@@ -299,17 +299,20 @@ function drawBigMap(){
   // buttons
   ctx.textAlign='center'; ctx.textBaseline='middle'; MAPBTN.forEach(([t],i)=>{ const [bx,by,bw,bh]=mapBtnRect(i); ctx.fillStyle='rgba(12,18,28,0.85)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(bx,by,bw,bh,8):ctx.rect(bx,by,bw,bh); ctx.fill(); ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.lineWidth=1; ctx.stroke(); ctx.fillStyle='#fff'; ctx.font='bold 22px system-ui,sans-serif'; ctx.fillText(t,bx+bw/2,by+bh/2+1); });
   // legend
-  { const lx0=30, ly0=VH-108; ctx.fillStyle='rgba(12,18,28,0.85)'; ctx.fillRect(lx0,ly0,168,86); ctx.textAlign='left'; ctx.font='bold 11px system-ui,sans-serif'; ctx.fillStyle='#f5b82e'; ctx.fillText('LEGEND',lx0+10,ly0+12);
-    const items=[['#2e86de','D','Depot (trailer bays)'],['#27ae60','F','Fuel / truck stop'],['#e67e22','G','Repair garage'],['#d6336c','S','Mall / supermarket'],['#8e44ad','$','Truck dealer'],['#ffdd33','▲','Your lorry']];
-    ctx.font='11px system-ui,sans-serif'; items.forEach(([c,l,n],i)=>{ const y=ly0+30+i*16; ctx.fillStyle=c; ctx.beginPath(); ctx.arc(lx0+16,y,6,0,7); ctx.fill(); ctx.fillStyle=i===3?'#000':'#fff'; ctx.font='bold 9px system-ui'; ctx.textAlign='center'; ctx.fillText(l,lx0+16,y+0.5); ctx.textAlign='left'; ctx.font='11px system-ui,sans-serif'; ctx.fillStyle='#e8eef5'; ctx.fillText(n,lx0+30,y); }); }
+  { if(bigmap.leg===undefined) bigmap.leg=!PORTRAIT_SQ; const items=[['#2e86de','D','Depot'],['#27ae60','F','Fuel'],['#e67e22','G','Garage'],['#d6336c','S','Mall / shop'],['#8e44ad','$','Dealer'],['#ffdd33','\u25B2','Your lorry']];
+    const lx0=28, w=bigmap.leg?196:92, h=bigmap.leg?24+Math.ceil(items.length/2)*17+4:24, ly0=VH-28-h; LEG_BTN=[lx0,ly0,w,h];
+    ctx.fillStyle='rgba(12,18,28,0.88)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(lx0,ly0,w,h,8):ctx.rect(lx0,ly0,w,h); ctx.fill(); ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1; ctx.stroke();
+    ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.font='bold 11px system-ui,sans-serif'; ctx.fillStyle='#f5b82e'; ctx.fillText('LEGEND '+(bigmap.leg?'\u25BE':'\u25B8'),lx0+10,ly0+12);
+    if(bigmap.leg) items.forEach(([c,l,n],i)=>{ const x=lx0+10+(i%2)*92, y=ly0+32+((i/2)|0)*17; ctx.fillStyle=c; ctx.beginPath(); ctx.arc(x+6,y,6,0,7); ctx.fill(); ctx.fillStyle=i===5?'#000':'#fff'; ctx.font='bold 9px system-ui'; ctx.textAlign='center'; ctx.fillText(l,x+6,y+0.5); ctx.textAlign='left'; ctx.font='11px system-ui,sans-serif'; ctx.fillStyle='#e8eef5'; ctx.fillText(n,x+16,y); }); }
   ctx.textBaseline='alphabetic';
-  ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='12px system-ui,sans-serif'; ctx.textAlign='right'; ctx.fillText('drag to pan \u00b7 wheel or +/\u2212 to zoom \u00b7 click icon = sat nav \u00b7 right-click/hold = route to point \u00b7 Home = centre',VW-24,28);
+  ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='12px system-ui,sans-serif'; ctx.textAlign='right'; { const R=VW-(document.body.classList.contains('touch')?24:150), L=270; let t='drag to pan \u00b7 wheel or +/\u2212 to zoom \u00b7 click icon = sat nav \u00b7 right-click/hold = route to point \u00b7 Home = centre'; for(const alt of ['drag to pan \u00b7 +/\u2212 zoom \u00b7 tap icon = sat nav \u00b7 hold = route','drag \u00b7 +/\u2212 zoom \u00b7 tap icon = sat nav']) if(ctx.measureText(t).width>R-L) t=alt; if(ctx.measureText(t).width<=R-L) ctx.fillText(t,R,28); }
   ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.strokeRect(20.5,40.5,VW-41,VH-61);
 }
+let LEG_BTN=null;
 function canvasPos(e){ const r=cv.getBoundingClientRect(); return [(e.clientX-r.left)*VW/r.width,(e.clientY-r.top)*VH/r.height]; }
 let downAt=null;
 cv.addEventListener('pointerdown',e=>{ const [x,y]=canvasPos(e); downAt=[x,y,performance.now()];
-  if(bigmap.open){ if(MAPBTN.some((b,i)=>{ const [bx,by,bw,bh]=mapBtnRect(i); return x>=bx&&x<=bx+bw&&y>=by&&y<=by+bh; })) return; bigmap.drag=[x,y,bigmap.cx,bigmap.cy]; if(bigmap.lp) clearTimeout(bigmap.lp); bigmap.lp=setTimeout(()=>{ bigmap.lp=null; if(bigmap.open&&bigmap.drag&&downAt&&Math.abs(bigmap.cx-bigmap.drag[2])<0.5&&Math.abs(bigmap.cy-bigmap.drag[3])<0.5){ bigmap.drag=null; downAt=null; routeToMapPoint(x,y); } },600); cv.setPointerCapture(e.pointerId); } });
+  if(bigmap.open){ if(LEG_BTN&&x>=LEG_BTN[0]&&x<=LEG_BTN[0]+LEG_BTN[2]&&y>=LEG_BTN[1]&&y<=LEG_BTN[1]+LEG_BTN[3]){ bigmap.leg=!bigmap.leg; downAt=null; return; } if(MAPBTN.some((b,i)=>{ const [bx,by,bw,bh]=mapBtnRect(i); return x>=bx&&x<=bx+bw&&y>=by&&y<=by+bh; })) return; bigmap.drag=[x,y,bigmap.cx,bigmap.cy]; if(bigmap.lp) clearTimeout(bigmap.lp); bigmap.lp=setTimeout(()=>{ bigmap.lp=null; if(bigmap.open&&bigmap.drag&&downAt&&Math.abs(bigmap.cx-bigmap.drag[2])<0.5&&Math.abs(bigmap.cy-bigmap.drag[3])<0.5){ bigmap.drag=null; downAt=null; routeToMapPoint(x,y); } },600); cv.setPointerCapture(e.pointerId); } });
 cv.addEventListener('pointermove',e=>{ if(bigmap.open&&!bigmap.drag){ const [x,y]=canvasPos(e); NAV.hover=navPOIAt(x,y,mBX,mBY); NAV.hx=x; NAV.hy=y; cv.style.cursor=NAV.hover?'pointer':''; } if(bigmap.open&&bigmap.drag){ const [x,y]=canvasPos(e); bigmap.cx=bigmap.drag[2]-(x-bigmap.drag[0])/bigmap.z; bigmap.cy=bigmap.drag[3]-(y-bigmap.drag[1])/bigmap.z; mapClamp(); } });
 cv.addEventListener('pointerup',e=>{ const [x,y]=canvasPos(e); const click=downAt&&Math.hypot(x-downAt[0],y-downAt[1])<6&&performance.now()-downAt[2]<400; bigmap.drag=null;
   if(bigmap.lp){ clearTimeout(bigmap.lp); bigmap.lp=null; }
