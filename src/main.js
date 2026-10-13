@@ -8,12 +8,12 @@ const cam={x:0,y:0,z:1,shake:0};
 let started=false, last=0, acc=0, timeS=0, fps=60, fpsAcc=0, fpsN=0, wasBraking=0;
 let CABART,TRLART,CABSH,TRLSH;
 function boot(){
-  const tb=performance.now(); makeTextures(); genWorld(); makeMinimap(); initParked();
+  const tb=performance.now(); makeTextures(); genWorld(); makeMinimap(); if(typeof railMinimap==='function') railMinimap(); initParked();
   CABART=makeCabArt('#d63b2f'); TRLART=makeTrailerArt(); CABSH=silhouette(CABART); TRLSH=silhouette(TRLART);
   truck.trl=makeTrailer('box',mulberry(9),{type:'player',id:'TR-0000',typeName:'Box van (Big Rig)',cargo:'General freight',cargoKg:7000,tareKg:7500,weight:14500,reqLevel:1,coupled:true}); world.trailers.push(truck.trl);
   const st=world.start; truck.x=st.x/PPM; truck.y=st.y/PPM; truck.h=st.h; truck.th=st.h;
   cam.x=st.x; cam.y=st.y;
-  window.__bigrig={NAV,setRoute,clearRoute,mBX,mBY,truck,input,world,cam,bigmap,openMap,closeMap,onRoadM,kingpin,traffic,toggleRefuel,fuelStationAt,refuel,get loadMs(){return world.loadMs;},spawnVehicle,toggleCouple,coupleCandidate,trailerInBay,BigRig,get fps(){return fps;},chunks:chunkCache};
+  window.__bigrig={RAIL,railSelfTest,railHead,railTime,railCrossState,NAV,setRoute,clearRoute,mBX,mBY,truck,input,world,cam,bigmap,openMap,closeMap,onRoadM,kingpin,traffic,toggleRefuel,fuelStationAt,refuel,get loadMs(){return world.loadMs;},spawnVehicle,toggleCouple,coupleCandidate,trailerInBay,BigRig,get fps(){return fps;},chunks:chunkCache};
   truck.fuel=260; truck.tank=400; truck.money=2500; truck.damage=0;
   const hadSave=loadGame(); if(!hadSave) applyModel('rigger'); uiInit(); padInstall(); mpInit(); mobInit();
   Object.assign(window.__bigrig,{BREAKDOWN,MP,mpHost,mpJoin,mpChatSend,startGame,getChunk,renderChunk,MAPC,drawMapDetail,pad,padUpdate,career,acceptJob,abandonJob,tryUnload,bayAlign,buyTruck,openBoard,openDealer,closeUI,fcv,addXP,saveGame,loadGame,applyModel,TRUCK_MODELS,TIERS,CARGOS,levelOf,uncouple,couple,fillBoard,jobRoute});
@@ -90,7 +90,7 @@ function draw(){
   drawParkedTrailers(vx0,vy0,vx1,vy1);
   drawTraffic(vx0,vy0,vx1,vy1);
   drawPortLow(vx0,vy0,vx1,vy1); drawFXLow(vx0,vy0,vx1,vy1); drawRemotePlayers(vx0,vy0,vx1,vy1); drawBreakdown();
-  drawLorry(); drawFXHigh(); drawPortHigh(vx0,vy0,vx1,vy1);
+  drawLorry(); drawRail(vx0,vy0,vx1,vy1); drawFXHigh(); drawPortHigh(vx0,vy0,vx1,vy1);
   for(const o of world.overhead) if(o.x>vx0-400&&o.x<vx1+400&&o.y>vy0-400&&o.y<vy1+400) drawOverhead(o);
   drawAmbientHigh(VR); drawWeather(vx0,vy0,vx1,vy1,z); drawNight(vx0,vy0,vx1,vy1,z);
   ctx.setTransform(1,0,0,1,0,0);
@@ -275,6 +275,7 @@ function drawBigMap(){
   const BX=t=>VW/2+(t-bigmap.cx)*z, BY=t=>VH/2+10+(t-bigmap.cy)*z;
   if(z>0.8) for(const v of traffic.vs){ ctx.fillStyle=v.heavy?'#ff9f1a':'#fff'; ctx.fillRect(BX(v.x/4)-1.5,BY(v.y/4)-1.5,3,3); }
   for(const t of world.trailers){ if(t.coupled) continue; if(z<0.8&&!t.target) continue; ctx.fillStyle=t.target?'#ffd600':'#4fd1ff'; ctx.fillRect(BX(t.x/4)-2,BY(t.y/4)-2,4,4); }
+  railBigMap(BX,BY,z);
   navLine(m=>BX(m/4),m=>BY(m/4),4,'#ff3df0');
   drawPOIs(m=>BX(m/4),m=>BY(m/4),z>0.6);
   mpDrawMap(m=>BX(m/4),m=>BY(m/4),true);

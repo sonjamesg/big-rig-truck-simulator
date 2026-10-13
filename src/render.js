@@ -227,6 +227,7 @@ function renderChunk(cx,cy){
       if(W(get(tx+1,ty))){ g.fillRect(px+27,py,5,32); g.fillStyle='#6d7178'; for(let k=0;k<32;k+=8) g.fillRect(px+27,py+k,5,2); } }
     if(t===T.QUAY && get(tx,ty+1)===T.WATER){ g.fillStyle='#f2c230'; for(let k=0;k<32;k+=10) g.fillRect(px+k,py+28,6,4); g.fillStyle='#333'; g.fillRect(px+14,py+22,5,5); }
   }
+  if(typeof railChunk==='function') railChunk(g,ox,oy);
   g.save(); g.translate(-ox,-oy); CUR_CHUNK=[ox,oy,ox+CHUNK,oy+CHUNK];
   const list=world.chunkObjs.get(cx+','+cy)||[];
   for(const o of list) drawObject(g,o);

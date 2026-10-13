@@ -417,6 +417,7 @@ function stepVeh(v,dt,pbs){
       if(stop) acc=Math.min(acc,idmAcc(v,v0,Math.max(0.1,gap),0));
     }
   }
+  if(typeof railStopAcc==='function'){ const ra=railStopAcc(v,v0); if(ra<acc) acc=ra; }
   v.sig=sig;
   // leader search along own path
   let lgap=1e9, lvel=0, lplayer=false; const cands=[];

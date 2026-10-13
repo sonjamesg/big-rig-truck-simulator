@@ -1,13 +1,14 @@
 // ---------- day / night cycle (game clock) ----------
 const DAY_LEN=1200;             // real seconds per 24h game day (20 min => 1 game hour = 50 s)
-let gameT=8;                    // game hour 0..24, starts 08:00
+let gameT=8, gameDay=0;   // gameDay: whole days elapsed (railway timetable clock)
+//                    // game hour 0..24, starts 08:00
 // phases (game hours): dawn 4.8-6.6 (1.5 min) | day 6.6-18.6 (10 min) | dusk 18.6-20.4 (1.5 min) | night 20.4-4.8 (7 min)
 const DN={dark:0,dusk:0,mm:0,lit:null,grid:null,cell:2048,lc:null,lg:null,spr:null,cone:null,glow:{},sendT:0};
 function dnSmooth(a,b,x){ const t=Math.max(0,Math.min(1,(x-a)/(b-a))); return t*t*(3-2*t); }
-function updateDayNight(dt,run){ if(run) gameT=(gameT+dt*24/DAY_LEN)%24; const h=gameT;
+function updateDayNight(dt,run){ if(run){ gameT+=dt*24/DAY_LEN; if(gameT>=24){ gameT-=24; gameDay++; } } const h=gameT;
   DN.dark= h<12 ? 1-dnSmooth(4.8,6.6,h) : dnSmooth(18.6,20.4,h);
   DN.dusk= h<12 ? Math.max(0,1-Math.abs(h-5.7)/1.3) : Math.max(0,1-Math.abs(h-19.3)/1.3);
-  if(typeof MP!=='undefined'&&MP.on&&MP.host){ DN.sendT-=dt; if(DN.sendT<=0){ DN.sendT=5; try{ mpSendAll({t:'clock',g:gameT,w:WX.st,wt:WX.timer}); }catch(e){} } } }
+  if(typeof MP!=='undefined'&&MP.on&&MP.host){ DN.sendT-=dt; if(DN.sendT<=0){ DN.sendT=5; try{ mpSendAll({t:'clock',g:gameT,d:gameDay,w:WX.st,wt:WX.timer}); }catch(e){} } } }
 function dnClock(){ const m=Math.floor(gameT*60)%1440; return String((m/60)|0).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
 function dnSprite(r,stops){ const c=document.createElement('canvas'); c.width=c.height=r*2; const g=c.getContext('2d'), gr=g.createRadialGradient(r,r,0,r,r,r); for(const [o,col] of stops) gr.addColorStop(o,col); g.fillStyle=gr; g.fillRect(0,0,r*2,r*2); return c; }
 function dnGlow(col){ return DN.glow[col]||(DN.glow[col]=dnSprite(32,[[0,col],[0.35,col.replace(/[\d.]+\)$/,'0.35)')],[1,col.replace(/[\d.]+\)$/,'0)')]])); }

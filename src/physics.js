@@ -89,8 +89,8 @@ function stepTruck(s,inp,dt){ if(typeof FX!=='undefined'&&FX.boom){ s.v=0; s.thr
   if(Math.abs(rel)>JK){ s.th=s.h-Math.sign(rel)*JK; if(s.v<0) s.v*=0.5; }
   }
   // ----- collisions
-  const hit=hitTest(s)||(typeof trafficHitTruck==='function'&&trafficHitTruck(s)?'veh':null);
-  if(hit){ const imp=Math.abs(s.v); if(imp>FX_CRASH_V&&typeof fxExplode==='function'){ Object.assign(s,prev); fxExplode(hit); return; } Object.assign(s,prev); s.v=-s.v*0.25; if(Math.abs(s.v)<0.3) s.v=0; s.throttle=0;
+  const hit=hitTest(s)||(typeof trafficHitTruck==='function'&&trafficHitTruck(s)?'veh':null)||(typeof railBarrierHit==='function'&&railBarrierHit(s,prev)?'barrier':null);
+  if(hit){ const imp=Math.abs(s.v); if(hit!=='barrier'&&imp>FX_CRASH_V&&typeof fxExplode==='function'){ Object.assign(s,prev); fxExplode(hit); return; } Object.assign(s,prev); s.v=-s.v*0.25; if(Math.abs(s.v)<0.3) s.v=0; s.throttle=0;
     if(imp>1.2){ s.bump=Math.min(1,imp/10); s.lastHit=hit; }
     if(hitTest(s)){ // still stuck after revert (e.g. steering into wall) -> straighten
       s.steer*=0.5; }

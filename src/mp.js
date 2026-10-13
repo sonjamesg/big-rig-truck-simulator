@@ -20,7 +20,7 @@ function mpOnMsg(raw,from){ let m; try{ m=typeof raw==='string'?JSON.parse(raw):
     const cc=MP.conns[from]; if(cc) cc.send(JSON.stringify({t:'welcome',id:from,host:MP.myId,roster:mpRoster(),drops:Object.values(MP.drops)})); mpSendAll({t:'join',id:from,n},from); mpToast('\u{1F69A} '+n+' joined'); mpRender(); return; }
   if(m.t==='welcome'){ MP.myId=m.id; for(const p of m.roster) if(p.id!==MP.myId){ MP.players[p.id]=MP.players[p.id]||mpNewPlayer(p.id,p.n); MP.players[p.id].n=p.n; } for(const d of m.drops||[]) mpApplyDrop(d); mpToast('Connected to '+MP.code+' \u2022 '+m.roster.length+' players'); mpRender(); BigRig.emit('mpJoined',{id:m.id}); return; }
   if(m.t==='join'){ if(m.id!==MP.myId){ MP.players[m.id]=MP.players[m.id]||mpNewPlayer(m.id,m.n); MP.players[m.id].n=m.n; mpToast('\u{1F69A} '+m.n+' joined'); mpRender(); } return; }
-  if(m.t==='clock'){ if(!MP.host&&typeof m.g==='number'){ gameT=m.g; if(m.w) WX.st=m.w; } return; }
+  if(m.t==='clock'){ if(!MP.host&&typeof m.g==='number'){ gameT=m.g; if(typeof m.d==='number') gameDay=m.d; if(m.w) WX.st=m.w; } return; }
   if(m.t==='leave'){ mpPlayerGone(m.id); return; }
   if(m.t==='drop'){ if(MP.host&&from){ m.id=from; mpSendAll(m,from); } const p=MP.players[m.id]; if(p){ p.dropT=m.ts; if(p.held===m.gid) p.held=0; } mpApplyDrop(m); return; }
   if(m.t==='chat'){ if(MP.host&&from){ m.id=from; m.n=(MP.players[from]||{}).n||'?'; mpSendAll(m,from); } mpChatLine(m.n,String(m.x).slice(0,140)); return; }
