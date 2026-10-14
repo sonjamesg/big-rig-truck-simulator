@@ -99,7 +99,12 @@ function drawPortLow(vx0,vy0,vx1,vy1){ for(const P of portList()){ if(!P.berths|
   ctx.save(); ctx.translate((P.lorU-0.75)*T_,(gv+gd*1.2)*T_); ctx.rotate(open?-Math.PI/2.4:0); ctx.fillStyle='#e74c3c'; ctx.fillRect(0,-3,1.5*T_,6); ctx.fillStyle='#fff'; ctx.fillRect(0.4*T_,-3,0.3*T_,6); ctx.fillRect(1.0*T_,-3,0.3*T_,6); ctx.restore();
   // tractors + lorries
   for(const tr of P.tracs){ const q=loopPos(P,tr.s); drawTractor(P,q[0],q[1],q[2],tr.box,tr.col); }
-  for(const l of P.lors){ if(l.p>P.laneLen+2) continue; drawPortLorry(P,P.lorU,P.lor[0]+P.laneDir*l.p,Math.atan2(P.laneDir,0),l); }
+  for(const l of P.lors){ if(l.p<1.5||l.p>P.laneLen+6) continue; drawPortLorry(P,P.lorU,P.lor[0]+P.laneDir*l.p,Math.atan2(P.laneDir,0),l); }
+  // covered check-in / check-out sheds over both lane ends: gate lorries enter and leave inside them, never from the water
+  for(const [p0,p1,lbl] of [[-2,5.5,'CHECK-IN'],[P.laneLen+0.5,P.laneLen+8,'EXIT']]){ const va=P.lor[0]+P.laneDir*p0, vb=P.lor[0]+P.laneDir*p1, v0=Math.min(va,vb), v1=Math.max(va,vb), u0=P.lorU-1.5, u1=P.lorU+1.5;
+    ctx.fillStyle='rgba(0,0,0,0.25)'; ctx.fillRect(u0*T_+6,v0*T_+6,(u1-u0)*T_,(v1-v0)*T_); ctx.fillStyle='#8d99a6'; ctx.fillRect(u0*T_,v0*T_,(u1-u0)*T_,(v1-v0)*T_);
+    ctx.fillStyle='#aab6c2'; for(let v=v0+0.5;v<v1;v+=1.1) ctx.fillRect(u0*T_+2,v*T_,(u1-u0)*T_-4,0.5*T_); ctx.fillStyle='#2d6cdf'; ctx.fillRect(u0*T_,v0*T_,(u1-u0)*T_,0.3*T_); ctx.fillRect(u0*T_,(v1-0.3)*T_,(u1-u0)*T_,0.3*T_);
+    if(typeof DN!=='undefined'&&DN.dark>0.05){ const w=PL(P,P.lorU,(v0+v1)/2); dnLight(w[0]*TILE,w[1]*TILE,60,'rgba(255,240,200,0.9)',0.7); } }
   }
   // ships (beneath the tall bridge decks) + the decks' shadow and piers
   const ships=(P.cur&&P.cur.ships)||[]; ctx.save(); if(P.brg.length) portClipBridges(P);
@@ -203,8 +208,24 @@ function shipNight(P,o,K){ const T_=TILE, p=o.pose, s=o.s, L=SHIP.L*T_, W=SHIP.W
 // world map: shipping lanes + live ships
 function portBigMap(BX,BY,z){ for(const P of portList()){ if(!P.ph) continue; ctx.save(); ctx.setLineDash([5,5]); ctx.lineWidth=Math.max(1.5,z*0.8);
   for(const [q,col] of [[P.ph[0],'rgba(120,220,255,0.85)'],[P.ph[P.ph.length-1],'rgba(255,200,120,0.85)']]){ ctx.strokeStyle=col; ctx.beginPath(); q.pts.forEach((p,i)=>{ const w=PL(P,p[0],p[1]); i?ctx.lineTo(BX(w[0]),BY(w[1])):ctx.moveTo(BX(w[0]),BY(w[1])); }); ctx.stroke(); }
-  ctx.setLineDash([]); for(const o of (P.cur?P.cur.ships:[])){ const p=o.pose, w=PL(P,p.u,p.v), f=PL(P,p.u+Math.cos(p.h)*20,p.v+Math.sin(p.h)*20), a=Math.atan2(BY(f[1])-BY(w[1]),BX(f[0])-BX(w[0])), x=BX(w[0]), y=BY(w[1]), r=Math.max(5,z*4);
-    ctx.save(); ctx.translate(x,y); ctx.rotate(a); ctx.fillStyle='#fff'; ctx.strokeStyle='#0b2545'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(r*1.6,0); ctx.lineTo(-r,-r*0.7); ctx.lineTo(-r,r*0.7); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore(); }
+  ctx.setLineDash([]); ctx.save(); const O=[BX(P.O[0]),BY(P.O[1])]; ctx.transform(z*P.U[0],z*P.U[1],z*P.V[0],z*P.V[1],O[0],O[1]); const px=1/z;   // draw in port-local tiles
+  const v0=P.qy0||P.berths[0].y0, v1=P.qy1||P.berths[P.berths.length-1].y1;
+  if(z>=0.6){ ctx.fillStyle='rgba(255,255,255,0.85)'; for(const bv of [P.vA,P.vB]) for(const e of [-14,14]) ctx.fillRect(-1.2,bv+e-2*px,1.2,4*px);   // berth marks
+    ctx.fillStyle='rgba(255,214,0,0.9)'; ctx.font='bold '+(11*px)+'px system-ui'; if(z>=1.5){ ctx.save(); ctx.textAlign='center'; ctx.fillText('BERTH A',-3,P.vA); ctx.fillText('BERTH B',-3,P.vB); ctx.restore(); }
+    ctx.fillStyle='rgba(70,70,70,0.9)'; for(const ru of [P.legL,-1]) ctx.fillRect(ru-0.15,v0,0.3,v1-v0);   // crane rails
+    for(const g of (P.rtg||[])){ ctx.fillStyle='rgba(255,214,0,0.25)'; ctx.fillRect(P.legL+0.2,g.v-1.1,P.tl1+0.7-P.legL,2.2); ctx.strokeStyle='#ffd400'; ctx.lineWidth=Math.max(1.5*px,0.35); ctx.strokeRect(P.legL+0.2,g.v-1.1,P.tl1+0.7-P.legL,2.2); }   // yard gantries
+    for(const c of (P.cranes||[])){ const a0=Math.min(P.legL,-1)-0.3, a1=Math.max(P.legL,-1)+0.3, b0=Math.min(a0,P.dockU-3.5), b1=Math.max(a1,P.dockU+3.5); ctx.fillStyle='#c0392b'; ctx.fillRect(a0,c.y-1.1,a1-a0,2.2); ctx.fillStyle='#e74c3c'; ctx.fillRect(b0,c.y-0.45,b1-b0,0.9);   // quay crane portal + boom over the berth
+      ctx.fillStyle='#2c3e50'; ctx.fillRect(c.u-0.6,c.y-0.6,1.2,1.2); if(c.car){ ctx.fillStyle=c.car; ctx.fillRect(c.u-0.5,c.y-1.4,1,2.8); } }
+    for(const t of (P.tracs||[])){ const q=loopPos(P,t.s); ctx.fillStyle='#ffd400'; ctx.beginPath(); ctx.arc(q[0],q[1],0.9,0,7); ctx.fill(); }
+    for(const l of (P.lors||[])){ if(l.p<1.5||l.p>P.laneLen+6) continue; ctx.fillStyle='#fff'; ctx.fillRect(P.lorU-0.55,P.lor[0]+P.laneDir*l.p-2,1.1,4); } }
+  for(const o of (P.cur?P.cur.ships:[])){ const p=o.pose, L=SHIP.L, W=SHIP.W; ctx.save(); ctx.translate(p.u,p.v); ctx.rotate(p.h);
+    ctx.beginPath(); ctx.moveTo(-L/2,-W/2); ctx.lineTo(L/2-4,-W/2); ctx.quadraticCurveTo(L/2-0.5,-W/2,L/2,0); ctx.quadraticCurveTo(L/2-0.5,W/2,L/2-4,W/2); ctx.lineTo(-L/2,W/2); ctx.closePath();
+    ctx.fillStyle=(o.s&&o.s.hull)||'#1f3a5f'; ctx.fill(); ctx.lineWidth=Math.max(2*px,0.3); ctx.strokeStyle=nmK()>0.3?'#e6f0ff':'#0b1626'; ctx.stroke();
+    ctx.fillStyle='#4b5157'; ctx.fillRect(boxAx(0)-1.6,-1.4,boxAx(SHIP.N-1)-boxAx(0)+3.2,2.8); ctx.fillStyle='#ecf0f1'; ctx.fillRect(-L/2+0.6,-W/2+0.5,2.8,W-1);
+    if(o.s) for(let j=0;j<SHIP.N;j++){ const c=o.s.has[j]; if(c){ ctx.fillStyle=c; ctx.fillRect(boxAx(j)-1.4,-1.2,2.8,2.4); } }
+    if(nmK()>0.3){ ctx.fillStyle='#ff3b30'; ctx.beginPath(); ctx.arc(-L/2+2.2,-W/2,Math.max(2.5*px,0.4),0,7); ctx.fill(); ctx.fillStyle='#34e070'; ctx.beginPath(); ctx.arc(-L/2+2.2,W/2,Math.max(2.5*px,0.4),0,7); ctx.fill(); }
+    ctx.restore(); }
+  ctx.restore();
   ctx.restore(); } }
 // ===================== v26 port logistics: ocean lanes -> unload berth -> shift -> export berth -> ocean =====================
 // Ships follow a fixed timetable that is a pure function of the game clock (railTime), so they can never overlap and reload in place.
@@ -212,6 +233,12 @@ function portBigMap(BX,BY,z){ for(const P of portList()){ if(!P.ph) continue; ct
 // (IMPORT / EXPORT). A rubber-tyred yard gantry over each block swaps boxes between the stacks, the tractors and road lorries on the
 // one-way lorry lane (gate at the entry end).
 const SHIP={L:28,W:5,N:6,PER:300,TA:150,TB:150,TSIDE:34,VIN:2.6,VOUT:2.4};
+// dock vehicles yield to the player: true when the truck (or its trailer) is within `look` tiles ahead in a 1.7-tile-wide corridor
+function portPlayerAhead(P,u,v,h,look){ const w=PL(P,u,v), c=Math.cos(h), sn=Math.sin(h), d=[P.U[0]*c+P.V[0]*sn,P.U[1]*c+P.V[1]*sn], pts=[[truck.x,truck.y]]; if(truck.trl) pts.push([truck.trl.x,truck.trl.y]);
+  if(typeof truckPts==='function'){ try{ for(const q of truckPts()) pts.push(q); }catch(e){} }
+  let best=1e9; for(const q of pts){ const rx=q[0]/M_T-w[0], ry=q[1]/M_T-w[1], a=rx*d[0]+ry*d[1], lat=Math.abs(rx*d[1]-ry*d[0]); if(a>-1&&a<look&&lat<2.4&&a<best) best=a; }
+  if(truck.trl){ const t=truck.trl, f=fwd(t.th||0); for(let k=-4;k<=4;k++){ const rx=(t.x+f[0]*k*1.6)/M_T-w[0], ry=(t.y+f[1]*k*1.6)/M_T-w[1], a=rx*d[0]+ry*d[1], lat=Math.abs(rx*d[1]-ry*d[0]); if(a>-1&&a<look&&lat<2.2&&a<best) best=a; } }
+  return best; }
 function portT(){ return typeof railTime==='function'?railTime():timeS; }
 function pHash(k){ let x=(k*2654435761)^0x9e3779b9; x=Math.imul(x^(x>>>15),2246822507); x=Math.imul(x^(x>>>13),3266489909); return ((x^(x>>>16))>>>0)/4294967296; }
 function portCfg(P){
@@ -315,7 +342,7 @@ function updatePortLogistics(P,dt,t){ const ships=portShips(P,t); let shA=null, 
     else if(k==='exp') tgt=tr.task.need?loopStop(P,P.expC,true):loopStop(P,tr.task.crane.tv,false,tr.s);
     else if(k==='toImp') tgt=loopStop(P,P.impC,true); else if(k==='retExp') tgt=loopStop(P,P.expC,true);
     tr.stop=tgt; const dist=tgt==null?1e9:loopFwd(P,tr.s,tgt); let gap=1e9; for(const o of TR) if(o!==tr){ const g=loopFwd(P,tr.s,o.s); if(g>0.01&&g<gap) gap=g; }
-    const vmax=tgt==null?1.6:Math.min(4.4,0.25+dist*0.9), mv=Math.max(0,Math.min(vmax*dt,dist<0.04?0:dist,gap-4.6)); tr.atStop=dist<0.05;
+    const tq=loopPos(P,tr.s), pa=portPlayerAhead(P,tq[0],tq[1],tq[2],6); tr.yield=pa<6; const vmax=tgt==null?1.6:Math.min(4.4,0.25+dist*0.9), mv=Math.max(0,Math.min(vmax*dt,dist<0.04?0:dist,gap-4.6,tr.yield?Math.max(0,(pa-2.6)*dt):1e9)); tr.atStop=dist<0.05;
     tr.s=(tr.s+mv)%P.lLen; tr.mv=mv/dt; if(mv>0.001||!tr.task||tr.atStop) tr.still=0; else tr.still+=dt;
     // stack hand-offs at the transfer row by the yard gantries
     if(tr.atStop&&(k==='toImp'||k==='retExp'||(k==='exp'&&tr.task.need))&&!tr.rq){ tr.rq=1; P.rtg[k==='toImp'?0:1].q.push({veh:tr,kind:k==='toImp'?'tDrop':k==='retExp'?'tRet':'tPick',u:P.tl1}); } }
@@ -327,7 +354,7 @@ function updatePortLogistics(P,dt,t){ const ships=portShips(P,t); let shA=null, 
   const LS=P.lors.slice().sort((a,b)=>b.p-a.p);
   for(let i=0;i<LS.length;i++){ const l=LS[i], ahead=i?LS[i-1].p:1e9; let tgt=P.laneLen+8;
     if(l.kind==='exp'&&l.box&&!l.dropped) tgt=pE; else if(l.claim&&!l.box) tgt=pI;
-    const dist=tgt-l.p, mv=Math.max(0,Math.min(dt*Math.min(3.2,0.3+Math.max(0,dist)*0.8),Math.max(0,dist),ahead-l.p-5.6)); l.p+=mv; l.mv=mv/dt; l.at=Math.abs(dist)<0.05;
+    const dist=tgt-l.p, pa=portPlayerAhead(P,P.lorU,P.lor[0]+P.laneDir*l.p,Math.atan2(P.laneDir,0),8); l.yield=pa<8; const mv=Math.max(0,Math.min(dt*Math.min(3.2,0.3+Math.max(0,dist)*0.8),Math.max(0,dist),ahead-l.p-5.6,l.yield?Math.max(0,(pa-3.4)*dt):1e9)); l.p+=mv; l.mv=mv/dt; l.at=Math.abs(dist)<0.05;
     if(mv>0.001||l.at) l.still=0; else l.still+=dt;
     if(l.at&&!l.rq){ if(tgt===pE){ l.rq=1; P.rtg[1].q.push({veh:l,kind:'lDrop',u:P.lorU}); } else if(tgt===pI){ l.rq=1; P.rtg[0].q.push({veh:l,kind:'lLoad',u:P.lorU}); } }
     if(l.at&&tgt===pI&&!l.box){ l.w+=dt; if(l.w>70&&P.rtg[0].cur?.veh!==l){ P.rtg[0].q=P.rtg[0].q.filter(j=>j.veh!==l); l.claim=0; P.impClaim--; l.rq=0; } } }
