@@ -35,12 +35,12 @@ function updateAudio(s,inp,time){
   const ctx=audio.ctx; if(!ctx) return; const t=ctx.currentTime;
   const load=s.throttle, rpm=s.rpm;
   if(typeof BREAKDOWN!=='undefined'&&BREAKDOWN.active){ audio.eng.gain.setTargetAtTime(0,t,0.25); audio.rum.gain.setTargetAtTime(0,t,0.25); audio.turboG.gain.setTargetAtTime(0,t,0.2); if(s.rpm!==undefined) s.rpm=Math.max(0,s.rpm*0.97); return; }
-  if(audio.engSrc) audio.engSrc.playbackRate.setTargetAtTime(0.78*rpm/IDLE*0.72+0.22,t,0.05);
+  if(audio.engSrc) audio.engSrc.playbackRate.setTargetAtTime((0.78*rpm/IDLE*0.72+0.22)*(s.sndP||1),t,0.05);
   audio.eng.gain.setTargetAtTime(0.32+0.38*load+0.1*(rpm-IDLE)/1600,t,0.08);
   audio.engLP.frequency.setTargetAtTime(900+load*2200+rpm*0.6,t,0.1);
   const fire=rpm/20; audio.o1.frequency.setTargetAtTime(fire,t,0.05); audio.o2.frequency.setTargetAtTime(fire/2,t,0.05);
   audio.rlp.frequency.setTargetAtTime(120+fire*2+load*120,t,0.1);
-  audio.rum.gain.setTargetAtTime(0.10+0.16*load,t,0.08);
+  audio.rum.gain.setTargetAtTime((0.10+0.16*load)*(s.sndR||1),t,0.08);
   audio.turbo.frequency.setTargetAtTime(2400+rpm*1.8,t,0.2); audio.turboG.gain.setTargetAtTime(load>0.5&&rpm>1200?0.012*(rpm-1200)/1000:0,t,0.3);
   if(inp.horn&&!audio.hornOn){ for(const [o,f] of audio.hornOsc){ o.frequency.cancelScheduledValues(t); o.frequency.setValueAtTime(f*0.93,t); o.frequency.setTargetAtTime(f,t,0.06); } }
   audio.hornOn=!!inp.horn; audio.horn.gain.setTargetAtTime(inp.horn?0.62:0,t,inp.horn?0.006:0.035);

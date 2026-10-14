@@ -87,7 +87,7 @@ function stepTruck(s,inp,dt){ if(typeof FX!=='undefined'&&FX.boom){ s.v=0; s.thr
   const d=(k1[0]-k0[0])*ft[0]+(k1[1]-k0[1])*ft[1]; ax+=ft[0]*d; ay+=ft[1]*d;      // axle moves only along trailer heading
   s.th=Math.atan2(k1[0]-ax,-(k1[1]-ay));
   if(s.skid){ const sv=Math.min(1,Math.abs(s.v)/20); s.th+=(Math.sin(timeS*4.3)*0.16+Math.sin(timeS*1.7)*0.08)*sv*dt*Math.max(0.2,1-(s.jkM||0)); }
-  if(s.jkM&&s.v>8){ const rl=Math.atan2(Math.sin(s.h-s.th),Math.cos(s.h-s.th)); s.th+=rl*Math.min(1,s.jkM*dt*0.8); }   // cz: air suspension keeps the trailer in line at speed
+  if(s.jkM&&s.v>8){ const rl=Math.atan2(Math.sin(s.h-s.th),Math.cos(s.h-s.th)); s.th+=rl*Math.min(1,s.jkM*dt*0.35); }   // cz: air suspension keeps the trailer in line at speed
   // max articulation ~87 deg: at the limit the cab pushes the trailer round (angle held) instead of freezing.
   // (old code halved reverse speed every frame here, which stalled the rig on full-lock reversing)
   let rel=Math.atan2(Math.sin(s.h-s.th),Math.cos(s.h-s.th)); const JK=1.52;

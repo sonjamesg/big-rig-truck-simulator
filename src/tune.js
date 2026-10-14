@@ -51,10 +51,10 @@ const CZ={tab:'engine',sel:null,ang:-0.6,view:'top',spin:0.25,drag:null,bay:null
 function czSetup(mid){ career.tune=career.tune||{}; return career.tune[mid]||(career.tune[mid]={own:{},fit:{}}); }
 function czFitted(mid,ov){ const s=czSetup(mid), f=Object.assign({},s.fit); if(ov) f[ov.slot]=ov.id; return f; }
 function czLook(mid,fit){ const L={}; for(const k in fit){ const p=czPart(fit[k]); if(p&&p.look) Object.assign(L,p.look); } return L; }
-function czFx(fit){ const F={pw:1,vm:0,acc:1,br:1,ebr:1,grip:1,hand:1,jk:0,econ:1,tank:0,dur:1,shift:1,beam:1};
-  for(const k in fit){ const p=czPart(fit[k]); if(!p||!p.fx) continue; for(const q in p.fx){ if(q==='vm'||q==='tank'||q==='jk') F[q]+=p.fx[q]; else F[q]*=p.fx[q]; } } return F; }
+function czFx(fit){ const F={pw:1,vm:0,acc:1,br:1,ebr:1,grip:1,hand:1,jk:0,econ:1,tank:0,dur:1,shift:1,beam:1,snd:0};
+  for(const k in fit){ const p=czPart(fit[k]); if(!p||!p.fx) continue; for(const q in p.fx){ if(q==='vm'||q==='tank'||q==='jk'||q==='snd') F[q]+=p.fx[q]; else F[q]*=p.fx[q]; } } return F; }
 // ---- stats (display 0..1 bars + text)
-function czStats(m,fit){ const F=czFx(fit), hp=Math.round(m.hp*F.pw), v=(m.vmax+F.vm)*3.6, acc=m.power*F.pw*F.acc, L=36*m.econ*F.econ;
+function czStats(m,fit){ const F=czFx(fit), hp=Math.round(m.hp*F.pw), v=(m.vmax+F.vm)*3.6, acc=m.power*F.pw*F.acc*(1+(1-F.shift)*0.15), L=36*m.econ*F.econ;
   return [['Power',hp+' hp',hp/1100],['Top speed',Math.round(v)+' km/h',(v-70)/45],['Acceleration',(acc*10).toFixed(1),acc/2.6],['Braking',Math.round(F.br*100)+'%',(F.br-0.6)/1.1],
     ['Handling',Math.round(F.grip*F.hand*100)+'%',(F.grip*F.hand+F.jk-0.6)/1.1],['Economy',L.toFixed(0)+' L/100',(60-L)/40],['Durability',Math.round(100/F.dur)+'%',(1/F.dur-0.5)/0.9]]; }
 // ---- apply to the live truck (called by applyModel)
@@ -199,7 +199,7 @@ function czTabParts(t){ const out=[]; for(const sl of CZ_TABS.find(x=>x.id===t).
 function czOwned(mid,p){ return p.stock||!!czSetup(mid).own[p.id]; }
 function czIsFit(mid,p){ const f=czSetup(mid).fit[p.slot]; return p.stock?!f:f===p.id; }
 function czFxText(p){ if(!p.fx) return p.look?'cosmetic':''; const t=[], f=p.fx, pc=(v,n)=>t.push((v>1?'+':'')+Math.round((v-1)*100)+'% '+n);
-  if(f.pw) pc(f.pw,'power'); if(f.vm) t.push('+'+Math.round(f.vm*3.6)+' km/h'); if(f.br) pc(f.br,'brakes'); if(f.ebr) pc(f.ebr,'engine brake'); if(f.grip) pc(f.grip,'grip'); if(f.econ) t.push((f.econ<1?'-':'+')+Math.abs(Math.round((f.econ-1)*100))+'% fuel use'); if(f.tank) t.push('+'+f.tank+' L tank'); if(f.dur) pc(1/f.dur,'durability'); if(f.jk) t.push('anti-jackknife'); if(f.shift) pc(1/f.shift,'shift speed'); if(f.beam) pc(f.beam,'beam reach'); return t.slice(0,2).join(' \u2022 '); }
+  if(f.pw) pc(f.pw,'power'); if(f.vm) t.push('+'+Math.round(f.vm*3.6)+' km/h'); if(f.br) pc(f.br,'brakes'); if(f.ebr) pc(f.ebr,'engine brake'); if(f.grip) pc(f.grip,'grip'); if(f.hand&&!f.grip) pc(f.hand,'handling'); if(f.econ) t.push((f.econ<1?'-':'+')+Math.abs(Math.round((f.econ-1)*100))+'% fuel use'); if(f.tank) t.push('+'+f.tank+' L tank'); if(f.dur) pc(1/f.dur,'durability'); if(f.jk) t.push('anti-jackknife'); if(f.shift) pc(1/f.shift,'shift speed'); if(f.beam) pc(f.beam,'beam reach'); if(f.snd) t.push('deeper sound'); return t.slice(0,2).join(' \u2022 '); }
 function czRender(){ const b=uiRoot.querySelector('.mback'); if(!b||career.uiOpen!=='tune') return; const m=modelById(career.cur), lvl=levelOf(career.xp);
   b.querySelector('#czBank').textContent=money(truck.money);
   b.querySelector('.cztabs').innerHTML=CZ_TABS.map(t=>`<button class="chip ${t.id===CZ.tab?'on':''}" data-t="${t.id}">${t.ic} ${esc(t.n)}</button>`).join('');
@@ -241,7 +241,7 @@ function czPad(g,hit,now,dt){ const rx=g.axes[2]||0; if(Math.abs(rx)>0.2){ CZ.an
 addEventListener('keydown',e=>{ if(career.uiOpen!=='tune') return; const k=e.code; if(k==='KeyQ'||k==='KeyE'){ const i=CZ_TABS.findIndex(t=>t.id===CZ.tab), n=CZ_TABS.length; CZ.tab=CZ_TABS[(i+(k==='KeyE'?1:-1)+n)%n].id; CZ.sel=null; czRender(); e.preventDefault(); }
   else if(k==='KeyZ'||k==='KeyX'){ CZ.ang+=k==='KeyX'?0.25:-0.25; CZ.spin=0; } else if(k==='KeyV'){ CZ.view=CZ.view==='top'?'side':'top'; } else if(k==='Escape'){ e.preventDefault(); closeUI(); } },true);
 // ---- tune shop bays: a drive-in pad at every truck repair garage + owned-yard garages
-function czBays(){ if(CZ.bays) return CZ.bays; const out=[]; for(const g of world.garages||[]){ const b=g.bay; if(!b) continue; out.push({name:g.name,x:b.x-12,y:b.y+1.5,w:5,L:12}); }
+function czBays(){ if(CZ.bays) return CZ.bays; const out=[]; for(const g of world.garages||[]){ const b=g.bay; if(!b) continue; out.push({name:g.name,x:b.x-23.5,y:b.y+1.5,w:4.6,L:12}); }
   for(const yd of world.forSale||[]) out.push({name:'Yard garage',yd,x:(yd.x0+12.2)*M_T,y:(yd.y0+6.4)*M_T,w:5,L:11}); return CZ.bays=out; }
 function czBayHere(){ if(!world.ready||!started) return null; const s=truck, f=fwd(s.h), cx=s.x+f[0]*2.2, cy=s.y+f[1]*2.2; for(const b of czBays()){ if(b.yd&&!(typeof ownedYard==='function'&&ownedYard(b.yd))) continue; if(Math.abs(cx-b.x)<b.w*0.9&&Math.abs(cy-b.y)<b.L/2) return b; } return null; }
 function czTick(){ if(!started||(typeof bigmap!=='undefined'&&bigmap.open)){ const e=document.getElementById('czGo'); if(e) e.remove(); return; } const here=Math.abs(truck.v)<0.4&&!career.uiOpen?czBayHere():null; CZ.bay=here||(career.uiOpen==='tune'?CZ.bay:null); let el=document.getElementById('czGo');
@@ -253,7 +253,7 @@ function czDrawBays(vx0,vy0,vx1,vy1){ if(!world.ready) return; const S=PPM, dark
   for(const b of czBays()){ if(b.yd&&!(typeof ownedYard==='function'&&ownedYard(b.yd))) continue; const x=b.x*S, y=b.y*S, w=b.w*S, L=b.L*S; if(x<vx0-200||x>vx1+200||y<vy0-200||y>vy1+200) continue; const here=CZ.bay===b;
     ctx.save(); ctx.fillStyle='rgba(245,184,46,0.12)'; ctx.fillRect(x-w/2,y-L/2,w,L); ctx.strokeStyle=here?'#2ecc71':'#f5b82e'; ctx.lineWidth=3; ctx.setLineDash([10,6]); ctx.strokeRect(x-w/2,y-L/2,w,L); ctx.setLineDash([]);
     for(let k=0;k<6;k++){ ctx.fillStyle=k%2?'#111':'#f5b82e'; ctx.fillRect(x-w/2+k*w/6,y+L/2-0.5*S,w/6,0.5*S); }
-    ctx.translate(x,y); ctx.rotate(-Math.PI/2); ctx.font='900 '+Math.round(0.95*S)+'px Arial Black,Arial'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle=here?'#2ecc71':'#f5b82e'; ctx.fillText('TUNE SHOP',0,0); ctx.restore();
+    ctx.translate(x,y); ctx.rotate(-Math.PI/2); ctx.font='900 '+Math.round(1.3*S)+'px Arial Black,Arial'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle=here?'#2ecc71':'#f5b82e'; ctx.fillText('TUNE SHOP',0,0); ctx.restore();
     if(dark>0.05&&typeof dnLight==='function') dnLight(x,y,110,'rgba(255,214,120,0.9)',0.6); } }
 // map: wrench marker on every tune bay (owned yards only)
 function czMapMarks(BX,BY,z,IR){ if(!world.ready) return; const r=Math.max(6,Math.min(11,IR||7)); for(const b of czBays()){ if(b.yd&&!(typeof ownedYard==='function'&&ownedYard(b.yd))) continue; if(!b.yd&&z<0.9) continue;
