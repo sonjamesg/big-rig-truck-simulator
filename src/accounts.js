@@ -4,10 +4,10 @@ const ACC={url:'https://sirsawhnqnvioqzmqihk.supabase.co',key:'sb_publishable_RF
 try{ ACC.tok=localStorage.getItem('bigrig.tok'); ACC.name=localStorage.getItem('bigrig.acct'); }catch(e){}
 async function accRpc(fn,args,keep){ const r=await fetch(ACC.url+'/rest/v1/rpc/'+fn,{method:'POST',keepalive:!!keep,headers:{'apikey':ACC.key,'Authorization':'Bearer '+ACC.key,'Content-Type':'application/json'},body:JSON.stringify(args)}); if(!r.ok) throw new Error('rpc '+r.status); return r.json(); }
 const accNorm=n=>String(n||'').trim().replace(/\s+/g,' ');
-function accSetSession(j){ document.body&&document.body.classList.add('acctin'); ACC.tok=j.token||ACC.tok; ACC.name=j.name||ACC.name; ACC.admin=!!j.is_admin; try{ localStorage.setItem('bigrig.tok',ACC.tok); localStorage.setItem('bigrig.acct',ACC.name); localStorage.setItem('bigrig.name',ACC.name); }catch(e){} const nm=document.getElementById('lbName'); if(nm) nm.value=ACC.name; }
-function accClear(){ document.body&&document.body.classList.remove('acctin'); ACC.tok=null; ACC.name=null; ACC.admin=false; try{ localStorage.removeItem('bigrig.tok'); localStorage.removeItem('bigrig.acct'); }catch(e){} }
+function accSetSession(j){ document.body&&document.body.classList.add('acctin'); ACC.tok=j.token||ACC.tok; ACC.name=j.name||ACC.name; ACC.admin=!!j.is_admin; try{ localStorage.setItem('bigrig.tok',ACC.tok); localStorage.setItem('bigrig.acct',ACC.name); localStorage.setItem('bigrig.lastacct',ACC.name); localStorage.setItem('bigrig.name',ACC.name); }catch(e){} const nm=document.getElementById('lbName'); if(nm) nm.value=ACC.name; }
+function accClear(keepName){ if(!keepName) try{ localStorage.removeItem('bigrig.lastacct'); }catch(e){} document.body&&document.body.classList.remove('acctin'); ACC.tok=null; ACC.name=null; ACC.admin=false; try{ localStorage.removeItem('bigrig.tok'); localStorage.removeItem('bigrig.acct'); }catch(e){} }
 // pull the cloud save into localStorage and reload it into the live game (only if the world is ready and we haven't started driving)
-async function accPull(){ if(!ACC.tok) return; try{ const j=await accRpc('load_save',{token:ACC.tok}); if(!j.ok){ accClear(); return; } ACC.admin=!!j.is_admin;
+async function accPull(){ if(!ACC.tok) return; try{ const j=await accRpc('load_save',{token:ACC.tok}); if(!j.ok){ accClear(true); return; } ACC.admin=!!j.is_admin;
   // newest save wins: the cloud copy replaces the local one unless the local save is strictly newer (then it is pushed up instead)
   if(j.save&&j.save.k&&j.save.d){ let loc=null; try{ loc=JSON.parse(localStorage.getItem(j.save.k)||'null'); }catch(e){} const ct=+(j.save.d.t||j.save.t||0), lt=+((loc&&loc.t)||0);
     if(!loc||ct>=lt){ localStorage.setItem(j.save.k,JSON.stringify(j.save.d)); if(typeof world!=='undefined'&&world.ready&&typeof loadGame==='function'&&(typeof started==='undefined'||!started||ct>lt)) loadGame(); ACC.pulled=1; }
@@ -65,16 +65,16 @@ function build(){ const ov=document.getElementById('overlay'); if(!ov||document.
     b.addEventListener('click',e=>{ e.stopPropagation(); if(!ACC.tok){ toast('Not signed in'); return; } accPush(true); const t=ACC.tok; accRpc('logout',{token:t},true).catch(()=>{}); accClear(); a.style.display=''; refresh(); toast('Logged out \u2022 local save kept'); });
     sp.appendChild(b); const sync=()=>{ b.style.display=ACC.tok?'':'none'; }; sync(); setInterval(sync,1000); }
 }
-addEventListener('load',()=>setTimeout(()=>{ build(); if(ACC.tok) accRpc('session_touch',{token:ACC.tok}).then(j=>{ if(j.ok){ ACC.name=j.name; ACC.admin=!!j.is_admin; accPull(); } else accClear(); ACC.refresh&&ACC.refresh(); }).catch(()=>{ ACC.online=false; }); },50));
+addEventListener('load',()=>setTimeout(()=>{ build(); if(ACC.tok) accRpc('session_touch',{token:ACC.tok}).then(j=>{ if(j.ok){ ACC.name=j.name; ACC.admin=!!j.is_admin; accPull(); } else { accClear(true); if(typeof toast==='function') toast('Session expired \u2022 enter your PIN to log back in'); } ACC.refresh&&ACC.refresh(); }).catch(()=>{ ACC.online=false; }); },50));
 // hooks: debounced cloud push after each local save, push on exit, admin perks while signed in
 setTimeout(()=>{ const sg=saveGame; saveGame=function(){ const r=sg.apply(this,arguments); if(r&&ACC.tok){ clearTimeout(ACC.timer); ACC.timer=setTimeout(()=>accPush(false),5000); } return r; };
   addEventListener('pagehide',()=>{ try{ saveGame(); }catch(e){} accPush(true); });
   document.addEventListener('visibilitychange',()=>{ if(document.hidden){ try{ saveGame(); }catch(e){} accPush(true); } });
-  const sgm=startGame; startGame=function(){ const ae=document.activeElement; if(ae&&ae.closest&&ae.closest('#acct')&&Date.now()<(ACC.padT||0)) return; return sgm.apply(this,arguments); };
+  const sgm=startGame; startGame=function(){ const ae=document.activeElement; if(ae&&ae.closest&&ae.closest('#overlay')&&ae.tagName!=='CANVAS'&&Date.now()<(ACC.padT||0)) return; return sgm.apply(this,arguments); };
   // Xbox: D-pad up/down moves through the account card, A presses the focused button (inputs open the on-screen keyboard)
-  let prev=[]; (function pp(){ requestAnimationFrame(pp); if(typeof started!=='undefined'&&started) return; const a=document.getElementById('acct'); if(!a||a.style.display==='none') return;
+  let prev=[]; (function pp(){ requestAnimationFrame(pp); if(typeof started!=='undefined'&&started) return; const a=document.getElementById('overlay'); if(!a||(window.INV&&INV.on)) return;
     const gp=(navigator.getGamepads?Array.from(navigator.getGamepads()||[]):[]).find(g=>g&&g.connected); if(!gp) return; const b=gp.buttons.map(x=>x.pressed), hit=i=>b[i]&&!prev[i]; prev=b;
-    const els=[...a.querySelectorAll('input,button')].filter(e=>e.offsetParent); let i=els.indexOf(document.activeElement);
+    const els=[...a.querySelectorAll('input,button')].filter(e=>e.offsetParent&&!e.disabled); let i=els.indexOf(document.activeElement);
     const mv=d=>{ i=i<0?0:Math.max(0,Math.min(els.length-1,i+d)); els[i].focus(); };
     if(hit(13)||(gp.axes[1]>.6&&!ACC.ax)) mv(1); if(hit(12)||(gp.axes[1]<-.6&&!ACC.ax)) mv(-1); ACC.ax=Math.abs(gp.axes[1]||0)>.6;
     if(hit(0)&&i>=0&&els[i].tagName==='BUTTON'){ ACC.padT=Date.now()+300; els[i].click(); }
