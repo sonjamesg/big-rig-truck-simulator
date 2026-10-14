@@ -168,7 +168,7 @@ function czIcon(g,p,W,H){ g.clearRect(0,0,W,H); const bg=g.createLinearGradient(
     g.restore(); return; }
   if(typeof czIcon2==='function') czIcon2(g,p,W,H,cx,cy,s,lv); }
 // ---- the customiser UI
-const CZ_CSS=`#ui .mback .modal.tz{width:min(1060px,100vw)!important;height:min(720px,100dvh)!important;max-height:none!important;padding:0!important;display:flex;flex-direction:column;overflow:hidden;background:#0c111a;border-radius:16px;border:1px solid rgba(245,184,46,.22)}
+const CZ_CSS=`#ui .mback .modal.tz{width:min(1060px,100%)!important;height:min(640px,100%)!important;max-height:100%!important;padding:0!important;display:flex;flex-direction:column;overflow:hidden;background:#0c111a;border-radius:16px;border:1px solid rgba(245,184,46,.22);box-shadow:0 24px 60px rgba(0,0,0,.55)}
 .tz .czh{display:flex;align-items:center;gap:6px;padding:6px 8px;flex:none;background:linear-gradient(90deg,rgba(245,184,46,.14),transparent 55%);border-bottom:1px solid rgba(255,255,255,.07)}
 .tz .czh .cztl{flex:1 1 0;min-width:0}.tz .czh h2{margin:0;font-size:15px;letter-spacing:.08em;font-weight:900;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tz .czh h2 small,.tz .czh .cztl small{display:block;font-size:11px;letter-spacing:0;opacity:.7;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
@@ -214,7 +214,7 @@ const CZ_CSS=`#ui .mback .modal.tz{width:min(1060px,100vw)!important;height:min(
 .tz .czf .msg{font-size:10px;opacity:.7;line-height:1.2}
 #ui:has(.modal.tz) .toast{top:auto;bottom:72px}
 @media (max-width:760px) and (orientation:portrait){
- #ui .mback .modal.tz{width:100vw!important;height:100dvh!important;border-radius:0;border:0}
+ #ui .mback .modal.tz{width:100%!important;height:100%!important;max-height:100%!important;border-radius:0;border:0}
  .modal.tz .czcards{grid-template-columns:1fr;gap:5px}
  .modal.tz .czcards .card{display:flex!important;flex-direction:row!important;align-items:center;min-height:52px!important;height:auto!important;padding:4px 8px!important;gap:8px!important}
  .modal.tz .czcards .card canvas{width:88px!important;height:44px!important;aspect-ratio:auto;flex:none;margin:0;border-radius:7px}
@@ -224,15 +224,24 @@ const CZ_CSS=`#ui .mback .modal.tz{width:min(1060px,100vw)!important;height:min(
  .tz .czs{grid-template-columns:1fr 1fr;gap:2px 10px;padding:5px 8px 3px}
 }
 @media (min-width:761px),(orientation:landscape){
- .tz .czm{flex-direction:row}.tz .czt{width:44%;border-right:1px solid rgba(255,255,255,.07)}
- .tz .czp{flex:1;height:auto;min-height:0}.tz .czk{width:56%}
+ .tz .czh{flex:none;z-index:2}.tz .czf{flex:none;z-index:2;box-shadow:0 -8px 18px rgba(0,0,0,.35)}
+ .tz .czm{flex:1;min-height:0;flex-direction:row}
+ .tz .czt{width:42%;flex:none;height:auto;align-self:stretch;display:flex;flex-direction:column;min-height:0;border-right:1px solid rgba(255,255,255,.07)}
+ .tz .czp{flex:1 1 auto;height:auto;min-height:160px}
+ .tz .czs{flex:none}
+ .tz .czk{width:58%;flex:none;min-height:0;display:flex;flex-direction:column}
+ .tz .cztabs{flex:none}.tz .czg{flex:1;min-height:0;overflow-y:auto}
  .tz .czcards{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+ .tz .czh h2{font-size:16px}.tz .wallet{font-size:13px;padding:6px 12px}
+ .tz .czf .btn{min-height:46px!important;height:46px;font-size:15px!important}
+ .tz .card:hover{border-color:rgba(245,184,46,.45);background:#1a2333}
 }
+
 @media (orientation:landscape) and (max-height:460px){
  .tz .czs{gap:1px 8px;padding:3px 8px}.tz .czs .b{height:4px}
  .tz .czh{padding:3px 6px}.tz .czb{width:36px;height:36px}.tz .czf .btn{min-height:38px;font-size:13px}
  .tz .czh h2{font-size:13px}.tz .wallet{font-size:11px;padding:3px 8px}
- #ui .mback .modal.tz{width:100vw!important;height:100dvh!important;border-radius:0;border:0}
+ #ui .mback .modal.tz{width:100%!important;height:100%!important;max-height:100%!important;border-radius:0;border:0}
  .tz .czcards{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))!important;gap:5px}
  .modal.tz .czcards .card{display:flex!important;flex-direction:row!important;align-items:center;min-height:48px;padding:3px 6px!important;gap:6px}
  .modal.tz .czcards .card canvas{width:72px!important;height:36px!important;aspect-ratio:auto;flex:none;border-radius:6px}
@@ -267,7 +276,7 @@ function czRender0(b){ const m=modelById(career.cur), lvl=levelOf(career.xp);
   b.querySelector('.czg').innerHTML=groups.map(G=>`<div class="czsl">${esc(CZ_SLOTS[G.slot]||G.slot)}</div><div class="czcards">${G.parts.map(p=>{ const own=czOwned(m.id,p), fit=czIsFit(m.id,p), lock=!own&&lvl<(p.req||1);
       return `<button class="card ${CZ.sel&&CZ.sel.id===p.id?'sel':''} ${own?'own':''} ${fit?'fit':''} ${lock?'lock':''}" data-p="${p.id}"><canvas width="200" height="100"></canvas>${fit?'<span class="ok">\u2713</span>':''}<div class="ci"><div class="cn">${esc(p.n)}</div><div class="cl">${p.lv?'Lv '+p.lv:(p.stock?'Factory':'Style')}${lock?` \u2022 <span class="lk">\u{1F512} Lv ${p.req}</span>`:''}</div><div class="cp">${p.stock?'Free':own?(fit?'FITTED':'OWNED'):money(p.p)}</div><div class="cf">${esc(czFxText(p))}</div></div></button>`; }).join('')}</div>`).join('');
   b.querySelectorAll('.czg .card').forEach(el=>{ const p=el.dataset.p.endsWith('_0')?{id:el.dataset.p,slot:el.dataset.p.slice(0,-2),n:'Stock',p:0,req:1,stock:1}:czPart(el.dataset.p); czIcon(el.querySelector('canvas').getContext('2d'),p,240,120);
-    el.addEventListener('click',()=>{ CZ.sel=(CZ.sel&&CZ.sel.id===p.id)?null:p; czRender(); }); });
+    el.addEventListener('click',()=>{ CZ.sel=(CZ.sel&&CZ.sel.id===p.id)?null:p; czRender(); });el.addEventListener('dblclick',e=>{ e.preventDefault(); if(lock) return; CZ.sel=p; czRender(); const bt=b.querySelector('#czAct'); if(bt&&!bt.disabled) czAction(); }); });
   czFooter(b,m,lvl); czStatsHTML(b,m); }
 function czFooter(b,m,lvl){ const p=CZ.sel, bt=b.querySelector('#czAct'), n=b.querySelector('#czSelN'), msg=b.querySelector('#czMsg'); bt.disabled=false;
   if(!p){ n.textContent=m.name; msg.textContent='Tap a part to preview it'; bt.textContent='DONE'; bt.className='btn sel'; return; }
