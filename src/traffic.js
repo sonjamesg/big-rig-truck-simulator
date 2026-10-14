@@ -357,7 +357,7 @@ function trafficHitTruck(s){
 function honkAt(x,y,heavy){
   traffic.honkReq=(traffic.honkReq||0)+1;
   const ctx=audio.ctx; if(!ctx||!audio.master) return; const d=Math.hypot(x-truck.x,y-truck.y); if(d>110) return;
-  const vol=0.16*Math.max(0,1-d/110)**1.3; const t=ctx.currentTime; const g=ctx.createGain(); g.gain.value=0;
+  const vol=0.16*Math.max(0,1-d/110)**1.3; if(heavy&&typeof airHornShot==='function'){ airHornShot(x,y,vol*1.8); traffic.honks=(traffic.honks||0)+1; return; } const t=ctx.currentTime; const g=ctx.createGain(); g.gain.value=0;
   let node=g; if(ctx.createStereoPanner){ const p=ctx.createStereoPanner(); p.pan.value=Math.max(-1,Math.min(1,(x-truck.x)/40)); g.connect(p); p.connect(audio.master); } else g.connect(audio.master);
   const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=heavy?900:2400; lp.connect(g);
   const fr=heavy?[150,190,227]:[392,494]; const dur=0.18+Math.random()*0.25, two=Math.random()<0.6;
