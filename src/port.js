@@ -438,7 +438,7 @@ function dgBuild(P){ const L=P.legL, uF=L+1, R=Math.abs(P.tl2-P.tl1)/2, lo=Math.
   const a=PL(P,uF-1,lo-1), b=PL(P,1,hi+1); for(let ty=Math.floor(Math.min(a[1],b[1]));ty<=Math.ceil(Math.max(a[1],b[1]));ty++) for(let tx=Math.floor(Math.min(a[0],b[0]));tx<=Math.ceil(Math.max(a[0],b[0]));tx++){
     const q=portLocal(P,tx+0.5,ty+0.5), u=q[0], v=q[1]; let k=null;
     if(u>=uF&&u<uF+1&&v>=lo-0.5&&v<hi+0.5) k='s'; else if(u>=uF&&u<0&&(Math.abs(v-lo)<0.5||Math.abs(v-hi)<0.5)) k='e'; if(!k) continue;
-    if(cross.some(c=>Math.abs(c[0]-u)<1.6&&Math.abs(c[1]-v)<2.6)) continue; if(get(tx,ty)===T.WATER) continue; DOCK_FENCE[idx(tx,ty)]=1; P.fence.push({u,v,k}); }
+    if(cross.some(c=>Math.abs(c[0]-u)<1.6&&Math.abs(c[1]-v)<2.6)) continue; if(P.gIn!=null&&k==='s'&&cross.length&&v>cross[0][1]&&v<P.gIn+0.6) continue; /* Albion: open entry funnel to the set-back barrier (trailer swing) */ if(get(tx,ty)===T.WATER) continue; DOCK_FENCE[idx(tx,ty)]=1; P.fence.push({u,v,k}); }
   // gates where the lorry path crosses the fence line
   P.gates=[]; let prev=polyAt(P.lpath,0)[0]; for(let s=0.25;s<=P.lpath.len;s+=0.25){ const q=polyAt(P.lpath,s), c=uF+0.5;
     if((prev<c)!==(q[0]<c)){ const IN=!P.gates.length; let gs=s, inner=0; if(IN&&P.gIn!=null){ for(let s2=s;s2<P.lpath.len;s2+=0.05) if(Math.abs(polyAt(P.lpath,s2)[1]-P.gIn)<0.06){ gs=s2; inner=1; break; } }   // Albion: barrier set back onto the straight lane so a waiting lorry clears the junction
