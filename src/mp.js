@@ -8,7 +8,7 @@ function mpName(){ return (document.getElementById('lbName')||{}).value||localSt
 const R2=v=>Math.round(v*100)/100, R3=v=>Math.round(v*1000)/1000;
 function mpGid(tr){ if((!tr.gid||tr.gid.startsWith('me:'))) tr.gid=(MP.myId||'me')+':'+tr.id; return tr.gid; }
 function mpSelfPose(){ const s=truck, tr=s.trl; const ind=IND.side;
-  const fl=((s.brake||0)>0.1?1:0)|(s.mode==='R'?2:0)|(ind<<2)|(input.hand?16:0)|(IND.haz?32:0)|(typeof HB!=='undefined'&&HB.on?64:0); const P=['p',MP.myId,Math.round(performance.now()),R2(s.x),R2(s.y),R3(s.h),R2(s.v),career.cur,career.colors[career.cur]||'',fl];
+  const fl=((s.brake||0)>0.1?1:0)|(s.mode==='R'?2:0)|(ind<<2)|(input.hand?16:0)|(IND.haz?32:0)|(typeof HB!=='undefined'&&HB.on?64:0); const P=['p',MP.myId,Math.round(performance.now()),R2(s.x),R2(s.y),R3(s.h),R2(s.v),career.cur,(career.colors[career.cur]||'')+(typeof czCosStr==='function'?'~'+czCosStr():''),fl];
   if(tr){ const k=kingpin(s); P.push(mpGid(tr),tr.type,tr.col||'',tr.logo||'',R3(tr.th),R2(k[0]),R2(k[1])); } else P.push(0); return P; }
 // ---------- network
 function mpSendAll(msg,except,pose){ const d=JSON.stringify(msg); for(const id in MP.conns){ if(id===except) continue; const c=(pose&&MP.pconns[id]&&MP.pconns[id].open)?MP.pconns[id]:MP.conns[id]; if(c&&c.open) try{ c.send(d); }catch(e){} } }
@@ -91,7 +91,7 @@ function mpInterp(p,t){ const b=p.buf, o=p.cur; let A=null,B=null;
   // drop snapshots older than the one we're interpolating from
   while(b.length>2&&b[1][2]<t-50) b.shift(); }
 const mpArt={};
-function mpCab(m,c){ const k=m+'|'+c; if(!mpArt[k]){ const a=modelArt(modelById(m),c||modelById(m).cols[0]); mpArt[k]={a,sh:silhouette(a)}; } return mpArt[k]; }
+function mpCab(m,c){ const k=m+'|'+c; if(!mpArt[k]){ const a=(c&&c.includes('~')&&typeof czRemoteArt==='function')?czRemoteArt(m,c):modelArt(modelById(m),c||modelById(m).cols[0]); mpArt[k]={a,sh:silhouette(a)}; } return mpArt[k]; }
 function mpTrl(tr){ const k=tr[1]+'|'+tr[2]+'|'+tr[3]; if(!mpArt[k]) mpArt[k]=tr[1]==='player'?{type:'player'}:{type:tr[1],art:trailerArt(TRAILER_TYPES[tr[1]]?tr[1]:'box',tr[2],tr[3])}; return mpArt[k]; }
 function drawRemotePlayers(vx0,vy0,vx1,vy1){ if(!MP.on) return; for(const id in MP.players){ const p=MP.players[id], r=p.cur; if(!p.has) continue; const X=r.x*PPM, Y=r.y*PPM; if(X<vx0-300||X>vx1+300||Y<vy0-300||Y>vy1+300) continue;
     const cab=mpCab(r.m,r.c); drawRig(cab.a,cab.sh,r.x,r.y,r.h,r.tr?mpTrl(r.tr):null,r.kx,r.ky,r.th,6);

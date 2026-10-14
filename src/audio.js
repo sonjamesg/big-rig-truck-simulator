@@ -42,8 +42,10 @@ function updateAudio(s,inp,time){
   audio.rlp.frequency.setTargetAtTime(120+fire*2+load*120,t,0.1);
   audio.rum.gain.setTargetAtTime((0.10+0.16*load)*(s.sndR||1),t,0.08);
   audio.turbo.frequency.setTargetAtTime(2400+rpm*1.8,t,0.2); audio.turboG.gain.setTargetAtTime(load>0.5&&rpm>1200?0.012*(rpm-1200)/1000:0,t,0.3);
-  if(inp.horn&&!audio.hornOn){ for(const [o,f] of audio.hornOsc){ o.frequency.cancelScheduledValues(t); o.frequency.setValueAtTime(f*0.93,t); o.frequency.setTargetAtTime(f,t,0.06); } }
-  audio.hornOn=!!inp.horn; audio.horn.gain.setTargetAtTime(inp.horn?0.62:0,t,inp.horn?0.006:0.035);
+  { const hp=audio.hornUntil>performance.now()?audio.hornPrev:(s.hornP||0); if(audio.hornP!==hp&&typeof CZ_HORNS!=='undefined'&&CZ_HORNS[hp]){ audio.hornP=hp; audio.hornOsc.forEach((e,i)=>{ e[1]=CZ_HORNS[hp][i]; e[0].frequency.setValueAtTime(e[1],t); }); } }
+  const hornIn=inp.horn||audio.hornUntil>performance.now();
+  if(hornIn&&!audio.hornOn){ for(const [o,f] of audio.hornOsc){ o.frequency.cancelScheduledValues(t); o.frequency.setValueAtTime(f*0.93,t); o.frequency.setTargetAtTime(f,t,0.06); } }
+  audio.hornOn=!!hornIn; audio.horn.gain.setTargetAtTime(hornIn?0.62:0,t,hornIn?0.006:0.035);
   audio.beep.gain.setTargetAtTime(s.mode==='R' && (time%1)<0.5 ? 0.09:0,t,0.005);
 }
 // ---- v22: tyre screech, area ambience (city hum / birds / gulls / wind), volume control ----

@@ -112,7 +112,7 @@ body:not(.padmode) .padhelp{display:none!important} body.padmode #help:not(.padh
 #ui .btn.start{font-size:17px;padding:14px 26px;letter-spacing:1.5px;flex:none;background:linear-gradient(180deg,#3ddc84,#1f9d55);color:#04150b;box-shadow:0 6px 22px rgba(61,220,132,.35)}
 #ui .btn.start kbd{background:rgba(0,0,0,.18);border-radius:5px;padding:1px 6px;margin-left:8px;font-size:12px}
 .hb.ab{border-color:rgba(255,110,100,.6)} .hb.ab:hover{background:linear-gradient(180deg,#ff6b5b,#c0392b);color:#fff}
-.toast{position:absolute;left:50%;top:70px;transform:translateX(-50%);background:rgba(8,12,20,.9);border:1px solid rgba(245,184,46,.5);padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;pointer-events:none;animation:cin .3s both}
+.toast{position:absolute;left:50%;top:70px;transform:translateX(-50%);background:rgba(8,12,20,.9);border:1px solid rgba(245,184,46,.5);padding:8px 14px;border-radius:10px;font-weight:700;z-index:5;pointer-events:none;font-size:13px;pointer-events:none;animation:cin .3s both}
 `;
 let uiRoot=null;
 function uiInit(){ if(uiRoot) return; const st=document.createElement('style'); st.textContent=UICSS; document.head.appendChild(st);
