@@ -97,13 +97,13 @@ function* railRouteSteps(objs){ const t0=performance.now(), N=MW*MH;
   const legs=[]; let cur=null, stp=0; const startC=tgt[0].c;
   let goalSet=null;
   let strN=0;
-  const leg=(seeds,goalC,goalDir)=>{ for(const sn of [RR_STR]){ strN=sn; const r=leg1(seeds,goalC,goalDir); if(r) return r; } return null; };
-  const leg1=(seeds,goalC,goalDir)=>{ stp++; { goalSet=new Set(); const gx0=goalC%GW, gy0=(goalC/GW)|0; const GR_=(tgt.find(t=>t.kind==='hub')||{}).c===goalC?5:RR_GR; for(let dy=-GR_;dy<=GR_;dy++) for(let dx=-GR_;dx<=GR_;dx++) if(dx*dx+dy*dy<=GR_*GR_){ const q=(gy0+dy)*GW+gx0+dx; if(q>=0&&q<NC&&CL[q]===1) goalSet.add(q); } } hn=0; const gx=goalC%GW, gy=(goalC/GW)|0;
+  const leg=function*(seeds,goalC,goalDir){ for(const sn of [RR_STR]){ strN=sn; const r=yield* leg1(seeds,goalC,goalDir); if(r) return r; } return null; };
+  const leg1=function*(seeds,goalC,goalDir){ stp++; { goalSet=new Set(); const gx0=goalC%GW, gy0=(goalC/GW)|0; const GR_=(tgt.find(t=>t.kind==='hub')||{}).c===goalC?5:RR_GR; for(let dy=-GR_;dy<=GR_;dy++) for(let dx=-GR_;dx<=GR_;dx++) if(dx*dx+dy*dy<=GR_*GR_){ const q=(gy0+dy)*GW+gx0+dx; if(q>=0&&q<NC&&CL[q]===1) goalSet.add(q); } } hn=0; const gx=goalC%GW, gy=(goalC/GW)|0;
     const h=c=>{ const dx=Math.abs(c%GW-gx), dy=Math.abs(((c/GW)|0)-gy); return (Math.max(dx,dy)+0.4142*Math.min(dx,dy)); };
     const seed=(s,v)=>{ stamp[s]=stp; g[s]=v; pv[s]=9; push(s,v+h(s>>3)); };
     for(const s0 of seeds) seed(s0,0);
     let found=-1, it=0;
-    while(hn>0){ const s=pop(), c=s>>3, d=s&7; it++; const gs=g[s];
+    while(hn>0){ if((it&4095)===4095) yield 'Routing the railway'; const s=pop(), c=s>>3, d=s&7; it++; const gs=g[s];
       if(gs>0&&(closeSet?closeSet.has(s):goalSet.has(c))){ found=s; break; }
       const cl=CL[c];
       for(const dd of (cl===1?[0,-1,1]:[0])){ const nd=(d+dd+8)&7, nx=c%GW+DX[nd], ny=((c/GW)|0)+DY[nd]; if(nx<0||ny<0||nx>=GW||ny>=GH) continue; const nc=ny*GW+nx, ncl=CL[nc]; if(!ncl) continue;
@@ -126,14 +126,14 @@ function* railRouteSteps(objs){ const t0=performance.now(), N=MW*MH;
   let prev=null, closeSet=null, closeCells=null;
   for(let k=1;k<=tgt.length+1;k++){ yield 'Routing the railway'; const goal=k<=tgt.length?tgt[k%tgt.length].c:startC; const gd=-1;
     let path;
-    if(k===1) path=leg([0,1,2,3,4,5,6,7].map(d=>startC*8+d),goal,-1);
+    if(k===1) path=yield* leg([0,1,2,3,4,5,6,7].map(d=>startC*8+d),goal,-1);
     else { // release the cells around the previous leg's end so we can continue out of it
       const TB=Math.min(RR_TAIL,all.length-2), tail=all.slice(all.length-TB);
       for(const ts of tail){ const ec=ts>>3, ex=ec%GW, ey=(ec/GW)|0; for(let dy=-3;dy<=3;dy++) for(let dx=-3;dx<=3;dx++) used[(ey+dy)*GW+ex+dx]=0; }
       if(k===tgt.length+1){ closeSet=new Map(); closeCells=new Set(); for(let q=4;q<Math.min(all.length-1,90);q++){ closeSet.set(all[q],q); closeCells.add(all[q]>>3); }
         for(let q=0;q<Math.min(all.length-1,90);q++){ const c=all[q]>>3, cx=c%GW, cy=(c/GW)|0; for(let dy=-3;dy<=3;dy++) for(let dx=-3;dx<=3;dx++) used[(cy+dy)*GW+cx+dx]=0; }
         }
-      path=leg(k===tgt.length+1?[prev]:tail,goal,gd);
+      path=yield* leg(k===tgt.length+1?[prev]:tail,goal,gd);
       if(path){ const q=all.lastIndexOf(path[0]); if(q>=0) all.length=q+1; } }
     if(!path){ RAIL.routeFail=tgt[k%tgt.length].name; RAIL._seen=new Uint8Array(NC); RAIL._used=used; for(let q=0;q<NS;q++) if(stamp[q]===stp) RAIL._seen[q>>3]=1; return null; }
     if(k===1){ const mid=path.length>>1; all=path.slice(mid); used.fill(0); markUsed(all,false); }   // loop starts mid-way along leg 1, so the closing legs re-lay the Albion end freely

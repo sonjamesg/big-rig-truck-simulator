@@ -4,8 +4,8 @@ const ACC={url:'https://sirsawhnqnvioqzmqihk.supabase.co',key:'sb_publishable_RF
 try{ ACC.tok=localStorage.getItem('bigrig.tok'); ACC.name=localStorage.getItem('bigrig.acct'); }catch(e){}
 async function accRpc(fn,args,keep){ const r=await fetch(ACC.url+'/rest/v1/rpc/'+fn,{method:'POST',keepalive:!!keep,headers:{'apikey':ACC.key,'Authorization':'Bearer '+ACC.key,'Content-Type':'application/json'},body:JSON.stringify(args)}); if(!r.ok) throw new Error('rpc '+r.status); return r.json(); }
 const accNorm=n=>String(n||'').trim().replace(/\s+/g,' ');
-function accSetSession(j){ ACC.tok=j.token||ACC.tok; ACC.name=j.name||ACC.name; ACC.admin=!!j.is_admin; try{ localStorage.setItem('bigrig.tok',ACC.tok); localStorage.setItem('bigrig.acct',ACC.name); localStorage.setItem('bigrig.name',ACC.name); }catch(e){} const nm=document.getElementById('lbName'); if(nm) nm.value=ACC.name; }
-function accClear(){ ACC.tok=null; ACC.name=null; ACC.admin=false; try{ localStorage.removeItem('bigrig.tok'); localStorage.removeItem('bigrig.acct'); }catch(e){} }
+function accSetSession(j){ document.body&&document.body.classList.add('acctin'); ACC.tok=j.token||ACC.tok; ACC.name=j.name||ACC.name; ACC.admin=!!j.is_admin; try{ localStorage.setItem('bigrig.tok',ACC.tok); localStorage.setItem('bigrig.acct',ACC.name); localStorage.setItem('bigrig.name',ACC.name); }catch(e){} const nm=document.getElementById('lbName'); if(nm) nm.value=ACC.name; }
+function accClear(){ document.body&&document.body.classList.remove('acctin'); ACC.tok=null; ACC.name=null; ACC.admin=false; try{ localStorage.removeItem('bigrig.tok'); localStorage.removeItem('bigrig.acct'); }catch(e){} }
 // pull the cloud save into localStorage and reload it into the live game (only if the world is ready and we haven't started driving)
 async function accPull(){ if(!ACC.tok) return; try{ const j=await accRpc('load_save',{token:ACC.tok}); if(!j.ok){ accClear(); return; } ACC.admin=!!j.is_admin;
   if(j.save&&j.save.k&&j.save.d){ localStorage.setItem(j.save.k,JSON.stringify(j.save.d)); if(typeof world!=='undefined'&&world.ready&&typeof started!=='undefined'&&!started&&typeof loadGame==='function') loadGame(); } }catch(e){ ACC.online=false; } }
@@ -23,6 +23,7 @@ const css=`#acct{width:min(440px,88vw);margin:14px auto 4px;padding:14px 16px;bo
 #acct .ab.g{background:rgba(255,255,255,.1);color:#dfe5ee;border:1px solid rgba(255,255,255,.2)}
 #acct input:focus,#acct .ab:focus{outline:3px solid #7dff8a;outline-offset:2px}
 #acct .am{font-size:13px;color:#cfe8d2;min-height:17px} #acct .am.e{color:#ff8a7a}
+body.acctin #wbNew,body.acctin #reset{display:none!important} #wbCard{display:flex;flex-wrap:wrap;justify-content:center;gap:8px} #wbCard>div{flex-basis:100%}
 #acct.in .lg{display:none!important} #acct:not(.in) .lo{display:none}
 @media (orientation:landscape) and (max-height:500px){ body.touch #overlay>#acct{grid-column:1;grid-row:5;width:min(44vw,400px);padding:6px 10px;gap:4px;margin:0} body.touch #overlay:has(#acct:not([style*=none]))>#logo{max-height:24vh!important} body.touch #acct .ah{display:none} body.touch #acct .lg[id^=acP]{display:inline-block;width:49%} body.touch #acct .am{font-size:11px;min-height:0} body.touch #acct #acGuest{min-height:30px;padding:4px;font-size:13px} body.touch #acct input,body.touch #acct .ab{min-height:36px;padding:6px 10px} }`;
 const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
@@ -53,7 +54,7 @@ function build(){ const ov=document.getElementById('overlay'); if(!ov||document.
   $('acGo').addEventListener('click',submit);
   for(const id of ['acName','acPin','acPin2']) $(id).addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); submit(); } });
   $('acGuest').addEventListener('click',()=>{ ACC.mode='guest'; accClear(); a.style.display='none'; });
-  function refresh(){ a.classList.toggle('in',!!ACC.tok); $('acWho').innerHTML=ACC.tok?`Signed in as <b>${String(ACC.name).replace(/[<>&"]/g,'')}</b>${ACC.admin?' \u2022 admin':''} \u2022 cloud save on`:''; }
+  function refresh(){ a.classList.toggle('in',!!ACC.tok); document.body.classList.toggle('acctin',!!ACC.tok); $('acWho').innerHTML=ACC.tok?`Signed in as <b>${String(ACC.name).replace(/[<>&"]/g,'')}</b>${ACC.admin?' \u2022 admin':''} \u2022 cloud save on`:''; }
   ACC.refresh=refresh; refresh();
   // logout in the settings panel
   const sp=document.getElementById('setPanel'); if(sp&&!document.getElementById('acOut')){ const b=document.createElement('button'); b.id='acOut'; b.className='ab'; b.style.cssText='font-weight:800;padding:8px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#dfe5ee;cursor:pointer'; b.textContent='Log out';

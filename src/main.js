@@ -13,9 +13,9 @@ let CABART,TRLART,CABSH,TRLSH;
 const LOADMS={"Painting textures":22,"Shaping coastline & terrain":1187,"Painting beaches":1075,"Laying roads":7,"Placing cities & towns":23,"Connecting towns":11,"Building country roads":291,"Building junctions":96,"Raising buildings":36,"Building the docks":8,"Building airports":9,"Planting farmland":22,"Growing forests":604,"Launching boats":4,"Carving kerbs":24,"Installing traffic lights":7,"Painting road markings":26,"Building depots & shops":181,"Building fuel stations":76,"Building garages":445,"Building city fuel & garages":1646,"Parking trailers":190,"Finishing towns":164,"Routing the railway":6345,"Laying the railway":20,"Placing stations":56,"Surveying the track":29,"Clearing the rail corridor":53,"Building level crossings":26,"Building rail bridges":6,"Writing the timetable":42,"Clearing roadsides":1100,"Drawing the map":93,"Spawning traffic":48,"Fuelling your truck":19};
 function bootYield(){ return new Promise(r=>requestAnimationFrame(()=>setTimeout(r,0))); }
 async function boot(){
-  const tb=performance.now(), tim={}, order=[]; const tot=Object.values(LOADMS).reduce((a,b)=>a+b,0)||1; let doneMs=0, cur=null, curT=tb, shown=0;
+  const tb=performance.now(), tim={}, order=[]; const tot=Object.values(LOADMS).reduce((a,b)=>a+b,0)||1; let doneMs=0, cur=null, curT=tb, shown=0, lastY=0;
   const show=txt=>{ const exp=LOADMS[cur]||0, el=performance.now()-curT; const p=Math.min(99,(doneMs+Math.min(exp*0.95,el*(exp?1:0)))/tot*100); shown=Math.max(shown,p); if(typeof homeProgress==='function') homeProgress(shown,txt); };
-  const stage=async name=>{ const n=performance.now(); if(name!==cur){ if(cur!==null){ tim[cur]=(tim[cur]||0)+(n-curT); doneMs+=LOADMS[cur]||0; } cur=name; curT=n; order.push(name); } show(name+'\u2026'); await bootYield(); };
+  const stage=async name=>{ const n=performance.now(); if(name!==cur){ if(cur!==null){ tim[cur]=(tim[cur]||0)+(n-curT); doneMs+=LOADMS[cur]||0; } cur=name; curT=n; order.push(name); } if(performance.now()-lastY<10) return; show(name+'\u2026'); await bootYield(); lastY=performance.now(); };
   await stage('Painting textures'); makeTextures();
   await stage('Shaping coastline & terrain'); for(const st of genWorldSteps()) await stage(st);
   await stage('Drawing the map'); makeMinimap(); if(typeof railMinimap==='function') railMinimap();

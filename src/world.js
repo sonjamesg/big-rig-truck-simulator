@@ -108,7 +108,7 @@ function* genWorldSteps(){
   const t0=performance.now();
   const R = mulberry(20261012);
   const water = new Uint8Array(MW*MH); world.water=water; const CE=new Float32Array(MW), CEH=new Float32Array(MW); for(let x=0;x<MW;x++){ CE[x]=cE(x); CEH[x]=cEh(x); }
-  for(let y=0;y<MH;y++){ if((y&127)===0) yield 'Shaping coastline & terrain'; const cw=cW(y), cwh=cWh(y); for(let x=0;x<MW;x++){
+  for(let y=0;y<MH;y++){ if((y&15)===0) yield 'Shaping coastline & terrain'; const cw=cW(y), cwh=cWh(y); for(let x=0;x<MW;x++){
     const d=Math.min(x,y,MW-1-x,MH-1-y); let w= d<22 || (d<107 && d < 22+fbm(x*1.4,y*1.4)*85);
     if(!w){ const dc=Math.abs(x-cw); if(dc<cwh+9 && dc<cwh+(vnoise(x,y,25)-0.5)*18) w=true; }
     if(!w && x>cw){ const ce=CE[x], dc=Math.abs(y-ce), eh=CEH[x]; if(dc<eh+8 && dc<eh+(vnoise(x+9,y,25)-0.5)*16) w=true; }
@@ -131,14 +131,14 @@ function* genWorldSteps(){
   const CW=new Float32Array(MH); for(let y=0;y<MH;y++) CW[y]=cW(y);
   
   // ground: water / desert sand / mountain rock / grass
-  for(let y=0;y<MH;y++){ if((y&255)===0) yield 'Shaping coastline & terrain'; for(let x=0;x<MW;x++){ const i=idx(x,y); if(water[i]){ G[i]=T.WATER; continue; }
+  for(let y=0;y<MH;y++){ if((y&31)===0) yield 'Shaping coastline & terrain'; for(let x=0;x<MW;x++){ const i=idx(x,y); if(water[i]){ G[i]=T.WATER; continue; }
     let t=(x>CW[y]+20&&y<CE[x]+40&&isDesert(x,y))?T.SAND:T.GRASS;
     for(const h of HILLS){ const dx=x-h.x, dy=y-h.y; if(Math.abs(dx)>h.r*1.2||Math.abs(dy)>h.r*1.2) continue; if(Math.hypot(dx,dy)<h.r*(0.82+0.3*vnoise(x,y,40))) t=T.ROCK; }
     G[i]=t; } }
   (world.tm=world.tm||[]).push(['// beaches:',performance.now()-t0|0]);
   // beaches: 1-5 tiles of sand along the coasts
   const bd=new Uint8Array(MW*MH);
-  for(let pass=1;pass<=5;pass++){ yield 'Painting beaches'; for(let y=1;y<MH-1;y++) for(let x=1;x<MW-1;x++){ const i=idx(x,y); if(water[i]||bd[i]) continue;
+  for(let pass=1;pass<=5;pass++){ yield 'Painting beaches'; for(let y=1;y<MH-1;y++) for(let x=1;x<MW-1;x++){ if(x===1&&(y&31)===0) yield 'Painting beaches'; const i=idx(x,y); if(water[i]||bd[i]) continue;
     const n=(j)=> pass===1? water[j] : bd[j]===pass-1;
     if(n(i-1)||n(i+1)||n(i-MW)||n(i+MW)){ if(pass>1+Math.floor(vnoise(x,y,45)*5.5)) continue; bd[i]=pass; if(G[i]!==T.ROCK) G[i]=T.SAND; } } }
   (world.tm=world.tm||[]).push(['// ---------------- ',performance.now()-t0|0]);
@@ -592,6 +592,7 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
   const FD=world.fd=new Uint8Array(MW*MH);
   const nearRoad=(x,y,r)=>{ for(const [dx,dy] of [[r,0],[-r,0],[0,r],[0,-r]]){ const t=get(x+dx,y+dy); if(t===T.ROAD||t===T.BRIDGE) return true; } return false; };
   for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){
+    if(x===0&&(y&31)===0) yield 'Growing forests';
     const t=G[idx(x,y)]; if(reserved[idx(x,y)]) continue; const h=hash2(x,y);
     if(t===T.GRASS){ const fd=forestD(x,y); FD[idx(x,y)]=fd*255; const p=fd>0.6?0.3 : fd>0.54?0.14 : 0.015; const pine= y<500||fd>0.68||hash2(x+3,y)<0.2;
       if(h<p){ const sp= pine?1 : hash2(y,x+1)<0.12?2 : hash2(y+5,x)<0.08?3 : 0;

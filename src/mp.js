@@ -9,7 +9,7 @@ const R2=v=>Math.round(v*100)/100, R3=v=>Math.round(v*1000)/1000;
 function mpGid(tr){ if((!tr.gid||tr.gid.startsWith('me:'))) tr.gid=(MP.myId||'me')+':'+tr.id; return tr.gid; }
 function mpSelfPose(){ const s=truck, tr=s.trl; const ind=IND.side;
   const fl=((s.brake||0)>0.1?1:0)|(s.mode==='R'?2:0)|(ind<<2)|(input.hand?16:0)|(IND.haz?32:0)|(typeof HB!=='undefined'&&HB.on?64:0); const P=['p',MP.myId,Math.round(performance.now()),R2(s.x),R2(s.y),R3(s.h),R2(s.v),career.cur,(career.colors[career.cur]||'')+(typeof czCosStr==='function'?'~'+czCosStr():''),fl];
-  if(tr){ const k=kingpin(s); P.push(mpGid(tr),tr.type,tr.col||'',tr.logo||'',R3(tr.th),R2(k[0]),R2(k[1])); } else P.push(0); return P; }
+  if(tr){ const k=kingpin(s); P.push(mpGid(tr),tr.type,tr.col||'',tr.logo||'',R3(s.th),R2(k[0]),R2(k[1])); } else P.push(0); return P; }
 // ---------- network
 function mpSendAll(msg,except,pose){ const d=JSON.stringify(msg); for(const id in MP.conns){ if(id===except) continue; const c=(pose&&MP.pconns[id]&&MP.pconns[id].open)?MP.pconns[id]:MP.conns[id]; if(c&&c.open) try{ c.send(d); }catch(e){} } }
 function mpSend(msg,pose){ if(MP.host) mpSendAll(msg,null,pose); else { const c=(pose&&MP.poseConn&&MP.poseConn.open)?MP.poseConn:MP.hostConn; if(c&&c.open) try{ c.send(JSON.stringify(msg)); }catch(e){} } }
@@ -132,14 +132,14 @@ function mpInit(){ const st=document.createElement('style'); st.textContent=MPCS
   lb.querySelector('#lbCode').addEventListener('keydown',e=>{ if(e.key==='Enter') lb.querySelector('#lbJoin').click(); });
   lb.querySelector('#lbCopy').onclick=()=>{ const t=lb.querySelector('#lbLink').textContent; (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>mpStatus('Invite link copied'),()=>{ const r=document.createRange(); r.selectNodeContents(lb.querySelector('#lbLink')); getSelection().removeAllRanges(); getSelection().addRange(r); mpStatus('Press Ctrl+C to copy'); }); };
   lb.querySelector('#lbDrive').onclick=()=>startGame();
-  if(jq) mpStatus('Invite found \u2014 enter your name and press JOIN');
+  if(jq&&!(window.INV&&INV.on)) mpStatus('Invite found \u2014 enter your name and press JOIN');
   // typing in inputs must not drive the truck
   addEventListener('keydown',e=>{ if(!MP.on||!started||career.uiOpen) return; if(e.code==='Tab'){ e.preventDefault(); mpToggleList(); } else if(e.code==='Enter'&&!bigmap.open){ e.preventDefault(); const ci=document.getElementById('mpChatIn'); ci.style.display='block'; for(const k in input) input[k]=false; setTimeout(()=>ci.focus(),0); } });
   const ui=document.getElementById('ui')||document.getElementById('frame'); const host=document.getElementById('frame');
   const pl=document.createElement('div'); pl.id='mplist'; host.appendChild(pl); const ch=document.createElement('div'); ch.id='mpchat'; ch.innerHTML='<div id="mpLines"></div><input id="mpChatIn" maxlength="140" placeholder="Say something\u2026 (Enter to send, Esc to cancel)">'; host.appendChild(ch);
   { const tg=ch.querySelector('#mpChatIn'); tg.addEventListener('keydown',e=>{ if(e.key==='Enter'){ mpChatSend(tg.value); tg.value=''; tg.style.display='none'; tg.blur(); } else if(e.key==='Escape'){ tg.value=''; tg.style.display='none'; tg.blur(); } }); }
   const bd=document.createElement('div'); bd.id='mpbadge'; bd.onclick=mpToggleList; host.appendChild(bd); }
-function mpLobbyHosted(){ const b=document.getElementById('lbHostBox'); b.style.display='flex'; document.getElementById('lbCodeOut').textContent=MP.code; const base=location.href.split('?')[0].split('#')[0]; document.getElementById('lbLink').textContent=base+'?join='+MP.code; mpRender(); }
+function mpLobbyHosted(){ const b=document.getElementById('lbHostBox'); b.style.display='flex'; document.getElementById('lbCodeOut').textContent=MP.code; const base=location.href.split('?')[0].split('#')[0]; document.getElementById('lbLink').textContent=base+'?join='+MP.code+'&h='+encodeURIComponent(String(MP.name||'').slice(0,16)); mpRender(); }
 function mpLobbyClose(){ const b=document.getElementById('lbHostBox'); if(b) b.style.display='none'; }
 function mpLobbyOpen(){ mpLobbyClose(); }
 function mpStatus(t){ const s=document.getElementById('lbStatus'); if(s) s.textContent=t; }

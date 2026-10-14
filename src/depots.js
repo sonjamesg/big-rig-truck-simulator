@@ -165,7 +165,7 @@ if(typeof buildCareerSites==='function') buildCareerSites({findSpot,access,clear
   // v13: every city gets 4 fuel stations (HGV bays + car pumps) and 4 artic-friendly repair garages, spread over its districts
   { const CN={C1:'Albion',SV:'Sandvale',KB:'Kingsbridge',MF:'Millford',DW:'Dustwater',CM:'Coppermine',RH:'Redhill',FW:'Fenwick',AB:'Ashby'}, Q=['North','East','South','West','Central','Park','Ring','Bridge'];
     world.cityPOI={};
-    for(const k in CN){ const c=world.cities[k]; if(!c) continue; const x0=c.xs[0], y0=c.ys[0], x1=c.X1, y1=c.Y1, cx=(x0+x1)/2, cy=(y0+y1)/2, hw=(x1-x0)/2, hh=(y1-y0)/2, mg=Math.max(hw,hh)<40?130:Math.max(hw,hh)<90?80:40;
+    for(const k in CN){ yield 'Building city fuel & garages'; const c=world.cities[k]; if(!c) continue; const x0=c.xs[0], y0=c.ys[0], x1=c.X1, y1=c.Y1, cx=(x0+x1)/2, cy=(y0+y1)/2, hw=(x1-x0)/2, hh=(y1-y0)/2, mg=Math.max(hw,hh)<40?130:Math.max(hw,hh)<90?80:40;
       const inC=p=>{ const tx=p.x/M_T, ty=p.y/M_T; return tx>x0-mg&&tx<x1+mg&&ty>y0-mg&&ty<y1+mg; };
       const tg=[[0,-.55],[.55,0],[0,.55],[-.55,0],[-.5,-.5],[.5,-.5],[.5,.5],[-.5,.5]].map(([a,b])=>[Math.round(cx+a*hw),Math.round(cy+b*hh)]); for(const [a,b] of [[0,-1.3],[1.3,0],[0,1.3],[-1.3,0],[1,-1],[1,1],[-1,1],[-1,-1]]) tg.push([Math.round(cx+a*hw),Math.round(cy+b*hh)]);
       const far=(list,d)=>(x,y)=>x<x0-mg||x>x1+mg-20||y<y0-mg||y>y1+mg-16||list.some(p=>Math.hypot(p.x/M_T-x,p.y/M_T-y)<d);

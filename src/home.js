@@ -7,7 +7,7 @@ const css=`#overlay{background:#070b13!important}
 #overlay .go.wait{background:#5b5f68!important;color:#c9ccd2!important;animation:none!important;opacity:.75;cursor:default}
 #loadBox{width:min(440px,86%);margin:16px auto 4px;text-align:center;padding:10px 14px 8px;border-radius:12px;background:rgba(8,12,20,.72);border:1px solid rgba(125,255,138,.18);box-shadow:0 6px 18px rgba(0,0,0,.4)}
 #loadTrack{position:relative;height:16px;border-radius:9px;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.22);overflow:hidden;box-shadow:inset 0 2px 4px rgba(0,0,0,.6)}
-#loadFill{position:absolute;left:0;top:0;bottom:0;width:0%;border-radius:9px;background:linear-gradient(180deg,#7dff8a,#2fc147 55%,#1f9a34);box-shadow:0 0 12px rgba(80,255,110,.55);transition:width .18s ease-out}
+#loadFill{position:absolute;left:0;top:0;bottom:0;width:0%;border-radius:9px;background:linear-gradient(180deg,#7dff8a,#2fc147 55%,#1f9a34);box-shadow:0 0 12px rgba(80,255,110,.55);transition:width .35s ease-out}
 #loadFill::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(-45deg,rgba(255,255,255,.18) 0 8px,transparent 8px 16px);animation:ldStripe .8s linear infinite}
 #loadBox.done #loadFill::after{animation:none;opacity:0}
 @keyframes ldStripe{to{background-position:22px 0}}
@@ -43,7 +43,8 @@ const st=document.createElement('style'); st.id='homeCss'; st.textContent=css; d
 const ov=document.getElementById('overlay'), ld=document.getElementById('loading'), go=ov&&ov.querySelector('.go');
 if(go&&!(typeof world!=='undefined'&&world.ready)) go.classList.add('wait');
 if(ld){ const b=document.createElement('div'); b.id='loadBox'; b.innerHTML='<div id="loadTrack"><div id="loadFill"></div></div><div id="loadRow"></div>'; ld.parentNode.insertBefore(b,ld); const r=b.querySelector('#loadRow'); r.appendChild(ld); const pc=document.createElement('span'); pc.id='loadPct'; pc.textContent='0%'; r.appendChild(pc); ld.textContent='Starting\u2026'; }
-window.homeProgress=function(p,txt){ p=Math.max(0,Math.min(100,Math.round(p))); const f=document.getElementById('loadFill'), pc=document.getElementById('loadPct'), l=document.getElementById('loading'); if(f) f.style.width=p+'%'; if(pc) pc.textContent=p+'%'; if(l&&txt) l.textContent=txt;
+window.homeSize=function(){ try{ const n=performance.getEntriesByType('navigation')[0]; if(!n) return ''; const mb=b=>(b/1048576).toFixed(1)+' MB', d=n.decodedBodySize||0, t=n.transferSize||0; if(!d) return ''; return ' \u00b7 '+mb(t>1000?t:d); }catch(e){ return ''; } };
+window.homeProgress=function(p,txt){ p=Math.max(0,Math.min(100,Math.round(p))); const f=document.getElementById('loadFill'), pc=document.getElementById('loadPct'), l=document.getElementById('loading'); if(f) f.style.width=p+'%'; if(pc) pc.textContent=p+'%'+homeSize(); if(l&&txt) l.textContent=txt;
   if(p>=100){ const bx=document.getElementById('loadBox'); if(bx) bx.classList.add('done'); const g=ov&&ov.querySelector('.go'); if(g){ g.classList.remove('wait'); g.removeAttribute('aria-disabled'); } } };
 if(go) go.setAttribute('aria-disabled','true');
 // backdrop: dusk sky, city skyline with lit windows, a motorway with street lamps and passing headlights / tail lights (light: ~30 fps, DPR capped, stops when hidden)
@@ -54,7 +55,7 @@ function setup(){ const dpr=Math.min(1.5,devicePixelRatio||1); W=Math.max(1,c.cl
   const R=rnd(7); bld=[]; let x=-10; while(x<W+10){ const w=18+R()*42, h=(0.08+R()*0.22)*H*(R()<.15?1.8:1); const win=[]; for(let yy=6;yy<h-6;yy+=9) for(let xx=4;xx<w-5;xx+=8) if(R()<.32) win.push([xx,yy,R()<.8?'#ffcf7a':'#cfe6ff']); bld.push({x,w,h,win}); x+=w+2+R()*6; }
   sky=g.createLinearGradient(0,0,0,H); sky.addColorStop(0,'#05080f'); sky.addColorStop(.45,'#101a30'); sky.addColorStop(.62,'#2a2440'); sky.addColorStop(.66,'#3a2a3a'); sky.addColorStop(1,'#06090f');
   cars=[]; const R2=rnd(11); for(let i=0;i<9;i++) cars.push({x:R2()*W,dir:i%2?1:-1,v:40+R2()*70,lorry:R2()<.35}); }
-function draw(t){ if(!ov||ov.classList.contains('hidden')){ requestAnimationFrame(draw); return; } if(t-lastT<33){ requestAnimationFrame(draw); return; } const dt=Math.min(.1,(t-lastT)/1000); lastT=t;
+function draw(t){ if(!ov||ov.classList.contains('hidden')){ requestAnimationFrame(draw); return; } if(t-lastT<15){ requestAnimationFrame(draw); return; } const dt=Math.min(.1,(t-lastT)/1000); lastT=t;
   if(c.clientWidth!==W||c.clientHeight!==H) setup();
   const hz=H*0.64; g.fillStyle=sky; g.fillRect(0,0,W,H);
   // skyline

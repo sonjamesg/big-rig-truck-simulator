@@ -99,7 +99,7 @@ function loadGame(){ const d=hasSave(); if(!d) return false;
       else if(truck.trl){ tr=truck.trl; tr.job=j.id; setRoute(j.to); }
       if(tr) career.active={job:j,trailer:tr,pickBay:{},bay,phase:tr.coupled?'deliver':'recouple',t0:timeS-(d.active.el||0),tc:timeS,dmg0:truck.damage}; } }catch(e){ console.warn('job restore',e); } } }
   return true; }
-function resetGame(){ try{ career.noSave=1; localStorage.removeItem(saveKey()); if(!world.v2poi) localStorage.removeItem(SAVE_KEY_OLD); }catch(e){} location.reload(); }
+function resetGame(){ if(typeof ACC!=='undefined'&&ACC.tok){ if(typeof toast==='function') toast('Signed in \u2022 your progress is safe in your account'); return; } try{ career.noSave=1; localStorage.removeItem(saveKey()); if(!world.v2poi) localStorage.removeItem(SAVE_KEY_OLD); }catch(e){} location.reload(); }
 // ---------- jobs
 const R7=mulberry((Date.now()%1e9)|0);
 function pickupsFor(c){ if(c.dock){ const p=world.depots.filter(d=>d.code==='APT'&&d.bays.length); if(p.length) return p; } const ds=world.depots.filter(d=>d.bays.length); const pref=c.trl==='cont'?ds.filter(d=>/Docks|Harbour|Freight/.test(d.name)):c.trl==='tank'?ds.filter(d=>/Quarry|Mine|Logistics|Harbour/.test(d.name)):c.trl==='fridge'?ds.filter(d=>/Agri|Farm|Distribution|Air/.test(d.name)):ds; return pref.length?pref:ds; }
