@@ -179,7 +179,7 @@ function planPiece(v,r){
     const ex= cd>0?o.ce:o.cs, q=lanePt(C2,cd,lane,ex);
     const ctrl= sg.dir==='h'?[q[0],p[1]]:[p[0],q[1]];
     pathQuad(v,ctrl[0],ctrl[1],q[0],q[1]); mk.dEnd=pathEnd(v); mk.turn=ch[0]; v.mk.push(mk);
-    if(J.lights&&ch[0]==='R'){ const dS=mk.d, L0=mk.dEnd-dS; v.mk.push({kind:'filter',d:dS+L0*0.32,dEnd:mk.dEnd,J,key:mk.key,opp:sg.id+':'+(-d)}); }
+    if(J.lights&&ch[0]==='R'){ const dS=mk.d, L0=mk.dEnd-dS; v.mk.push({kind:'filter',d:dS+L0*(v.kind==='lorry'||v.heavy?0.12:0.32),dEnd:mk.dEnd,J,key:mk.key,opp:sg.id+':'+(-d)}); }
     v.mk.push({kind:'sig',d0:dStop-38,d1:mk.dEnd,side:ch[0]==='L'?-1:1});
     v.mk.push({kind:'slow',d0:dStop,d1:mk.dEnd,v:ch[0]==='L'?5.5:6.5});
     P.seg=C2.id; P.dir=cd; P.lane=lane; P.pos=ex; return true;
@@ -420,7 +420,7 @@ function stepVeh(v,dt,pbs){
     else if(m.kind==='filter'){ const gap=m.d-front; if(gap<-1.5||m.go) { v.filtering=false; continue; } if(gap>14) continue;
       // UK filtering right turn: pull forward into the junction, wait for a gap in oncoming traffic; when the stage ends, clear the junction
       const st=sigState(m.J,m.key,'R'); let wait=false; if(st==='g'&&sigFilter(m.J,m.key,'R')&&sigOncoming(v,m.J,m.opp)) wait=true;
-      if(!wait&&gap<3&&oppTurnIn(v,m.J)) wait=true;   // v25: an opposing right-turner already committed in the box goes first
+      if(!wait&&gap<3&&oppTurnIn(v,m.J)) wait=true; if(!wait&&gap<3&&boxBlocked(v,m)) wait=true;   // box junction: the exit must be clear before we commit across   // v25: an opposing right-turner already committed in the box goes first
       if(gap<6) v.filterJ=m.J;
       if(wait){ v.filtering=gap<4; acc=Math.min(acc,idmAcc(v,v0,Math.max(0.1,gap),0)); } else if(gap<2){ m.go=true; v.filtering=false; v.turnJ=m.J; v.filterJ=null; } }
     else if(m.kind==='light'||m.kind==='gw'||m.kind==='rb'){
@@ -476,6 +476,10 @@ function stepVeh(v,dt,pbs){
   // deadlock breaker: only ghost through the car ahead when the queue is genuinely locked (a loop of cars waiting on each other, or the
   // head of the queue has been stood for over a minute) — never just because we are queued behind a red light (v24: cars were driving into each other)
   if(v.stopT>7 && !lplayer && lgap<6 && queueLocked(v) && !rbQueued(v)){ v.ghostT=2.5; v.stopT=0; }
+  // nose-to-nose in a junction (e.g. two opposing right-turners whose rigs swept into each other): after ~4 s the lower id ghosts through
+  if(v.stopT>4&&v.ghostT<=0){ const f=fwd(v.h||0); for(const o of traffic.vs){ if(o===v||o.id<v.id||(o.stopT||0)<4) continue; if(Math.abs(o.x-v.x)>24||Math.abs(o.y-v.y)>24) continue;
+      const g=fwd(o.h||0); if(f[0]*g[0]+f[1]*g[1]>-0.3) continue; const dx=o.x-v.x, dy=o.y-v.y; if(dx*f[0]+dy*f[1]<0) continue;
+      if(!(v.turnJ||v.filterJ||o.turnJ||o.filterJ)&&!(world.junctions||[]).some(J=>v.x>J.x*M_T-3&&v.x<(J.x+J.w)*M_T+3&&v.y>J.y*M_T-3&&v.y<(J.y+J.h)*M_T+3)) continue; v.ghostT=3; v.stopT=0; traffic.jUnlock=(traffic.jUnlock||0)+1; break; } }
   if(v.ghostT>0) v.ghostT-=dt;
   if(v.shakeT<=0 && (v.offX||v.offY)){
     // recovery: a forward shove is simply absorbed as progress along the path (never slide back into whoever hit us);
