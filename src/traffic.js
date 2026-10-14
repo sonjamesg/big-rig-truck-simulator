@@ -377,9 +377,10 @@ function giveWayBusy(v,J){
       if(dist<8+Math.abs(b.vel)*3.2) return true; } }
   return false; }
 function boxBlocked(v,m){ // UK box junction: don't enter unless the exit is clear
-  for(let s=m.dEnd+0.5;s<m.dEnd+v.L+4;s+=2){ const p=pathAt(v,s); const kx=Math.floor(p[0]/HC), ky=Math.floor(p[1]/HC);
+  const need=v.L+(v.kind==='lorry'?14:0)+5;   // v27: room for the whole rig (lorry + trailer) past the box
+  for(let s=m.dEnd+0.5;s<m.dEnd+need;s+=2){ const p=pathAt(v,s); const kx=Math.floor(p[0]/HC), ky=Math.floor(p[1]/HC);
     for(let dx=-1;dx<=1;dx++) for(let dy=-1;dy<=1;dy++){ const a=traffic.hash.get((kx+dx+4096)*8192+ky+dy+4096); if(!a) continue;
-      for(const b of a){ if(b.veh===v) continue; if(Math.abs(b.vel||0)<2.5 && ptBoxDist(p[0],p[1],b)<v.W/2+0.3) return true; } } }
+      for(const b of a){ if(b.veh===v) continue; if(Math.abs(b.vel||0)<3.5 && ptBoxDist(p[0],p[1],b)<v.W/2+0.3) return true; } } }
   return false; }
 function releaseJ(v){ if(v.jHeld){ const o=v.jHeld.occ; const i=o.indexOf(v.jEntry); if(i>=0) o.splice(i,1); v.jHeld=null; } }
 function idmAcc(v,v0,gap,vl){ const a=v.amax, b=3.0, T=v.heavy?1.7:1.25, s0=2.2; const ss=s0+Math.max(0,v.v*T+v.v*(v.v-vl)/(2*Math.sqrt(a*b)));
@@ -429,7 +430,7 @@ function stepVeh(v,dt,pbs){
         if(!stop&&gap<12&&boxBlocked(v,m)) stop=true;            // never enter unless the exit is clear
         if(!stop&&gap<6&&jBusy(v,m.J)) stop=true;                 // give way to anything still crossing the junction
         if(!stop&&gap<3){ m.go=true; m.goT=timeS; if(traffic.goLog) traffic.goLog.push({J:m.J.id,key:m.key,mv:m.move,t:timeS,st:ls,veh:v.id}); } }
-      else if(m.kind==='gw'){ if(gap<18){ if(!giveWayBusy(v,m.J)||v.stopT>10) { if(gap<2.5) m.go=true; } else stop=true; } }
+      else if(m.kind==='gw'){ if(gap<12&&m.dEnd!==undefined&&boxBlocked(v,m)) stop=true; else if(gap<18){ if(!giveWayBusy(v,m.J)||v.stopT>10) { if(gap<2.5) m.go=true; } else stop=true; } }
       else { if(gap<14){ let busy=false; for(const o of traffic.vs){ if(o===v||o.ring!==m.rb) continue; const a=Math.atan2(o.y-m.rb.cy*M_T,o.x-m.rb.cx*M_T); const df=mod2pi(m.ang-a); if(df<1.5&&df>0.05){ busy=true; break; } }
           if(!busy){ const t=truck, dr=Math.hypot(t.x-m.rb.cx*M_T,t.y-m.rb.cy*M_T); if(dr<(m.rb.rout+1)*M_T&&Math.abs(t.v)>0.8){ const a=Math.atan2(t.y-m.rb.cy*M_T,t.x-m.rb.cx*M_T), df=mod2pi(m.ang-a); if(df<1.6&&df>0.05) busy=true; } }
           if(busy&&v.stopT>12){ busy=false; for(const o of traffic.vs){ if(o===v||o.ring!==m.rb) continue; const a=Math.atan2(o.y-m.rb.cy*M_T,o.x-m.rb.cx*M_T), df=mod2pi(m.ang-a); if(df<0.5&&df>-0.15&&o.v>0.5){ busy=true; break; } } }   // long wait: only a car right at the merge still blocks

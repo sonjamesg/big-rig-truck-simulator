@@ -21,10 +21,10 @@ AUDIT=r"""(()=>{ const W=__bigrig.world,S=W.segs, X0=1385,Y0=1370,X1=1945,Y1=194
   // 6) every signalised junction has a working phase plan: each approach gets a green at some point
   for(const J of kbJ){ if(!J.lights) continue; const P=sigOf(J); if(!P.stages.length) fail.push('no stages '+J.x+','+J.y); for(const k of Object.keys(J.appr||{})) if(!P.mvs.some(m=>m.key===k)) fail.push('approach never green '+J.x+','+J.y+' '+k); }
   // 7) Northgate Diagonal: chain of straight stubs joined by tied curves, every stub junction signalised
-  const DG=W.kbDiag||[]; if(DG.length<7) fail.push('diagonal chain missing'); const dset=new Set();
+  const DG=W.kbDiag||[]; if(DG.length) fail.push('Northgate Diagonal should be gone'); const dset=new Set();
   for(const sg of DG){ if(!sg.js.length) fail.push('diagonal stub without junction '+sg.id); for(const J of sg.js) if(!J.lights) fail.push('diagonal junction unlit '+J.x+','+J.y);
     for(let b=sg.b0;b<=sg.b1;b++) for(let k=0;k<sg.w;k++) dset.add(sg.dir==='h'?idx(b,sg.a+k):idx(sg.a+k,b)); }
-  const dcv=W.curves.filter(c=>c.name==='Northgate Diagonal'); if(dcv.length!==DG.length-1) fail.push('diagonal links '+dcv.length); for(const c of dcv){ if(!c.A||!c.B) fail.push('diagonal curve not tied '+c.id); for(const [x,y] of c.pts) dset.add(idx(Math.floor(x),Math.floor(y))); }
+  const dcv=W.curves.filter(c=>c.name==='Northgate Diagonal'); if(dcv.length) fail.push('diagonal links '+dcv.length); for(const c of dcv){ if(!c.A||!c.B) fail.push('diagonal curve not tied '+c.id); for(const [x,y] of c.pts) dset.add(idx(Math.floor(x),Math.floor(y))); }
   const CH=W.kbChan||[]; if(CH.length!==2) fail.push('channel diagonal stubs missing'); for(const sg of CH){ if(!sg.js.length) fail.push('channel stub without junction'); for(const J of sg.js) if(!J.lights) fail.push('channel junction unlit');
     for(let b=sg.b0;b<=sg.b1;b++) for(let k=0;k<sg.w;k++) dset.add(sg.dir==='h'?idx(b,sg.a+k):idx(sg.a+k,b)); }
   const ccv=W.curves.filter(c=>c.name==='Channel Diagonal'); if(ccv.length!==1||!ccv[0].A||!ccv[0].B) fail.push('channel curve not tied'); for(const c of ccv) for(const [x,y] of c.pts){ dset.add(idx(Math.floor(x),Math.floor(y))); if(G[idx(Math.floor(x),Math.floor(y))]!==T.ROAD&&G[idx(Math.floor(x),Math.floor(y))]!==T.BRIDGE) fail.push('channel tile painted over '+x+','+y); }
@@ -55,5 +55,5 @@ async def main():
       if a['fail'] or stuck or errs or ovl: ok=False
       diagSeen=globals().setdefault('DS',[0]); diagSeen[0]+=len(onDiag)
       await pg.close()
-    await b.close(); print(json.dumps(res,indent=1)); ok=ok and DS[0]>0; print('PASS' if ok else 'FAIL'); sys.exit(0 if ok else 1)
+    await b.close(); print(json.dumps(res,indent=1)); print('PASS' if ok else 'FAIL'); sys.exit(0 if ok else 1)
 asyncio.run(main())

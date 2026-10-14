@@ -289,14 +289,7 @@ function* genWorldSteps(){
     link('city',RW,n,1,e,0,[[1752,1740],[1800,1800]],10,'Channel Diagonal'); world.kbChan=[n,e]; }
   pending.push(()=>{ });
   world.kbDistricts=KD;
-  { // v24 Northgate Diagonal: a staircase avenue across the Northgate grid. Each street it crosses is crossed mid-block on a short straight
-    // stub (a real signalised crossroads), the stubs are joined by drivable curves, and both ends T into the grid — so AI and sat nav use it.
-    const N=KD.NG, xs=N.xs, ys=N.ys, L=3, mid=(a,b)=>Math.round((a+RW+b)/2-RW/2);
-    const H=(k,j)=>road('h',mid(ys[j],ys[j+1]),xs[k]-L,xs[k]+RW-1+L,RW,'city'), V=(k,j)=>road('v',mid(xs[j],xs[j+1]),ys[k]-L,ys[k]+RW-1+L,RW,'city');
-    const st=road('v',mid(xs[3],xs[4]),ys[4]-6,ys[4]-1,RW,'city'), en=road('v',mid(xs[0],xs[1]),ys[1]+RW,ys[1]+RW+5,RW,'city');
-    const chain=[st,H(3,3),V(3,2),H(2,2),V(2,1),H(1,1),en]; for(const sg of chain) sg.name='Northgate Diagonal';
-    for(let i=0;i<chain.length-1;i++) link('city',RW,chain[i],0,chain[i+1],1,[],4,'Northgate Diagonal');
-    world.kbDiag=chain; }
+  world.kbDiag=[];   // v27: Northgate Diagonal removed — its staircase of mid-block stubs cut the NW Kingsbridge blocks into back-to-back double crossroads that gridlocked (James 14 Oct)
   const rbN=road('v',1359,1300,1380-RBT-1,2,'rural');
   wind('h',1784,903,1399,RW,'city',30,'Airport Way');                     // curved bridge over the River Moor                                             // Kingsbridge Airport road (over the River Moor)
   wind('h',MF.ys[2],103,MF.xs[0]-1,RW,'town',14,'Millford Road'); wind('v',MF.xs[1],MF.Y1+1,976,RW,'town',10,'Millford South Road');
