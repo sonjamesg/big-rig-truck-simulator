@@ -37,8 +37,19 @@ function railHardMask(objs){ const N=MW*MH, H=new Uint8Array(N);
   for(const o of objs){ if(!RR_HARDO[o.kind]||o._dead) continue; const r=o.r||0; if(o.w!==undefined) box(o.x/TILE,o.y/TILE,(o.x+o.w)/TILE,(o.y+o.h)/TILE); else box((o.x-r)/TILE,(o.y-r)/TILE,(o.x+r*2.2)/TILE,(o.y+r*2.2)/TILE); }
   return H; }
 function railRoute(objs){ const it=railRouteSteps(objs); for(;;){ const r=it.next(); if(r.done) return r.value; } }
+function railHashArr(h,a){ if(!a) return Math.imul(h^0x55,16777619)>>>0; const u=new Uint8Array(a.buffer,a.byteOffset,a.byteLength); const n=u.length;
+  let h1=h^n, h2=0x9e3779b9; for(let i=0;i+3<n;i+=4){ const k=u[i]|(u[i+1]<<8)|(u[i+2]<<16)|(u[i+3]<<24); h1=Math.imul(h1^k,0x01000193); h2=Math.imul(h2+k,0x85ebca6b)^(h2>>>13); } for(let i=n&~3;i<n;i++) h1=Math.imul(h1^u[i],0x01000193); return ((h1^h2)>>>0); }
+function railInKey(H){ let h=2166136261; for(const a of [world.ground,H,world.jMask,world.roadH,world.roadV,world.cornerAt]) h=railHashArr(h,a&&a.buffer?a:null);
+  const g=JSON.stringify([MW,MH,RR_C,(world.junctions||[]).map(J=>[J.x,J.y,J.w,J.h]),(world.curves||[]).map(c=>[c.w,c.pts.length,c.pts[0]]),(world.tapers||[]).map(t=>[t.wW,t.pts.length,t.pts[0]]),RAIL_ST]);
+  for(let i=0;i<g.length;i++) h=Math.imul(h^g.charCodeAt(i),16777619)>>>0; return 'r1-'+h.toString(36)+'-'+g.length; }
+function railCacheGet(k){ try{ const B=window.RAIL_BAKE; if(B&&B.k===k) return {raw:railUnpack(B.raw),route:JSON.parse(B.route),src:'bake'}; const s=localStorage.getItem('bigrig.railc'); if(s){ const o=JSON.parse(s); if(o.k===k) return {raw:railUnpack(o.raw),route:JSON.parse(o.route),src:'local'}; } }catch(e){} return null; }
+function railPack(raw){ const f=new Float64Array(raw.length*2); raw.forEach((p,i)=>{ f[i*2]=p[0]; f[i*2+1]=p[1]; }); let s=''; const u=new Uint8Array(f.buffer); for(let i=0;i<u.length;i+=8192) s+=String.fromCharCode.apply(null,u.subarray(i,i+8192)); return btoa(s); }
+function railUnpack(b){ const s=atob(b), u=new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); const f=new Float64Array(u.buffer), r=[]; for(let i=0;i<f.length;i+=2) r.push([f[i],f[i+1]]); return r; }
+function railCachePut(k,raw){ try{ const o={k,raw:railPack(raw),route:JSON.stringify(RAIL.route)}; window.__railBakeOut=o; localStorage.setItem('bigrig.railc',JSON.stringify(o)); }catch(e){} }
 function* railRouteSteps(objs){ const t0=performance.now(), N=MW*MH;
   const H=railHardMask(objs); RAIL.hard=H;
+  // route cache: the A* result is a pure function of the generated world, so reuse it when every input hashes identically
+  const RKEY=railInKey(H); { const c=railCacheGet(RKEY); if(c){ RAIL.route=c.route; RAIL.route.cached=c.src; return c.raw; } }
   const RD=new Uint8Array(N), WT=new Uint8Array(N);
   for(let i=0;i<N;i++){ const g=G[i]; if(g===T.ROAD||g===T.BRIDGE||g===T.WALK||g===T.ISLAND) RD[i]=1; if(g===T.WATER) WT[i]=1; }
   for(const c of world.curves||[]) for(const [px,py] of c.pts) for(let dy=-2;dy<=2;dy++) for(let dx=-2;dx<=2;dx++){ const x=Math.floor(px+dx),y=Math.floor(py+dy); if(inb(x,y)&&Math.hypot(x+0.5-px,y+0.5-py)<=c.w/2+0.5) RD[y*MW+x]=1; }
@@ -222,7 +233,7 @@ function* railRouteSteps(objs){ const t0=performance.now(), N=MW*MH;
   { const m=raw.length; let mn=1e9; const st=15; for(let i=0;i<m;i++){ const a=raw[(i-st+m)%m], b=raw[i], c=raw[(i+st)%m]; const A2=Math.abs((b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0])); if(A2<1e-6) continue; const R=Math.hypot(b[0]-a[0],b[1]-a[1])*Math.hypot(c[0]-b[0],c[1]-b[1])*Math.hypot(c[0]-a[0],c[1]-a[1])/(2*A2); if(R<mn) mn=R; } RAIL.route.minRsm=Math.round(mn); }
   RAIL.route.verts=nV; RAIL.route.minR=Math.round(Math.min(...Array.from(Rv).filter(r=>r>0))); RAIL.route.radii=Array.from(Rv).map(Math.round); RAIL.route.small=V.map((v,i)=>[Math.round(v[0]/M_T),Math.round(v[1]/M_T),Math.round(Rv[i])]).filter(q=>q[2]>0&&q[2]<100);
   RAIL.route.tgt=tgt; RAIL.route.ms=Math.round(performance.now()-t0);
-  return raw; }
+  railCachePut(RKEY,raw); return raw; }
 // ---------- geometry
 function railBuild(objs){ for(const _ of railBuildSteps(objs)); }
 function* railBuildSteps(objs){

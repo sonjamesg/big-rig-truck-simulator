@@ -94,10 +94,13 @@ function* buildDepotsSteps(objs,R){
   const okT=t=>t===T.GRASS||t===T.TREE||t===T.SAND||t===T.QUAY||t===T.FIELD||t===T.HEDGE||t===T.GRAVEL||t===T.WALK||t===T.PGRASS||t===T.ROCK||t===T.CONC;
   function findSpot(tx,ty,w,h,maxGap,rej,allowB,maxR){ const okB=allowB?(t=>okT(t)||t===T.BLDG||t===T.LOT||t===T.PLAZA):okT, soft=t=>allowB&&(t===T.WALK||t===T.PLAZA||t===T.PGRASS||t===T.BLDG||t===T.LOT);
     // summed-area table of unusable tiles over the search window (fast rectangle tests)
-    const RAD=162, X0=Math.max(0,tx-RAD-2), Y0=Math.max(0,ty-RAD-2), X1=Math.min(MW-1,tx+RAD+w+3), Y1=Math.min(MH-1,ty+RAD+h+3), SW=X1-X0+2, sat=new Int32Array(SW*(Y1-Y0+2));
-    for(let j=Y0;j<=Y1;j++){ let row=0; const o=(j-Y0+1)*SW, op=(j-Y0)*SW; for(let i=X0;i<=X1;i++){ const k=idx(i,j); row+=(!okB(G[k])||(world.reserved[k]&&!soft(G[k])))?1:0; sat[o+i-X0+1]=sat[op+i-X0+1]+row; } }
+    const RAD=Math.min(162,(maxR||160)+2), X0=Math.max(0,tx-RAD-2), Y0=Math.max(0,ty-RAD-2), X1=Math.min(MW-1,tx+RAD+w+3), Y1=Math.min(MH-1,ty+RAD+h+3), SW=X1-X0+2, sat=new Int32Array(SW*(Y1-Y0+2));
+    // lookup tables instead of per-tile closures (same truth table), flat index walk
+    const OKL=new Uint8Array(256), SFL=new Uint8Array(256); for(let t=0;t<256;t++){ OKL[t]=okB(t)?1:0; SFL[t]=soft(t)?1:0; } const RS=world.reserved;
+    for(let j=Y0;j<=Y1;j++){ let row=0; const o=(j-Y0+1)*SW, op=(j-Y0)*SW; let k=idx(X0,j); for(let i=X0;i<=X1;i++,k++){ const g=G[k]; row+=(!OKL[g]||(RS[k]&&!SFL[g]))?1:0; sat[o+i-X0+1]=sat[op+i-X0+1]+row; } }
     const badIn=(x,y,ww,hh)=>{ if(x<X0||y<Y0||x+ww-1>X1||y+hh-1>Y1) return true; const a=x-X0, b=y-Y0, c=a+ww, d=b+hh; return sat[d*SW+c]-sat[b*SW+c]-sat[d*SW+a]+sat[b*SW+a]>0; };
-    for(let rad=0;rad<(maxR||160);rad+=2) for(let dy=-rad;dy<=rad;dy+=2) for(let dx=-rad;dx<=rad;dx+=2){ if(Math.max(Math.abs(dx),Math.abs(dy))!==rad) continue;
+    // ring walk: same visiting order as scanning the square and skipping interior cells, without the O(r^2) skips
+    for(let rad=0;rad<(maxR||160);rad+=2) for(let dy=-rad;dy<=rad;dy+=2) for(let dx=-rad;dx<=rad;dx+=(dy===-rad||dy===rad||rad===0)?2:2*rad){
       const x=tx+dx, y=ty+dy; if(x<2||y<4||x+w>MW-2||y+h>MH-2) continue;
       if(badIn(x-1,y,w+2,h+1)) continue; if(rej&&rej(x,y)) continue;
       for(let gap=1;gap<=(maxGap||8);gap++){ const j=y-1-gap; let road=0; for(let i=x+w/2-2;i<x+w/2+2;i++){ const sid=world.roadH[idx(i,j)]; if((get(i,j)===T.ROAD||get(i,j)===T.BRIDGE)&&sid>=0&&world.segs[sid].type!=='hwy'&&world.roadV[idx(i,j)]<0) road++; }

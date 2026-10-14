@@ -5,6 +5,8 @@ for f in ['keyguard.js','world.js','render.js','bldg2.js','lorry.js','physics.js
 import datetime,subprocess
 try: _rev=subprocess.check_output(['git','rev-parse','--short','HEAD'],cwd=d).decode().strip()
 except Exception: _rev='dev'
+_bk=os.path.join(s,'railbake.json')
+if os.path.exists(_bk): js="window.RAIL_BAKE="+open(_bk).read().strip()+";\n"+js
 js="window.BIGRIG_VERSION='Build "+datetime.date.today().strftime('%d %b %Y')+" \\u00b7 "+_rev+"';\n"+js
 html=open(os.path.join(s,'template.html')).read().replace('/*SCRIPT*/',js)
 open(os.path.join(d,'BigRig.html'),'w').write(html)

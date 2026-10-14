@@ -138,9 +138,15 @@ function* genWorldSteps(){
   (world.tm=world.tm||[]).push(['// beaches:',performance.now()-t0|0]);
   // beaches: 1-5 tiles of sand along the coasts
   const bd=new Uint8Array(MW*MH);
-  for(let pass=1;pass<=5;pass++){ yield 'Painting beaches'; for(let y=1;y<MH-1;y++) for(let x=1;x<MW-1;x++){ if(x===1&&(y&31)===0) yield 'Painting beaches'; const i=idx(x,y); if(water[i]||bd[i]) continue;
-    const n=(j)=> pass===1? water[j] : bd[j]===pass-1;
-    if(n(i-1)||n(i+1)||n(i-MW)||n(i+MW)){ if(pass>1+Math.floor(vnoise(x,y,45)*5.5)) continue; bd[i]=pass; if(G[i]!==T.ROCK) G[i]=T.SAND; } } }
+  // pass 1 scans the map; later passes only visit neighbours of the previous ring (identical result: a pass only reads water and bd===pass-1)
+  let ring=[];
+  for(let pass=1;pass<=5;pass++){ yield 'Painting beaches'; const nxt=[];
+    const tryCell=(x,y)=>{ const i=idx(x,y); if(water[i]||bd[i]) return;
+      const n=(j)=> pass===1? water[j] : bd[j]===pass-1;
+      if(n(i-1)||n(i+1)||n(i-MW)||n(i+MW)){ if(pass>1+Math.floor(vnoise(x,y,45)*5.5)) return; bd[i]=pass; nxt.push(i); if(G[i]!==T.ROCK) G[i]=T.SAND; } };
+    if(pass===1){ for(let y=1;y<MH-1;y++){ if((y&31)===0) yield 'Painting beaches'; for(let x=1;x<MW-1;x++) tryCell(x,y); } }
+    else { const seen=new Set(); for(const i of ring){ for(const j of [i-1,i+1,i-MW,i+MW]){ if(seen.has(j)) continue; seen.add(j); const x=j%MW, y=(j/MW)|0; if(x<1||y<1||x>=MW-1||y>=MH-1) continue; tryCell(x,y); } } }
+    ring=nxt; }
   (world.tm=world.tm||[]).push(['// ---------------- ',performance.now()-t0|0]);
   yield 'Laying roads';
   // ---------------- roads ----------------
@@ -686,9 +692,9 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
     const poly=(pts,hw)=>{ for(const [px,py] of pts) for(let ty=Math.floor(py-hw);ty<=py+hw;ty++) for(let tx=Math.floor(px-hw);tx<=px+hw;tx++) if(Math.hypot(tx+0.5-px,ty+0.5-py)<=hw+0.5) src(tx,ty); };
     for(const c of world.curves) poly(c.pts,c.w/2); for(const t of world.tapers||[]) poly(t.pts,t.wW/2);
     if(typeof RAIL!=='undefined'&&RAIL.X&&RAIL.L){ for(let s2=0;s2<RAIL.L;s2++){ const cx=RAIL.X[s2]/M_TILE, cy=RAIL.Y[s2]/M_TILE; for(let oy=-1;oy<=1;oy++) for(let ox=-1;ox<=1;ox++) src(Math.floor(cx+ox*0.5),Math.floor(cy+oy*0.5)); } }
-    const relax=(i,j)=>{ if(NX[j]<0) return; const x=i%MW,y=(i/MW)|0, dx=x-NX[j], dy=y-NY[j], d=dx*dx+dy*dy; if(d<D[i]){ D[i]=d; NX[i]=NX[j]; NY[i]=NY[j]; } };
-    for(let y=0;y<MH;y++){ if((y&127)===0) yield 'Clearing roadsides'; for(let x=0;x<MW;x++){ const i=idx(x,y); if(x>0) relax(i,i-1); if(y>0){ relax(i,i-MW); if(x>0) relax(i,i-MW-1); if(x<MW-1) relax(i,i-MW+1); } } for(let x=MW-2;x>=0;x--) relax(idx(x,y),idx(x,y)+1); }
-    for(let y=MH-1;y>=0;y--){ if((y&127)===0) yield 'Clearing roadsides'; for(let x=MW-1;x>=0;x--){ const i=idx(x,y); if(x<MW-1) relax(i,i+1); if(y<MH-1){ relax(i,i+MW); if(x<MW-1) relax(i,i+MW+1); if(x>0) relax(i,i+MW-1); } } for(let x=1;x<MW;x++) relax(idx(x,y),idx(x,y)-1); }
+    const relax=(i,j,x,y)=>{ if(NX[j]<0) return; const dx=x-NX[j], dy=y-NY[j], d=dx*dx+dy*dy; if(d<D[i]){ D[i]=d; NX[i]=NX[j]; NY[i]=NY[j]; } };
+    for(let y=0;y<MH;y++){ if((y&127)===0) yield 'Clearing roadsides'; for(let x=0;x<MW;x++){ const i=idx(x,y); if(x>0) relax(i,i-1,x,y); if(y>0){ relax(i,i-MW,x,y); if(x>0) relax(i,i-MW-1,x,y); if(x<MW-1) relax(i,i-MW+1,x,y); } } for(let x=MW-2;x>=0;x--) relax(idx(x,y),idx(x,y)+1,x,y); }
+    for(let y=MH-1;y>=0;y--){ if((y&127)===0) yield 'Clearing roadsides'; for(let x=MW-1;x>=0;x--){ const i=idx(x,y); if(x<MW-1) relax(i,i+1,x,y); if(y<MH-1){ relax(i,i+MW,x,y); if(x<MW-1) relax(i,i+MW+1,x,y); if(x>0) relax(i,i+MW-1,x,y); } } for(let x=1;x<MW;x++) relax(idx(x,y),idx(x,y)-1,x,y); }
     // clearance in tiles from a point (tile units) to the nearest road/rail tile's square edge
     const clear=(px,py)=>{ const tx=Math.floor(px),ty=Math.floor(py); if(!inb(tx,ty)) return 0; const i=idx(tx,ty); if(NX[i]<0) return 1e9; const qx=NX[i],qy=NY[i];
       const ex=Math.max(qx-px,0,px-(qx+1)), ey=Math.max(qy-py,0,py-(qy+1)); return Math.max(0,Math.hypot(ex,ey)-0.35); };   // -0.35: slack for the neighbour approximation

@@ -15,7 +15,7 @@ function bootYield(){ return new Promise(r=>requestAnimationFrame(()=>setTimeout
 async function boot(){
   const tb=performance.now(), tim={}, order=[]; const tot=Object.values(LOADMS).reduce((a,b)=>a+b,0)||1; let doneMs=0, cur=null, curT=tb, shown=0, lastY=0;
   const show=txt=>{ const exp=LOADMS[cur]||0, el=performance.now()-curT; const p=Math.min(99,(doneMs+Math.min(exp*0.95,el*(exp?1:0)))/tot*100); shown=Math.max(shown,p); if(typeof homeProgress==='function') homeProgress(shown,txt); };
-  const stage=async name=>{ const n=performance.now(); if(name!==cur){ if(cur!==null){ tim[cur]=(tim[cur]||0)+(n-curT); doneMs+=LOADMS[cur]||0; } cur=name; curT=n; order.push(name); } if(performance.now()-lastY<10) return; show(name+'\u2026'); await bootYield(); lastY=performance.now(); };
+  const stage=async name=>{ const n=performance.now(); if(name!==cur){ if(cur!==null){ tim[cur]=(tim[cur]||0)+(n-curT); doneMs+=LOADMS[cur]||0; } cur=name; curT=n; order.push(name); } if(performance.now()-lastY<13) return; show(name+'\u2026'); await bootYield(); lastY=performance.now(); };
   await stage('Painting textures'); makeTextures();
   await stage('Shaping coastline & terrain'); for(const st of genWorldSteps()) await stage(st);
   await stage('Drawing the map'); makeMinimap(); if(typeof railMinimap==='function') railMinimap();
