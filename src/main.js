@@ -62,7 +62,7 @@ function frame(ts){
   padUpdate(dt); updateMP(dt); const paused=uiBlocking();
   if(started&&!paused){
     acc+=dt; const H=1/120; const inp=input;
-    while(acc>=H){ stepTruck(truck,BREAKDOWN.active?BD_IN:inp,H); acc-=H; }
+    while(acc>=H){ stepTruck(truck,BREAKDOWN.active||(typeof FLY!=='undefined'&&FLY.on)?BD_IN:inp,H); acc-=H; }
     // air brake hiss on release after a firm stop / handbrake
     const braking=truck.brake>0; if(braking) wasBraking+=dt; else { if(wasBraking>0.6 && Math.abs(truck.v)<6) airHiss(); wasBraking=0; }
     if(truck.bump>0.01 && !truck._bumped){ thump(truck.bump); cam.shake=truck.bump*10; truck._bumped=true; } if(truck.bump<=0.01) truck._bumped=false;
@@ -81,6 +81,7 @@ function frame(ts){
   if(window.__camHold){ cam.x=__camHold[0]; cam.y=__camHold[1]; }   // test/debug: hold the camera on a spot
   const zt=cam.zLock||(1.05-0.33*Math.min(1,sp/24)); cam.z+=(zt-cam.z)*(1-Math.exp(-dt*1.2));
   cam.shake*=Math.exp(-dt*8);
+  if(typeof flyCamTick==='function') flyCamTick(dt);
   draw();
   requestAnimationFrame(frame);
 }
