@@ -61,5 +61,5 @@ function sigOncoming(v,J,oppKey){ for(const o of traffic.vs){ if(o===v) continue
 // vehicles (AI or the player) already inside the junction on a crossing heading
 function jBusy(v,J){ const x0=J.x*M_T-1, y0=J.y*M_T-1, x1=(J.x+J.w)*M_T+1, y1=(J.y+J.h)*M_T+1, fv=fwd(v.h||0);
   const chk=(x,y,h)=>{ if(x<x0||x>x1||y<y0||y>y1) return false; const f=fwd(h); return Math.abs(f[0]*fv[0]+f[1]*fv[1])<0.8; };
-  for(const o of traffic.vs){ if(o!==v&&!o.filtering&&chk(o.x,o.y,o.h||0)) return true; }
+  for(const o of traffic.vs){ if(o!==v&&!o.filtering&&(chk(o.x,o.y,o.h||0)||(o.trl&&chk(o.trl.x,o.trl.y,o.trl.h)))) return true; }   // v25: a lorry's trailer still crossing counts
   if(chk(truck.x,truck.y,truck.h)) return true; if(truck.trl&&chk(truck.trl.x,truck.trl.y,truck.trl.th||0)) return true; return false; }

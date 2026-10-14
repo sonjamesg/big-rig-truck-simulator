@@ -286,8 +286,9 @@ function spawnVehicle(x,y,force,opt){
   if(along<sg.b0+2||along>sg.b1-1) return null;
   const dir=opt&&opt.dir?opt.dir:(r()<0.5?1:-1), lane=opt?0:(r()*nLanes(sg))|0;
   const p=lanePt(sg,dir,lane,along);
-  for(const o of traffic.vs) if(Math.abs(o.x-p[0])<16&&Math.abs(o.y-p[1])<16) return null;
   const kind=opt&&opt.kind?opt.kind:pickW(MIX[sg.type]||MIX.city,r()), t=VTYPES[kind];
+  { const dv=dirVec(sg,dir), back=kind==='lorry'?17:t.L/2+1, cx=p[0]-dv[0]*back/2, cy=p[1]-dv[1]*back/2, R=back/2+15;   // v25: clearance covers our own trailer and theirs (no spawning on top of a lorry's trailer)
+    for(const o of traffic.vs){ for(const b of boxesOf(o)) if(Math.abs(b.x-cx)<R&&Math.abs(b.y-cy)<R) return null; } }
   const v={id:traffic.nextId++,kind,L:t.L,W:t.W,heavy:t.heavy,amax:t.acc,art:artFor(kind,r),px:[],py:[],pd:[],i:0,s:0,mk:[],
     plan:{seg:sid,dir,lane,pos:along},v:0,x:p[0],y:p[1],offX:0,offY:0,stopT:0,honkT:0,blockT:0,shakeT:0,ghostT:0,pinT:0,brake:false,sig:0,h:undefined,
     drv:0.88+r()*0.22, r:mulberry((r()*1e9)|0), born:timeS, dist:0};
@@ -565,10 +566,10 @@ function drawTraffic(vx0,vy0,vx1,vy1){
     ctx.fillStyle=p.hair; ctx.beginPath(); ctx.arc(0,0.2,1.7,0,7); ctx.fill(); ctx.restore(); }
   const lo=list.filter(v=>!v.layer), hi=list.filter(v=>v.layer);
   const drawL=list=>{
-  for(const v of list){ blitV(v.art.body.sh,v.x,v.y,v.h,v.L,v.W,4,4); if(v.trl) blitV(v.art.trl.sh,v.trl.x,v.trl.y,v.trl.h,13.6,2.55,6,6); }
+  for(const v of list){ blitV(v.art.body.sh,v.x,v.y,v.h,v.L,v.W,4,4); if(v.trl&&v.art.trl) blitV(v.art.trl.sh,v.trl.x,v.trl.y,v.trl.h,13.6,2.55,6,6); }
   const blink=(timeS%0.8)<0.4;
   for(const v of list){
-    if(v.trl){ blitV(v.art.trl.c,v.trl.x,v.trl.y,v.trl.h,13.6,2.55,0,0); }
+    if(v.trl&&v.art.trl){ blitV(v.art.trl.c,v.trl.x,v.trl.y,v.trl.h,13.6,2.55,0,0); }
     blitV(v.art.body.c,v.x,v.y,v.h,v.L,v.W,0,0);
     if(v.parked) continue;
     const rx=v.trl||v; const rL=v.trl?13.6:v.L, rW=v.trl?2.55:v.W;

@@ -106,7 +106,7 @@ function updateForecourts(dt){
   for(let k=fcv.cars.length-1;k>=0;k--){ const c=fcv.cars[k];
     if(c.phase==='pump'){ c.t-=dt; if(c.t<=0){ c.phase='out'; fcv.stats.refuelled++; const st=c.st, y1=st.y0+M_T*11; c.wp=[[c.sp.x,y1],[st.aisleOut,y1],[st.aisleOut,st.entOut[1]+3],[st.entOut[0],st.entOut[1]]]; c.i=0; } continue; }
     const w=c.wp[c.i]; if(!w){ // reached the road again: hand back to traffic
-      if(c.phase==='out'){ const nv=spawnVehicle(c.x,c.y-2)||spawnVehicle(c.x,c.y-6); if(nv){ nv.art=c.art; nv.kind=c.v.kind; nv.L=c.L; nv.W=c.W; nv.v=2; } if(nv||!onScreen(c.x,c.y,20)||(c.wait=(c.wait||0)+dt)>6){ c.sp.busy=null; fcv.cars.splice(k,1); fcv.stats.left++; } }
+      if(c.phase==='out'){ const nv=spawnVehicle(c.x,c.y-2)||spawnVehicle(c.x,c.y-6); if(nv){ nv.art=Object.assign({},nv.art,c.art,{trl:(c.art&&c.art.trl)||nv.art.trl}); nv.kind=c.v.kind; nv.L=c.L; nv.W=c.W; nv.v=2; } if(nv||!onScreen(c.x,c.y,20)||(c.wait=(c.wait||0)+dt)>6){ c.sp.busy=null; fcv.cars.splice(k,1); fcv.stats.left++; } }
       else { c.phase='pump'; c.t=4+Math.random()*4; c.spd=0; } continue; }
     const dx=w[0]-c.x, dy=w[1]-c.y, d=Math.hypot(dx,dy); const last=c.i===c.wp.length-1;
     // yield to the player's lorry
