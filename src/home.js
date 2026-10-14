@@ -19,7 +19,25 @@ const css=`#overlay{background:#070b13!important}
 #setPanel>*:not(.sph){margin:0!important;justify-content:space-between!important}
 #homeVer{position:relative;margin-top:14px;padding-bottom:4px;font-size:10px;letter-spacing:1px;opacity:.45;color:#cfd6e0}
 body.touch #overlay #loadBox{width:min(380px,90vw)}
-@media (orientation:landscape) and (max-height:500px){ body.touch #overlay #logo{max-height:30vh!important} body.touch #overlay #loadBox{margin-top:10px} body.touch #setPanel{margin-top:10px;padding:8px 14px} }`;
+@media (orientation:landscape) and (max-height:500px){ body.touch #overlay #logo{max-height:30vh!important} body.touch #overlay #loadBox{margin-top:10px} body.touch #setPanel{margin-top:10px;padding:8px 14px} }
+body:has(#overlay:not(.hidden)) #hudbtns,body:has(#overlay:not(.hidden)) #mpbadge{display:none!important}
+@media (orientation:landscape) and (max-height:500px){
+ body.touch #overlay{display:grid!important;grid-template-columns:1fr 1fr;grid-auto-rows:min-content;column-gap:18px;row-gap:6px;align-content:center;justify-items:center;padding:10px 18px!important}
+ body.touch #overlay>*{grid-column:1;margin-top:0!important;margin-bottom:0!important}
+ body.touch #overlay>#homeBg{grid-column:auto}
+ body.touch #overlay>#lobby,body.touch #overlay>#wbCard,body.touch #overlay>#setPanel{grid-column:2}
+ body.touch #overlay>#lobby{grid-row:1/span 3;align-self:center} body.touch #overlay>#setPanel{grid-row:4/span 2;align-self:start}
+ body.touch #overlay>#logo{grid-row:1/span 3;max-height:44vh!important;max-width:40vw!important}
+ body.touch #overlay>#loadBox{grid-row:4;width:min(380px,44vw)!important}
+ body.touch #overlay>#homeVer{grid-column:1/span 2;grid-row:6}
+ body.touch #lobby,body.touch #wbCard{width:min(44vw,400px)!important;gap:6px!important}
+ body.touch #lobby .row{flex-direction:row!important;align-items:center!important;gap:6px!important}
+ body.touch #lobby .row>*{width:auto!important;flex:1 1 0;min-width:0}
+ body.touch #lobby .row>span{flex:0 0 auto}
+ body.touch #lobby .lb{padding:7px 10px!important;font-size:13px!important;min-height:36px}
+ body.touch #lobby input{padding:6px 10px!important;min-height:36px;font-size:16px}
+ body.touch #setPanel{width:min(44vw,400px);min-width:0;padding:6px 14px!important;gap:4px} body.touch #setPanel .sph{display:none}
+}`;
 const st=document.createElement('style'); st.id='homeCss'; st.textContent=css; document.head.appendChild(st);
 const ov=document.getElementById('overlay'), ld=document.getElementById('loading'), go=ov&&ov.querySelector('.go');
 if(go&&!(typeof world!=='undefined'&&world.ready)) go.classList.add('wait');
