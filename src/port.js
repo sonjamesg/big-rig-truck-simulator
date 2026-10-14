@@ -24,7 +24,7 @@ function updatePort(dt){ portHookTraffic(); if(typeof updatePortTrucks==='functi
 function updateOnePort(P,dt){ if(!P.berths) return; portInit(P); updatePortLogistics(P,dt,portT());
   // v25 loop: AI skeletal truck queues at the loading bay -> loading crane lowers a yard box -> truck hauls to a depot -> despawns there (nothing left) -> returns empty
   const dp=P.depot, lb=P.lb; if(!dp||!lb) return; const e=dp.entrance, near=Math.hypot(truck.x-e.x,truck.y-e.y)<280;
-  if(P.lc){ const L=P.lc; L.t+=dt; if(L.t>=6){ P.lc=null; P.stock=Math.max(0,P.stock-1); P.loaded=(P.loaded||0)+1;
+  if(P.lc){ const L=P.lc; L.t+=dt; if(L.t>=6){ P.lc=null; if(P.stock>0) P.collected=(P.collected||0)+1; P.stock=Math.max(0,P.stock-1); P.loaded=(P.loaded||0)+1;
       if(L.player){ portLoadPlayer(P); } else { const out=portSpawn(P,'lorry',false); const gd=aiDepot(P)||world.depots.find(d=>d!==dp&&d.bays.length);
         if(out&&gd&&aiGoal(out,gd)) PORTSIM.ai.push({P,v:out,st:'haul',t:0,gd}); else { if(out){ const i=traffic.vs.indexOf(out); if(i>=0) traffic.vs.splice(i,1); } PORTSIM.ai.push({P,v:null,st:'haul',t:0,gd:gd||dp,virt:1,eta:60}); } } } }
   for(let k=PORTSIM.ai.length-1;k>=0;k--){ const a=PORTSIM.ai[k]; if(a.P!==P) continue; a.t+=dt; const v=a.v;
@@ -38,7 +38,7 @@ function updateOnePort(P,dt){ if(!P.berths) return; portInit(P); updatePortLogis
     if(a.st==='ret'&&a.t>a.eta){ PORTSIM.ai.splice(k,1); P.back=(P.back||0)+1; if(near&&P.stock-P.impClaim>0){ const c=portSpawn(P,'lorry',true); if(c) PORTSIM.ai.push({P,v:c,st:'in',t:0}); } } }
   const nAI=PORTSIM.ai.filter(a=>a.P===P).length;
   P.aiT-=dt; if(P.aiT<=0&&typeof PTRUCK==='undefined'){ P.aiT=12+Math.random()*6; if(near&&nAI<2&&P.stock-P.impClaim>0&&!P.lc&&!PORTSIM.ai.some(a=>a.P===P&&a.st==='in')){ const v=portSpawn(P,'lorry',true); if(v) PORTSIM.ai.push({P,v,st:'in',t:0}); } }
-  if(!near){ P.virtT-=dt; if(P.virtT<=0){ P.virtT=35+Math.random()*20; if(P.stock-P.impClaim>0){ P.stock--; P.loaded=(P.loaded||0)+1; P.dropped=(P.dropped||0)+1; } } }
+  if(false){ P.virtT-=dt; if(P.virtT<=0){ P.virtT=35+Math.random()*20; if(P.stock-P.impClaim>0){ P.stock--; P.loaded=(P.loaded||0)+1; P.dropped=(P.dropped||0)+1; } } }
   // player side job: stop an empty / job-free trailer under the loading crane
   const tr=truck.trl; if(tr&&!career.active&&!P.lc){ const dk=Math.hypot(tr.x-lb.kx,tr.y-lb.ky);
     if(dk<4&&Math.abs(truck.v)<0.5&&P.stock-P.impClaim>0){ P.lc={t:0,player:true,col:YARD_COLS[(Math.random()*8)|0]}; flash('Loading crane: hold still \u2022 lowering a container onto your trailer'); }
@@ -233,7 +233,7 @@ function portBigMap(BX,BY,z){ if(typeof portMapTrucks==='function') portMapTruck
 // Quay cranes swap boxes with terminal tractors running a one-way loop under the portal; tractors feed two marked stack blocks
 // (IMPORT / EXPORT). A rubber-tyred yard gantry over each block swaps boxes between the stacks, the tractors and road lorries on the
 // one-way lorry lane (gate at the entry end).
-const SHIP={L:28,W:5,N:6,PER:300,TA:150,TB:150,TSIDE:34,VIN:2.6,VOUT:2.4};
+const SHIP={L:28,W:5,N:6,PER:300,TA:200,TB:190,TSIDE:34,VIN:2.6,VOUT:2.4};
 // dock vehicles yield to the player: true when the truck (or its trailer) is within `look` tiles ahead in a 1.7-tile-wide corridor
 function portPlayerAhead(P,u,v,h,look){ const w=PL(P,u,v), c=Math.cos(h), sn=Math.sin(h), d=[P.U[0]*c+P.V[0]*sn,P.U[1]*c+P.V[1]*sn], pts=[[truck.x,truck.y]]; if(truck.trl) pts.push([truck.trl.x,truck.trl.y]);
   if(typeof truckPts==='function'){ try{ for(const q of truckPts()) pts.push(q); }catch(e){} }
@@ -271,7 +271,7 @@ function portCfg(P){
   P.blocks=[[L+1.7,C.impV[0],2.8,C.impV[1]-C.impV[0]],[L+1.7,C.expV[0],2.8,C.expV[1]-C.expV[0]]];
   P.slots=[]; for(const V of [C.impV,C.expV]) for(let r=0;r<8;r++) for(const u of P.blkU) P.slots.push([u,V[0]+1.8+r*3.6]);
   P.impC=(C.impV[0]+C.impV[1])/2; P.expC=(C.expV[0]+C.expV[1])/2;
-  P.stock=Math.min(P.stock??6,P.cap); P.ex=10; P.resImp=0; P.exRes=0; P.impClaim=0; P.sent=0; P.recv=0; P.unl=0; P.ld=0; P.shipsDone=0; P.lorT=3;
+  P.stock=0; P.ex=10; P.resImp=0; P.exRes=0; P.impClaim=0; P.sent=0; P.recv=0; P.unl=0; P.ld=0; P.shipsDone=0; P.lorT=3;
   P.loadT=4; P.aiT=6+Math.random()*6; P.virtT=30; P.lc=null;
   // ship timeline
   const ph=[]; const poly=(pts,sp,ease)=>{ const cum=[0]; for(let i=1;i<pts.length;i++) cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1])); const len=cum[cum.length-1]; return {pts,cum,len,dur:len/sp*1.25,ease}; };
@@ -286,7 +286,9 @@ function portCfg(P){
   let t=0; for(const q of ph){ q.t0=t; t+=q.dur; } P.ph=ph; P.Ltot=t; P.sh=new Map();
   P.tA0=ph[2].t0; P.tA1=ph[3].t0; P.tB0=ph[4].t0; P.tB1=ph[5].t0;
   // cranes: 2 on the unload berth, the rest on the export berth; each works one half of the single row of boxes
-  const nc=P.cranes.length; P.cranes.forEach((c,i)=>{ const A=i<2; c.role=A?'A':'B'; const grp=P.cranes.filter((x,j)=>(j<2)===A); const gi=A?i:i-2, n=A?2:nc-2;
+  // v32: exactly ONE import crane (berth A) and ONE export crane (berth B)
+  if(P.cranes.length>2) P.cranes=[P.cranes[0],P.cranes[P.cranes.length-1]];
+  const nc=P.cranes.length; P.cranes.forEach((c,i)=>{ const A=i<1; c.role=A?'A':'B'; const gi=A?i:i-1, n=1;
     c.idx=n===1?[0,1,2,3,4,5]:(gi===0?[0,1,2]:[5,4,3]); const bv=A?C.vA:C.vB; c.home=bv+hs*(n===1?0:(gi===0?-12:12)); c.y=c.home; c.u=P.tl1; c.ph=0; c.w=0; c.car=null; c.hz=1; c.job=null; c.trac=null; });
   // tractor loop
   const vs=[C.vA,C.vB,P.impC,P.expC]; P.lv0=Math.min(...vs)-16; P.lv1=Math.max(...vs)+16; P.lLv=P.lv1-P.lv0; P.lTn=Math.PI*Math.abs(P.tl2-P.tl1)/2; P.lLen=2*P.lLv+2*P.lTn;
@@ -335,6 +337,7 @@ function updatePortLogistics(P,dt,t){ const ships=portShips(P,t); let shA=null, 
     if(k==='sideIn'&&!(s.horn&1)){ s.horn|=1; portHorn(P,o.pose.u,o.pose.v); } if(k==='out'&&!(s.horn&2)){ s.horn|=2; portHorn(P,o.pose.u,o.pose.v); P.shipsDone++; } }
   for(const k of P.sh.keys()) if(!ships.some(o=>o.k===k)) P.sh.delete(k);
   P.cur={ships,shA,shB};
+  if(shB&&P.ex+P.exRes<SHIP.N){ P.ex=SHIP.N-P.exRes; }
   // ---- quay cranes
   for(const c of P.cranes){ const B=c.role==='A'?shA:shB; const tv=c.trac&&c.trac.box&&c.role==='B'?c.tv:null;
     if(c.ph===0&&c.job==null){ c.trac=c.trac&&c.trac.task&&c.trac.task.crane===c?c.trac:null;
@@ -344,7 +347,7 @@ function updatePortLogistics(P,dt,t){ const ships=portShips(P,t); let shA=null, 
     const sv=B?null:null; const shipV=(c.role==='A'?P.vA:P.vB);
     c.tv=c.job!=null?shipV+P.hs*boxAx(c.job):c.home;
     // gantry travel, never closer than 5.4 tiles to another crane
-    const d=c.tv-c.y, st=Math.sign(d)*Math.min(Math.abs(d),dt*1.6), ny=c.y+st; if(!P.cranes.some(o=>o!==c&&Math.abs(o.y-ny)<5.4&&Math.abs(o.y-ny)<Math.abs(o.y-c.y))) c.y=ny;
+    const d=c.tv-c.y, st=Math.sign(d)*Math.min(Math.abs(d),dt*2.4), ny=c.y+st; if(!P.cranes.some(o=>o!==c&&Math.abs(o.y-ny)<5.4&&Math.abs(o.y-ny)<Math.abs(o.y-c.y))) c.y=ny;
     const at=Math.abs(c.y-c.tv)<0.05, tr=c.trac, trAt=tr&&tr.stop!=null&&tr.atStop&&tr.task&&tr.task.crane===c, landU=tr?loopPos(P,tr.s)[0]:P.tl1;
     const mvU=(u,sp)=>{ const e=u-c.u; c.u+=Math.sign(e)*Math.min(Math.abs(e),dt*(sp||5)); return Math.abs(e)<0.03; };
     if(c.role==='A'){
@@ -367,7 +370,7 @@ function updatePortLogistics(P,dt,t){ const ships=portShips(P,t); let shA=null, 
     else if(k==='exp') tgt=tr.task.need?loopStop(P,P.expC,true):loopStop(P,tr.task.crane.tv,false,tr.s);
     else if(k==='toImp') tgt=loopStop(P,P.impC,true); else if(k==='retExp') tgt=loopStop(P,P.expC,true);
     tr.stop=tgt; const dist=tgt==null?1e9:loopFwd(P,tr.s,tgt); let gap=1e9; for(const o of TR) if(o!==tr){ const g=loopFwd(P,tr.s,o.s); if(g>0.01&&g<gap) gap=g; }
-    const tq=loopPos(P,tr.s), pa=portPlayerAhead(P,tq[0],tq[1],tq[2],6); tr.yield=pa<6; const vmax=tgt==null?1.6:Math.min(4.4,0.25+dist*0.9), mv=Math.max(0,Math.min(vmax*dt,dist<0.04?0:dist,gap-4.6,tr.yield?Math.max(0,(pa-2.6)*dt):1e9)); tr.atStop=dist<0.05;
+    const tq=loopPos(P,tr.s), pa=portPlayerAhead(P,tq[0],tq[1],tq[2],6); tr.yield=pa<6; const vmax=tgt==null?1.6:Math.min(6,0.3+dist*1.0), mv=Math.max(0,Math.min(vmax*dt,dist<0.04?0:dist,gap-4.6,tr.yield?Math.max(0,(pa-2.6)*dt):1e9)); tr.atStop=dist<0.05;
     tr.s=(tr.s+mv)%P.lLen; tr.mv=mv/dt; { const a=loopPos(P,tr.s+0.6), b=loopPos(P,tr.s-0.2), h=loopPos(P,tr.s); tr.h=Math.atan2(a[1]-b[1],a[0]-b[0]); tr.th=tr.h; } if(mv>0.001||!tr.task||tr.atStop) tr.still=0; else tr.still+=dt;
     // stack hand-offs at the transfer row by the yard gantries
     if(tr.atStop&&(k==='toImp'||k==='retExp'||(k==='exp'&&tr.task.need))&&!tr.rq){ tr.rq=1; P.rtg[k==='toImp'?0:1].q.push({veh:tr,kind:k==='toImp'?'tDrop':k==='retExp'?'tRet':'tPick',u:P.tl1}); } }
@@ -392,11 +395,11 @@ function updatePortLogistics(P,dt,t){ const ships=portShips(P,t); let shA=null, 
     const j=g.cur, src=(j.kind==='tDrop'||j.kind==='tRet'||j.kind==='lDrop')?j.u:P.blkU[1], dst=src===j.u?P.blkU[1]:j.u; g.t+=dt; const T1=1.4,T2=3.4,T3=4.8,T4=6.2;
     if(g.t<T1){ g.su+=(src-g.su)*Math.min(1,dt*4); g.hz=1-g.t/T1; }
     else if(!g.car&&g.t<T2){ g.car=1;
-      if(j.kind==='tDrop'||j.kind==='tRet'||j.kind==='lDrop'){ g.col=j.veh.box; j.veh.box=null; } else { g.col=YARD_COLS[(P.stock*5+3)%8]; if(j.kind==='lLoad'){ P.stock--; P.impClaim--; j.veh.claim=0; } else { /* tPick: ex already reserved at dispatch */ } } }
+      if(j.kind==='tDrop'||j.kind==='tRet'||j.kind==='lDrop'){ g.col=j.veh.box; j.veh.box=null; } else { g.col=YARD_COLS[(P.stock*5+3)%8]; if(j.kind==='lLoad'){ P.stock--; P.impClaim--; j.veh.claim=0; P.collected=(P.collected||0)+1; } else { /* tPick: ex already reserved at dispatch */ } } }
     if(g.t>=T1&&g.t<T3){ g.su+=(dst-g.su)*Math.min(1,dt*1.6); g.hz=Math.min(1,(g.t-T1)/1); }
     if(g.t>=T3) g.hz=Math.max(0,1-(g.t-T3)/(T4-T3));
     if(g.t>=T4){ const v=j.veh; v.rq=0;
-      if(j.kind==='tDrop'){ P.stock++; P.resImp--; v.task=null; } else if(j.kind==='tRet'){ P.ex++; P.exRes--; v.task=null; }
+      if(j.kind==='tDrop'){ P.stock++; P.resImp--; v.task=null; P.yIn=(P.yIn||0)+1; } else if(j.kind==='tRet'){ P.ex++; P.exRes--; v.task=null; }
       else if(j.kind==='lDrop'){ P.ex++; P.recv++; v.dropped=1; if(P.stock-P.impClaim>0&&Math.random()<0.6){ v.claim=1; P.impClaim++; } }
       else if(j.kind==='lLoad'){ v.box=g.col; } else if(j.kind==='tPick'){ v.box=g.col; if(v.task.cancel) v.task={k:'retExp'}; else v.task.need=0; }
       g.cur=null; g.car=null; g.hz=1; } } }
