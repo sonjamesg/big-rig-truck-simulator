@@ -41,22 +41,30 @@ function mpApplyDrop(d){ MP.drops[d.gid]={t:'drop',gid:d.gid,x:d.x,y:d.y,th:d.th
   t.x=d.x; t.y=d.y; t.th=d.th; t.coupled=false; t.heldBy=null; if(t.bay){ t.bay.trailer=null; t.bay=null; } }
 BigRig.on('uncouple',e=>{ if(!MP.on) return; const t=e.trailer; const d={t:'drop',id:MP.myId,ts:Math.round(performance.now()),gid:mpGid(t),x:R2(t.x),y:R2(t.y),th:R3(t.th),ty:t.type,c:t.col||'',l:t.logo||'',cargo:t.cargo}; MP.drops[d.gid]=d; mpSend(d); mpSend(mpSelfPose(),true); });
 BigRig.on('couple',e=>{ if(!MP.on) return; delete MP.drops[mpGid(e.trailer)]; mpSend(mpSelfPose(),true); });
-function mpNewPeer(id){ return new Peer(id,{debug:0,config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'}]}}); }
+const MP_ICE=[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302']},{urls:'stun:global.stun.twilio.com:3478'},{urls:'stun:stun.cloudflare.com:3478'},
+  {urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}];   // TURN fallback for phones on mobile data / strict NAT
+function mpNewPeer(id){ return new Peer(id,{debug:0,pingInterval:4000,config:{iceServers:MP_ICE}}); }
+// host keep-alive: re-register with the signalling server whenever the socket drops (background tab, network switch), wake lock while hosting
+function mpKeepAlive(pr){ let n=0; const re=()=>{ if(MP.peer!==pr||pr.destroyed||!pr.disconnected) return; if(MP.host) mpStatus('Reconnecting room '+MP.code+'\u2026'); try{ pr.reconnect(); }catch(e){} setTimeout(re,Math.min(15000,1500*(++n))); };
+  pr.on('disconnected',()=>{ n=0; setTimeout(re,500); }); pr.on('open',()=>{ n=0; if(MP.host&&MP.on) mpStatus(''); }); }
+function mpWake(){ try{ if(navigator.wakeLock&&MP.host&&document.visibilityState==='visible') navigator.wakeLock.request('screen').then(l=>MP.wl=l).catch(()=>{}); }catch(e){} }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState!=='visible'||!MP.peer) return; if(MP.peer.disconnected&&!MP.peer.destroyed){ try{ MP.peer.reconnect(); }catch(e){} } mpWake(); });
 function mpTagWorld(){ for(const t of world.trailers) if(!t.gid&&!t.coupled) t.gid=t.id; }
-function mpHost(){ mpReset(); MP.name=mpName(); mpTagWorld(); const code=String(1000+((Math.random()*9000)|0)); MP.code='TRUCK-'+code; mpStatus('Opening room '+MP.code+'\u2026');
-  const pr=MP.peer=mpNewPeer(MP_PREFIX+code.toLowerCase()); MP.host=true;
-  pr.on('open',id=>{ MP.myId=id; MP.on=true; mpStatus(''); mpLobbyHosted(); BigRig.emit('mpHosting',{code:MP.code}); });
+function mpHost(){ mpReset(); MP.name=mpName(); mpTagWorld(); let code=null, tries=0; try{ const sv=JSON.parse(sessionStorage.getItem('bigrig.mphost')||'null'); if(sv&&Date.now()-sv.t<3*3600e3){ code=sv.c; tries=sv.n||0; } }catch(e){} if(!code||tries>6){ code=String(1000+((Math.random()*9000)|0)); tries=0; } try{ sessionStorage.setItem('bigrig.mphost',JSON.stringify({c:code,t:Date.now(),n:tries})); }catch(e){} MP.code='TRUCK-'+code; mpStatus('Opening room '+MP.code+'\u2026');
+  const pr=MP.peer=mpNewPeer(MP_PREFIX+code.toLowerCase()); MP.host=true; mpKeepAlive(pr);
+  pr.on('open',id=>{ MP.myId=id; MP.on=true; mpStatus(''); mpLobbyHosted(); mpWake(); try{ sessionStorage.setItem('bigrig.mphost',JSON.stringify({c:code,t:Date.now(),n:0})); }catch(e){} BigRig.emit('mpHosting',{code:MP.code}); });
   pr.on('connection',c=>{ if(c.label==='pose'||(c.metadata&&c.metadata.kind==='pose')){ MP.pconns[c.peer]=c; c.on('data',d=>mpOnMsg(d,c.peer)); c.on('close',()=>{ if(MP.pconns[c.peer]===c) delete MP.pconns[c.peer]; }); return; }
     if(Object.keys(MP.conns).length>=MP.max-1){ c.on('open',()=>{ c.send(JSON.stringify({t:'end',why:'full'})); setTimeout(()=>c.close(),300); }); return; } MP.conns[c.peer]=c;
     c.on('data',d=>mpOnMsg(d,c.peer)); const gone=()=>{ if(!MP.conns[c.peer]) return; delete MP.conns[c.peer]; delete MP.pconns[c.peer]; if(MP.players[c.peer]){ mpPlayerGone(c.peer); mpSendAll({t:'leave',id:c.peer}); } mpRender(); }; c.on('close',gone); c.on('error',gone); });
-  pr.on('error',e=>{ if(e.type==='unavailable-id'){ mpStatus('Code taken, retrying\u2026'); setTimeout(mpHost,300); } else mpStatus('Network error: '+e.type); }); }
-function mpJoin(code){ mpReset(); MP.name=mpName(); mpTagWorld(); code=String(code||'').toUpperCase().replace(/[^0-9]/g,''); if(code.length<4){ mpStatus('Enter a room code like TRUCK-4821'); return; }
-  MP.code='TRUCK-'+code; mpStatus('Connecting to '+MP.code+'\u2026'); const pr=MP.peer=mpNewPeer();
-  pr.on('open',()=>{ const c=MP.hostConn=pr.connect(MP_PREFIX+code,{reliable:true,label:'main'}); const to=setTimeout(()=>{ if(!MP.on) mpStatus('No game found with code '+MP.code); },9000);
-    c.on('open',()=>{ clearTimeout(to); MP.on=true; MP.host=false; c.send(JSON.stringify({t:'hello',n:MP.name})); mpStatus(''); mpLobbyClose(); startGame();
+  pr.on('error',e=>{ if(e.type==='unavailable-id'){ /* after a reload the old registration can linger a few seconds: retry the same code, then pick a new one */ try{ sessionStorage.setItem('bigrig.mphost',JSON.stringify({c:code,t:Date.now(),n:tries+1})); }catch(x){} mpStatus('Opening room\u2026'); setTimeout(mpHost,tries<6?2500:300); } else if(e.type==='network'||e.type==='server-error'||e.type==='socket-error'||e.type==='socket-closed'){ mpStatus('Lost the multiplayer server \u2014 reconnecting\u2026'); } else if(e.type!=='peer-unavailable') mpStatus('Network error: '+e.type); }); }
+function mpJoin(code,att){ att=att||0; mpReset(); MP.name=mpName(); mpTagWorld(); code=String(code||'').toUpperCase().replace(/[^0-9]/g,''); if(code.length<4){ mpStatus('Enter a room code like TRUCK-4821'); return; }
+  MP.code='TRUCK-'+code; mpStatus('Connecting to '+MP.code+'\u2026'+(att?' (try '+(att+1)+')':'')); const pr=MP.peer=mpNewPeer(); let done=false;
+  const retry=(msg)=>{ if(done||MP.peer!==pr) return; done=true; if(att<2){ mpStatus(msg+' \u2014 retrying\u2026'); setTimeout(()=>mpJoin(code,att+1),3000); } else mpStatus(msg); };
+  pr.on('open',()=>{ const c=MP.hostConn=pr.connect(MP_PREFIX+code,{reliable:true,label:'main'}); const to=setTimeout(()=>{ if(!MP.on) retry('Found the host but couldn\'t connect \u2014 try Wi-Fi, or ask the host to keep the game open'); },20000);
+    c.on('open',()=>{ done=true; clearTimeout(to); MP.on=true; MP.host=false; c.send(JSON.stringify({t:'hello',n:MP.name})); mpStatus(''); mpLobbyClose(); startGame();
       const pc=MP.poseConn=pr.connect(MP_PREFIX+code,{reliable:false,label:'pose',metadata:{kind:'pose'}}); pc.on('data',d=>mpOnMsg(d,null)); });
-    c.on('data',d=>mpOnMsg(d,null)); c.on('close',()=>mpEnded('Disconnected from the host')); c.on('error',()=>mpEnded('Connection error')); });
-  pr.on('error',e=>{ mpStatus(e.type==='peer-unavailable'?'No game found with code '+MP.code:'Network error: '+e.type); }); }
+    c.on('data',d=>mpOnMsg(d,null)); c.on('close',()=>{ if(MP.on) mpEnded('Disconnected from the host'); }); c.on('error',()=>{ if(MP.on) mpEnded('Connection error'); }); });
+  pr.on('error',e=>{ if(e.type==='peer-unavailable') retry('Host not online \u2014 ask them to keep the game open (code '+MP.code+')'); else if(!MP.on) retry('Network error: '+e.type); }); }
 function mpReset(){ try{ if(MP.peer) MP.peer.destroy(); }catch(e){} MP.on=false; MP.host=false; MP.peer=null; MP.conns={}; MP.pconns={}; MP.hostConn=null; MP.poseConn=null; MP.players={}; MP.ended=false;
   for(const t of world.trailers||[]) if(t.heldBy){ t.heldBy=null; t.coupled=false; } mpRender(); }
 function mpLeave(){ if(MP.host) mpSendAll({t:'end'}); MP.ended=true; setTimeout(mpReset,150); }
