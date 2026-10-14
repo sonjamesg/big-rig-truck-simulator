@@ -6,8 +6,8 @@ const OWN_TIERS={1:{price:2000,trucks:2,pay:500,bays:4,label:'Tier 1 haulage yar
 const OWN_MAX=3;
 const OWN={yards:{},slot:null,inc:0,home:null};   // yards: id -> {tier,bought,delivered,earned}
 function ownCompany(){ const n=(localStorage.getItem('bigrig.name')||'').trim(); return (n?n:'Your')+' Haulage'; }
-function ownSave(){ return {yards:OWN.yards,home:OWN.home}; }
-function ownLoad(o){ OWN.yards=(o&&o.yards)||{}; OWN.home=(o&&o.home)||null; OWN.applied=0; }
+function ownSave(){ return {yards:OWN.yards,home:OWN.home,homes:typeof homesSave==='function'?homesSave():undefined}; }
+function ownLoad(o){ OWN.yards=(o&&o.yards)||{}; OWN.home=(o&&o.home)||null; OWN.applied=0; if(typeof homesLoad==='function') homesLoad(o&&o.homes); }
 function ownT(yd){ const o=OWN.yards[yd.id]; return o?o.tier||1:0; }
 // make the yard match its tier: open the extra bays, make the new buildings solid
 function ownApplyTier(yd){ const t=ownT(yd); for(const b of yd.bays){ const on=t>=(b.need||1)||(!t&&b.need===1); if(b.need>1) b.assigned=!on; }
