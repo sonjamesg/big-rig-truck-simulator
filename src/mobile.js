@@ -80,7 +80,7 @@ function mobBtn(id,html,cls,k){ const b=document.createElement('div'); b.classNa
   b.addEventListener('pointerdown',on); b.addEventListener('pointerup',off); b.addEventListener('pointercancel',off); b.addEventListener('pointerleave',off); return b; }
 MOB.nav={ left:()=>padNav('l'), right:()=>padNav('r'), up:()=>padNav('u'), down:()=>padNav('d'),
   okA:()=>{ const el=padFocusEl(); if(el){ el.click(); setTimeout(()=>padNav(null),40); } else padNav(null); }, back:()=>{ if(career.uiOpen==='result'){ const k=document.querySelector('#ui #keep'); if(k) k.click(); } else closeUI(); } };
-const act=f=>()=>{ if(!started){ startGame(); return; } f(); };
+const act=f=>()=>{ if(!started) return; f(); };
 function mobCSS(){ if(MOB.css) return; MOB.css=1; const st=document.createElement('style'); st.textContent=MOBCSS; document.head.appendChild(st); }
 if(('ontouchstart' in window)||navigator.maxTouchPoints>0){ document.body.classList.add('touch'); mobCSS(); }
 function mobInit(){ if(!document.body.classList.contains('touch')) return; MOB.on=true; mobCSS();
@@ -92,7 +92,7 @@ function mobInit(){ if(!document.body.classList.contains('touch')) return; MOB.o
   const s=mobBtn('mSteer','<div class="knob">\u25C0\u25B6</div>','steer',null); mobSteer(s);
   mobBtn('mLeft','\u25C0','dp','left'); mobBtn('mRight','\u25B6','dp','right'); mobBtn('mUp','\u25B2','dp',()=>{ if(career.uiOpen) MOB.nav.up(); else if(MP.on) mpToggleList(); }); mobBtn('mDown','\u25BC','dp',()=>{ if(career.uiOpen) MOB.nav.down(); });
   mobBtn('mCen','','dp dpc',null);
-  mobBtn('mA','A<small>GAS</small>','ab',()=>{ if(career.uiOpen) MOB.nav.okA(); else { if(!started) startGame(); input.up=true; } });
+  mobBtn('mA','A<small>GAS</small>','ab',()=>{ if(career.uiOpen) MOB.nav.okA(); else { if(!started) return; input.up=true; } });
   mobBtn('mB','B<small>BRAKE</small>','ab',()=>{ if(career.uiOpen) MOB.nav.back(); else input.down=true; });
   for(const id of ['mA','mB']){ const el=document.getElementById(id); const off=()=>{ input[id==='mA'?'up':'down']=false; }; el.addEventListener('pointerup',off); el.addEventListener('pointercancel',off); el.addEventListener('pointerleave',off); }
   mobBtn('mIndL','\u2B05<small>IND</small>','fn',act(()=>indToggle(1))); mobBtn('mIndR','\u27A1<small>IND</small>','fn',act(()=>indToggle(2))); mobBtn('mHaz','\u26A0<small>HAZ</small>','fn',act(()=>hazToggle())); mobBtn('mBeam','<i class="hbi"></i><small>BEAM</small>','fn',act(()=>hbToggle())); mobBtn('mHand','P<small>H/BRAKE</small>','fn','hand'); mobBtn('mHorn','\u{1F4E3}<small>HORN</small>','fn','horn');

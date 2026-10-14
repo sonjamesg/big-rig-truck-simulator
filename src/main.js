@@ -40,16 +40,17 @@ function welcomeCard(){ const ov=document.getElementById('overlay'); if(!ov||doc
   const go=ov.querySelector('.go'); (go||ov).after?go.after(c):ov.appendChild(c); const b=c.querySelector('#wbGo'); b.addEventListener('click',e=>{ e.stopPropagation(); startGame(); }); b.focus();
   const n=c.querySelector('#wbNew'); n.addEventListener('click',e=>{ e.stopPropagation(); if(n.dataset.arm){ resetGame(); return; } n.dataset.arm=1; n.textContent='Click again to wipe save'; n.style.color='#ff8a7a'; }); n.addEventListener('keydown',e=>e.stopPropagation()); }
 function startGame(){ if(started||!world.ready) return; started=true; document.getElementById('overlay').classList.add('hidden'); initAudio(); }
-addEventListener('keydown',e=>{ const k=KEYMAP[e.code]; if(k){ input[k]=true; e.preventDefault(); } if(!started && (k||e.code==='Enter')) startGame(); else if(audio.ctx&&audio.ctx.state==='suspended') audio.ctx.resume(); });
+addEventListener('keydown',e=>{ const k=KEYMAP[e.code]; if(k){ input[k]=true; e.preventDefault(); } if(!started && (k||e.code==='Enter') && !(e.target&&e.target.closest&&e.target.closest('input,textarea,select,button,#invite,#acct,#srvCard'))) startGame(); else if(audio.ctx&&audio.ctx.state==='suspended') audio.ctx.resume(); });
 addEventListener('keydown',e=>{ if((e.code==='KeyT'||e.code==='KeyC')&&started&&!e.repeat){ toggleCouple(); e.preventDefault(); } if(e.code==='KeyF'&&started&&!e.repeat){ toggleRefuel(); e.preventDefault(); } });
 addEventListener('keyup',e=>{ const k=KEYMAP[e.code]; if(k){ input[k]=false; e.preventDefault(); } });
 addEventListener('blur',()=>{ for(const k in input) input[k]=false; });
-document.getElementById('overlay').addEventListener('pointerdown',e=>{ if(e.target.closest&&e.target.closest('#wbNew')) return; e.preventDefault(); startGame(); });
+// home: only a mouse click on empty space starts (touch must scroll freely; PLAY SOLO / CONTINUE / TAP TO DRIVE start on phones)
+document.getElementById('overlay').addEventListener('pointerdown',e=>{ if(e.pointerType!=='mouse') return; if(e.target.closest&&e.target.closest('button,input,select,textarea,a,label,#wbCard,#acct,#lobby,#invite,#setPanel,#srvCard')) return; e.preventDefault(); startGame(); });
 document.querySelectorAll('[data-k]').forEach(b=>{ const k=b.dataset.k;
-  const on=e=>{ e.preventDefault(); input[k]=true; b.classList.add('on'); startGame(); }, off=e=>{ e.preventDefault(); input[k]=false; b.classList.remove('on'); };
+  const on=e=>{ e.preventDefault(); input[k]=true; b.classList.add('on'); }, off=e=>{ e.preventDefault(); input[k]=false; b.classList.remove('on'); };
   b.addEventListener('pointerdown',on); b.addEventListener('pointerup',off); b.addEventListener('pointercancel',off); b.addEventListener('pointerleave',off); });
-document.getElementById('fbtn').addEventListener('pointerdown',e=>{ e.preventDefault(); if(started) toggleRefuel(); else startGame(); });
-document.getElementById('tbtn').addEventListener('pointerdown',e=>{ e.preventDefault(); if(started) toggleCouple(); else startGame(); });
+document.getElementById('fbtn').addEventListener('pointerdown',e=>{ e.preventDefault(); if(started) toggleRefuel(); });
+document.getElementById('tbtn').addEventListener('pointerdown',e=>{ e.preventDefault(); if(started) toggleCouple(); });
 if(('ontouchstart' in window)||navigator.maxTouchPoints>0) document.body.classList.add('touch');
 document.getElementById('fs').addEventListener('click',()=>{ const f=document.getElementById('frame'); if(!document.fullscreenElement) (f.requestFullscreen||f.webkitRequestFullscreen).call(f); else document.exitFullscreen(); });
 // scale the fixed 960x600 window down to fit small screens

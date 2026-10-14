@@ -20,7 +20,7 @@ const CSS=`#srvCard{width:min(440px,90vw);margin:4px auto;padding:10px 12px;bord
 #srvCard button{font:inherit;font-weight:900;font-size:14px;letter-spacing:1px;border:0;border-radius:20px;padding:9px 18px;cursor:pointer;background:#2f81f7;color:#fff;min-height:40px} #srvCard button:disabled{background:#444;color:#aaa;cursor:default}
 #srvCard button:focus{outline:3px solid #7dff8a;outline-offset:2px}`;
 function srvCard(){ const lb=document.getElementById('lobby'); if(!lb) return; let c=document.getElementById('srvCard');
-  if(!c){ const st=document.createElement('style'); st.textContent=CSS; document.head.appendChild(st); c=document.createElement('div'); c.id='srvCard'; const ref=lb.querySelector('#lbHostBox'); lb.insertBefore(c,ref);
+  if(!c){ const st=document.createElement('style'); st.textContent=CSS; document.head.appendChild(st); c=document.createElement('div'); c.id='srvCard'; lb.insertBefore(c,lb.firstChild);
     for(const ev of ['pointerdown','click','keydown']) c.addEventListener(ev,e=>e.stopPropagation()); for(const S of SERVERS) srvPeek(S); }
   c.innerHTML='<div class="sh">\u{1F310} PUBLIC SERVERS</div>'+SERVERS.map(S=>{ const n=SRV.peek[S.id]; const off=n===undefined||n<0, full=!off&&n>=SRV.cap;
     return `<div class="sv"><div class="sn">${S.name} \u2022 ${S.region}<small><span class="dot ${off?'off':full?'full':''}"></span>${n===undefined?'Checking\u2026':n<0?'Offline':full?'FULL':'Online'}</small></div><div class="ct">${off?'\u2013':n} / ${SRV.cap}</div><button data-s="${S.id}" ${full||n<0?'disabled':''}>${full?'FULL':'JOIN'}</button></div>`; }).join('');
