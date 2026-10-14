@@ -59,11 +59,12 @@ function trailerBox(t){ const ft=fwd(t.th); return {x:t.x-ft[0]*TRL_KP_TO_CENTRE
 function buildDepots(objs,R){ for(const _ of buildDepotsSteps(objs,R)); }
 // original haulier identities for the purchasable yards (not real brands)
 const YARD_BRANDS=[{name:'Ironhaul Logistics',mono:'IH',col:'#24508f',acc:'#f2b134',glyph:'chev'},{name:'Saltmarsh Freight',mono:'SF',col:'#1d7f73',acc:'#e8fff8',glyph:'wave'},{name:'Copperline Haulage',mono:'CL',col:'#a8532a',acc:'#ffe2c4',glyph:'bars'},{name:'Northwind Carriers',mono:'NW',col:'#4a3a8c',acc:'#bfe3ff',glyph:'peak'}];
+const YD_H=24;   // up: yard = 15 rows of apron + warehouse strip + rail siding
 function yardSpot(tx,ty,rj,dbg){ const OK=[T.GRASS,T.TREE,T.SAND,T.FIELD,T.HEDGE,T.GRAVEL,T.PGRASS,T.ROCK], ok=(i,j)=>inb(i,j)&&OK.includes(get(i,j))&&(!world.reserved[idx(i,j)]||get(i,j)===T.GRASS); let best=null,bd=1e9;
       for(let y=ty-320;y<=ty+320;y+=3) for(let x=tx-320;x<=tx+320;x+=3){ const dd=(x-tx)**2+(y-ty)**2; if(dd>=bd||rj(x,y)) continue; let gap=0;
         for(let g=1;g<=10&&!gap;g++){ const j=y-1-g; let r=0; for(let i=x+8;i<x+12;i++){ if(!inb(i,j)) break; const sid=world.roadH[idx(i,j)]; if(sid>=0&&world.segs[sid].type!=='hwy') r++; } if(r===4) gap=g; }
         if(!gap) continue; let good=true; for(let j=y-gap;j<y&&good;j++) for(let i=x+7;i<x+13;i++) if(!ok(i,j)&&get(i,j)!==T.WALK){ good=false; break; }
-        for(let j=y;j<y+16&&good;j++) for(let i=x-1;i<x+21;i++) if(!ok(i,j)){ good=false; break; } if(good){ best=[x,y,gap]; bd=dd; } } return best; }
+        for(let j=y;j<y+YD_H+1&&good;j++) for(let i=x-1;i<x+21;i++) if(!ok(i,j)){ good=false; break; } if(good){ best=[x,y,gap]; bd=dd; } } return best; }
 function* buildDepotsSteps(objs,R){
   world.depots=[]; world.trailers=[];
   // bucket index of clearable scenery so clearing a site doesn't scan every object in the world
@@ -179,11 +180,11 @@ if(typeof buildCareerSites==='function') buildCareerSites({findSpot,access,clear
       world.cityPOI[CN[k]]={fuel:fs().length,garages:gs().length}; }
     console.log('[sites] per city fuel+garages',JSON.stringify(world.cityPOI)); }
   // v31 empty yards FOR SALE (tier-1 player depots; bought per player, see owndepot.js)
-  world.forSale=[]; for(const [tx,ty] of [[380,960],[1010,1300],[1640,1700],[700,700],[1300,900],[900,1600],[400,1400],[1400,1450],[250,800],[1150,1350]]){ if(world.forSale.length>=3) break; const rj=(x,y)=>world.forSale.some(o=>Math.abs(o.x0-x)<120&&Math.abs(o.y0-y)<120); const s=findSpot(tx,ty,20,15,16,rj)||yardSpot(tx,ty,rj); if(!s) continue; const BR=YARD_BRANDS[world.forSale.length%YARD_BRANDS.length], n=BR.name; const [x,y,gap]=s;
-    access(x,y,20,gap); clearObjs(x,y,20,15); fill(x,y,20,15,T.CONC); for(let j=y;j<y+15;j++) for(let i=x;i<x+20;i++) world.reserved[idx(i,j)]=1;
-    const yd={id:'Y'+(world.forSale.length+1),name:n,tier:1,x0:x,y0:y,w:20,h:15,x:(x+10)*M_T,y:(y+7.5)*M_T,entrance:{x:(x+10)*M_T,y:(y-gap)*M_T},slot:{x:(x+10)*M_T,y:(y+3.2)*M_T,w:7,L:12},bays:[],region:region(x,y)};
-    for(let k=0;k<4;k++){ const cxT=x+7.5+k*1.25+0.625, y0=y+15-4.7, y1=y+15-0.3; const b={id:k+1,label:yd.id+'-'+(k+1),depot:yd,cx:cxT*M_T,cy:(y0+y1)/2*M_T,th:0,w:1.25*M_T,L:(y1-y0)*M_T,x0:(cxT-0.625)*M_T,x1:(cxT+0.625)*M_T,y0:y0*M_T,y1:y1*M_T,dock:y1*M_T}; b.kx=b.cx; b.ky=b.cy-TRL_KP_TO_CENTRE+0.2; yd.bays.push(b); }
-    Object.assign(yd,{brand:BR,office:{x0:x+1,y0:y+1,w:5,h:4},garage:{x0:x+14,y0:y+1,w:5,h:3}}); fill(x+1,y+1,5,4,T.BLDG); fill(x+14,y+1,5,3,T.BLDG);   // solid site office + truck garage
+  world.forSale=[]; for(const [tx,ty] of [[380,960],[1010,1300],[1640,1700],[700,700],[1300,900],[900,1600],[400,1400],[1400,1450],[250,800],[1150,1350]]){ if(world.forSale.length>=3) break; const rj=(x,y)=>world.forSale.some(o=>Math.abs(o.x0-x)<120&&Math.abs(o.y0-y)<120); const s=findSpot(tx,ty,20,YD_H,16,rj)||yardSpot(tx,ty,rj); if(!s) continue; const BR=YARD_BRANDS[world.forSale.length%YARD_BRANDS.length], n=BR.name; const [x,y,gap]=s;
+    access(x,y,20,gap); clearObjs(x,y,20,YD_H); fill(x,y,20,YD_H,T.CONC); for(let j=y;j<y+YD_H;j++) for(let i=x;i<x+20;i++) world.reserved[idx(i,j)]=1;
+    const yd={id:'Y'+(world.forSale.length+1),name:n,tier:1,x0:x,y0:y,w:20,h:YD_H,x:(x+10)*M_T,y:(y+7.5)*M_T,entrance:{x:(x+10)*M_T,y:(y-gap)*M_T},slot:{x:(x+10)*M_T,y:(y+3.2)*M_T,w:7,L:12},bays:[],region:region(x,y)};
+    for(let k=0;k<8;k++){ const cxT=x+7.5+k*1.25+0.625, y0=y+15-4.7, y1=y+15-0.3; const b={id:k+1,label:yd.id+'-'+(k+1),depot:yd,cx:cxT*M_T,cy:(y0+y1)/2*M_T,th:0,w:1.25*M_T,L:(y1-y0)*M_T,x0:(cxT-0.625)*M_T,x1:(cxT+0.625)*M_T,y0:y0*M_T,y1:y1*M_T,dock:y1*M_T}; b.kx=b.cx; b.ky=b.cy-TRL_KP_TO_CENTRE+0.2; b.need=k<4?1:k<6?2:3; if(b.need>1) b.assigned=true; yd.bays.push(b); }
+    Object.assign(yd,{brand:BR,office:{x0:x+1,y0:y+1,w:5,h:4},garage:{x0:x+14,y0:y+1,w:5,h:3}}); fill(x+1,y+1,5,4,T.BLDG); fill(x+14,y+1,5,3,T.BLDG); fill(x+7,y+15,6,4,T.BLDG); yd.wh={x0:x+7,y0:y+15,w:6,h:4}; yd.wh2={x0:x+13,y0:y+15,w:6,h:4}; yd.hq={x0:x+1,y0:y+15,w:5,h:4};   // T1 warehouse (bays back onto it); T2 warehouse + T3 HQ become solid on upgrade   // solid site office + truck garage
     yd.gslot={x:(x+16.5)*M_T,y:(y+5.6)*M_T,w:7,L:10}; yd.oslot={x:(x+3.5)*M_T,y:(y+6.6)*M_T,w:7,L:9}; yd.sslot={x:(x+3.5)*M_T,y:(y+12)*M_T,w:7,L:10};
     world.forSale.push(yd); }
   yield 'Parking trailers';
