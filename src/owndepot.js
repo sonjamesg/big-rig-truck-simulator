@@ -1,6 +1,6 @@
 // ===================== v33 player-owned haulage yards (tier 1). Per player: ownership lives in this client's save only, so in
 // multiplayer other players keep seeing an empty FOR SALE yard and never get the owner's trucks (traffic is local per client).
-const OWN_TIERS={1:{price:2000,trucks:2,pay:500,bays:4,label:'Tier 1 haulage yard',adds:'Office, truck garage and warehouse \u2022 4 bays'},
+const OWN_TIERS={1:{price:50000,trucks:2,pay:500,bays:4,label:'Tier 1 haulage yard',adds:'Office, truck garage and warehouse \u2022 4 bays'},
   2:{price:3000,trucks:4,pay:500,bays:6,label:'Tier 2 depot',adds:'Second warehouse \u2022 6 bays \u2022 4 trucks'},
   3:{price:5000,trucks:6,pay:500,bays:8,label:'Tier 3 distribution hub',adds:'Distribution centre HQ \u2022 8 bays \u2022 more floodlights \u2022 6 trucks'}};   // up: prices are test values - edit here
 const OWN_MAX=3;

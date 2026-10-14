@@ -8,10 +8,14 @@ function accSetSession(j){ document.body&&document.body.classList.add('acctin');
 function accClear(){ document.body&&document.body.classList.remove('acctin'); ACC.tok=null; ACC.name=null; ACC.admin=false; try{ localStorage.removeItem('bigrig.tok'); localStorage.removeItem('bigrig.acct'); }catch(e){} }
 // pull the cloud save into localStorage and reload it into the live game (only if the world is ready and we haven't started driving)
 async function accPull(){ if(!ACC.tok) return; try{ const j=await accRpc('load_save',{token:ACC.tok}); if(!j.ok){ accClear(); return; } ACC.admin=!!j.is_admin;
-  if(j.save&&j.save.k&&j.save.d){ localStorage.setItem(j.save.k,JSON.stringify(j.save.d)); if(typeof world!=='undefined'&&world.ready&&typeof started!=='undefined'&&!started&&typeof loadGame==='function') loadGame(); } }catch(e){ ACC.online=false; } }
-function accPush(keep){ if(!ACC.tok||!ACC.online) return; try{ const k=saveKey(), s=localStorage.getItem(k); if(!s) return; accRpc('store_save',{token:ACC.tok,data:{k,d:JSON.parse(s),t:Date.now()}},keep).catch(()=>{}); }catch(e){} }
-function accAdmin(){ if(!ACC.admin||!ACC.tok||typeof truck==='undefined') return; if(truck.money<999000000) truck.money=999000000; const need=levelNeed(60); if(career.xp<need){ career.xp=need; career.tier=tierOf(career.xp); }
-  if(typeof ownYards==='function') for(const yd of ownYards()){ const o=ownedYard(yd); if(o&&o.tier<OWN_MAX){ o.tier=OWN_MAX; ownApplyTier(yd); } } }
+  // newest save wins: the cloud copy replaces the local one unless the local save is strictly newer (then it is pushed up instead)
+  if(j.save&&j.save.k&&j.save.d){ let loc=null; try{ loc=JSON.parse(localStorage.getItem(j.save.k)||'null'); }catch(e){} const ct=+(j.save.d.t||j.save.t||0), lt=+((loc&&loc.t)||0);
+    if(!loc||ct>=lt){ localStorage.setItem(j.save.k,JSON.stringify(j.save.d)); if(typeof world!=='undefined'&&world.ready&&typeof loadGame==='function'&&(typeof started==='undefined'||!started||ct>lt)) loadGame(); ACC.pulled=1; }
+    else { ACC.pulled=1; accPush(false); } } else ACC.pulled=1; }catch(e){ ACC.online=false; } }
+function accPush(keep){ if(!ACC.tok||!ACC.online||!ACC.pulled) return;   // never push before the cloud save has been compared (stale local must not overwrite it)
+  try{ const k=saveKey(), s=localStorage.getItem(k); if(!s) return; accRpc('store_save',{token:ACC.tok,data:{k,d:JSON.parse(s),t:Date.now()}},keep).catch(()=>{}); }catch(e){} }
+// is_admin only unlocks admin tools (fly cam etc.); it no longer grants money, XP or yard tiers
+function accAdmin(){}
 // ---- login card ----
 (function(){
 const css=`#acct{width:min(440px,88vw);margin:14px auto 4px;padding:14px 16px;border-radius:14px;background:rgba(14,20,32,.82);border:1px solid rgba(245,184,46,.4);box-shadow:0 8px 24px rgba(0,0,0,.45);text-align:center;display:flex;flex-direction:column;gap:8px}
@@ -75,5 +79,5 @@ setTimeout(()=>{ const sg=saveGame; saveGame=function(){ const r=sg.apply(this,a
     if(hit(13)||(gp.axes[1]>.6&&!ACC.ax)) mv(1); if(hit(12)||(gp.axes[1]<-.6&&!ACC.ax)) mv(-1); ACC.ax=Math.abs(gp.axes[1]||0)>.6;
     if(hit(0)&&i>=0&&els[i].tagName==='BUTTON'){ ACC.padT=Date.now()+300; els[i].click(); }
     if(hit(1)&&i>=0){ ACC.padT=Date.now()+300; document.activeElement.blur(); } })();
-  setInterval(()=>{ if(typeof started!=='undefined'&&started) accAdmin(); },1500); },0);
+},0);
 })();
