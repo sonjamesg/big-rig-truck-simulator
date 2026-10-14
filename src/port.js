@@ -263,9 +263,9 @@ function pHash(k){ let x=(k*2654435761)^0x9e3779b9; x=Math.imul(x^(x>>>15),22468
 function portCfg(P){
   const kb=P===world.kbPort, L=P.legL;
   const C=kb?{vA:1600,vB:1690,ex:1,inP:[[190,1770],[60,1770],[40,1768],[26,1755],[21,1738],[20,1720],[20,1600]],outT:[[33,1740],[42,1752],[60,1752],[190,1752]],
-      lor:[1740,1551],appr:[[1805,1868.6],[1751,1868.6],[1748,1870.5],[1745.5,1875],[1743,1876.8]],dpth:[[1549,1877],[1545,1876],[1540,1871],[1532,1868.6],[1470,1868.6]],impV:[1615,1645],expV:[1647,1677],chan:[1730,1928,1790,2000],piers:[1740,1761,1781],off:137,tracN:7}
-    :{vA:385,vB:300,ex:-1,inP:[[185,-40],[185,168],[150,200],[90,228],[40,250],[21,264],[20,280],[20,385]],outT:[[33,240],[70,206],[160,170],[160,-40]],
-      lor:[293,388],appr:[[540,286.4],[578,286.4],[584,287.5],[587.3,290.4]],dpth:[[587.6,391],[584.5,394.6],[578,395.4],[540,395.4]],impV:[350,380],expV:[316,346],chan:[700,60,830,140],piers:[748,772,798],off:0,tracN:8};
+      lor:[1740,1551],appr:[[1805,1868.6],[1751,1868.6],[1747.5,1869.4],[1745.4,1871.4],[1745,1874],[1745,1876],[1745,1878],[1745,1879.6],[1743.4,1880.1]],dpth:[[1548.6,1879.3],[1546.2,1879.9],[1545.5,1878.6],[1545.5,1876.5],[1545.5,1874.5],[1545.1,1872],[1542.5,1869.6],[1536,1868.6],[1470,1868.6]],impV:[1615,1645],expV:[1647,1677],chan:[1730,1928,1790,2000],piers:[1740,1761,1781],off:137,tracN:7}
+    :{vA:378,vB:308,gIn:294,ex:-1,inP:[[185,-40],[185,168],[150,200],[90,228],[40,250],[21,264],[20,280],[20,378]],outT:[[33,240],[70,206],[160,170],[160,-40]],
+      lor:[293,388],appr:[[540,286.4],[578,286.4],[582,286.4],[585,286.4],[587,286.4],[589,286.4],[590.9,286.4],[591.0,288.2]],dpth:[[590.0,391.5],[590.6,393.6],[590.8,395.4],[589,395.4],[587,395.4],[585,395.4],[578,395.4],[540,395.4]],impV:[350,380],expV:[316,346],chan:[700,60,830,140],piers:[748,772,798],off:0,tracN:8};
   Object.assign(P,C); const hs=-C.ex; P.hs=hs; P.dockU=3.6;
   // lanes inside the crane portal (u from landside leg to waterside leg): lorry lane | 2-col stack block | tractor lane 1 | tractor lane 2
   P.lorU=L+2.7; P.blkU=[L+4.4,L+5.8]; P.tl1=L+7.6; P.tl2=kb?-1.9:L+10.8;   // dg: roomier (fence at L+1..L+2) P.cap=16; P.ecap=16;
@@ -432,7 +432,7 @@ function drawPortPickBays(vx0,vy0,vx1,vy1){ const S=PPM; for(const P of portList
 // ===================== dg: dock perimeter fence + IN / OUT barrier gates with traffic lights =====================
 // Fence (solid tiles via DOCK_FENCE) runs along the landside of the crane portal and across both ends down to the quay edge;
 // the gate lorry path cuts the only two gaps. Each gate: barrier arm lifts for an approaching lorry / the player, light red while down, green when up.
-function dgBuild(P){ const L=P.legL, uF=L+1, R=Math.abs(P.tl2-P.tl1)/2, lo=Math.min(P.lv0-R,...P.lor)-6, hi=Math.max(P.lv1+R,...P.lor)+6;
+function dgBuild(P){ const L=P.legL, uF=L+1, R=Math.abs(P.tl2-P.tl1)/2, lo=Math.min(P.lv0-R,...P.lor)-10, hi=Math.max(P.lv1+R,...P.lor)+10;
   if(!DOCK_FENCE) DOCK_FENCE=new Uint8Array(MW*MH); P.fence=[]; P.fenceL=[[uF+0.5,lo,uF+0.5,hi],[uF+0.5,lo,0,lo],[uF+0.5,hi,0,hi]];
   const cross=[]; { let pr=polyAt(P.lpath,0); for(let s=0.25;s<=P.lpath.len;s+=0.25){ const q=polyAt(P.lpath,s); if((pr[0]<uF+0.5)!==(q[0]<uF+0.5)) cross.push(q); pr=q; } }
   const a=PL(P,uF-1,lo-1), b=PL(P,1,hi+1); for(let ty=Math.floor(Math.min(a[1],b[1]));ty<=Math.ceil(Math.max(a[1],b[1]));ty++) for(let tx=Math.floor(Math.min(a[0],b[0]));tx<=Math.ceil(Math.max(a[0],b[0]));tx++){
@@ -441,15 +441,18 @@ function dgBuild(P){ const L=P.legL, uF=L+1, R=Math.abs(P.tl2-P.tl1)/2, lo=Math.
     if(cross.some(c=>Math.abs(c[0]-u)<1.6&&Math.abs(c[1]-v)<2.6)) continue; if(get(tx,ty)===T.WATER) continue; DOCK_FENCE[idx(tx,ty)]=1; P.fence.push({u,v,k}); }
   // gates where the lorry path crosses the fence line
   P.gates=[]; let prev=polyAt(P.lpath,0)[0]; for(let s=0.25;s<=P.lpath.len;s+=0.25){ const q=polyAt(P.lpath,s), c=uF+0.5;
-    if((prev<c)!==(q[0]<c)){ const IN=!P.gates.length, n=polyAt(P.lpath,s+0.5), m=polyAt(P.lpath,s-0.5), h=Math.atan2(n[1]-m[1],n[0]-m[0]), rt=[-Math.sin(h),Math.cos(h)], sd=IN?1:-1;
-      P.gates.push({name:IN?'IN':'OUT',s,p:s-P.lpre,pu:q[0],pv:q[1],h,a:0,want:0,lu:q[0]+rt[0]*sd*1.25-Math.cos(h)*0.6,lv:q[1]+rt[1]*sd*1.25-Math.sin(h)*0.6,sd}); }
+    if((prev<c)!==(q[0]<c)){ const IN=!P.gates.length; let gs=s, inner=0; if(IN&&P.gIn!=null){ for(let s2=s;s2<P.lpath.len;s2+=0.05) if(Math.abs(polyAt(P.lpath,s2)[1]-P.gIn)<0.06){ gs=s2; inner=1; break; } }   // Albion: barrier set back onto the straight lane so a waiting lorry clears the junction
+      const q2=polyAt(P.lpath,gs), n=polyAt(P.lpath,gs+0.5), m=polyAt(P.lpath,gs-0.5), h=inner?Math.atan2(P.laneDir,0):Math.atan2(n[1]-m[1],n[0]-m[0]), rt=[-Math.sin(h),Math.cos(h)], sd=inner?-1:IN?1:-1;
+      P.gates.push({name:IN?'IN':'OUT',inner,s:gs,p:gs-P.lpre,pu:q2[0],pv:q2[1],h,a:0,want:0,lu:q2[0]+rt[0]*sd*1.3-Math.cos(h)*0.35,lv:q2[1]+rt[1]*sd*1.3-Math.sin(h)*0.35,sd}); }
     prev=q[0]; }
   // high-mast floodlights: yard ends, between the stacks, quay ends, beside each gate and along the outside of the fence
   const M=[[L+4.2,lo+1.4],[L+4.2,hi-1.4],[-2.2,lo+1.4],[-2.2,hi-1.4],[(P.blkU[0]+P.blkU[1])/2,(P.impV[0]>P.expV[1]?(P.impV[0]+P.expV[1]):(P.expV[0]+P.impV[1]))/2]];
   { const bu=(P.blkU[0]+P.blkU[1])/2, s0=Math.min(P.impV[0],P.expV[0]), s1=Math.max(P.impV[1],P.expV[1]); M.push([bu,s0-5],[bu,s1+5]); }
-  for(const g of P.gates){ const rt=[-Math.sin(g.h),Math.cos(g.h)]; M.push([g.pu+rt[0]*g.sd*2.3+Math.cos(g.h)*1.6,g.pv+rt[1]*g.sd*2.3+Math.sin(g.h)*1.6]); }
+  for(const g of P.gates){ const rt=[-Math.sin(g.h),Math.cos(g.h)]; const k=g.name==='IN'&&!g.inner?1:-1; M.push([g.pu+rt[0]*g.sd*3.4+Math.cos(g.h)*k*1.2,g.pv+rt[1]*g.sd*3.4+Math.sin(g.h)*k*1.2]); }
   for(let v=lo+14;v<hi-8;v+=26){ const w=PL(P,uF-0.6,v); const t=get(Math.floor(w[0]),Math.floor(w[1])); if(t!==T.ROAD&&t!==T.BRIDGE&&!P.gates.some(g=>Math.abs(g.pv-v)<5)) M.push([uF-0.6,v]); }
-  P.masts=M.map(m=>({u:m[0],v:m[1]})); for(const m of P.masts){ const w=PL(P,m.u,m.v); DOCK_FENCE[idx(Math.floor(w[0]),Math.floor(w[1]))]=1; } }
+  const crR=P.cranes.map(c=>{ const bv=c.role==='A'?P.vA:P.vB, x0=bv+P.hs*boxAx(0), x1=bv+P.hs*boxAx(SHIP.N-1); return [Math.min(x0,x1)-3,Math.max(x0,x1)+3]; }), pth=[]; for(let s=0;s<=P.lpath.len;s+=0.5) pth.push(polyAt(P.lpath,s));
+  const okM=m=>!crR.some(r=>m[1]>r[0]&&m[1]<r[1])&&pth.every(p=>Math.hypot(p[0]-m[0],p[1]-m[1])>2)&&!P.blocks.some(b=>m[0]>b[0]-0.6&&m[0]<b[0]+b[2]+0.6&&m[1]>b[1]-0.6&&m[1]<b[1]+b[3]+0.6)&&!P.fence.some(f=>Math.hypot(f.u-m[0],f.v-m[1])<0.9)&&(()=>{ for(let q=0;q<P.lLen;q+=0.5){ const L2=loopPos(P,q); if(Math.hypot(L2[0]-m[0],L2[1]-m[1])<2.2) return false; } return true; })();
+  P.masts=M.filter(okM).map(m=>({u:m[0],v:m[1]})); for(const m of P.masts){ const w=PL(P,m.u,m.v); DOCK_FENCE[idx(Math.floor(w[0]),Math.floor(w[1]))]=1; } }
 function dgDrawMasts(P){ const T_=TILE, K=typeof DN!=='undefined'?DN.dark:0; for(const m of (P.masts||[])){ const x=m.u*T_, y=m.v*T_;
     ctx.save(); ctx.strokeStyle='rgba(0,0,0,'+(0.28*(1-K*0.7))+')'; ctx.lineWidth=5; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+2.6*T_,y+2.6*T_); ctx.stroke();   // long pole shadow
     ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fillRect(x+2.6*T_-9,y+2.6*T_-5,18,10);
@@ -457,7 +460,7 @@ function dgDrawMasts(P){ const T_=TILE, K=typeof DN!=='undefined'?DN.dark:0; for
     ctx.fillStyle='#2f353a'; ctx.fillRect(x-12,y-5,24,10); ctx.fillStyle=K>0.05?'#fff4d6':'#dfe4e8'; for(const dx of [-8,-2.7,2.7,8]) ctx.fillRect(x+dx-2.2,y-3,4.4,6);   // lamp head (4 lanterns)
     ctx.restore(); if(K>0.05){ const w=PL(P,m.u,m.v); dnLight(w[0]*TILE,w[1]*TILE,7*TILE,'rgba(255,226,170,0.9)',0.6); } } }
 function dgUpdate(P,dt){ if(!P.gates) return; const pl=[[truck.x,truck.y]]; if(truck.trl) pl.push([truck.trl.x,truck.trl.y]);
-  for(const g of P.gates){ const w=PL(P,g.pu,g.pv); let want=P.lors.some(l=>l.p>g.p-11&&l.p<g.p+5);
+  for(const g of P.gates){ const w=PL(P,g.pu,g.pv); let want=P.lors.some(l=>l.p>g.p-2.9&&l.p<g.p+5&&(l.p>g.p-2.4||(l.mv||0)<0.3));   // lorry checks in at the stop line, then the arm lifts
     if(!want) for(const q of pl){ if(Math.hypot(q[0]/M_T-w[0],q[1]/M_T-w[1])<6.5) want=true; }
     g.want=want; g.a=Math.max(0,Math.min(1,g.a+(want?1:-1)*dt/1.3)); } }
 // distance a gate lorry may still travel before the stop line of a closed gate ahead of it
@@ -472,7 +475,7 @@ function dgDrawFence(P){ const T_=TILE; if(!P.fence) return; const W=0.34*T_;
 function dgDrawGate(P,g){ const T_=TILE, c=Math.cos(g.h), sn=Math.sin(g.h), rt=[-sn,c], sd=g.sd, pv=[g.pu+rt[0]*sd*1.15,g.pv+rt[1]*sd*1.15];
   // booth + posts
   ctx.save(); ctx.translate(g.pu*T_,g.pv*T_); ctx.rotate(g.h);
-  ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fillRect(-0.9*T_+4,sd*1.6*T_-0.45*T_+4,1.6*T_,0.9*T_); ctx.fillStyle='#e9eef2'; ctx.fillRect(-0.9*T_,sd*1.6*T_-0.45*T_,1.6*T_,0.9*T_); ctx.fillStyle='#2d6cdf'; ctx.fillRect(-0.9*T_,sd*1.6*T_-0.45*T_,1.6*T_,0.22*T_); ctx.fillStyle='#7fd3ff'; ctx.fillRect(-0.7*T_,sd*1.6*T_-0.12*T_,1.2*T_,0.14*T_);
+  const bx=(g.name==='IN'&&!g.inner?0.5:-2.1)*T_; ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fillRect(bx+4,sd*1.6*T_-0.45*T_+4,1.6*T_,0.9*T_); ctx.fillStyle='#e9eef2'; ctx.fillRect(bx,sd*1.6*T_-0.45*T_,1.6*T_,0.9*T_); ctx.fillStyle='#2d6cdf'; ctx.fillRect(bx,sd*1.6*T_-0.45*T_,1.6*T_,0.22*T_); ctx.fillStyle='#7fd3ff'; ctx.fillRect(bx+0.2*T_,sd*1.6*T_-0.12*T_,1.2*T_,0.14*T_);
   ctx.fillStyle='#222'; ctx.fillRect(-0.15*T_,-sd*1.25*T_-4,0.3*T_,8);   // arm rest post
   ctx.restore();
   // barrier arm (pivot on the booth side, swings 85 deg up = foreshortened in top view)

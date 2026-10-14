@@ -546,7 +546,7 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
     const L=(1745-1552)/3; world.kbPort={O:[0,1885+DOCK_W],U:[0,1],V:[1,0],vIn:1436,vOut:1800,dep:'KHT',legL:-9-DOCK_W,asg:[0,1,2],off:[0,0,0],qy0:1548,qy1:1748,
       berths:[0,1,2].map(i=>({i,y0:1552+i*L,y1:1552+(i+1)*L,ship:null})), cranes:[0,1,2].map(i=>({i,y:1552+L*(i+0.5),ty:0,tr:0.5,ph:0,car:null}))}; }
   // v26: keep the crane portal strip clear for the lorry lane, stack blocks and tractor loop (both ports)
-  for(const [x0,y0,x1,y1] of [[1546,1874,1752,1885+DOCK_W],[586,260,600+DOCK_W,416]]){ for(let i=objs.length-1;i>=0;i--){ const o=objs[i]; if(o.kind!=='cont') continue; const ox=o.x/TILE, oy=o.y/TILE; if(ox+o.w/TILE>x0&&ox<x1&&oy+o.h/TILE>y0&&oy<y1) objs.splice(i,1); }
+  for(const [x0,y0,x1,y1] of [[1546,1874,1752,1885+DOCK_W],[1536,1864,1556,1885+DOCK_W],[1734,1864,1752,1885+DOCK_W],[586,260,600+DOCK_W,416]]){ for(let i=objs.length-1;i>=0;i--){ const o=objs[i]; if(o.kind!=='cont') continue; const ox=o.x/TILE, oy=o.y/TILE; if(ox+o.w/TILE>x0&&ox<x1&&oy+o.h/TILE>y0&&oy<y1) objs.splice(i,1); }
     for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++) if(get(x,y)===T.CONT) set(x,y,T.QUAY); }
   yield 'Building airports';
   // airports: concrete apron, runways, terminal, hangars
