@@ -43,14 +43,14 @@ function drawNight(vx0,vy0,vx1,vy1,z){ const K=DN.dark, D=DN.dusk; if(K<0.01&&D<
   const relief=(g,str)=>{ g.globalCompositeOperation='destination-out'; for(const c of cities){ g.save(); g.translate((c.x-vx0)*z*q,(c.y-vy0)*z*q); g.scale(c.rx*1.35*z*q,c.ry*1.35*z*q); const gr=g.createRadialGradient(0,0,0,0,0,1); gr.addColorStop(0,'rgba(0,0,0,'+str+')'); gr.addColorStop(0.55,'rgba(0,0,0,'+str+')'); gr.addColorStop(0.78,'rgba(0,0,0,'+(str*0.45)+')'); gr.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=gr; g.beginPath(); g.arc(0,0,1,0,7); g.fill(); g.restore(); } g.globalCompositeOperation='source-over'; };
   const TG=DN.tg; TG.setTransform(1,0,0,1,0,0); TG.globalCompositeOperation='source-over'; TG.globalAlpha=1; TG.clearRect(0,0,W,H); TG.fillStyle='rgba(70,95,170,1)'; TG.fillRect(0,0,W,H); relief(TG,0.45);
   ctx.globalAlpha=0.55*K; ctx.globalCompositeOperation='multiply'; ctx.drawImage(DN.tc,0,0,VW,VH); ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
-  if(!DN.spr){ DN.spr=dnSprite(64,[[0,'rgba(0,0,0,1)'],[0.45,'rgba(0,0,0,0.75)'],[1,'rgba(0,0,0,0)']]); DN.cone=dnCone(); }
+  if(!DN.spr){ DN.spr=dnSprite(64,[[0,'rgba(0,0,0,1)'],[0.45,'rgba(0,0,0,0.75)'],[1,'rgba(0,0,0,0)']]); DN.cone=dnCone(); DN.coneD=dnConeD(); DN.coneF=dnConeF(); }
   const L=DN.lg; L.setTransform(1,0,0,1,0,0); L.globalCompositeOperation='source-over'; L.clearRect(0,0,W,H); L.fillStyle='rgba(4,8,22,'+(0.72*K)+')'; L.fillRect(0,0,W,H); relief(L,0.47);
   L.globalCompositeOperation='destination-out'; const sx=x=>(x-vx0)*z*q, sy=y=>(y-vy0)*z*q, pad=300;
   const lights=[]; const C=DN.cell; for(let cy=Math.floor((vy0-pad)/C);cy<=Math.floor((vy1+pad)/C);cy++) for(let cx=Math.floor((vx0-pad)/C);cx<=Math.floor((vx1+pad)/C);cx++){ const a=DN.grid.get(cx+','+cy); if(a) for(const l of a) if(l.x>vx0-pad&&l.x<vx1+pad&&l.y>vy0-pad&&l.y<vy1+pad) lights.push(l); }
   for(const P of (typeof portList==='function'?portList():[])) if(P.cranes) for(const c of P.cranes){ for(const u of [P.legL,-1,c.u,16]){ const p=PL(P,u,c.y); const x=p[0]*TILE,y=p[1]*TILE; if(x>vx0-300&&x<vx1+300&&y>vy0-300&&y<vy1+300) dnLight(x,y,u===c.u?150:70,u===c.u?'rgba(235,240,255,0.7)':'rgba(255,60,40,0.9)',0.8); } }
   const dyn=DN.dyn||[]; for(const l of lights.concat(dyn)){ if(l.k==='b') continue; if(l.k==='sh'){ const r=l.r*z*q; L.globalAlpha=0.9; L.drawImage(DN.spr,sx(l.x)-r,sy(l.y)-r,r*2,r*2); continue; } const so=l.k==='st'?slOn(l.l):1; if(so<0.02) continue; const r=l.r*z*q; L.globalAlpha=l.k==='st'?0.85*so:0.95; L.drawImage(DN.spr,sx(l.x)-r,sy(l.y)-r,r*2,r*2); }
   const veh=dnVehs();
-  L.globalAlpha=1; for(const V of veh){ const x=V.fx*PPM,y=V.fy*PPM; if(x<vx0-500||x>vx1+500||y<vy0-500||y>vy1+500) continue; const ang=Math.atan2(V.f[1],V.f[0]); L.save(); L.translate(sx(x),sy(y)); L.rotate(ang); const s=z*q*(V.big?1.55:1.1); L.scale(s,s); L.globalAlpha=1; L.drawImage(DN.cone,0,-64); L.drawImage(DN.spr,-26,-26,52,52); L.restore(); }
+  L.globalAlpha=1; for(const V of veh){ const x=V.fx*PPM,y=V.fy*PPM; if(x<vx0-500||x>vx1+500||y<vy0-500||y>vy1+500) continue; const ang=Math.atan2(V.f[1],V.f[0]); L.save(); L.translate(sx(x),sy(y)); L.rotate(ang); const s=z*q*(V.big?1.55:1.1); L.scale(s,s); const hk=V.hb||0; if(hk<0.999){ L.globalAlpha=1-hk; L.drawImage(DN.coneD,0,-64); } if(hk>0.001){ L.globalAlpha=hk; L.drawImage(DN.coneF,0,-100); } L.globalAlpha=1; L.drawImage(DN.spr,-26,-26,52,52); L.restore(); }
   L.globalCompositeOperation='source-over'; L.globalAlpha=1;
   ctx.globalCompositeOperation='source-over'; ctx.drawImage(DN.lc,0,0,VW,VH);
   // additive colour: lamp glows, windows/neon, tail + nav lights
@@ -65,7 +65,7 @@ function drawNight(vx0,vy0,vx1,vy1,z){ const K=DN.dark, D=DN.dusk; if(K<0.01&&D<
   for(const l of dyn) gz(l.c||DN_COL.fl,l.x,l.y,l.r*0.5,l.a||0.6);
   const blink=typeof indBlink==='function'&&indBlink();
   for(const V of veh){ const X=V.fx*PPM,Y=V.fy*PPM; if(X<vx0-600||X>vx1+600||Y<vy0-600||Y>vy1+600) continue; const r=[-V.f[1],V.f[0]], hw=V.W/2-0.15;
-    for(const sd of [-1,1]){ const lx=V.fx+r[0]*sd*hw*0.85, ly=V.fy+r[1]*sd*hw*0.85; gz('rgba(255,250,225,1)',lx*PPM,ly*PPM,V.big?7:5,1); gz('rgba(255,245,210,0.8)',(lx+V.f[0]*2)*PPM,(ly+V.f[1]*2)*PPM,V.big?16:11,0.5); }
+    for(const sd of [-1,1]){ const lx=V.fx+r[0]*sd*hw*0.85, ly=V.fy+r[1]*sd*hw*0.85; const hk=V.hb||0; gz('rgba(255,250,225,1)',lx*PPM,ly*PPM,(V.big?7:5)*(1+0.3*hk),1); gz('rgba(255,245,210,0.8)',(lx+V.f[0]*(2+2*hk))*PPM,(ly+V.f[1]*(2+2*hk))*PPM,(V.big?16:11)*(0.85+0.6*hk),0.4+0.25*hk); }
     const rf=V.rf, rr=[-rf[1],rf[0]], rw=V.rW/2-0.12;
     for(const sd of [-1,1]){ const lx=V.rx+rr[0]*sd*rw, ly=V.ry+rr[1]*sd*rw; gz('rgba(255,30,20,0.95)',lx*PPM,ly*PPM,V.br?8:5,V.br?1:0.7); if(V.rv) gz('rgba(255,255,245,1)',(lx-rr[0]*sd*0.45)*PPM,(ly-rr[1]*sd*0.45)*PPM,6,1);
       const ind=V.haz||(V.side===1&&sd<0)||(V.side===2&&sd>0); if(ind&&blink){ gz('rgba(255,170,20,1)',(lx+rf[0]*0.1)*PPM,(ly+rf[1]*0.1)*PPM,9,1); const fl=V.fx+r[0]*sd*(hw+0.05), fy=V.fy+r[1]*sd*(hw+0.05); gz('rgba(255,170,20,1)',fl*PPM,fy*PPM,9,1); } }
@@ -75,13 +75,22 @@ function drawNight(vx0,vy0,vx1,vy1,z){ const K=DN.dark, D=DN.dusk; if(K<0.01&&D<
 // lamp geometry (metres) for every lit vehicle: front lamp line + rear lamp line following trailer articulation
 function dnVehs(){ const out=[];
   { const t=truck, f=fwd(t.h); let rx,ry,rf,rW; if(t.trl){ const k=kingpin(t); rf=fwd(t.th); rx=k[0]-rf[0]*TRL.rear; ry=k[1]-rf[1]*TRL.rear; rW=TRL.w; } else { rf=f; rx=t.x-f[0]*1.15; ry=t.y-f[1]*1.15; rW=2.4; }
-    out.push({fx:t.x+f[0]*5.0,fy:t.y+f[1]*5.0,f,W:2.45,big:1,rx,ry,rf,rW,br:t.brake>0.02&&t.mode!=='R'||(t.brake>0.02&&Math.abs(t.v)>0.3),rv:t.mode==='R',side:typeof IND!=='undefined'?IND.side:0,haz:typeof IND!=='undefined'&&IND.haz}); }
+    out.push({fx:t.x+f[0]*5.0,fy:t.y+f[1]*5.0,f,W:2.45,big:1,rx,ry,rf,rW,br:t.brake>0.02&&t.mode!=='R'||(t.brake>0.02&&Math.abs(t.v)>0.3),rv:t.mode==='R',side:typeof IND!=='undefined'?IND.side:0,haz:typeof IND!=='undefined'&&IND.haz,hb:typeof hbStep==='function'?hbStep():0}); }
   for(const v of (traffic.vs||[])){ if(v.x===undefined) continue; const f=fwd(v.h||0), L=v.L||4.4, W=v.W||1.8; let rx,ry,rf,rW; if(v.trl){ rf=fwd(v.trl.h); rx=v.trl.x-rf[0]*6.8; ry=v.trl.y-rf[1]*6.8; rW=2.55; } else { rf=f; rx=v.x-f[0]*L/2; ry=v.y-f[1]*L/2; rW=W; }
     out.push({fx:v.x+f[0]*L/2,fy:v.y+f[1]*L/2,f,W,big:v.kind==='lorry'||v.kind==='cab',rx,ry,rf,rW,br:!!v.brake,rv:false,side:0,haz:false}); }
   if(typeof MP!=='undefined'&&MP.on) for(const id in MP.players){ const p=MP.players[id], r=p.cur; if(!p.has||!r) continue; const f=fwd(r.h), fl=r.fl|0; let rx,ry,rf,rW; if(r.tr){ rf=fwd(r.th); rx=r.kx-rf[0]*TRL.rear; ry=r.ky-rf[1]*TRL.rear; rW=TRL.w; } else { rf=f; rx=r.x-f[0]*1.15; ry=r.y-f[1]*1.15; rW=2.4; }
-    out.push({fx:r.x+f[0]*5.0,fy:r.y+f[1]*5.0,f,W:2.45,big:1,rx,ry,rf,rW,br:!!(fl&1),rv:!!(fl&2),side:(fl>>2)&3,haz:!!(fl&32)}); }
+    out.push({fx:r.x+f[0]*5.0,fy:r.y+f[1]*5.0,f,W:2.45,big:1,rx,ry,rf,rW,br:!!(fl&1),rv:!!(fl&2),side:(fl>>2)&3,haz:!!(fl&32),hb:(p.hbk=(p.hbk||0)+(((fl&64)?1:0)-(p.hbk||0))*0.15)}); }
   return out; }
 // twin cone beams (destination-out mask): hotspot near lamps, soft lateral + distance falloff
+// dipped: short, dimmer, kicked up toward the LEFT kerb (local -y = nearside); full: long, bright, wide and symmetric
+function dnConeD(){ const Lc=150, Hc=128, c=document.createElement('canvas'); c.width=Lc; c.height=Hc; const g=c.getContext('2d');
+  for(const oy of [-11,11]){ const cy=Hc/2+oy; g.save(); g.beginPath(); g.moveTo(0,cy-3); g.lineTo(Lc*0.55,cy-Hc*0.40); g.lineTo(Lc,cy-Hc*0.46); g.lineTo(Lc,cy+Hc*0.10); g.lineTo(0,cy+3); g.closePath(); g.clip(); g.filter='blur(5px)';
+    const gr=g.createRadialGradient(0,cy,0,0,cy,Lc); gr.addColorStop(0,'rgba(0,0,0,0.9)'); gr.addColorStop(0.25,'rgba(0,0,0,0.7)'); gr.addColorStop(0.65,'rgba(0,0,0,0.32)'); gr.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=gr; g.globalAlpha=0.62; g.fillRect(0,0,Lc,Hc); g.restore(); }
+  const hs=g.createRadialGradient(24,Hc/2-6,0,24,Hc/2-6,34); hs.addColorStop(0,'rgba(0,0,0,0.8)'); hs.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=hs; g.fillRect(0,0,70,Hc); return c; }
+function dnConeF(){ const Lc=340, Hc=200, c=document.createElement('canvas'); c.width=Lc; c.height=Hc; const g=c.getContext('2d');
+  for(const oy of [-11,11]){ const cy=Hc/2+oy; g.save(); g.beginPath(); g.moveTo(0,cy-3); g.lineTo(Lc,cy-Hc*0.40); g.lineTo(Lc,cy+Hc*0.40); g.lineTo(0,cy+3); g.closePath(); g.clip(); g.filter='blur(6px)';
+    const gr=g.createRadialGradient(0,cy,0,0,cy,Lc); gr.addColorStop(0,'rgba(0,0,0,1)'); gr.addColorStop(0.2,'rgba(0,0,0,0.9)'); gr.addColorStop(0.6,'rgba(0,0,0,0.55)'); gr.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=gr; g.globalAlpha=0.85; g.fillRect(0,0,Lc,Hc); g.restore(); }
+  const hs=g.createRadialGradient(30,Hc/2,0,30,Hc/2,46); hs.addColorStop(0,'rgba(0,0,0,0.95)'); hs.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=hs; g.fillRect(0,0,90,Hc); return c; }
 function dnCone(){ const Lc=230, Hc=128, c=document.createElement('canvas'); c.width=Lc; c.height=Hc; const g=c.getContext('2d');
   for(const oy of [-11,11]){ const cy=Hc/2+oy; g.save(); g.beginPath(); g.moveTo(0,cy-3); g.lineTo(Lc,cy-Hc*0.36); g.lineTo(Lc,cy+Hc*0.36); g.lineTo(0,cy+3); g.closePath(); g.clip(); g.filter='blur(5px)';
     const gr=g.createRadialGradient(0,cy,0,0,cy,Lc); gr.addColorStop(0,'rgba(0,0,0,0.95)'); gr.addColorStop(0.18,'rgba(0,0,0,0.8)'); gr.addColorStop(0.55,'rgba(0,0,0,0.45)'); gr.addColorStop(1,'rgba(0,0,0,0)'); g.fillStyle=gr; g.globalAlpha=0.75; g.fillRect(0,0,Lc,Hc); g.restore(); }

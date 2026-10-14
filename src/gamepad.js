@@ -48,7 +48,7 @@ function padUpdate(dt){
   if(!started) return;
   if(hit(12)&&MP.on) mpToggleList();
   if(hit(0)) toggleCouple(); if(hit(2)) toggleRefuel(); if(hit(3)) tryUnload();
-  if(hit(14)) indToggle(1); if(hit(15)) indToggle(2); if((hit(4)&&now[5])||(hit(5)&&now[4])){ hazToggle(); input.horn=false; }
+  if(hit(13)&&typeof hbToggle==='function') hbToggle(); if(hit(14)) indToggle(1); if(hit(15)) indToggle(2); if((hit(4)&&now[5])||(hit(5)&&now[4])){ hazToggle(); input.horn=false; }
   if(hit(8)) openMap(); if(hit(9)) openBoard(); if(hit(5)&&!now[4]&&NAV.route){ clearRoute(); flash('Route cancelled'); }
 }
 // ---- spatial focus navigation for the DOM panels

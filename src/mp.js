@@ -8,7 +8,7 @@ function mpName(){ return (document.getElementById('lbName')||{}).value||localSt
 const R2=v=>Math.round(v*100)/100, R3=v=>Math.round(v*1000)/1000;
 function mpGid(tr){ if((!tr.gid||tr.gid.startsWith('me:'))) tr.gid=(MP.myId||'me')+':'+tr.id; return tr.gid; }
 function mpSelfPose(){ const s=truck, tr=s.trl; const ind=IND.side;
-  const fl=((s.brake||0)>0.1?1:0)|(s.mode==='R'?2:0)|(ind<<2)|(input.hand?16:0)|(IND.haz?32:0); const P=['p',MP.myId,Math.round(performance.now()),R2(s.x),R2(s.y),R3(s.h),R2(s.v),career.cur,career.colors[career.cur]||'',fl];
+  const fl=((s.brake||0)>0.1?1:0)|(s.mode==='R'?2:0)|(ind<<2)|(input.hand?16:0)|(IND.haz?32:0)|(typeof HB!=='undefined'&&HB.on?64:0); const P=['p',MP.myId,Math.round(performance.now()),R2(s.x),R2(s.y),R3(s.h),R2(s.v),career.cur,career.colors[career.cur]||'',fl];
   if(tr){ const k=kingpin(s); P.push(mpGid(tr),tr.type,tr.col||'',tr.logo||'',R3(tr.th),R2(k[0]),R2(k[1])); } else P.push(0); return P; }
 // ---------- network
 function mpSendAll(msg,except,pose){ const d=JSON.stringify(msg); for(const id in MP.conns){ if(id===except) continue; const c=(pose&&MP.pconns[id]&&MP.pconns[id].open)?MP.pconns[id]:MP.conns[id]; if(c&&c.open) try{ c.send(d); }catch(e){} } }

@@ -45,6 +45,8 @@ body.portrait #mob .pill small{color:#fff;font-size:11px;margin:0;max-width:none
 body.touch #mob .fn{border-radius:12px;background:#3d4252;border:none;box-shadow:0 3px 0 #1d2029;font-size:17px}
 body.touch #mob .fn.on,body.touch #mob .ab.on,body.touch #mob .dp.on{transform:translateY(2px);filter:brightness(1.3)}
 body.touch #mob .fn.ctxon{background:#c98a10;box-shadow:0 3px 0 #6d4a06}
+#mob .b.beamon{background:#1f5fd6!important;border-color:#6fa8ff!important;box-shadow:0 0 10px rgba(80,150,255,.7),0 3px 0 #0d3277!important;color:#fff!important}
+#mob .hbi{display:inline-block;width:1.1em;height:.7em;background:linear-gradient(90deg,currentColor 0 38%,transparent 38% 48%,currentColor 48% 100%);-webkit-mask:repeating-linear-gradient(180deg,#000 0 18%,transparent 18% 27%);mask:repeating-linear-gradient(180deg,#000 0 18%,transparent 18% 27%);border-radius:50% 0 0 50%/50% 0 0 50%}
 body.touch.portrait .modal,body.touch .modal{width:min(916px,96vw)!important;height:min(552px,94vh)!important}
 @media (max-width:760px){ #ui .grid{grid-template-columns:minmax(0,1fr)!important} #ui .bar{flex-wrap:wrap} #ui .mh .sub{display:none} #ui .detail{flex-wrap:wrap} #ui .btn.start{width:100%} #ui .show{flex-direction:column;overflow:auto} #ui .tl{width:auto;flex-direction:row;overflow-x:auto;border-right:none} #ui .ti{flex:none} .result{width:94vw!important} }
 body.touch.ovl #mob,body.touch.ovl #deck{display:none!important} body.touch.ovl #frame{z-index:40}
@@ -83,7 +85,7 @@ function mobInit(){ if(!document.body.classList.contains('touch')) return; MOB.o
   mobBtn('mA','A<small>GAS</small>','ab',()=>{ if(career.uiOpen) MOB.nav.okA(); else { if(!started) startGame(); input.up=true; } });
   mobBtn('mB','B<small>BRAKE</small>','ab',()=>{ if(career.uiOpen) MOB.nav.back(); else input.down=true; });
   for(const id of ['mA','mB']){ const el=document.getElementById(id); const off=()=>{ input[id==='mA'?'up':'down']=false; }; el.addEventListener('pointerup',off); el.addEventListener('pointercancel',off); el.addEventListener('pointerleave',off); }
-  mobBtn('mIndL','\u2B05<small>IND</small>','fn',act(()=>indToggle(1))); mobBtn('mIndR','\u27A1<small>IND</small>','fn',act(()=>indToggle(2))); mobBtn('mHaz','\u26A0<small>HAZ</small>','fn',act(()=>hazToggle())); mobBtn('mHand','P<small>H/BRAKE</small>','fn','hand'); mobBtn('mHorn','\u{1F4E3}<small>HORN</small>','fn','horn');
+  mobBtn('mIndL','\u2B05<small>IND</small>','fn',act(()=>indToggle(1))); mobBtn('mIndR','\u27A1<small>IND</small>','fn',act(()=>indToggle(2))); mobBtn('mHaz','\u26A0<small>HAZ</small>','fn',act(()=>hazToggle())); mobBtn('mBeam','<i class="hbi"></i><small>BEAM</small>','fn',act(()=>hbToggle())); mobBtn('mHand','P<small>H/BRAKE</small>','fn','hand'); mobBtn('mHorn','\u{1F4E3}<small>HORN</small>','fn','horn');
   mobBtn('mCouple','\u{1F517}<small>COUPLE</small>','fn ctx',act(()=>toggleCouple())); mobBtn('mFuel','\u26FD<small>REFUEL</small>','fn ctx',act(()=>toggleRefuel())); mobBtn('mUnload','\u{1F4E6}<small>UNLOAD</small>','fn ctx',act(()=>tryUnload()));
   mobBtn('mJobs','\u{1F4CB}<small>JOBS</small>','fn pill',act(()=>{ if(career.uiOpen) closeUI(); else openBoard(); })); mobBtn('mMap','\u{1F5FA}<small>MAP</small>','fn pill',act(()=>{ bigmap.open?closeMap():openMap(); }));
   document.getElementById('frame').addEventListener('touchmove',e=>{ if(e.target.closest&&e.target.closest('#overlay,#ui .mback,#ui .celebrate,#bdPanel')) return; e.preventDefault(); },{passive:false});
@@ -104,7 +106,7 @@ function mobLayout(){ if(!MOB.on) return; const W=innerWidth, H=innerHeight, por
     for(const id of ['deckL','deckR']){ const d=document.getElementById(id); if(d){ d.style.width=(g-2)+'px'; d.querySelector('.brand').style.top=(6+sat)+'px'; } }
     const top=26+sat, stH=Math.min(120,H*0.30), sb=Math.max(40,Math.min(58,(iw-pad)/2,(H-top-stH-5*pad)/2.6)), sw=(iw-pad)/2, iy=top+2*(sb+pad);
     place('mHand',pad,top,sw,sb); place('mHorn',pad+sw+pad,top,sw,sb); place('mJobs',pad,top+sb+pad,sw,sb); place('mMap',pad+sw+pad,top+sb+pad,sw,sb);
-    const tw=(iw-2*6)/3; ['mIndL','mHaz','mIndR'].forEach((id,k)=>place(id,pad+k*(tw+6),iy,tw,sb*0.6));
+    const tw=(iw-2*6)/3; ['mIndL','mHaz','mIndR'].forEach((id,k)=>place(id,pad+k*(tw+6),iy,tw,sb*0.6)); { const by=iy+sb*0.6+pad, bh=sb*0.6, stTop=H-stH-pad; if(by+bh<=stTop-4) place('mBeam',pad,by,iw,bh); else { const t4=(iw-3*6)/4; ['mIndL','mHaz','mBeam','mIndR'].forEach((id,k)=>place(id,pad+k*(t4+6),iy,t4,sb*0.6)); } }
     place('mSteer',pad,H-stH-pad,iw,stH);
     const R=W-g+pad; place('mCouple',R,top,sw,sb); place('mFuel',R+sw+pad,top,sw,sb); place('mUnload',R,top+sb+pad,iw,sb);
     const py=top+2*(sb+pad), ph=Math.max(70,H-py-pad); place('mBrk',R,py+ph*0.22,sw,ph*0.78); place('mGas',R+sw+pad,py,sw,ph);
@@ -114,7 +116,7 @@ function mobLayout(){ if(!MOB.on) return; const W=innerWidth, H=innerHeight, por
     const DH=H-deckTop, u=Math.min(W/412,DH/330); const S=v=>v*u;
     const dcx=S(78), dcy=deckTop+S(98), k=S(38); place('mUp',dcx-k/2,dcy-k*1.5,k,k); place('mDown',dcx-k/2,dcy+k/2,k,k); place('mLeft',dcx-k*1.5,dcy-k/2,k,k); place('mRight',dcx+k/2,dcy-k/2,k,k); place('mCen',dcx-k/2,dcy-k/2,k,k);
     const ab=S(58); place('mB',W-S(150),dcy-ab*0.2,ab,ab); place('mA',W-S(78),dcy-ab*0.85,ab,ab);
-    const fy=deckTop+S(178), fw=Math.min(S(66),(W-24)/5-6), gap=(W-5*fw)/6; ['mCouple','mFuel','mUnload','mHand','mHorn'].forEach((id,i)=>place(id,gap+i*(fw+gap),fy,fw,fw*0.78)); ['mIndL','mHaz','mIndR'].forEach((id,i)=>place(id,gap+(i*2)*(fw+gap),fy+fw*1.08,fw,fw*0.5));
+    const fy=deckTop+S(178), fw=Math.min(S(66),(W-24)/5-6), gap=(W-5*fw)/6; ['mCouple','mFuel','mUnload','mHand','mHorn'].forEach((id,i)=>place(id,gap+i*(fw+gap),fy,fw,fw*0.78)); { const g4=gap, w4=(W-5*g4)/4; ['mIndL','mHaz','mBeam','mIndR'].forEach((id,i)=>place(id,g4+i*(w4+g4),fy+fw*1.08,w4,fw*0.5)); }
     const py=fy+fw*1.78; const pw=S(84),ph2=S(26); place('mMap',W/2-pw-S(8),py,pw,ph2); place('mJobs',W/2+S(8),py,pw,ph2); const gr=document.querySelector('#deck .grille'); if(gr){ gr.style.top=(py-deckTop+ph2/2-S(9))+'px'; gr.style.bottom='auto'; gr.style.height=S(18)+'px'; gr.style.width=S(40)+'px'; }
     for(const id of ['mSteer','mGas','mBrk']) place(id,0,0,0,0,false);
   }
@@ -127,7 +129,7 @@ function mobContext(){ if(!MOB.on) return; if(document.querySelector('#mob .b')&
   const fuel=!!(started&&fuelStationAt&&fuelStationAt())||refuel.active; let cpl=false; if(started){ if(s.trl) cpl=Math.abs(s.v)<1; else { const c=coupleCandidate(); cpl=!!(c&&c.d<8); } }
   let unl=false; if(a&&(a.phase==='deliver'||a.phase==='unloading')){ const al=bayAlign(a.bay); unl=!!(al&&al.dist<30); }
   const por=MOB.mode==='portrait'; const set=(id,on)=>{ const b=document.getElementById(id); if(!b) return; if(true){ b.classList.remove('hide'); b.classList.toggle('ctxon',on); b.classList.toggle('dim',!on); } else { b.classList.toggle('hide',!on); } };
-  set('mCouple',cpl); set('mFuel',fuel); set('mUnload',unl); const c=document.getElementById('mChat'); if(c) c.style.display=MP.on?'flex':'none';
+  { const bm=document.getElementById('mBeam'); if(bm) bm.classList.toggle('beamon',!!(typeof HB!=='undefined'&&HB.on)); } set('mCouple',cpl); set('mFuel',fuel); set('mUnload',unl); const c=document.getElementById('mChat'); if(c) c.style.display=MP.on?'flex':'none';
   const cb=document.getElementById('mCouple'); if(cb) { const sm=cb.querySelector('small'), t=s.trl?'UNCOUPLE':'COUPLE'; if(sm.textContent!==t){ sm.textContent=t; mobFit(); } } }
 
 (function ovlWatch(){ const f=()=>{ const ov=document.getElementById('overlay'); const on=!!(typeof career!=='undefined'&&career.uiOpen)||!!document.getElementById('bdPanel')||!!document.querySelector('#ui .celebrate')||!!(ov&&!ov.classList.contains('hidden')&&ov.offsetParent!==null); document.body.classList.toggle('ovl',on); }; setInterval(f,150); })();

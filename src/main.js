@@ -196,7 +196,7 @@ function drawOverhead(o){
 // ---------- HUD
 function drawHUD(){
   const s=truck, kmh=Math.abs(s.v)*3.6;
-  drawMinimap(); dnMapShade(MM.x,MM.y,MM.w,MM.h); drawClockHUD(); drawWeatherHUD(); drawCoupleHUD(); drawFuelHUD(); drawIndHUD(); drawCareerHUD(); drawNavHUD();
+  drawMinimap(); dnMapShade(MM.x,MM.y,MM.w,MM.h); drawClockHUD(); drawWeatherHUD(); drawCoupleHUD(); drawFuelHUD(); drawIndHUD(); if(typeof drawBeamHUD==='function') drawBeamHUD(); drawCareerHUD(); drawNavHUD();
   // gauge panel
   const gx=14, gy=VH-150, gw=186, gh=136;
   ctx.fillStyle='rgba(10,14,22,0.72)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(gx,gy,gw,gh,16):ctx.rect(gx,gy,gw,gh); ctx.fill();
