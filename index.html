@@ -2027,6 +2027,8 @@ function stepVeh(v,dt,pbs){
     }
     else if(m.kind==='major'&&m.turn&&!m.swOk){ const gap=m.d-front-0.8; if(gap<8&&gap>-0.5){ if(turnSweepBlocked(v,m)) acc=Math.min(acc,idmAcc(v,v0,Math.max(0.1,gap),0)); else if(gap<2) m.swOk=true; } }
   }
+  if(v.L>8||v.trl){ for(const m of v.mk){ if(!m.turn||m.dEnd===undefined||v.s+v.L/2<m.d||v.s+v.L/2>m.dEnd) continue;   // v25: long vehicle mid-turn - stop rather than sweep into a car stood in the way
+      if(turnSweepBlocked(v,{d:v.s+v.L/2+0.5,dEnd:Math.min(m.dEnd,v.s+v.L/2+8)})) acc=Math.min(acc,-6); break; } }
   if(typeof railStopAcc==='function'){ const ra=railStopAcc(v,v0); if(ra<acc) acc=ra; }
   v.sig=sig;
   // leader search along own path
