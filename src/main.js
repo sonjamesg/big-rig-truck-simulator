@@ -71,8 +71,8 @@ function frame(ts){
   if(!paused){ updateTraffic(dt); updateFuel(dt); updateForecourts(dt); if(started) updateCareer(dt); if(started) updateIndicators(dt); updateFX(dt); } updatePort(dt);
   { const z=cam.z; updateAmbient(dt,[cam.x-VW/2/z,cam.y-VH/2/z,cam.x+VW/2/z,cam.y+VH/2/z]); }
   if(started&&!paused) updateNav(dt);
-  if(truck.bump>0.05&&!truck._dmg){ truck.damage=Math.min(100,truck.damage+truck.bump*6); truck._dmg=true; } if(truck.bump<=0.01) truck._dmg=false;
-  updateBreakdown(dt); updateDayNight(dt,started&&!paused); updateWeather(dt,started&&!paused);
+  if(truck.bump>0.05&&!truck._dmg){ truck.damage=Math.min(100,truck.damage+truck.bump*6*(truck.dmgM||1)); truck._dmg=true; } if(truck.bump<=0.01) truck._dmg=false;
+  updateBreakdown(dt); if(typeof czTick==='function') czTick(); updateDayNight(dt,started&&!paused); updateWeather(dt,started&&!paused);
   // camera: look-ahead + zoom-out with speed
   const f=fwd(truck.h), sp=Math.abs(truck.v);
   const kp=kingpin(truck); const mid=[(truck.x-f[0]*1.9)*PPM, (truck.y-f[1]*1.9)*PPM];
@@ -297,6 +297,7 @@ function drawBigMap(){
   drawPOIs(m=>BX(m/4),m=>BY(m/4),z>0.6,IR);
   mpDrawMap(m=>BX(m/4),m=>BY(m/4),true);
   if(typeof ownMapLabels==='function') ownMapLabels(BX,BY,z,IR);
+  if(typeof czMapMarks==='function') czMapMarks(BX,BY,z,IR);
   if(z>1.2) for(const dp of world.depots) mapLabel(dp.name,BX(dp.entrance.x/4)+IR+4,BY(dp.entrance.y/4),'#8fc8ff',true);
   if(z>=4){ for(const f of world.fuel) mapLabel(f.name,BX(f.x/4)+IR+4,BY(f.y/4),'#9be7a8'); for(const g of world.garages) mapLabel(g.name,BX(g.x/4)+IR+4,BY(g.y/4),'#ffc58a'); for(const m of world.malls||[]) mapLabel(m.name,BX(m.entrance.x/4)+IR+4,BY(m.entrance.y/4),'#ff9cc0'); for(const d of world.dealers||[]) mapLabel(d.name,BX(d.entrance.x/4)+IR+4,BY(d.entrance.y/4),'#d6a8f0'); }
   for(const S of world.susp||[]){ const p=(u,v)=>S.dir==='h'?[BX(u),BY(v)]:[BX(v),BY(u)], c=S.a+S.w/2, a=p(S.r0,c), b=p(S.r1,c); ctx.save(); ctx.strokeStyle='#e0603f'; ctx.lineWidth=Math.max(2,z*2.5); ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();

@@ -37,7 +37,7 @@ function stepTruck(s,inp,dt){ if(typeof FX!=='undefined'&&FX.boom){ s.v=0; s.thr
   if(inp.hand) brk=Math.max(brk,1.4);
   s.throttle+= (thr-s.throttle)*Math.min(1,dt*3); s.brake=brk;
   // v14 wheel lock: a hard stamp on the brakes at speed locks the wheels -> long skid, little steering, trailer sway
-  if(s.mode==='D'&&brk>(typeof WX!=='undefined'&&WX.wet>0.5?0.8:0.92)&&Math.abs(s.v)>15) s.lockT=(s.lockT||0)+dt; else s.lockT=0;
+  if(s.mode==='D'&&brk>Math.min(0.99,(typeof WX!=='undefined'&&WX.wet>0.5?0.8:0.92)+((s.grip||1)-1)*0.4)&&Math.abs(s.v)>15) s.lockT=(s.lockT||0)+dt; else s.lockT=0;
   s.skid=(s.skid?brk>0.6:s.lockT>0.15)&&Math.abs(s.v)>3;
   // ----- surface
   const surf=surfaceAt(s); s.offroad=(surf===T.GRASS||surf===T.PGRASS||surf===T.SAND||surf===T.GRAVEL);
@@ -49,20 +49,20 @@ function stepTruck(s,inp,dt){ if(typeof FX!=='undefined'&&FX.boom){ s.v=0; s.thr
   let rpm = Math.max(IDLE+s.throttle*700*(coupled<IDLE+200?1:0), coupled);   // clutch slip at pull-away
   if(s.shiftT>0){ s.shiftT-=dt; rpm = s.rpm+(coupled-s.rpm)*Math.min(1,dt*6); }
   if(s.mode==='D' && s.shiftT<=0){
-    if(coupled>1850 && s.gear<8 && s.throttle>0.3){ s.gear++; s.shiftT=0.45; }
-    else if(coupled<1000 && s.gear>1 && (s.throttle>0.3||coupled<800)){ s.gear--; s.shiftT=0.3; }
+    if(coupled>1850 && s.gear<8 && s.throttle>0.3){ s.gear++; s.shiftT=0.45*(s.shiftM||1); }
+    else if(coupled<1000 && s.gear>1 && (s.throttle>0.3||coupled<800)){ s.gear--; s.shiftT=0.3*(s.shiftM||1); }
   }
   s.rpm += (Math.min(REDLINE,rpm)-s.rpm)*Math.min(1,dt*8);
   let F=0;
   if(s.shiftT<=0){
-    let tq=torqueAt(s.rpm)*s.throttle*(s.power||1); if(av>(s.vmax||VMAX) && dir>0) tq=0; if(s.mode==='R' && av>3.5) tq=0;
+    let tq=torqueAt(s.rpm)*s.throttle*(s.power||1)*(av<14?(s.accM||1):1); if(av>(s.vmax||VMAX) && dir>0) tq=0; if(s.mode==='R' && av>3.5) tq=0;
     F += dir*tq*ratio*FINAL*0.9/WHEEL_R;
-    if(s.throttle<0.05 && av>1) F -= Math.sign(s.v)*(250+0.35*s.rpm)*ratio*FINAL/WHEEL_R*0.6;   // engine braking
+    if(s.throttle<0.05 && av>1) F -= Math.sign(s.v)*(250+0.35*s.rpm)*ratio*FINAL/WHEEL_R*0.6*(s.ebr||1);   // engine braking (cz: exhaust/jake brake)
   }
   const roll=(s.offroad?0.06:0.008)*M*9.81, air=0.5*1.2*6.5*0.7*s.v*s.v;
   F -= Math.sign(s.v)*(roll+air);
   // brakes
-  const bF=(s.skid?(solo?0.42:0.36):s.brake*(solo?0.6:0.5))*M*9.81*(typeof WX!=='undefined'?WX.grip:1);
+  const bF=(s.skid?(solo?0.42:0.36)*(s.grip||1):s.brake*(solo?0.6:0.5)*(s.brk||1))*M*9.81*(typeof WX!=='undefined'?WX.grip:1);
   let a=F/M; let nv=s.v+a*dt;
   if(s.brake>0){ const dv=bF/M*dt; if(Math.abs(nv)<=dv) nv=0; else nv-=Math.sign(nv)*dv; }
   if(Math.abs(nv)<0.05 && s.throttle<0.05) nv=0;
@@ -71,14 +71,14 @@ function stepTruck(s,inp,dt){ if(typeof FX!=='undefined'&&FX.boom){ s.v=0; s.thr
   if(s.jkLimit && Math.abs(nv)>1.2) nv*=1-0.6*dt;   // scrub at jackknife limit, never below walking pace
   s.v=nv;
   // ----- steering with inertia and self-centring
-  const vabs=Math.abs(s.v), maxSteer=(solo?0.7:0.62)/(1+vabs*vabs/(solo?140:90)); const SR=solo?1.6:1;
+  const vabs=Math.abs(s.v), hg=(s.grip||1)*(s.hand||1), maxSteer=(solo?0.7:0.62)/(1+vabs*vabs/((solo?140:90)*hg)); const SR=(solo?1.6:1)*(s.hand||1);
   let target=(inp.left?-1:0)+(inp.right?1:0); if(target===0&&inp.padSteer) target=inp.padSteer;
   if(target!==0){ const tgt=target*maxSteer; const rate=(Math.sign(tgt-s.steer)!==Math.sign(s.steer)&&s.steer!==0)?2.2*SR:1.1*SR; s.steer+=Math.sign(tgt-s.steer)*Math.min(Math.abs(tgt-s.steer),rate*dt); }
   else { const rate=(1.0+vabs*0.12)*SR; s.steer-=Math.sign(s.steer)*Math.min(Math.abs(s.steer),rate*dt); }
   if(Math.abs(s.steer)>maxSteer) s.steer=Math.sign(s.steer)*maxSteer;
   // ----- kinematics (bicycle model) + trailer non-holonomic constraint
   const prev={x:s.x,y:s.y,h:s.h,th:s.th};
-  const om=s.v*Math.tan(s.steer)/CAB.wheelbase*(s.skid?0.22:1);
+  const om=s.v*Math.tan(s.steer)/CAB.wheelbase*(s.skid?0.22*(s.grip||1):1);
   const k0=kingpin(s);
   s.h+=om*dt; const f=fwd(s.h); s.x+=f[0]*s.v*dt; s.y+=f[1]*s.v*dt;
   const k1=kingpin(s);
@@ -86,7 +86,8 @@ function stepTruck(s,inp,dt){ if(typeof FX!=='undefined'&&FX.boom){ s.v=0; s.thr
   const ft=fwd(s.th); let ax=k0[0]-ft[0]*TRL.axle, ay=k0[1]-ft[1]*TRL.axle;
   const d=(k1[0]-k0[0])*ft[0]+(k1[1]-k0[1])*ft[1]; ax+=ft[0]*d; ay+=ft[1]*d;      // axle moves only along trailer heading
   s.th=Math.atan2(k1[0]-ax,-(k1[1]-ay));
-  if(s.skid){ const sv=Math.min(1,Math.abs(s.v)/20); s.th+=(Math.sin(timeS*4.3)*0.16+Math.sin(timeS*1.7)*0.08)*sv*dt; }
+  if(s.skid){ const sv=Math.min(1,Math.abs(s.v)/20); s.th+=(Math.sin(timeS*4.3)*0.16+Math.sin(timeS*1.7)*0.08)*sv*dt*Math.max(0.2,1-(s.jkM||0)); }
+  if(s.jkM&&s.v>8){ const rl=Math.atan2(Math.sin(s.h-s.th),Math.cos(s.h-s.th)); s.th+=rl*Math.min(1,s.jkM*dt*0.8); }   // cz: air suspension keeps the trailer in line at speed
   // max articulation ~87 deg: at the limit the cab pushes the trailer round (angle held) instead of freezing.
   // (old code halved reverse speed every frame here, which stalled the rig on full-lock reversing)
   let rel=Math.atan2(Math.sin(s.h-s.th),Math.cos(s.h-s.th)); const JK=1.52;

@@ -20,6 +20,7 @@ function padUpdate(dt){
   if(now.some(x=>x)||Math.abs(lx)+Math.abs(ly)>0.2||rt>0.05||lt>0.05){ if(!pad.active){ pad.active=true; padHud(); } pad.lastUse=timeS; }
   // ---- menus (job board, dealership, results, tier unlock)
   if(career.uiOpen||(typeof BREAKDOWN!=='undefined'&&BREAKDOWN.active&&document.getElementById('bdPanel'))){ input.padThr=input.padBrk=input.padSteer=0; if(pad.hb){ input.hand=false; pad.hb=false; }
+    if(career.uiOpen==='tune'&&typeof czPad==='function'&&czPad(g,hit,now,dt)) return;
     pad.navT-=dt; let dir=null; if(hit(12)) dir='u'; else if(hit(13)) dir='d'; else if(hit(14)) dir='l'; else if(hit(15)) dir='r';
     else if(pad.navT<=0&&(Math.abs(lx)>0.6||Math.abs(ly)>0.6)){ dir=Math.abs(lx)>Math.abs(ly)?(lx>0?'r':'l'):(ly>0?'d':'u'); pad.navT=0.22; }
     if(dir) padNav(dir);
@@ -47,7 +48,7 @@ function padUpdate(dt){
   if(!started){ if(hit(0)&&!isTyping(document.activeElement)) startGame(); return; }   // lobby: no game actions, A = play solo
   if(!started) return;
   if(hit(12)&&MP.on) mpToggleList();
-  if(hit(0)) toggleCouple(); if(hit(2)) toggleRefuel(); if(hit(3)) tryUnload();
+  if(hit(0)){ if(document.getElementById('czGo')&&typeof czOpen==='function') czOpen(); else toggleCouple(); } if(hit(2)) toggleRefuel(); if(hit(3)) tryUnload();
   if(hit(13)&&typeof hbToggle==='function') hbToggle(); if(hit(14)) indToggle(1); if(hit(15)) indToggle(2); if((hit(4)&&now[5])||(hit(5)&&now[4])){ hazToggle(); input.horn=false; }
   if(hit(8)) openMap(); if(hit(9)) openBoard(); if(hit(5)&&!now[4]&&NAV.route){ clearRoute(); flash('Route cancelled'); }
 }
