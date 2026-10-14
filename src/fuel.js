@@ -52,5 +52,6 @@ function drawPOIs(px,py,big,R){ const rr=R||(big?7:5.5);
   for(const g of world.garages) icon(px(g.x),py(g.y),'#e67e22','G');
   for(const m of world.malls||[]) icon(px(m.entrance.x),py(m.entrance.y),(career.active&&career.active.job.to===m)?'#ff3df0':'#d6336c','S');
   for(const d of world.dealers||[]) icon(px(d.entrance.x),py(d.entrance.y),'#8e44ad','$');
+  for(const y of world.forSale||[]) icon(px(y.entrance.x),py(y.entrance.y),(typeof ownedYard==='function'&&ownedYard(y))?ydBrand(y).col:'#f39c12','Y');
   ctx.textBaseline='alphabetic';
 }

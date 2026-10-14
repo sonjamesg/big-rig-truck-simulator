@@ -296,6 +296,7 @@ function drawBigMap(){
   navLine(m=>BX(m/4),m=>BY(m/4),4,'#ff3df0');
   drawPOIs(m=>BX(m/4),m=>BY(m/4),z>0.6,IR);
   mpDrawMap(m=>BX(m/4),m=>BY(m/4),true);
+  if(typeof ownMapLabels==='function') ownMapLabels(BX,BY,z,IR);
   if(z>1.2) for(const dp of world.depots) mapLabel(dp.name,BX(dp.entrance.x/4)+IR+4,BY(dp.entrance.y/4),'#8fc8ff',true);
   if(z>=4){ for(const f of world.fuel) mapLabel(f.name,BX(f.x/4)+IR+4,BY(f.y/4),'#9be7a8'); for(const g of world.garages) mapLabel(g.name,BX(g.x/4)+IR+4,BY(g.y/4),'#ffc58a'); for(const m of world.malls||[]) mapLabel(m.name,BX(m.entrance.x/4)+IR+4,BY(m.entrance.y/4),'#ff9cc0'); for(const d of world.dealers||[]) mapLabel(d.name,BX(d.entrance.x/4)+IR+4,BY(d.entrance.y/4),'#d6a8f0'); }
   for(const S of world.susp||[]){ const p=(u,v)=>S.dir==='h'?[BX(u),BY(v)]:[BX(v),BY(u)], c=S.a+S.w/2, a=p(S.r0,c), b=p(S.r1,c); ctx.save(); ctx.strokeStyle='#e0603f'; ctx.lineWidth=Math.max(2,z*2.5); ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke();
@@ -321,7 +322,7 @@ function drawBigMap(){
   // buttons
   ctx.textAlign='center'; ctx.textBaseline='middle'; MAPBTN.forEach(([t],i)=>{ const [bx,by,bw,bh]=mapBtnRect(i); ctx.fillStyle='rgba(12,18,28,0.85)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(bx,by,bw,bh,8):ctx.rect(bx,by,bw,bh); ctx.fill(); ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.lineWidth=1; ctx.stroke(); ctx.fillStyle='#fff'; ctx.font='bold 22px system-ui,sans-serif'; ctx.fillText(t,bx+bw/2,by+bh/2+1); });
   // legend
-  { if(bigmap.leg===undefined) bigmap.leg=!PORTRAIT_SQ; const items=[['#2e86de','D','Depot'],['#27ae60','F','Fuel'],['#e67e22','G','Garage'],['#d6336c','S','Mall / shop'],['#8e44ad','$','Dealer'],['#ffffff','R','Station'],['#ffdd33','\u25B2','Your lorry'],['#4fd1ff','~P','Passenger train'],['#ff9f1a','~F','Freight train']];
+  { if(bigmap.leg===undefined) bigmap.leg=!PORTRAIT_SQ; const items=[['#2e86de','D','Depot'],['#27ae60','F','Fuel'],['#e67e22','G','Garage'],['#d6336c','S','Mall / shop'],['#8e44ad','$','Dealer'],['#ffffff','R','Station'],['#ffdd33','\u25B2','Your lorry'],['#4fd1ff','~P','Passenger train'],['#ff9f1a','~F','Freight train'],['#f39c12','Y','Haulage yard'],['#d63b2f','H','Haulage truck']];
     const lx0=28, w=bigmap.leg?232:92, h=bigmap.leg?24+Math.ceil(items.length/2)*17+4:24, ly0=VH-28-h; LEG_BTN=[lx0,ly0,w,h];
     ctx.fillStyle='rgba(12,18,28,0.88)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(lx0,ly0,w,h,8):ctx.rect(lx0,ly0,w,h); ctx.fill(); ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1; ctx.stroke();
     ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.font='bold 11px system-ui,sans-serif'; ctx.fillStyle='#f5b82e'; ctx.fillText('LEGEND '+(bigmap.leg?'\u25BE':'\u25B8'),lx0+10,ly0+12);
