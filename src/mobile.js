@@ -64,7 +64,7 @@ body.touch #ui .mback{pointer-events:auto} body.touch.mapo #mob,body.touch.mapo 
 @media (max-height:460px){ #ui .mh{padding:8px 12px} #ui .bar{padding:6px 12px} #ui .stage .floor{height:150px} }
 `;
 function mobBtn(id,html,cls,k){ const b=document.createElement('div'); b.className='b '+(cls||''); b.id=id; b.innerHTML=html; document.getElementById('mob').appendChild(b);
-  const on=e=>{ e.preventDefault(); b.classList.add('on'); if(e.pointerType==='touch'&&typeof hapPress==='function') hapPress(id); if(audio.ctx&&audio.ctx.state==='suspended') audio.ctx.resume();
+  const on=e=>{ e.preventDefault(); b.classList.add('on'); if(e.pointerType!=='mouse'&&typeof hapPress==='function') hapPress(id); if(audio.ctx&&audio.ctx.state==='suspended') audio.ctx.resume();
       if(typeof k==='string'){ if(career.uiOpen&&MOB.nav[k]){ MOB.nav[k](); return; } input[k]=true; } else if(k) k(); },
     off=e=>{ e.preventDefault(); b.classList.remove('on'); if(typeof k==='string') input[k]=false; };
   b.addEventListener('pointerdown',on); b.addEventListener('pointerup',off); b.addEventListener('pointercancel',off); b.addEventListener('pointerleave',off); return b; }
