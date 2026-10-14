@@ -445,6 +445,10 @@ function dgBuild(P){ const L=P.legL, uF=L+1, R=Math.abs(P.tl2-P.tl1)/2, lo=Math.
       const q2=polyAt(P.lpath,gs), n=polyAt(P.lpath,gs+0.5), m=polyAt(P.lpath,gs-0.5), h=inner?Math.atan2(P.laneDir,0):Math.atan2(n[1]-m[1],n[0]-m[0]), rt=[-Math.sin(h),Math.cos(h)], bxc=(IN&&!inner?1.3:-1.3), clr=k=>{ const b=[q2[0]+rt[0]*k*1.6+Math.cos(h)*bxc,q2[1]+rt[1]*k*1.6+Math.sin(h)*bxc]; let m=1e9; for(let z=0;z<=P.lpath.len;z+=0.5){ const p=polyAt(P.lpath,z); m=Math.min(m,Math.hypot(p[0]-b[0],p[1]-b[1])); } for(let z=0;z<P.lLen;z+=0.5){ const p=loopPos(P,z); m=Math.min(m,Math.hypot(p[0]-b[0],p[1]-b[1])+0.3); } return m; }, sd=inner?-1:clr(1)>=clr(-1)?1:-1;   // booth on whichever side keeps clear of the lorry path
       P.gates.push({name:IN?'IN':'OUT',inner,s:gs,p:gs-P.lpre,pu:q2[0],pv:q2[1],h,a:0,want:0,lu:q2[0]+rt[0]*sd*1.3-Math.cos(h)*0.35,lv:q2[1]+rt[1]*sd*1.3-Math.sin(h)*0.35,sd}); }
     prev=q[0]; }
+  // junctions the gate lorry path crosses: the gate becomes a phase of that junction's signal cycle
+  P.jl=[]; if(world.junctions){ let cur=null; for(let z=0;z<=P.lpath.len;z+=0.2){ const q=polyAt(P.lpath,z), w=PL(P,q[0],q[1]); const J=world.junctions.find(J=>w[0]>J.x-0.3&&w[0]<J.x+J.w+0.3&&w[1]>J.y-0.3&&w[1]<J.y+J.h+0.3);
+      if(J&&(!cur||cur.J!==J)){ cur={J,s0:z,s1:z}; P.jl.push(cur); } else if(J&&cur) cur.s1=z; else cur=null; }
+    for(const L of P.jl){ L.out=P.gates.length>1&&L.s0>P.gates[1].s-0.5; L.gate=L.out?P.gates[1]:(P.gates[0].s>L.s1?P.gates[0]:null); if(L.out&&L.gate) L.gate.jl=L; } dgHookSig(); }
   // high-mast floodlights: yard ends, between the stacks, quay ends, beside each gate and along the outside of the fence
   const M=[[L+4.2,lo+1.4],[L+4.2,hi-1.4],[-2.2,lo+1.4],[-2.2,hi-1.4],[(P.blkU[0]+P.blkU[1])/2,(P.impV[0]>P.expV[1]?(P.impV[0]+P.expV[1]):(P.expV[0]+P.impV[1]))/2]];
   { const bu=(P.blkU[0]+P.blkU[1])/2, s0=Math.min(P.impV[0],P.expV[0]), s1=Math.max(P.impV[1],P.expV[1]); M.push([bu,s0-5],[bu,s1+5]); }
@@ -460,11 +464,19 @@ function dgDrawMasts(P){ const T_=TILE, K=typeof DN!=='undefined'?DN.dark:0; for
     ctx.fillStyle='#2f353a'; ctx.fillRect(x-12,y-5,24,10); ctx.fillStyle=K>0.05?'#fff4d6':'#dfe4e8'; for(const dx of [-8,-2.7,2.7,8]) ctx.fillRect(x+dx-2.2,y-3,4.4,6);   // lamp head (4 lanterns)
     ctx.restore(); if(K>0.05){ const w=PL(P,m.u,m.v); dnLight(w[0]*TILE,w[1]*TILE,7*TILE,'rgba(255,226,170,0.9)',0.6); } } }
 function dgUpdate(P,dt){ if(!P.gates) return; const pl=[[truck.x,truck.y]]; if(truck.trl) pl.push([truck.trl.x,truck.trl.y]);
+  for(const L of (P.jl||[])){ const J=L.J, a0=L.s0-P.lpre, a1=L.s1-P.lpre, gw=L.out&&L.gate?L.gate:null, w=PL(P,...polyAt(P.lpath,L.s0));
+    let need=P.lors.some(l=>gw?(l.p>gw.p-3&&l.p<a1+4.4):(l.p>a0-13&&l.p<a1+4.4));
+    if(gw&&!need) for(const q of pl) if(Math.hypot(q[0]/M_T-PL(P,gw.pu,gw.pv)[0],q[1]/M_T-PL(P,gw.pu,gw.pv)[1])<6.5) need=true;
+    if(need&&!J.pre) J.pre={ph:'amber',t:0,P}; if(!J.pre||J.pre.P!==P) continue; const R=J.pre; R.t+=dt;
+    if(R.ph==='amber'&&R.t>=SIG_AMBER){ R.ph='allred'; R.t=0; }
+    else if(R.ph==='allred'&&R.t>=SIG_ALLRED&&!dgBoxBusy(J)){ R.ph='gate'; R.t=0; }
+    else if(R.ph==='gate'&&!need&&R.t>2){ J.pre=null; } }
   for(const g of P.gates){ const w=PL(P,g.pu,g.pv); let want=P.lors.some(l=>l.p>g.p-2.9&&l.p<g.p+5&&(l.p>g.p-2.4||(l.mv||0)<0.3));   // lorry checks in at the stop line, then the arm lifts
     if(!want) for(const q of pl){ if(Math.hypot(q[0]/M_T-w[0],q[1]/M_T-w[1])<6.5) want=true; }
+    if(g.jl&&!(g.jl.J.pre&&g.jl.J.pre.ph==='gate'&&g.jl.J.pre.P===P)) want=false;   /* barrier only lifts on the gate's own signal phase */
     g.want=want; g.a=Math.max(0,Math.min(1,g.a+(want?1:-1)*dt/1.3)); } }
 // distance a gate lorry may still travel before the stop line of a closed gate ahead of it
-function dgStop(P,l){ let m=1e9; for(const g of (P.gates||[])){ const d=g.p-2.3-l.p; if(d>-0.5&&d<12&&g.a<0.97) m=Math.min(m,Math.max(0,d)); } return m; }
+function dgStop(P,l){ let m=1e9; for(const L of (P.jl||[])){ if(L.out) continue; const d=L.s0-P.lpre-1.7-l.p; if(d>-0.5&&d<14&&!(L.J.pre&&L.J.pre.ph==='gate'&&L.J.pre.P===P)) m=Math.min(m,Math.max(0,d)); } for(const g of (P.gates||[])){ const d=g.p-2.3-l.p; if(d>-0.5&&d<12&&g.a<0.97) m=Math.min(m,Math.max(0,d)); } return m; }
 function dgDrawFence(P){ const T_=TILE; if(!P.fence) return; const W=0.34*T_;
   const rect=(f,dx,dy,w)=>{ if(f.k==='s') ctx.fillRect(f.u*T_-w/2+dx,(f.v-0.5)*T_+dy,w,T_); else ctx.fillRect((f.u-0.5)*T_+dx,f.v*T_-w/2+dy,T_,w); };
   ctx.fillStyle='rgba(0,0,0,0.3)'; for(const f of P.fence) rect(f,5,5,W);              // shadow
@@ -491,3 +503,10 @@ function dgDrawGate(P,g){ const T_=TILE, c=Math.cos(g.h), sn=Math.sin(g.h), rt=[
 function dgLabel(P,g){ const rt=[-Math.sin(g.h),Math.cos(g.h)], w=PL(P,g.pu+rt[0]*g.sd*3.1,g.pv+rt[1]*g.sd*3.1); ctx.save(); ctx.translate(w[0]*TILE,w[1]*TILE);
   ctx.font='bold 13px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(-32,-9,64,18); ctx.fillStyle=g.name==='IN'?'#7dffa8':'#ffd36b'; ctx.fillText('GATE '+g.name,0,1); ctx.restore(); }
 function dgLamp(x,y,green,K){ const col=green?'46,230,110':'255,55,45', r=26; const gr=ctx.createRadialGradient(x,y,0,x,y,r); gr.addColorStop(0,'rgba('+col+','+(0.95*K)+')'); gr.addColorStop(1,'rgba('+col+',0)'); ctx.globalAlpha=1; ctx.fillStyle=gr; ctx.fillRect(x-r,y-r,2*r,2*r); }
+
+function dgBoxBusy(J){ const x0=J.x*M_T-0.5, y0=J.y*M_T-0.5, x1=(J.x+J.w)*M_T+0.5, y1=(J.y+J.h)*M_T+0.5, inn=(x,y)=>x>x0&&x<x1&&y>y0&&y<y1;
+  if(traffic.vs.some(o=>inn(o.x,o.y)||inn(o.x+fwd(o.h||0)[0]*(o.L||4.6)/2,o.y+fwd(o.h||0)[1]*(o.L||4.6)/2)||inn(o.x-fwd(o.h||0)[0]*(o.L||4.6)/2,o.y-fwd(o.h||0)[1]*(o.L||4.6)/2))) return true;
+  return inn(truck.x,truck.y)||(truck.trl&&inn(truck.trl.x,truck.trl.y)); }
+// gate pre-emption: while a junction is held for a dock gate every road movement shows amber then red (all-red clearance), the gate gets the green
+function dgHookSig(){ if(dgHookSig.done||typeof sigState!=='function') return; dgHookSig.done=1; const base=sigState;
+  sigState=function(J,key,mv){ const s0=base(J,key,mv), R=J&&J.pre; if(!R) return s0; if(R.ph==='amber') return s0==='g'||s0==='a'?'a':'r'; return 'r'; }; }
