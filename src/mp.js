@@ -6,7 +6,7 @@ function mpName(){ return (document.getElementById('lbName')||{}).value||localSt
 // ---- compact pose packet (array, ~110 bytes JSON) sent ~20 Hz on an unreliable/unordered channel, sender-timestamped
 // [ 'p', id, t_ms, x, y, h, v, model, colour, flags, gid|0, trlType, trlCol, trlLogo, trlTh, kx, ky ]
 const R2=v=>Math.round(v*100)/100, R3=v=>Math.round(v*1000)/1000;
-function mpGid(tr){ if((!tr.gid||tr.gid.startsWith('me:'))) tr.gid=(MP.myId||'me')+':'+tr.id; return tr.gid; }
+function mpGid(tr){ if((!tr.gid||tr.gid.startsWith('me:')||(tr.local&&!tr.gid.startsWith('L:')))) tr.gid=(tr.local?'L:':'')+(MP.myId||'me')+':'+tr.id; return tr.gid; }   // L: = a player's own job trailer (never collectable by others)
 function mpSelfPose(){ const s=truck, tr=s.trl; const ind=IND.side;
   const fl=((s.brake||0)>0.1?1:0)|(s.mode==='R'?2:0)|(ind<<2)|(input.hand?16:0)|(IND.haz?32:0)|(typeof HB!=='undefined'&&HB.on?64:0); const P=['p',MP.myId,Math.round(performance.now()),R2(s.x),R2(s.y),R3(s.h),R2(s.v),career.cur,(career.colors[career.cur]||'')+(typeof czCosStr==='function'?'~'+czCosStr():''),fl];
   if(tr){ const k=kingpin(s); P.push(mpGid(tr),tr.type,tr.col||'',tr.logo||'',R3(s.th),R2(k[0]),R2(k[1])); } else P.push(0); return P; }
@@ -34,9 +34,10 @@ function mpPose(m){ let p=MP.players[m[1]]; if(!p){ p=MP.players[m[1]]=mpNewPlay
   const b=p.buf; if(b.length&&m[2]<=b[b.length-1][2]){ if(b.some(q=>q[2]===m[2])) return; b.push(m); b.sort((a,c)=>a[2]-c[2]); } else b.push(m); if(b.length>24) b.shift();
   p.m=m[7]; p.c=m[8]; p.fl=m[9];
   if(m[2]>(p.newest||0)){ p.newest=m[2]; if(m[2]>(p.dropT||0)){ const gid=m[10]||0; if(gid!==p.held){ if(gid) mpHoldTrailer(gid,m[1]); p.held=gid; } if(gid) p.lastTr=[m[11],m[12],m[13]]; } } }
-function mpHoldTrailer(gid,peer){ for(const t of world.trailers) if(t.gid===gid&&t!==truck.trl){ t.coupled=true; t.heldBy=peer; if(t.bay){ t.bay.trailer=null; t.bay=null; } } }
+function mpHoldTrailer(gid,peer){ if(String(gid).startsWith('L:')) return; for(const t of world.trailers) if(t.gid===gid&&t!==truck.trl&&!t.local){ t.coupled=true; t.heldBy=peer; if(t.bay){ t.bay.trailer=null; t.bay=null; } } }
 // shared dropped trailers: everyone gets the same object at the same pose (late joiners via welcome.drops)
-function mpApplyDrop(d){ MP.drops[d.gid]={t:'drop',gid:d.gid,x:d.x,y:d.y,th:d.th,ty:d.ty,c:d.c,l:d.l,cargo:d.cargo}; let t=world.trailers.find(t=>t.gid===d.gid); if(t&&t===truck.trl) return;
+function mpApplyDrop(d){ if(String(d.gid||'').startsWith('L:')) return;   // other players' job trailers stay theirs
+ MP.drops[d.gid]={t:'drop',gid:d.gid,x:d.x,y:d.y,th:d.th,ty:d.ty,c:d.c,l:d.l,cargo:d.cargo}; let t=world.trailers.find(t=>t.gid===d.gid); if(t&&t===truck.trl) return;
   if(!t){ const ty=TRAILER_TYPES[d.ty]?d.ty:'box'; t=makeTrailer(ty,mulberry(7),{col:d.c||undefined,logo:d.l||undefined}); if(d.ty==='player'){ t.type='player'; t.typeName='Box van (Big Rig)'; } if(d.cargo) t.cargo=d.cargo; t.gid=d.gid; world.trailers.push(t); }
   t.x=d.x; t.y=d.y; t.th=d.th; t.coupled=false; t.heldBy=null; if(t.bay){ t.bay.trailer=null; t.bay=null; } }
 BigRig.on('uncouple',e=>{ if(!MP.on) return; const t=e.trailer; const d={t:'drop',id:MP.myId,ts:Math.round(performance.now()),gid:mpGid(t),x:R2(t.x),y:R2(t.y),th:R3(t.th),ty:t.type,c:t.col||'',l:t.logo||'',cargo:t.cargo}; MP.drops[d.gid]=d; mpSend(d); mpSend(mpSelfPose(),true); });
@@ -49,7 +50,7 @@ function mpKeepAlive(pr){ let n=0; const re=()=>{ if(MP.peer!==pr||pr.destroyed|
   pr.on('disconnected',()=>{ n=0; setTimeout(re,500); }); pr.on('open',()=>{ n=0; if(MP.host&&MP.on) mpStatus(''); }); }
 function mpWake(){ try{ if(navigator.wakeLock&&MP.host&&document.visibilityState==='visible') navigator.wakeLock.request('screen').then(l=>MP.wl=l).catch(()=>{}); }catch(e){} }
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState!=='visible'||!MP.peer) return; if(MP.peer.disconnected&&!MP.peer.destroyed){ try{ MP.peer.reconnect(); }catch(e){} } mpWake(); });
-function mpTagWorld(){ for(const t of world.trailers) if(!t.gid&&!t.coupled) t.gid=t.id; }
+function mpTagWorld(){ for(const t of world.trailers) if(!t.gid&&!t.coupled&&!t.local) t.gid=t.id; }
 function mpHost(){ mpReset(); MP.name=mpName(); mpTagWorld(); let code=null, tries=0; try{ const sv=JSON.parse(sessionStorage.getItem('bigrig.mphost')||'null'); if(sv&&Date.now()-sv.t<3*3600e3){ code=sv.c; tries=sv.n||0; } }catch(e){} if(!code||tries>6){ code=String(1000+((Math.random()*9000)|0)); tries=0; } try{ sessionStorage.setItem('bigrig.mphost',JSON.stringify({c:code,t:Date.now(),n:tries})); }catch(e){} MP.code='TRUCK-'+code; mpStatus('Opening room '+MP.code+'\u2026');
   const pr=MP.peer=mpNewPeer(MP_PREFIX+code.toLowerCase()); MP.host=true; mpKeepAlive(pr);
   pr.on('open',id=>{ MP.myId=id; MP.on=true; mpStatus(''); mpLobbyHosted(); mpWake(); try{ sessionStorage.setItem('bigrig.mphost',JSON.stringify({c:code,t:Date.now(),n:0})); }catch(e){} BigRig.emit('mpHosting',{code:MP.code}); });

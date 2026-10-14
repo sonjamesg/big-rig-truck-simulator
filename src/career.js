@@ -21,6 +21,15 @@ const CARGOS=[
   {id:'fuel', name:'Forecourt diesel',     icon:'\u26FD',   trl:'tank',   kg:[20000,26000],mult:1.70,tier:3,col:'#455a64'},
   {id:'steel',name:'Shop-fit steelwork',   icon:'\u{1F3D7}',trl:'flat',   kg:[18000,26000],mult:1.60,tier:3,col:'#5d4037'},
   {id:'lux',  name:'Luxury goods',         icon:'\u{1F48E}',trl:'box',    kg:[3000,6000],  mult:1.95,tier:3,col:'#ad1457'},
+  {id:'bake', name:'Bakery & bread',       icon:'\u{1F35E}',trl:'box',    kg:[4000,8000],  mult:1.05,tier:1,col:'#d4a056'},
+  {id:'diy',  name:'DIY & garden centre',  icon:'\u{1FAB4}',trl:'curtain',kg:[9000,16000], mult:1.00,tier:1,col:'#558b2f'},
+  {id:'parc', name:'Parcels & post',       icon:'\u{1F4EE}',trl:'box',    kg:[3000,7000],  mult:1.15,tier:1,col:'#b71c1c'},
+  {id:'ret',  name:'Store returns & cages',icon:'\u{1F501}',trl:'curtain',kg:[3000,6000],  mult:0.95,tier:1,col:'#607d8b',ret:true},
+  {id:'dairy',name:'Milk & dairy',         icon:'\u{1F95B}',trl:'fridge', kg:[12000,18000],mult:1.25,tier:2,col:'#90caf9'},
+  {id:'paper',name:'Paper & print',        icon:'\u{1F4F0}',trl:'curtain',kg:[14000,20000],mult:1.10,tier:2,col:'#795548'},
+  {id:'wood', name:'Timber & sheet board', icon:'\u{1FAB5}',trl:'flat',   kg:[16000,24000],mult:1.45,tier:3,col:'#8d6e63'},
+  {id:'mach', name:'Plant machinery',      icon:'\u{1F69C}',trl:'flat',   kg:[15000,25000],mult:1.75,tier:3,col:'#f9a825'},
+  {id:'gas',  name:'LPG cylinders (ADR)',  icon:'\u{1F525}',trl:'tank',   kg:[16000,22000],mult:2.05,tier:4,col:'#e65100'},
   {id:'chem', name:'Pool chemicals (ADR)', icon:'\u2623',   trl:'tank',   kg:[18000,24000],mult:2.20,tier:4,col:'#f9a825'}];
 const TRUCK_MODELS=[
   {id:'rigger',  name:'Rigger Classic 360', price:0,     hp:360,power:1.00,vmax:25.0,tank:400,econ:1.00,style:{roof:'std'},                              cols:['#d63b2f','#2471a3','#f4f4f4','#1e8449','#f1c40f'],blurb:'The trusty cab you started with.'},
@@ -72,10 +81,10 @@ const modelById=id=>TRUCK_MODELS.find(m=>m.id===id)||TRUCK_MODELS[0];
 function applyModel(id,col){ const m=modelById(id); col=col||career.colors[id]||m.cols[0]; career.cur=m.id; career.colors[m.id]=col;
   CABART=modelArt(m,col); CABSH=silhouette(CABART); truck.power=m.power; truck.vmax=m.vmax; truck.econ=m.econ; truck.tank=m.tank; truck.model=m.id; if(truck.fuel>truck.tank) truck.fuel=truck.tank; if(typeof czApply==='function') czApply(); }
 // ---------- save / load
-function jobSer(j){ return {id:j.id,cargo:j.cargo.name,tier:j.tier,from:world.depots.indexOf(j.from),to:world.malls.indexOf(j.to),km:j.km,kg:j.kg,weight:j.weight,trailerType:j.trailerType,pay:j.pay,xp:j.xp,mins:j.mins,approx:j.approx}; }
-function jobDe(o){ const c=CARGOS.find(c=>c.name===o.cargo), from=world.depots[o.from], to=world.malls[o.to]; if(!c||!from||!to) return null; return Object.assign({},o,{cargo:c,from,to}); }
+function jobSer(j){ return {band:j.band,repeat:j.repeat,id:j.id,cargo:j.cargo.name,tier:j.tier,from:jobRef(j.from),to:jobRef(j.to),km:j.km,kg:j.kg,weight:j.weight,trailerType:j.trailerType,pay:j.pay,xp:j.xp,mins:j.mins,approx:j.approx}; }
+function jobDe(o){ const c=CARGOS.find(c=>c.name===o.cargo), from=typeof o.from==='number'?world.depots[o.from]:jobObj(o.from), to=typeof o.to==='number'?world.malls[o.to]:jobObj(o.to); if(!c||!from||!to) return null; return Object.assign({},o,{cargo:c,from,to}); }
 function saveGame(){ try{ if(!world.ready) return false; const tr=truck.trl, a=career.active; const d={v:8,name:localStorage.getItem('bigrig.name')||'',money:truck.money,fuel:truck.fuel,damage:truck.damage,xp:career.xp,tier:career.tier,owned:career.owned,cur:career.cur,colors:career.colors,tune:career.tune||{},done:career.done,earned:career.earned,boardSeq:career.boardSeq,
-    pos:{x:truck.x,y:truck.y,h:truck.h}, gameT, gameDay, wx:{st:WX.st,t:WX.timer,wet:WX.wet}, settings:SETTINGS, hb:!!(typeof HB!=='undefined'&&HB.on), own:typeof ownSave==='function'?ownSave():null, jobs:career.jobs.filter(j=>!j.taken).map(jobSer),
+    pos:{x:truck.x,y:truck.y,h:truck.h}, gameT, gameDay, wx:{st:WX.st,t:WX.timer,wet:WX.wet}, settings:SETTINGS, hb:!!(typeof HB!=='undefined'&&HB.on), own:typeof ownSave==='function'?ownSave():null, hist:career.hist||[], jobs:career.jobs.filter(j=>!j.taken).map(jobSer),
     active:a?{job:jobSer(a.job),phase:a.phase==='unloading'?'deliver':a.phase,bay:a.job.to.bays.indexOf(a.bay),trl:a.phase==='recouple'?{x:a.trailer.x,y:a.trailer.y,th:a.trailer.th,type:a.trailer.type,col:a.trailer.col,logo:a.trailer.logo,cargo:a.trailer.cargo,cargoKg:a.trailer.cargoKg,weight:a.trailer.weight}:null,el:timeS-a.t0}:null,
     trailer:tr?{type:tr.type,col:tr.col,logo:tr.logo,cargo:tr.cargo,cargoKg:tr.cargoKg,weight:tr.weight,typeName:tr.typeName,job:tr.job||null}:null, t:Date.now()};
     localStorage.setItem(saveKey(),JSON.stringify(d)); career.lastSave=timeS; return true; }catch(e){ console.warn('save failed',e); return false; } }
@@ -91,7 +100,7 @@ function loadGame(){ const d=hasSave(); if(!d) return false;
     else { let best=null,bd=1e18; for(const dp of world.depots){ const q=Math.hypot(dp.entrance.x-d.pos.x,dp.entrance.y-d.pos.y); if(q<bd&&dp.bays.length){ bd=q; best=dp; } } const p=best&&ftSpot(best); if(p){ truck.x=p.x; truck.y=p.y; truck.h=truck.th=p.h; career.posFallback=best.name; } } }
   if(truck.trl){ const f=fwd(truck.h); const k=kingpin(truck); truck.trl.th=truck.h; if(k){ truck.trl.x=k[0]; truck.trl.y=k[1]; } }
   cam.x=truck.x*PPM; cam.y=truck.y*PPM;
-  if(Array.isArray(d.jobs)) career.jobs=d.jobs.map(jobDe).filter(Boolean);
+  career.hist=Array.isArray(d.hist)?d.hist:[]; if(Array.isArray(d.jobs)) career.jobs=d.jobs.map(jobDe).filter(Boolean);
   if(d.active){ const j=jobDe(d.active.job); if(j){ try{
     if(d.active.phase==='pickup'){ career.jobs.unshift(j); acceptJob(j); }
     else { const bay=j.to.bays[d.active.bay]||j.to.bays[0]; bay.assigned=true; j.taken=true; let tr=null;
@@ -102,16 +111,37 @@ function loadGame(){ const d=hasSave(); if(!d) return false;
 function resetGame(){ if(typeof ACC!=='undefined'&&ACC.tok){ if(typeof toast==='function') toast('Signed in \u2022 your progress is safe in your account'); return; } try{ career.noSave=1; localStorage.removeItem(saveKey()); if(!world.v2poi) localStorage.removeItem(SAVE_KEY_OLD); }catch(e){} location.reload(); }
 // ---------- jobs
 const R7=mulberry((Date.now()%1e9)|0);
-function pickupsFor(c){ if(c.dock){ const p=world.depots.filter(d=>d.code==='APT'&&d.bays.length); if(p.length) return p; } const ds=world.depots.filter(d=>d.bays.length); const pref=c.trl==='cont'?ds.filter(d=>/Docks|Harbour|Freight/.test(d.name)):c.trl==='tank'?ds.filter(d=>/Quarry|Mine|Logistics|Harbour/.test(d.name)):c.trl==='fridge'?ds.filter(d=>/Agri|Farm|Distribution|Air/.test(d.name)):ds; return pref.length?pref:ds; }
-function makeJob(tierWanted){ const tier=Math.max(1,Math.min(TIERS.length,tierWanted)); const cs=CARGOS.filter(c=>c.tier===tier); const c=cs[(R7()*cs.length)|0]; const T_=tierInfo(tier);
-  for(let tries=0;tries<40;tries++){ const pk=pickupsFor(c), from=pk[(R7()*pk.length)|0], dl=c.dock?world.depots.filter(d=>d!==from&&d.bays.length&&d.code!=='APT'):world.malls, to=dl[(R7()*dl.length)|0]; if(!from||!to) return null;
-    const km=Math.hypot(to.entrance.x-from.entrance.x,to.entrance.y-from.entrance.y)*1.3/1000; if(km<1.0||km>T_.maxKm||(tier>1&&km<(tier-1)*2.2)) continue;
+function pickupsFor(c){ if(c.ret) return (world.malls||[]).filter(m=>m.bays&&m.bays.length); if(c.dock){ const p=world.depots.filter(d=>d.code==='APT'&&d.bays.length); if(p.length) return p; } const ds=world.depots.filter(d=>d.bays.length); const pref=c.trl==='cont'?ds.filter(d=>/Docks|Harbour|Freight/.test(d.name)):c.trl==='tank'?ds.filter(d=>/Quarry|Mine|Logistics|Harbour/.test(d.name)):c.trl==='fridge'?ds.filter(d=>/Agri|Farm|Distribution|Air/.test(d.name)):ds; return pref.length?pref:ds; }
+function dropsFor(c,from){ const D=world.depots.filter(d=>d!==from&&d.bays.length&&d.code!=='APT'); if(c.dock||c.ret) return D; const M=(world.malls||[]).filter(m=>m!==from&&m.bays&&m.bays.length); return c.trl==='flat'||c.trl==='tank'?M.concat(D.filter(d=>!/Port|Harbour|Docks/.test(d.name))):M.concat(D.filter((d,i)=>i%3===0)); }
+// v32 job mix: early career = short local runs around the start depot; later a spread of local / regional / long haul (pays clearly more)
+const JOB_LOCAL_KM=3.2;
+function jobHome(){ const d=world.depots.find(d=>d.code==='HQ')||world.depots[0]; return d.entrance; }
+function jobEarly(){ return (career.done||0)<6&&levelOf(career.xp||0)<=3; }
+function jobPay(km,c,T_,kg,band){ const base=(240+175*km)*c.mult*T_.payMult*(0.85+kg/60000); return Math.round(base*(band==='long'?1.35+Math.min(0.4,km/60):1)/10)*10; }
+function makeJob(tierWanted,band){ const tier=Math.max(1,Math.min(TIERS.length,tierWanted)); const cs=CARGOS.filter(c=>c.tier===tier&&(band!=='local'||!c.dock)); const c=cs[(R7()*cs.length)|0]; const T_=tierInfo(tier); const H=jobHome();
+  band=band||'med';
+  for(let tries=0;tries<60;tries++){ let pk=pickupsFor(c); if(band==='local') pk=pk.filter(d=>Math.hypot(d.entrance.x-H.x,d.entrance.y-H.y)<JOB_LOCAL_KM*1000); const from=pk[(R7()*pk.length)|0]; if(!from) return null;
+    let dl=dropsFor(c,from); if(band==='local') dl=dl.filter(d=>Math.hypot(d.entrance.x-H.x,d.entrance.y-H.y)<JOB_LOCAL_KM*1000); const to=dl[(R7()*dl.length)|0]; if(!to) continue;
+    const km=Math.hypot(to.entrance.x-from.entrance.x,to.entrance.y-from.entrance.y)*1.3/1000;
+    if(band==='local'){ if(km<0.6||km>4.5) continue; } else if(band==='long'){ if(km<7) continue; } else { if(km<1.0||km>T_.maxKm||km>=7||(tier>1&&km<(tier-1)*2.2)) continue; }
     const kg=Math.round((c.kg[0]+R7()*(c.kg[1]-c.kg[0]))/100)*100, TT=TRAILER_TYPES[c.trl];
-    const pay=Math.round((240+175*km)*c.mult*T_.payMult*(0.85+kg/60000)/10)*10, xp=Math.round((55+38*km)*c.mult*(0.8+tier*0.35));
-    return {id:'J'+(career.boardSeq++),cargo:c,tier,from,to,km,kg,weight:kg+TT.tare,trailerType:TT.name,pay,xp,mins:Math.round(km/42*60+3),approx:true,fresh:true}; }
+    const pay=jobPay(km,c,T_,kg,band), xp=Math.round((55+38*km)*c.mult*(0.8+tier*0.35)*(band==='long'?1.2:1));
+    return {id:'J'+(career.boardSeq++),cargo:c,tier,from,to,km,kg,weight:kg+TT.tare,trailerType:TT.name,pay,xp,mins:Math.round(km/42*60+3),approx:true,fresh:true,band}; }
   return null; }
-function fillBoard(){ const want=9; career.jobs=career.jobs.filter(j=>!j.taken); if(typeof portBoardJobs==='function'&&!career.jobs.some(j=>j.portBoard)) for(const j of portBoardJobs()) career.jobs.push(j); const top=Math.min(TIERS.length,career.tier+1);
-  while(career.jobs.length<want){ const nLocked=career.jobs.filter(j=>j.tier>career.tier).length; let t; if(career.tier<TIERS.length&&nLocked<2) t=top; else t=1+((R7()*career.tier)|0); const j=makeJob(t); if(j) career.jobs.push(j); else break; } }
+// repeatable routes: every completed job is remembered and comes back on the board (Repeat tag, +/-8% pay)
+function jobRef(o){ let i=world.depots.indexOf(o); if(i>=0) return 'd'+i; i=(world.malls||[]).indexOf(o); return i>=0?'m'+i:null; }
+function jobObj(r){ if(typeof r==='number') return null; if(!r) return null; const L=r[0]==='d'?world.depots:world.malls; return L&&L[+r.slice(1)]||null; }
+function makeRepeat(){ const H=(career.hist||[]).filter(h=>{ const c=CARGOS.find(c=>c.id===h.c); return c&&c.tier<=career.tier&&!career.jobs.some(j=>j.cargo.id===h.c&&jobRef(j.from)===h.f&&jobRef(j.to)===h.t); }); if(!H.length) return null;
+  const h=H[(R7()*H.length)|0], c=CARGOS.find(c=>c.id===h.c), from=jobObj(h.f), to=jobObj(h.t); if(!from||!to) return null; const T_=tierInfo(c.tier);
+  const km=Math.hypot(to.entrance.x-from.entrance.x,to.entrance.y-from.entrance.y)*1.3/1000, kg=Math.round((c.kg[0]+R7()*(c.kg[1]-c.kg[0]))/100)*100, TT=TRAILER_TYPES[c.trl];
+  const pay=Math.round(jobPay(km,c,T_,kg,h.b)*(0.92+R7()*0.16)/10)*10, xp=Math.round((55+38*km)*c.mult*(0.8+c.tier*0.35)*(h.b==='long'?1.2:1));
+  return {id:'J'+(career.boardSeq++),cargo:c,tier:c.tier,from,to,km,kg,weight:kg+TT.tare,trailerType:TT.name,pay,xp,mins:Math.round(km/42*60+3),approx:true,fresh:true,band:h.b||'med',repeat:(h.n||1)}; }
+function fillBoard(){ const want=10; career.jobs=career.jobs.filter(j=>!j.taken); if(typeof portBoardJobs==='function'&&!career.jobs.some(j=>j.portBoard)){ const ear=jobEarly(); let n=0; for(const j of portBoardJobs()){ if(n>=2||(ear&&(j.km>4.5||Math.hypot(j.from.entrance.x-jobHome().x,j.from.entrance.y-jobHome().y)>JOB_LOCAL_KM*1000))) continue; if(!ear&&j.km>=7){ j.band='long'; j.pay=Math.round(j.pay*1.35/10)*10; } career.jobs.push(j); n++; } } const top=Math.min(TIERS.length,career.tier+1);
+  const early=jobEarly(), cnt=b=>career.jobs.filter(j=>j.band===b).length; let guard=0;
+  if(!early&&(career.hist||[]).length) for(let k=0;k<2&&career.jobs.filter(j=>j.repeat).length<2&&career.jobs.length<want;k++){ const j=makeRepeat(); if(j) career.jobs.push(j); }
+  while(career.jobs.length<want&&guard++<40){ const nLocked=career.jobs.filter(j=>j.tier>career.tier).length; let t; if(career.tier<TIERS.length&&nLocked<2&&!early) t=top; else t=1+((R7()*career.tier)|0);
+    const band=early?'local':cnt('local')<2?'local':cnt('long')<3?'long':'med'; const j=makeJob(t,band)||(band!=='med'?makeJob(t,'med'):null); if(j) career.jobs.push(j); }
+  if(early&&(career.hist||[]).length) { const j=makeRepeat(); if(j&&Math.hypot(j.from.entrance.x-jobHome().x,j.from.entrance.y-jobHome().y)<JOB_LOCAL_KM*1000){ career.jobs.push(j); } } }
 function refreshBoard(keep){ if(!keep) career.jobs=[]; fillBoard(); if(career.uiOpen==='board') renderBoard(); }
 function jobRoute(j){ if(j.path!==undefined) return j.path; const a=navSnap(j.from.entrance.x/M_T,j.from.entrance.y/M_T,70), b=navSnap(j.to.entrance.x/M_T,j.to.entrance.y/M_T,70);
   const p=(a&&b)?navAStar(a[0],a[1],b[0],b[1]):null; j.path=p; if(p){ let L=0; for(let k=1;k<p.length;k++){ const i0=p[k-1],i1=p[k]; L+=Math.hypot((i1%MW)-(i0%MW),((i1/MW)|0)-((i0/MW)|0))*M_T; } const km=L/1000, c=j.cargo, T_=tierInfo(j.tier);
@@ -119,7 +149,7 @@ function jobRoute(j){ if(j.path!==undefined) return j.path; const a=navSnap(j.fr
 function acceptJob(j){ if(j.tier>career.tier) return false; if(career.active) abandonJob(true);
   const dp=j.from, BAYS=j.pickBays||dp.bays; let bay=BAYS.find(b=>!b.trailer&&!b.target);
   if(!bay){ bay=BAYS[(R7()*BAYS.length)|0]; const old=bay.trailer; if(old){ const i=world.trailers.indexOf(old); if(i>=0) world.trailers.splice(i,1); bay.trailer=null; } }
-  const c=j.cargo, tr=makeTrailer(c.trl,R7,{cargo:c.name,cargoKg:j.kg,weight:j.weight,reqLevel:j.tier,target:true,job:j.id});
+  const c=j.cargo, tr=makeTrailer(c.trl,R7,{cargo:c.name,cargoKg:j.kg,weight:j.weight,reqLevel:j.tier,target:true,job:j.id}); tr.local=true;   // MP: job trailers are per-player, never shared
   tr.x=bay.kx; tr.y=bay.ky; tr.th=bay.th; tr.bay=bay; tr.depot=dp; bay.trailer=tr; bay.target=true; world.trailers.push(tr);
   const free=j.to.bays.filter(b=>!b.assigned&&!b.parked&&!b.trailer); const mb=(free.length?free:j.to.bays)[(R7()*(free.length||j.to.bays.length))|0]; mb.assigned=true;
   career.active={job:j,trailer:tr,pickBay:bay,bay:mb,phase:'pickup',t0:timeS,dmg0:truck.damage}; j.taken=true;
@@ -144,7 +174,7 @@ function finishJob(){ const a=career.active, j=a.job; const dmg=Math.max(0,truck
   if(dmg<0.5) lines.push(['No-damage bonus (+12%)',Math.round(base*0.12)]); else lines.push(['Damage penalty ('+dmg.toFixed(0)+'%)',-Math.round(base*Math.min(0.6,dmg*0.03))]);
   if(took<=j.mins*1.15) lines.push(['On-time bonus (+10%)',Math.round(base*0.10)]);
   const total=lines.reduce((s,l)=>s+l[1],0), xp=j.xp+(dmg<0.5?Math.round(j.xp*0.15):0);
-  truck.money+=total; career.done++; career.earned+=total; a.bay.assigned=false; a.bay.doorT=0;
+  truck.money+=total; career.done++; { const H=career.hist=career.hist||[], f=jobRef(j.from), tt=jobRef(j.to), o=H.find(h=>h.c===j.cargo.id&&h.f===f&&h.t===tt); if(o) o.n=(o.n||1)+1; else if(f&&tt){ H.push({c:j.cargo.id,f,t:tt,b:j.band||'med',n:1}); if(H.length>40) H.shift(); } } career.earned+=total; a.bay.assigned=false; a.bay.doorT=0;
   const tr=a.trailer; tr.cargo='Empty'; tr.cargoKg=0; tr.weight=tr.tareKg; tr.job=null;
   career.active=null; career.jobs=career.jobs.filter(x=>x!==j); fillBoard(); clearRoute();
   BigRig.emit('jobComplete',{job:j,total,xp,lines}); const res={job:j,total,xp,lines,tierBefore:career.tier}; showResult(res, a.bay); addXP(xp); saveGame(); }
