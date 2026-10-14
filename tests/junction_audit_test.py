@@ -40,7 +40,7 @@ SOAK=r"""((cx,cy,R)=>{ const B=__bigrig, tk=B.truck; tk.x=cx*M_T; tk.y=cy*M_T; t
     for(let i=0;i<vs.length;i++) for(let j=i+1;j<vs.length;j++){ const a=vs[i],b=vs[j]; if(a.ghostT>0||b.ghostT>0||(a.layer|0)!==(b.layer|0)||Math.hypot(a.x-b.x,a.y-b.y)>30) continue; if(hit(corners(a),corners(b))){ const k=Math.min(a.id,b.id)+'-'+Math.max(a.id,b.id); if(!T.coll.has(k)){ T.coll.add(k); const d=o=>({hist:(T.hist.get(o.id)||[]).slice(-12),age:+(timeS-o.born).toFixed(1),lead:o.lead&&o.lead.id,mk:o.mk.map(m=>m.kind+':'+(m.d!==undefined?(m.d-o.s).toFixed(0):(m.d0-o.s).toFixed(0))).join(' '),id:o.id,k:o.kind,h:+(o.h||0).toFixed(2),v:+o.v.toFixed(1),seg:o.plan&&o.plan.seg,lane:o.plan&&o.plan.lane,trl:!!o.trl,ring:o.ring&&o.ring.id}); T.pairs.push({at:[a.x/M_T|0,a.y/M_T|0],a:d(a),b:d(b)}); } } }
     if(vs.length<12 && Math.random()<0.5){ const segs=B.world.segs.filter(s=>s.dir==='h'?(Math.abs(s.a-cy)<R&&s.b0<cx+R&&s.b1>cx-R):(Math.abs(s.a-cx)<R&&s.b0<cy+R&&s.b1>cy-R)); if(segs.length){ const sg=segs[(Math.random()*segs.length)|0], c=sg.dir==='h'?cx:cy, al=Math.max(sg.b0+1,Math.min(sg.b1-1,c+(Math.random()*2-1)*R*0.8)), dir=Math.random()<0.5?1:-1;
       if(!sg.js.some(j=>{ const [a,b]=jRange(sg,j); return al>a-3&&al<b+3; })){ const x=sg.dir==='h'?al:sg.a+sg.w/2, y=sg.dir==='h'?sg.a+sg.w/2:al; try{ B.spawnVehicle(x*M_T,y*M_T,true,{seg:sg.id,along:al,dir}); }catch(e){} } } } },250); })"""
-STOP="""(()=>{ clearInterval(window.__jaI); const T=window.__jaT; return {seen:T.seen.size,stuck:T.why,coll:T.pairs,recov:(__bigrig.traffic.recovers||0)-T.rec0}; })()"""
+STOP="""(()=>{ clearInterval(window.__jaI); const T=window.__jaT; return {nvs:__bigrig.traffic.vs.length,fps:+(__bigrig.fps||0).toFixed(0),seen:T.seen.size,stuck:T.why,coll:T.pairs,recov:(__bigrig.traffic.recovers||0)-T.rec0}; })()"""
 async def main():
   async with async_playwright() as p:
     b=await p.chromium.launch(executable_path='/usr/bin/google-chrome'); pg=await b.new_page(viewport={'width':900,'height':700}); errs=[]
@@ -64,11 +64,12 @@ async def main():
       if c: c[2].append(n)
       else: cl.append([x,y,[n]])
     print('CLUSTERS',len(cl),flush=True); dyn=[]; thin=0; seen=0
-    for x,y,names in cl:
+    skip=int(os.environ.get('SKIP',0))   # resume a long soak after cluster N
+    for x,y,names in cl[skip:skip+int(os.environ.get('LIMIT',10**6))]:
       if SECS<=0: break
       slow=os.environ.get('SLOW','').split(','); t=max(SECS,float(os.environ.get('SLOW_SECS',60))) if any(n in slow for n in names) else SECS
       await pg.evaluate(SOAK+f"({x},{y},40)"); await pg.wait_for_timeout(int(t*1000)); r=await pg.evaluate(STOP); seen+=r['seen']; thin+=r['seen']<3
-      print('  progress',cl.index([x,y,names])+1,'/',len(cl),names[0],'secs',t,'seen',r['seen'],flush=True)
+      print('  progress',cl.index([x,y,names])+1,'/',len(cl),names[0],'secs',t,'seen',r['seen'],'vs',r.get('nvs'),'fps',r.get('fps'),flush=True)
       if os.environ.get('V'): print('  ',names[:4],json.dumps(r),flush=True)
       if r['stuck'] or r['coll']: dyn.append({'at':[x,y],'names':names,**r}); print('  DYN',json.dumps(dyn[-1]),flush=True)
     await b.close()
