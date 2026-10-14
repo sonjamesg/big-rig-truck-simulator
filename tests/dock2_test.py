@@ -42,8 +42,14 @@ async def main():
       b0=await pg.evaluate(f"(()=>{{ const P=portList()[{pi}]; const b=portPickBays(P)[0]; if(!b) return null; const t=__bigrig.truck; t.x=b.kx+25; t.y=b.ky+10; return [b.kx,b.ky]; }})()")
       if not b0: out['fail'].append(f'no pickup bays port {pi}')
       await pg.wait_for_timeout(1200); await pg.evaluate('typeof closeUI==="function"&&closeUI()'); await pg.wait_for_timeout(400); await pg.screenshot(path=f'{PRE}_p{pi}_pickbays.png')
-      # player in the lorry path just inside the gate: lorries must stop short
-      await pg.evaluate(f"(()=>{{ const P=portList()[{pi}]; const ls=P.lors.filter(l=>l.p<P.laneLen-30).sort((a,b)=>b.p-a.p); const pp=ls.length?ls[0].p+14:10; const q=polyAt(P.lpath,P.lpre+pp), w=PL(P,q[0],q[1]); const t=__bigrig.truck; t.x=w[0]*M_T; t.y=w[1]*M_T; t.v=0; }})()")
+      # deterministic: insert a test lorry with a clear 30+ tile stretch behind the queue and park the player 14 tiles ahead of it on its path
+      await pg.evaluate(f"(()=>{{ const t=__bigrig.truck; const P=portList()[{pi}]; const w=PL(P,P.legL-4,P.impC); t.x=w[0]*M_T; t.y=w[1]*M_T; }})()")
+      placed=0
+      for k in range(40):
+        placed=await pg.evaluate(f"(()=>{{ const P=portList()[{pi}]; const mn=Math.min(P.laneLen,...P.lors.map(l=>l.p)); const x=Math.max(-P.lpre+2,mn-40); if(mn-x<30) return 0; const l={{p:x,box:'#2e86c1',kind:'exp',w:0,still:0,col:'#f4f6f7',test:1}}; P.lors.push(l); P.ex=Math.min(P.ex,2); const q=polyAt(P.lpath,P.lpre+x+14), w=PL(P,q[0],q[1]); const t=__bigrig.truck; t.x=w[0]*M_T; t.y=w[1]*M_T; t.v=0; return 1; }})()")
+        if placed: break
+        await pg.wait_for_timeout(1500)
+      if not placed: out['fail'].append(f'no moving gate lorry to test against at port {pi}')
       md=1e9; ys=0
       for k in range(12):
         await pg.wait_for_timeout(1500)
