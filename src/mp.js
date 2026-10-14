@@ -12,7 +12,7 @@ function mpSelfPose(){ const s=truck, tr=s.trl; const ind=IND.side;
   if(tr){ const k=kingpin(s); P.push(mpGid(tr),tr.type,tr.col||'',tr.logo||'',R3(s.th),R2(k[0]),R2(k[1])); } else P.push(0); return P; }
 // ---------- network
 function mpSendAll(msg,except,pose){ const d=JSON.stringify(msg); for(const id in MP.conns){ if(id===except) continue; const c=(pose&&MP.pconns[id]&&MP.pconns[id].open)?MP.pconns[id]:MP.conns[id]; if(c&&c.open) try{ c.send(d); }catch(e){} } }
-function mpSend(msg,pose){ if(MP.host) mpSendAll(msg,null,pose); else { const c=(pose&&MP.poseConn&&MP.poseConn.open)?MP.poseConn:MP.hostConn; if(c&&c.open) try{ c.send(JSON.stringify(msg)); }catch(e){} } }
+function mpSend(msg,pose){ if(MP.srv){ srvSend(msg,pose); return; } if(MP.host) mpSendAll(msg,null,pose); else { const c=(pose&&MP.poseConn&&MP.poseConn.open)?MP.poseConn:MP.hostConn; if(c&&c.open) try{ c.send(JSON.stringify(msg)); }catch(e){} } }
 function mpRoster(){ return Object.values(MP.players).map(p=>({id:p.id,n:p.n})).concat([{id:MP.myId,n:MP.name}]); }
 function mpOnMsg(raw,from){ let m; try{ m=typeof raw==='string'?JSON.parse(raw):raw; }catch(e){ return; }
   if(Array.isArray(m)){ if(m[0]==='p'){ if(MP.host&&from) m[1]=from; mpPose(m); if(MP.host) mpSendAll(m,from,true); } return; }
@@ -73,7 +73,7 @@ addEventListener('beforeunload',()=>{ if(MP.on&&MP.host) mpSendAll({t:'end'}); }
 // ---------- per-frame (allocation-free interpolation into p.cur)
 const MP_DELAY=130;   // ms interpolation buffer (covers ~100 ms jitter at 20 Hz)
 function updateMP(dt){ if(!MP.on) return; MP.sendT-=dt; if(MP.sendT<=0&&started){ MP.sendT=MP.rate; mpSend(mpSelfPose(),true); }
-  const now=performance.now(); for(const id in MP.players){ const p=MP.players[id]; if(!p.buf.length) continue; mpInterp(p,now-p.off-MP_DELAY); const r=p.cur; if(!p.has) continue;
+  const now=performance.now(); for(const id in MP.players){ const p=MP.players[id]; if(!p.buf.length) continue; mpInterp(p,now-p.off-(MP.delay||MP_DELAY)); const r=p.cur; if(!p.has) continue;
     const dx=truck.x-r.x, dy=truck.y-r.y, d=Math.hypot(dx,dy); if(d<4.2&&d>0.01){ const k=(4.2-d)*0.35; truck.x+=dx/d*k; truck.y+=dy/d*k; truck.v*=0.96; } } }
 function mpInterp(p,t){ const b=p.buf, o=p.cur; let A=null,B=null;
   for(let i=b.length-1;i>=0;i--){ if(b[i][2]<=t){ A=b[i]; B=b[i+1]||null; break; } }
@@ -146,11 +146,11 @@ function mpStatus(t){ const s=document.getElementById('lbStatus'); if(s) s.textC
 function mpToast(t){ if(typeof toast==='function') toast(t); else flash(t); }
 function mpToggleList(){ MP.listOpen=!MP.listOpen; mpRender(); }
 function mpRender(){ const pl=document.getElementById('mplist'), bd=document.getElementById('mpbadge'); if(!pl) return; const n=Object.keys(MP.players).length+1;
-  bd.style.display=MP.on?'block':'none'; bd.textContent=(n>1?'\u{1F7E2} Connected \u2022 ':MP.host?'\u{1F7E1} Waiting for players \u2022 ':'\u{1F7E1} ')+n+' player'+(n>1?'s':'')+' \u2022 '+MP.code; bd.style.borderColor=n>1?'#3ddc84':'#f5b82e';
+  bd.style.display=MP.on?'block':'none'; bd.textContent=(n>1||MP.srv?'\u{1F7E2} Connected \u2022 ':MP.host?'\u{1F7E1} Waiting for players \u2022 ':'\u{1F7E1} ')+n+' player'+(n>1?'s':'')+' \u2022 '+MP.code; bd.style.borderColor=n>1||MP.srv?'#3ddc84':'#f5b82e';
   pl.style.display=MP.on&&MP.listOpen?'block':'none';
   pl.innerHTML=`<h4>PLAYERS \u2022 ${MP.code} ${MP.host?'(you host)':''}</h4><div class="p me"><span>\u2B50 ${esc(MP.name)} (you)</span><span>${MP.host?'host':''}</span></div>`+Object.values(MP.players).map(p=>{ const r=p.has?p.cur:null; const d=r?Math.hypot(r.x-truck.x,r.y-truck.y):0; return `<div class="p"><span>\u{1F69A} ${esc(p.n)}</span><span style="opacity:.7">${r?(d>=1000?(d/1000).toFixed(1)+' km':Math.round(d)+' m'):'\u2026'}</span></div>`; }).join('')+
    `<div style="margin-top:8px;opacity:.6;font-size:11px">Enter = chat \u2022 Tab = close</div><button class="chip" id="mpLeaveBtn" style="margin-top:6px">${MP.host?'End session':'Leave'}</button>`;
-  const lv=pl.querySelector('#mpLeaveBtn'); if(lv) lv.onclick=()=>{ if(MP.host){ mpLeave(); mpToast('Session ended'); } else { MP.ended=true; mpReset(); mpToast('Left the game'); } mpRender(); }; }
+  const lv=pl.querySelector('#mpLeaveBtn'); if(lv) lv.onclick=()=>{ if(MP.srv){ srvLeave(); return; } if(MP.host){ mpLeave(); mpToast('Session ended'); } else { MP.ended=true; mpReset(); mpToast('Left the game'); } mpRender(); }; }
 setInterval(()=>{ if(MP.on&&MP.listOpen) mpRender(); },1000);
 function mpChatSend(t){ t=String(t||'').trim().slice(0,140); if(!t||!MP.on) return; mpSend({t:'chat',id:MP.myId,n:MP.name,x:t}); mpChatLine(MP.name,t); }
 function mpChatLine(n,t){ const L=document.getElementById('mpLines'); if(!L) return; const d=document.createElement('div'); d.className='l'; d.innerHTML='<b>'+esc(n)+':</b> '+esc(t); L.appendChild(d); MP.chat.push([n,t]); while(L.children.length>5) L.firstChild.remove(); setTimeout(()=>{ d.style.transition='opacity .6s'; d.style.opacity='0'; setTimeout(()=>d.remove(),700); },12000); }
