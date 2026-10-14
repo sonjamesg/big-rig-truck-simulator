@@ -78,6 +78,7 @@ function frame(ts){
   const kp=kingpin(truck); const mid=[(truck.x-f[0]*1.9)*PPM, (truck.y-f[1]*1.9)*PPM];
   const tx=mid[0]+f[0]*truck.v*PPM*1.3, ty=mid[1]+f[1]*truck.v*PPM*1.3;
   const k=1-Math.exp(-dt*3); cam.x+=(tx-cam.x)*k; cam.y+=(ty-cam.y)*k;
+  if(window.__camHold){ cam.x=__camHold[0]; cam.y=__camHold[1]; }   // test/debug: hold the camera on a spot
   const zt=cam.zLock||(1.05-0.33*Math.min(1,sp/24)); cam.z+=(zt-cam.z)*(1-Math.exp(-dt*1.2));
   cam.shake*=Math.exp(-dt*8);
   draw();
@@ -104,7 +105,7 @@ function draw(){
   drawPortLow(vx0,vy0,vx1,vy1); drawFXLow(vx0,vy0,vx1,vy1); drawRemotePlayers(vx0,vy0,vx1,vy1); drawBreakdown();
   drawLorry(); if(!truck.foLay&&world.foZ&&world.foZ[idx(Math.floor(truck.x/M_T),Math.floor(truck.y/M_T))]) drawFlyovers(vx0,vy0,vx1,vy1,0.72); drawRail(vx0,vy0,vx1,vy1); drawFXHigh(); drawPortHigh(vx0,vy0,vx1,vy1);
   for(const o of world.overhead) if(o.x>vx0-400&&o.x<vx1+400&&o.y>vy0-400&&o.y<vy1+400) drawOverhead(o);
-  drawAmbientHigh(VR); drawWeather(vx0,vy0,vx1,vy1,z); drawNight(vx0,vy0,vx1,vy1,z); drawStreetLamps(vx0,vy0,vx1,vy1); drawSigNight(); drawPortNight(vx0,vy0,vx1,vy1);
+  drawAmbientHigh(VR); drawWeather(vx0,vy0,vx1,vy1,z); drawNight(vx0,vy0,vx1,vy1,z); drawStreetLamps(vx0,vy0,vx1,vy1); drawSigNight(); drawPortNight(vx0,vy0,vx1,vy1); if(typeof ptYardCounter==='function') ptYardCounter(vx0,vy0,vx1,vy1);
   ctx.setTransform(1,0,0,1,0,0);
   drawHUD();
   if(bigmap.open){ drawBigMap(); drawPadMapCursor(); }
