@@ -522,7 +522,7 @@ let pedBlk=null;
 function pedMask(){ if(pedBlk) return pedBlk; 
   const blk=new Set(); const mark=(x0,y0,x1,y1)=>{ for(let y=Math.floor(y0);y<Math.ceil(y1);y++) for(let x=Math.floor(x0);x<Math.ceil(x1);x++) blk.add(x*65536+y); };
   for(const o of world.objects){ if(o.kind==='tree'&&o.r){ mark(o.x/TILE-0.3,o.y/TILE-0.3,o.x/TILE+0.3,o.y/TILE+0.3); continue; } if(!PED_SOLID[o.kind]||o.w==null||o.h==null) continue; mark(o.x/TILE-0.3,o.y/TILE-0.3,(o.x+o.w)/TILE+0.3,(o.y+o.h)/TILE+0.3); }
-  const P=world.port; if(P) mark(P.x0+4,P.y0-1,P.edge+3,P.y1+1); // whole yard/quay/crane rails except the gate strip
+  const P=world.port; if(P) mark(P.x0+4,P.y0-1,P.edge+3,P.y1+1); if(world.kbPort) mark(1538,1844,1756,1885+DOCK_W+2);   // dg: no pedestrians in either dock // whole yard/quay/crane rails except the gate strip
   return pedBlk=blk; }
 function pedOk(tx,ty){ return WALKABLE[get(tx,ty)]&&!pedMask().has(tx*65536+ty); }
 const PED_COLS=['#c0392b','#2980b9','#27ae60','#f1c40f','#8e44ad','#ecf0f1','#2c3e50','#e67e22','#16a085','#7f8c8d'];
