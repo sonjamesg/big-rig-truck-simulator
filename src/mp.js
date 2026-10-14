@@ -56,16 +56,16 @@ function mpHost(){ mpReset(); MP.name=mpName(); mpTagWorld(); let code=null, tri
   pr.on('connection',c=>{ if(c.label==='pose'||(c.metadata&&c.metadata.kind==='pose')){ MP.pconns[c.peer]=c; c.on('data',d=>mpOnMsg(d,c.peer)); c.on('close',()=>{ if(MP.pconns[c.peer]===c) delete MP.pconns[c.peer]; }); return; }
     if(Object.keys(MP.conns).length>=MP.max-1){ c.on('open',()=>{ c.send(JSON.stringify({t:'end',why:'full'})); setTimeout(()=>c.close(),300); }); return; } MP.conns[c.peer]=c;
     c.on('data',d=>mpOnMsg(d,c.peer)); const gone=()=>{ if(!MP.conns[c.peer]) return; delete MP.conns[c.peer]; delete MP.pconns[c.peer]; if(MP.players[c.peer]){ mpPlayerGone(c.peer); mpSendAll({t:'leave',id:c.peer}); } mpRender(); }; c.on('close',gone); c.on('error',gone); });
-  pr.on('error',e=>{ if(e.type==='unavailable-id'){ /* after a reload the old registration can linger a few seconds: retry the same code, then pick a new one */ try{ sessionStorage.setItem('bigrig.mphost',JSON.stringify({c:code,t:Date.now(),n:tries+1})); }catch(x){} mpStatus('Opening room\u2026'); setTimeout(mpHost,tries<6?2500:300); } else if(e.type==='network'||e.type==='server-error'||e.type==='socket-error'||e.type==='socket-closed'){ mpStatus('Lost the multiplayer server \u2014 reconnecting\u2026'); } else if(e.type!=='peer-unavailable') mpStatus('Network error: '+e.type); }); }
+  pr.on('error',e=>{ mpDbg('peer error '+e.type); if(e.type==='unavailable-id'){ /* after a reload the old registration can linger a few seconds: retry the same code, then pick a new one */ try{ sessionStorage.setItem('bigrig.mphost',JSON.stringify({c:code,t:Date.now(),n:tries+1})); }catch(x){} mpStatus('Opening room\u2026'); setTimeout(mpHost,tries<6?2500:300); } else if(e.type==='network'||e.type==='server-error'||e.type==='socket-error'||e.type==='socket-closed'){ mpStatus('Lost the multiplayer server \u2014 reconnecting\u2026'); } else if(e.type!=='peer-unavailable') mpStatus('Network error: '+e.type); }); }
 function mpJoin(code,att){ att=att||0; mpReset(); MP.name=mpName(); mpTagWorld(); code=String(code||'').toUpperCase().replace(/[^0-9]/g,''); if(code.length<4){ mpStatus('Enter a room code like TRUCK-4821'); return; }
-  MP.code='TRUCK-'+code; mpStatus('Connecting to '+MP.code+'\u2026'+(att?' (try '+(att+1)+')':'')); const pr=MP.peer=mpNewPeer(); let done=false;
-  const retry=(msg)=>{ if(done||MP.peer!==pr) return; done=true; if(att<2){ mpStatus(msg+' \u2014 retrying\u2026'); setTimeout(()=>mpJoin(code,att+1),3000); } else mpStatus(msg); };
-  pr.on('open',()=>{ const c=MP.hostConn=pr.connect(MP_PREFIX+code,{reliable:true,label:'main'}); const to=setTimeout(()=>{ if(!MP.on) retry('Found the host but couldn\'t connect \u2014 try Wi-Fi, or ask the host to keep the game open'); },20000);
-    c.on('open',()=>{ done=true; clearTimeout(to); MP.on=true; MP.host=false; c.send(JSON.stringify({t:'hello',n:MP.name})); mpStatus(''); mpLobbyClose(); startGame();
+  MP.joining=true; MP.code='TRUCK-'+code; mpStatus('Connecting to '+MP.code+'\u2026'+(att?' (try '+(att+1)+')':'')); const pr=MP.peer=mpNewPeer(); let done=false;
+  const retry=(msg)=>{ if(done||MP.peer!==pr) return; done=true; if(att<2){ mpStatus(msg+' \u2014 retrying\u2026'); setTimeout(()=>mpJoin(code,att+1),3000); } else { MP.joining=false; mpStatus(msg); mpToast('\u26A0 '+msg); } };
+  pr.on('open',()=>{ mpDbg('peer open, dialling host'); const c=MP.hostConn=pr.connect(MP_PREFIX+code,{reliable:true,label:'main'}); const to=setTimeout(()=>{ if(!MP.on) retry('Found the host but couldn\'t connect \u2014 try Wi-Fi, or ask the host to keep the game open'); },20000);
+    c.on('open',()=>{ done=true; MP.joining=false; clearTimeout(to); MP.on=true; mpDbg('main conn open'); MP.host=false; c.send(JSON.stringify({t:'hello',n:MP.name})); mpStatus(''); mpLobbyClose(); startGame();
       const pc=MP.poseConn=pr.connect(MP_PREFIX+code,{reliable:false,label:'pose',metadata:{kind:'pose'}}); pc.on('data',d=>mpOnMsg(d,null)); });
     c.on('data',d=>mpOnMsg(d,null)); c.on('close',()=>{ if(MP.on) mpEnded('Disconnected from the host'); }); c.on('error',()=>{ if(MP.on) mpEnded('Connection error'); }); });
-  pr.on('error',e=>{ if(e.type==='peer-unavailable') retry('Host not online \u2014 ask them to keep the game open (code '+MP.code+')'); else if(!MP.on) retry('Network error: '+e.type); }); }
-function mpReset(){ try{ if(MP.peer) MP.peer.destroy(); }catch(e){} MP.on=false; MP.host=false; MP.peer=null; MP.conns={}; MP.pconns={}; MP.hostConn=null; MP.poseConn=null; MP.players={}; MP.ended=false;
+  pr.on('error',e=>{ mpDbg('peer error '+e.type); if(e.type==='peer-unavailable') retry('Host not online \u2014 ask them to keep the game open (code '+MP.code+')'); else if(!MP.on) retry('Network error: '+e.type); }); }
+function mpReset(){ MP.joining=false; try{ if(MP.peer) MP.peer.destroy(); }catch(e){} MP.on=false; MP.host=false; MP.peer=null; MP.conns={}; MP.pconns={}; MP.hostConn=null; MP.poseConn=null; MP.players={}; MP.ended=false;
   for(const t of world.trailers||[]) if(t.heldBy){ t.heldBy=null; t.coupled=false; } mpRender(); }
 function mpLeave(){ if(MP.host) mpSendAll({t:'end'}); MP.ended=true; setTimeout(mpReset,150); }
 function mpEnded(why){ if(MP.ended||!MP.on) return; MP.ended=true; mpReset(); mpToast(why); started=false; const ov=document.getElementById('overlay'); ov.classList.remove('hidden'); mpLobbyOpen(); mpStatus(why+' \u2014 back in the lobby'); BigRig.emit('mpEnded',{why}); }
@@ -113,7 +113,7 @@ const MPCSS=`#lobby{margin-top:6px;display:flex;flex-direction:column;gap:10px;a
 #mplist h4{margin:0 0 6px;font-size:12px;letter-spacing:1px;color:#7fd8ff} #mplist .p{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed rgba(255,255,255,.08)} #mplist .me{color:#ffd866}
 #mpchat{position:absolute;left:230px;bottom:16px;width:380px;color:#fff;font:12.5px system-ui,sans-serif;pointer-events:none} #mpchat .l{background:rgba(8,12,20,.7);border-radius:8px;padding:3px 8px;margin-top:3px;width:fit-content;max-width:380px;animation:cin .3s both} #mpchat .l b{color:#7fd8ff}
 #mpchat input{pointer-events:auto;width:100%;margin-top:4px;background:rgba(8,12,20,.92);border:1px solid #29b6ff;border-radius:8px;color:#fff;padding:7px 9px;font-size:13px;outline:none;display:none}
-#mpbadge{position:absolute;right:14px;top:132px;background:rgba(8,12,20,.85);border:1px solid rgba(41,182,255,.6);border-radius:10px;padding:6px 10px;color:#bfe9ff;font:bold 12px system-ui,sans-serif;pointer-events:auto;cursor:pointer;display:none}`;
+#mpbadge{position:absolute;left:50%;transform:translateX(-50%);top:46px;z-index:6;background:rgba(8,12,20,.85);border:1px solid rgba(41,182,255,.6);border-radius:10px;padding:6px 10px;color:#bfe9ff;font:bold 12px system-ui,sans-serif;pointer-events:auto;cursor:pointer;display:none}`;
 function mpInit(){ const st=document.createElement('style'); st.textContent=MPCSS; document.head.appendChild(st);
   const ov=document.getElementById('overlay'), go=ov.querySelector('.go'); if(go) go.style.display='none';
   const lb=document.createElement('div'); lb.id='lobby'; const nm=(localStorage.getItem('bigrig.name')||'').replace(/[<>"&]/g,''); const jq=(new URLSearchParams(location.search).get('join')||'').toUpperCase();
@@ -146,7 +146,7 @@ function mpStatus(t){ const s=document.getElementById('lbStatus'); if(s) s.textC
 function mpToast(t){ if(typeof toast==='function') toast(t); else flash(t); }
 function mpToggleList(){ MP.listOpen=!MP.listOpen; mpRender(); }
 function mpRender(){ const pl=document.getElementById('mplist'), bd=document.getElementById('mpbadge'); if(!pl) return; const n=Object.keys(MP.players).length+1;
-  bd.style.display=MP.on?'block':'none'; bd.textContent='\u{1F310} '+MP.code+' \u2022 '+n+' player'+(n>1?'s':'')+' (Tab)';
+  bd.style.display=MP.on?'block':'none'; bd.textContent=(n>1?'\u{1F7E2} Connected \u2022 ':MP.host?'\u{1F7E1} Waiting for players \u2022 ':'\u{1F7E1} ')+n+' player'+(n>1?'s':'')+' \u2022 '+MP.code; bd.style.borderColor=n>1?'#3ddc84':'#f5b82e';
   pl.style.display=MP.on&&MP.listOpen?'block':'none';
   pl.innerHTML=`<h4>PLAYERS \u2022 ${MP.code} ${MP.host?'(you host)':''}</h4><div class="p me"><span>\u2B50 ${esc(MP.name)} (you)</span><span>${MP.host?'host':''}</span></div>`+Object.values(MP.players).map(p=>{ const r=p.has?p.cur:null; const d=r?Math.hypot(r.x-truck.x,r.y-truck.y):0; return `<div class="p"><span>\u{1F69A} ${esc(p.n)}</span><span style="opacity:.7">${r?(d>=1000?(d/1000).toFixed(1)+' km':Math.round(d)+' m'):'\u2026'}</span></div>`; }).join('')+
    `<div style="margin-top:8px;opacity:.6;font-size:11px">Enter = chat \u2022 Tab = close</div><button class="chip" id="mpLeaveBtn" style="margin-top:6px">${MP.host?'End session':'Leave'}</button>`;
@@ -157,3 +157,22 @@ function mpChatLine(n,t){ const L=document.getElementById('mpLines'); if(!L) ret
 
 // fast travel: tell peers to snap (not glide) the truck to its new spot
 BigRig.on('fastTravel',()=>{ if(!MP.on) return; mpSend({t:'ft',id:MP.myId,ts:Math.round(performance.now())}); mpSend(mpSelfPose(),true); });
+
+// ---- joining guard: no silent fall-back to solo while a join is still connecting
+setTimeout(()=>{ const sg=startGame; startGame=function(){ if(MP.joining&&!MP.on){ mpStatus('Still connecting to '+MP.code+'\u2026'); return; } return sg.apply(this,arguments); }; },0);
+// ---- ?mpdebug=1: console log of PeerJS states + an on-screen overlay James can screenshot
+const MPDBG=/[?&#]mpdebug=1/.test(location.href);
+function mpDbg(t){ if(MPDBG) console.log('[mp]',new Date().toISOString().slice(11,19),t); }
+if(MPDBG){ const ms0=mpStatus; mpStatus=function(t){ if(t) mpDbg('status: '+t); return ms0(t); };
+  const oi=mpOnMsg; mpOnMsg=function(raw,from){ try{ const m=typeof raw==='string'?JSON.parse(raw):raw; if(!Array.isArray(m)) mpDbg('msg '+m.t+' from '+(from||'host')); else { MP.dbgPk=(MP.dbgPk||0)+1; } }catch(e){} return oi(raw,from); };
+  const od=document.createElement('div'); od.id='mpdbg'; od.style.cssText='position:fixed;left:6px;bottom:6px;z-index:99999;background:rgba(0,0,0,.82);color:#9f9;font:11px/1.35 monospace;padding:6px 8px;border-radius:6px;max-width:92vw;white-space:pre;pointer-events:none';
+  addEventListener('load',()=>document.body.appendChild(od));
+  setInterval(()=>{ const pr=MP.peer, now=performance.now(); let t='MPDEBUG '+(window.BIGRIG_VERSION||'')+'\n';
+    t+='on='+MP.on+' host='+MP.host+' joining='+!!MP.joining+' code='+MP.code+' me='+MP.myId+' started='+(typeof started!=='undefined'&&started)+'\n';
+    t+='peer: '+(pr?('id='+pr.id+' open='+pr.open+' disc='+pr.disconnected+' destroyed='+pr.destroyed):'none')+'\n';
+    const cs=c=>c?(c.open?'open':'closed')+'/'+((c.peerConnection&&c.peerConnection.iceConnectionState)||'?'):'-';
+    if(!MP.host) t+='hostConn='+cs(MP.hostConn)+' poseConn='+cs(MP.poseConn)+'\n';
+    for(const id in MP.conns) t+='conn '+id.slice(-6)+' main='+cs(MP.conns[id])+' pose='+cs(MP.pconns[id])+'\n';
+    t+='pose packets rx='+(MP.dbgPk||0)+'\n';
+    for(const id in MP.players){ const p=MP.players[id]; t+='player '+p.n+' has='+p.has+' buf='+p.buf.length+' age='+(p.last?Math.round(now-p.last)+'ms':'never')+(p.has?' at '+Math.round(p.cur.x)+','+Math.round(p.cur.y)+' d='+Math.round(Math.hypot(p.cur.x-truck.x,p.cur.y-truck.y))+'m':'')+'\n'; }
+    t+='status: '+((document.getElementById('lbStatus')||{}).textContent||''); od.textContent=t; },500); }
