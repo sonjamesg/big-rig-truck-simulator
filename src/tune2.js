@@ -51,7 +51,7 @@ CZ_PARTS.push(
     g.fillStyle='#c8cdd2'; for(const s of [-1,1]) for(let k=0;k<3+ar.lv;k++) g.fillRect(X(s*1.0)-1,Y(-2.45+k*0.3*(ar.lv>=4?1:0.6)),2.5,2.5);
     g.strokeStyle='#e0a800'; g.lineWidth=0.08*S; g.strokeRect(X(-0.9),Y(-0.2),1.8*S,0.15*S); g.restore(); }
   // exhaust: stacks behind the cab (style) / pipe diameter from the performance system
-  const es=L.exs||(ex?'chrome':null); if(es){ const dia=0.15+(ex?ex.lv*0.035:0); const col=es==='black'?['#111','#555']:['#8d959e','#ffffff'];
+  const es=L.exs||(ex?'chrome':null); if(es){ const dia=0.21+(ex?ex.lv*0.04:0); const col=es==='black'?['#111','#555']:['#8d959e','#ffffff'];
     if(es==='side'){ for(const s of [-1,1]){ const gr=g.createLinearGradient(X(s*1.3)-dia*S,0,X(s*1.3)+dia*S,0); gr.addColorStop(0,'#7d858e'); gr.addColorStop(0.5,'#fff'); gr.addColorStop(1,'#7d858e'); g.fillStyle=gr; rr(g,X(s*1.3)-dia*S*0.7,Y(-3.5),dia*1.4*S,1.6*S,dia*0.7*S); g.fill(); g.fillStyle='#111'; g.beginPath(); g.arc(X(s*1.3),Y(-1.95),dia*0.5*S,0,7); g.fill(); } }
     else for(const s of [-1,1]){ const cx=X(s*1.12), cy=Y(-2.45), r=dia*S*(es==='tall'?1.15:1); const gr=g.createRadialGradient(cx-r*0.3,cy-r*0.3,1,cx,cy,r); gr.addColorStop(0,col[1]); gr.addColorStop(1,col[0]); g.fillStyle=gr; g.beginPath(); g.arc(cx,cy,r,0,7); g.fill();
       g.fillStyle='#050505'; g.beginPath(); g.arc(cx,cy,r*0.55,0,7); g.fill(); if(es==='tall'){ g.strokeStyle='#fff'; g.lineWidth=1.5; g.beginPath(); g.arc(cx,cy,r*0.8,-2.4,-0.6); g.stroke(); }

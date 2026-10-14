@@ -62,7 +62,7 @@ function padNav(dir){ const els=padFocusables(); if(!els.length) return; let cur
     for(const e of els){ if(e===cur) continue; const q=e.getBoundingClientRect(), ex=q.left+q.width/2, ey=q.top+q.height/2, dx=ex-cx, dy=ey-cy;
       const along=dir==='r'?dx:dir==='l'?-dx:dir==='d'?dy:-dy, side=(dir==='r'||dir==='l')?Math.abs(dy):Math.abs(dx); if(along<=4) continue; const sc=along+side*2.2; if(sc<bs){ bs=sc; best=e; } }
     if(best) cur=best; }
-  for(const e of document.querySelectorAll('.padfocus')) e.classList.remove('padfocus'); pad.focus=cur; cur.classList.add('padfocus'); if(dir&&cur.classList.contains('ti')) cur.click(); const gr=cur.closest('.grid,.tl'); if(gr){ const q=cur.getBoundingClientRect(), r2=gr.getBoundingClientRect(); if(q.top<r2.top) gr.scrollTop-=r2.top-q.top+8; else if(q.bottom>r2.bottom) gr.scrollTop+=q.bottom-r2.bottom+8; } }
+  for(const e of document.querySelectorAll('.padfocus')) e.classList.remove('padfocus'); pad.focus=cur; cur.classList.add('padfocus'); if(dir&&cur.classList.contains('ti')) cur.click(); const gr=cur.closest('.grid,.tl,.czg,.cztabs'); if(gr){ const q=cur.getBoundingClientRect(), r2=gr.getBoundingClientRect(); if(q.top<r2.top) gr.scrollTop-=r2.top-q.top+8; else if(q.bottom>r2.bottom) gr.scrollTop+=q.bottom-r2.bottom+8; } }
 // ---- glyphs: when the pad is the active device, key hints in canvas prompts become controller buttons
 function padGlyphs(t){ if(!pad.active||typeof t!=='string') return t;
   return t.replace(/Press F to/g,'Press '+GLYPH.X+' to').replace(/\(F to stop\)/g,'('+GLYPH.X+' to stop)').replace(/Press T to/g,'Press '+GLYPH.A+' to').replace(/\bT: (couple|uncouple)/g,GLYPH.A+': $1')
