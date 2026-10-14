@@ -119,7 +119,7 @@ function drawPortLow(vx0,vy0,vx1,vy1){ drawPortPickBays(vx0,vy0,vx1,vy1); if(typ
     ctx.textBaseline='alphabetic'; } } }
 function portBridgeWorld(P){ const ch=P.chan, runs=[]; for(let y=ch[1];y<ch[3];y++){ let x0=-1; for(let x=ch[0];x<=ch[2];x++){ const b=x<ch[2]&&get(x,y)===T.BRIDGE; if(b&&x0<0) x0=x; if(!b&&x0>=0){ runs.push([x0,y,x-x0]); x0=-1; } } }
   let box=null; if(runs.length){ box=[1e9,1e9,-1e9,-1e9]; for(const r of runs){ box[0]=Math.min(box[0],r[0]); box[1]=Math.min(box[1],r[1]); box[2]=Math.max(box[2],r[0]+r[2]); box[3]=Math.max(box[3],r[1]+1); } } P.brgW={runs,box}; }
-function drawRTG(P,g,sh){ const T_=TILE, y=g.v*T_, u0=(P.legL+0.2)*T_, u1=(P.tl1+0.9)*T_, gap=2.3*T_; ctx.save(); if(sh){ ctx.translate(1.6*T_,1.6*T_); ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.strokeStyle='rgba(0,0,0,0.2)'; }
+function drawRTG(P,g,sh){ const T_=TILE, y=g.v*T_, u0=(P.legL+2.2)*T_, u1=(P.tl1+0.9)*T_, gap=2.3*T_; ctx.save(); if(sh){ ctx.translate(1.6*T_,1.6*T_); ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.strokeStyle='rgba(0,0,0,0.2)'; }
   // two portal frames along v + girders across u
   ctx.fillStyle=sh?ctx.fillStyle:'#f1c40f'; for(const dv of [-gap,gap]) ctx.fillRect(u0,y+dv-5,u1-u0,10); for(const u of [u0,u1]) ctx.fillRect(u-6,y-gap-7,12,2*gap+14);
   if(!sh){ ctx.fillStyle='#222'; for(const u of [u0,u1]) for(const dv of [-gap-9,gap+5]) ctx.fillRect(u-7,y+dv,14,5); ctx.fillStyle='#b7950b'; ctx.fillRect(u1-0.9*T_,y-gap-6,0.8*T_,0.8*T_); }
@@ -212,7 +212,7 @@ function portBigMap(BX,BY,z){ if(typeof portMapTrucks==='function') portMapTruck
   if(z>=0.6){ ctx.fillStyle='rgba(255,255,255,0.85)'; for(const bv of [P.vA,P.vB]) for(const e of [-14,14]) ctx.fillRect(-1.2,bv+e-2*px,1.2,4*px);   // berth marks
     ctx.fillStyle='rgba(255,214,0,0.9)'; ctx.font='bold '+(11*px)+'px system-ui'; if(z>=1.5){ ctx.save(); ctx.textAlign='center'; ctx.fillText('BERTH A',-3,P.vA); ctx.fillText('BERTH B',-3,P.vB); ctx.restore(); }
     ctx.fillStyle='rgba(70,70,70,0.9)'; for(const ru of [P.legL,-1]) ctx.fillRect(ru-0.15,v0,0.3,v1-v0);   // crane rails
-    for(const g of (P.rtg||[])){ ctx.fillStyle='rgba(255,214,0,0.25)'; ctx.fillRect(P.legL+0.2,g.v-1.1,P.tl1+0.7-P.legL,2.2); ctx.strokeStyle='#ffd400'; ctx.lineWidth=Math.max(1.5*px,0.35); ctx.strokeRect(P.legL+0.2,g.v-1.1,P.tl1+0.7-P.legL,2.2); }   // yard gantries
+    for(const g of (P.rtg||[])){ ctx.fillStyle='rgba(255,214,0,0.25)'; ctx.fillRect(P.legL+2.2,g.v-1.1,P.tl1-1.3-P.legL,2.2); ctx.strokeStyle='#ffd400'; ctx.lineWidth=Math.max(1.5*px,0.35); ctx.strokeRect(P.legL+2.2,g.v-1.1,P.tl1-1.3-P.legL,2.2); }   // yard gantries
     for(const c of (P.cranes||[])){ const a0=Math.min(P.legL,-1)-0.3, a1=Math.max(P.legL,-1)+0.3, b0=Math.min(a0,P.dockU-3.5), b1=Math.max(a1,P.dockU+3.5); ctx.fillStyle='#c0392b'; ctx.fillRect(a0,c.y-1.1,a1-a0,2.2); ctx.fillStyle='#e74c3c'; ctx.fillRect(b0,c.y-0.45,b1-b0,0.9);   // quay crane portal + boom over the berth
       ctx.fillStyle='#2c3e50'; ctx.fillRect(c.u-0.6,c.y-0.6,1.2,1.2); if(c.car){ ctx.fillStyle=c.car; ctx.fillRect(c.u-0.5,c.y-1.4,1,2.8); } }
     for(const t of (P.tracs||[])){ const q=loopPos(P,t.s); ctx.fillStyle='#ffd400'; ctx.beginPath(); ctx.arc(q[0],q[1],0.9,0,7); ctx.fill(); }
@@ -467,7 +467,8 @@ function dgUpdate(P,dt){ if(!P.gates) return; const pl=[[truck.x,truck.y]]; if(t
   for(const L of (P.jl||[])){ const J=L.J, a0=L.s0-P.lpre, a1=L.s1-P.lpre, gw=L.out&&L.gate?L.gate:null, w=PL(P,...polyAt(P.lpath,L.s0));
     let need=P.lors.some(l=>gw?(l.p>gw.p-3&&l.p<a1+4.4):(l.p>a0-13&&l.p<a1+4.4));
     if(gw&&!need) for(const q of pl) if(Math.hypot(q[0]/M_T-PL(P,gw.pu,gw.pv)[0],q[1]/M_T-PL(P,gw.pu,gw.pv)[1])<6.5) need=true;
-    if(need&&!J.pre) J.pre={ph:'amber',t:0,P}; if(!J.pre||J.pre.P!==P) continue; const R=J.pre; R.t+=dt;
+    const papp=(!gw&&P.gIn!=null)?dgPlayerApp(P,J):null; if(papp) need=true;
+    if(need&&!J.pre) J.pre={ph:'amber',t:0,P}; if(J.pre&&J.pre.P===P&&!gw&&P.gIn!=null) J.pre.app=P.lors.some(l=>l.p>a0-13&&l.p<a1+4.4)?'h':(papp||'h'); if(!J.pre||J.pre.P!==P) continue; const R=J.pre; R.t+=dt;
     if(R.ph==='amber'&&R.t>=SIG_AMBER){ R.ph='allred'; R.t=0; }
     else if(R.ph==='allred'&&R.t>=SIG_ALLRED&&!dgBoxBusy(J)){ R.ph='gate'; R.t=0; }
     else if(R.ph==='gate'&&!need&&R.t>2){ J.pre=null; } }
@@ -509,4 +510,33 @@ function dgBoxBusy(J){ const x0=J.x*M_T-0.5, y0=J.y*M_T-0.5, x1=(J.x+J.w)*M_T+0.
   return inn(truck.x,truck.y)||(truck.trl&&inn(truck.trl.x,truck.trl.y)); }
 // gate pre-emption: while a junction is held for a dock gate every road movement shows amber then red (all-red clearance), the gate gets the green
 function dgHookSig(){ if(dgHookSig.done||typeof sigState!=='function') return; dgHookSig.done=1; const base=sigState;
-  sigState=function(J,key,mv){ const s0=base(J,key,mv), R=J&&J.pre; if(!R) return s0; if(R.ph==='amber') return s0==='g'||s0==='a'?'a':'r'; return 'r'; }; }
+  sigState=function(J,key,mv){ const s0=base(J,key,mv), R=J&&J.pre; if(!R) return s0; if(R.ph==='amber') return s0==='g'||s0==='a'?'a':'r'; if(R.ph==='gate'&&R.app&&key&&world.segs[+String(key).split(':')[0]]&&world.segs[+String(key).split(':')[0]].dir===R.app) return 'g'; return 'r'; }; }   /* Albion IN arm: the approach feeding the dock arm runs with the gate phase */
+
+// ===================== Albion IN road arm: a proper junction exit (2-lane stub) from the signal junction into the dock, leading to the IN barrier =====================
+function dgArmGeom(P){ if(P.arm!==undefined) return P.arm; P.arm=null; if(P.gIn==null||!P.gates||!P.gates.length||!P.jl) return null; const L=P.jl.find(l=>!l.out); if(!L) return null; const J=L.J, g=P.gates[0], gw=PL(P,g.pu,g.pv), lu=PL(P,P.lorU,0)[0];
+  const x0=J.x+J.w, y0=J.y, y1=J.y+J.h, x1=Math.max(lu+1.9,x0+3.6); P.arm={x0,x1,y0,y1,lx0:lu-1.0,lx1:lu+1.25,ly1:gw[1]+2.6,gy:gw[1]}; return P.arm; }
+function dgDrawArm(P,vx0,vy0,vx1,vy1){ const A=dgArmGeom(P); if(!A) return; const S=TILE; if(A.x1*S<vx0-50||A.x0*S>vx1+50||A.y0*S>vy1+50||A.ly1*S<vy0-50) return;
+  ctx.save(); ctx.fillStyle='#3b3e44';
+  ctx.fillRect(A.x0*S,A.y0*S,(A.x1-A.x0)*S,(A.y1-A.y0)*S); ctx.fillRect(A.lx0*S,A.y1*S-2,(A.lx1-A.lx0)*S,(A.ly1-A.y1)*S+2);
+  // kerb fillet on the inside corner
+  ctx.beginPath(); ctx.moveTo(A.x0*S,A.y1*S); ctx.lineTo(A.lx0*S,A.y1*S); ctx.lineTo(A.lx0*S,(A.y1+0.6)*S); ctx.quadraticCurveTo(A.lx0*S,A.y1*S,(A.lx0-0.6)*S,A.y1*S); ctx.fill();
+  ctx.strokeStyle='rgba(240,240,240,0.9)'; ctx.lineWidth=0.09*S; ctx.lineCap='butt';
+  // edge lines
+  ctx.beginPath(); ctx.moveTo(A.x0*S,(A.y0+0.12)*S); ctx.lineTo((A.x1-0.12)*S,(A.y0+0.12)*S); ctx.lineTo((A.x1-0.12)*S,(A.y1)*S); ctx.lineTo((A.lx1-0.12)*S,A.y1*S); ctx.lineTo((A.lx1-0.12)*S,A.ly1*S); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(A.x0*S,(A.y1-0.12)*S); ctx.lineTo((A.lx0+0.12)*S,(A.y1-0.12)*S); ctx.lineTo((A.lx0+0.12)*S,A.ly1*S); ctx.stroke();
+  // centre line: lane IN (nearside, UK) / hatched no-entry half
+  const ym=(A.y0+A.y1)/2; ctx.setLineDash([0.6*S,0.5*S]); ctx.beginPath(); ctx.moveTo(A.x0*S,ym*S); ctx.lineTo((A.lx0+0.2)*S,ym*S); ctx.stroke(); ctx.setLineDash([]);
+  ctx.save(); ctx.beginPath(); ctx.rect(A.x0*S,ym*S,(A.lx0-A.x0)*S,(A.y1-ym-0.12)*S); ctx.clip(); ctx.lineWidth=0.07*S; for(let k=-4;k<10;k+=0.55){ ctx.beginPath(); ctx.moveTo((A.x0+k)*S,ym*S); ctx.lineTo((A.x0+k+1.6)*S,A.y1*S); ctx.stroke(); } ctx.restore();
+  // arrows: east along the arm, then south down to the barrier
+  const arrow=(x,y,h)=>{ ctx.save(); ctx.translate(x*S,y*S); ctx.rotate(h); ctx.fillStyle='rgba(240,240,240,0.85)'; ctx.fillRect(-0.9*S,-0.09*S,1.1*S,0.18*S); ctx.beginPath(); ctx.moveTo(0.55*S,0); ctx.lineTo(0.1*S,-0.38*S); ctx.lineTo(0.1*S,0.38*S); ctx.closePath(); ctx.fill(); ctx.restore(); };
+  arrow(A.x0+1.4,(A.y0+ym)/2,0); arrow((A.lx0+A.lx1)/2,A.y1+1.4,Math.PI/2);
+  ctx.save(); ctx.translate((A.lx0+A.lx1)/2*S,(A.y1+3.1)*S); ctx.rotate(Math.PI/2); ctx.fillStyle='rgba(240,240,240,0.85)'; ctx.font='bold '+(0.62*S)+'px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('DOCK IN',0,0); ctx.restore();
+  ctx.restore(); }
+{ const dpl0=drawPortLow; drawPortLow=function(vx0,vy0,vx1,vy1){ for(const P of portList()) if(P.ready&&P.gates) dgDrawArm(P,vx0,vy0,vx1,vy1); return dpl0.apply(this,arguments); }; }
+
+// player heading for the Albion IN arm: on the west approach eastbound, northbound on the south approach (not signalling left), or already on the arm -> request the gate phase
+function dgPlayerApp(P,J){ if(!J) return null; const tx=truck.x/M_T, ty=truck.y/M_T, f=fwd(truck.h), A=dgArmGeom(P);
+  if(A&&tx>=A.x0-0.2&&tx<=A.x1+0.3&&ty>=A.y0-0.3&&ty<=A.gy+1) return 'h';
+  if(tx>=J.x-26&&tx<=J.x+J.w&&ty>=J.y-0.3&&ty<=J.y+J.h/2+0.6&&f[0]>0.5) return 'h';
+  if(tx>=J.x+J.w/2-0.5&&tx<=J.x+J.w+0.3&&ty>=J.y+J.h-0.5&&ty<=J.y+J.h+22&&f[1]<-0.5&&(typeof IND==='undefined'||IND.side!==1)) return 'v';
+  return null; }
