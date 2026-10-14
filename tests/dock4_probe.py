@@ -1,6 +1,6 @@
 import asyncio,json,sys,os
 from playwright.async_api import async_playwright
-URL='file://'+os.path.abspath(sys.argv[1]); JS=sys.argv[2]
+URL=sys.argv[1] if sys.argv[1].startswith('http') else 'file://'+os.path.abspath(sys.argv[1]); JS=sys.argv[2]
 async def main():
   async with async_playwright() as p:
     b=await p.chromium.launch(executable_path='/usr/bin/google-chrome',args=['--use-gl=swiftshader','--enable-unsafe-swiftshader'])
