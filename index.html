@@ -3826,7 +3826,7 @@ function mobInit(){ if(!document.body.classList.contains('touch')) return; MOB.o
   mobBtn('mCouple','\u{1F517}<small>COUPLE</small>','fn ctx',act(()=>toggleCouple())); mobBtn('mFuel','\u26FD<small>REFUEL</small>','fn ctx',act(()=>toggleRefuel())); mobBtn('mUnload','\u{1F4E6}<small>UNLOAD</small>','fn ctx',act(()=>tryUnload()));
   mobBtn('mJobs','\u{1F4CB}<small>JOBS</small>','fn pill',act(()=>{ if(career.uiOpen) closeUI(); else openBoard(); })); mobBtn('mMap','\u{1F5FA}<small>MAP</small>','fn pill',act(()=>{ bigmap.open?closeMap():openMap(); }));
   document.getElementById('frame').addEventListener('touchmove',e=>{ if(e.target.closest&&e.target.closest('#overlay,#ui .mback,#ui .celebrate,#bdPanel')) return; e.preventDefault(); },{passive:false});
-  addEventListener('resize',mobLayout); addEventListener('orientationchange',()=>setTimeout(mobLayout,200)); mobLayout(); setInterval(mobContext,250); }
+  addEventListener('resize',mobLayout); addEventListener('orientationchange',()=>setTimeout(mobLayout,200)); if(window.visualViewport) visualViewport.addEventListener('resize',mobLayout); document.addEventListener('fullscreenchange',()=>setTimeout(mobLayout,50)); mobLayout(); setInterval(mobContext,250); }
 function mobSteer(el){ const knob=el.querySelector('.knob');
   const upd=e=>{ const r=el.getBoundingClientRect(); const u=Math.max(-1,Math.min(1,(e.clientX-(r.left+r.width/2))/(r.width/2-30))); input.padSteer=Math.abs(u)<0.06?0:u; knob.style.left=(50+u*(50-30/r.width*100))+'%'; };
   el.addEventListener('pointerdown',e=>{ if(career.uiOpen) return; MOB.steerId=e.pointerId; el.setPointerCapture(e.pointerId); upd(e); });
@@ -3838,7 +3838,7 @@ function mobLayout(){ if(!MOB.on) return; const W=innerWidth, H=innerHeight, por
   const cv=document.getElementById('game'), fr=document.getElementById('frame'); const sa=(n)=>parseFloat(getComputedStyle(document.documentElement).getPropertyValue(n))||0;
   let cw,ch,cx,cy;
   if(!por){ // landscape: canvas centred, controls live in the side gutters
-    const G=Math.max(150,Math.min(230,W*0.19)); cw=W-2*G; ch=cw/1.6; if(ch>H-8){ ch=H-8; cw=ch*1.6; } cx=(W-cw)/2; cy=(H-ch)/2;
+    const G=Math.max(150,Math.min(230,W*0.19)); cw=W-2*G; ch=H-8; cx=G; cy=4;   // fill the whole box between the panels; backing store follows its aspect (mobView) so nothing stretches
     const g=(W-cw)/2, pad=8, iw=g-2*pad, sat=sa('--sat');
     for(const id of ['deckL','deckR']){ const d=document.getElementById(id); if(d){ d.style.width=(g-2)+'px'; d.querySelector('.brand').style.top=(6+sat)+'px'; } }
     const top=26+sat, stH=Math.min(120,H*0.30), sb=Math.max(40,Math.min(58,(iw-pad)/2,(H-top-stH-5*pad)/2.6)), sw=(iw-pad)/2, iy=top+2*(sb+pad);
@@ -3857,10 +3857,13 @@ function mobLayout(){ if(!MOB.on) return; const W=innerWidth, H=innerHeight, por
     const py=fy+fw*1.78; const pw=S(84),ph2=S(26); place('mMap',W/2-pw-S(8),py,pw,ph2); place('mJobs',W/2+S(8),py,pw,ph2); const gr=document.querySelector('#deck .grille'); if(gr){ gr.style.top=(py-deckTop+ph2/2-S(9))+'px'; gr.style.bottom='auto'; gr.style.height=S(18)+'px'; gr.style.width=S(40)+'px'; }
     for(const id of ['mSteer','mGas','mBrk']) place(id,0,0,0,0,false);
   }
+  if(!document.body.classList.contains('mapo')) mobView(cw,ch,por);
   cv.style.width=cw+'px'; cv.style.height=ch+'px'; fr.style.left=cx+'px'; fr.style.top=cy+'px'; fr.style.width=cw+'px'; fr.style.height=ch+'px';
   MOB.fitOk=0; mobFit();
   // overlays (#ui / lobby) cover the whole screen in portrait, the canvas area in landscape is too small for modals so they also go full-screen
 }
+// keep the canvas backing store at exactly the CSS box aspect (1:1 world pixels). Landscape keeps ~600 logical px tall and shows more world sideways; portrait stays square 640.
+function mobView(cw,ch,por){ const c=document.getElementById('game'); let w,h; if(por){ w=h=640; } else { h=600; w=Math.round(h*cw/ch); } if(VW!==w||VH!==h||c.width!==w||c.height!==h){ VW=w; VH=h; c.width=w; c.height=h; } }
 function mobFit(){ for(const sm of document.querySelectorAll('#mob .b small')){ if(sm.closest('.ab')||sm.closest('.pill')) continue; sm.style.fontSize=''; let f=parseFloat(getComputedStyle(sm).fontSize); while(f>9&&sm.scrollWidth>sm.clientWidth+1){ f-=0.5; sm.style.fontSize=f+'px'; } } }
 function mobContext(){ if(!MOB.on) return; if(document.querySelector('#mob .b')&&document.getElementById('mHand').clientWidth&&!MOB.fitOk){ mobFit(); MOB.fitOk=1; } const a=career.active; const s=truck;
   const fuel=!!(started&&fuelStationAt&&fuelStationAt())||refuel.active; let cpl=false; if(started){ if(s.trl) cpl=Math.abs(s.v)<1; else { const c=coupleCandidate(); cpl=!!(c&&c.d<8); } }
