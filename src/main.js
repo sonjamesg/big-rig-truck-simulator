@@ -95,7 +95,7 @@ function draw(){
   drawAmbientHigh(VR); drawWeather(vx0,vy0,vx1,vy1,z); drawNight(vx0,vy0,vx1,vy1,z); drawStreetLamps(vx0,vy0,vx1,vy1); drawSigNight(); drawPortNight(vx0,vy0,vx1,vy1);
   ctx.setTransform(1,0,0,1,0,0);
   drawHUD();
-  if(bigmap.open){ drawBigMap(); dnMapShade(0,0,VW,VH,0.35); drawPadMapCursor(); }
+  if(bigmap.open){ drawBigMap(); drawPadMapCursor(); }
 }
 function blit(art,mx,my,ang,dx=0,dy=0){ ctx.save(); ctx.translate(mx*PPM+dx,my*PPM+dy); ctx.rotate(ang); ctx.drawImage(art.c,-art.ox/ART_SCALE,-art.oy/ART_SCALE,art.W/ART_SCALE,art.H/ART_SCALE); ctx.restore(); }
 // coupled artic layering: tractor chassis + fifth wheel (behind the cab body) draw UNDER the trailer, cab body over the trailer nose
@@ -196,7 +196,7 @@ function drawOverhead(o){
 // ---------- HUD
 function drawHUD(){
   const s=truck, kmh=Math.abs(s.v)*3.6;
-  drawMinimap(); dnMapShade(MM.x,MM.y,MM.w,MM.h); drawClockHUD(); drawWeatherHUD(); drawCoupleHUD(); drawFuelHUD(); drawIndHUD(); if(typeof drawBeamHUD==='function') drawBeamHUD(); drawCareerHUD(); drawNavHUD();
+  drawMinimap(); drawClockHUD(); drawWeatherHUD(); drawCoupleHUD(); drawFuelHUD(); drawIndHUD(); if(typeof drawBeamHUD==='function') drawBeamHUD(); drawCareerHUD(); drawNavHUD();
   // gauge panel
   const gx=14, gy=VH-150, gw=186, gh=136;
   ctx.fillStyle='rgba(10,14,22,0.72)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(gx,gy,gw,gh,16):ctx.rect(gx,gy,gw,gh); ctx.fill();
@@ -230,13 +230,13 @@ function drawMinimap(){
   ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip();
   const cxT=s.x*PPM/TILE, cyT=s.y*PPM/TILE, sc=w/span, sh=h/sc;
   ctx.imageSmoothingEnabled=false; ctx.drawImage(MINIMAP,cxT-span/2,cyT-sh/2,span,sh,x,y,w,h);
-  ctx.imageSmoothingEnabled=true; drawMapDetail(x-(cxT-span/2)*sc,y-(cyT-sh/2)*sc,sc,x,y,x+w,y+h);
+  ctx.imageSmoothingEnabled=true; drawMapDetail(x-(cxT-span/2)*sc,y-(cyT-sh/2)*sc,sc,x,y,x+w,y+h); nightMapLayer(x-(cxT-span/2)*sc,y-(cyT-sh/2)*sc,sc,x,y,x+w,y+h,true);
   navLine(m=>x+(m/4-(cxT-span/2))*sc, m=>y+(m/4-(cyT-sh/2))*sc, 3, '#ff3df0');
   drawPOIs(m=>x+(m/4-(cxT-span/2))*sc, m=>y+(m/4-(cyT-sh/2))*sc, false);
   mpDrawMap(m=>x+(m/4-(cxT-span/2))*sc, m=>y+(m/4-(cyT-sh/2))*sc, false);
   for(const t of world.trailers){ if(t.coupled) continue; const mx=x+(t.x/4-(cxT-span/2))*sc, my=y+(t.y/4-(cyT-sh/2))*sc; if(mx<x||my<y||mx>x+w||my>y+h) continue; ctx.fillStyle=t.target?'#ffd600':'#4fd1ff'; ctx.fillRect(mx-2,my-3,4,6); }
   for(const v of traffic.vs){ const mx=x+(v.x/4-(cxT-span/2))*sc, my=y+(v.y/4-(cyT-sh/2))*sc; if(mx<x||my<y||mx>x+w||my>y+h) continue; ctx.fillStyle=v.heavy?'#ff9f1a':'#ffffff'; ctx.fillRect(mx-1.5,my-1.5,3,3); }
-  ctx.translate(x+w/2,y+h/2); ctx.rotate(s.h); ctx.fillStyle='#ffdd33'; ctx.strokeStyle='#000'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(0,-8); ctx.lineTo(6,7); ctx.lineTo(0,3); ctx.lineTo(-6,7); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.translate(x+w/2,y+h/2); ctx.rotate(s.h); if(nmK()>0.05){ ctx.shadowColor='rgba(255,221,51,0.95)'; ctx.shadowBlur=10; } ctx.fillStyle='#ffdd33'; ctx.strokeStyle='#000'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(0,-8); ctx.lineTo(6,7); ctx.lineTo(0,3); ctx.lineTo(-6,7); ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.restore();
   ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='bold 10px system-ui,sans-serif'; ctx.textAlign='left'; ctx.fillText('MAP (M)',x+4,y+12); ctx.textAlign='right'; ctx.fillText('N\u2191',x+w-4,y+12);
 }
@@ -271,8 +271,9 @@ function drawBigMap(){
       const wx=bigmap.cx+(a[0]-VW/2)/z0, wy=bigmap.cy+(a[1]-VH/2-10)/z0; bigmap.z=z1; bigmap.cx=wx-(a[0]-VW/2)/z1; bigmap.cy=wy-(a[1]-VH/2-10)/z1; } mapClamp(); }
   ctx.fillStyle='rgba(6,9,15,0.92)'; ctx.fillRect(0,0,VW,VH);
   const z=bigmap.z; ctx.save(); ctx.beginPath(); ctx.rect(20,40,VW-40,VH-60); ctx.clip();
-  ctx.fillStyle='#6e8aac'; ctx.fillRect(20,40,VW-40,VH-60); ctx.imageSmoothingEnabled=z<1; ctx.drawImage(MINIMAP,VW/2-bigmap.cx*z,VH/2+10-bigmap.cy*z,MW*z,MH*z);
+  ctx.fillStyle='#6e8aac'; ctx.fillRect(20,40,VW-40,VH-60); { const K=nmK(); if(K>0.01){ ctx.globalAlpha=K; ctx.fillStyle='#08102a'; ctx.fillRect(20,40,VW-40,VH-60); ctx.globalAlpha=1; } } ctx.imageSmoothingEnabled=z<1; ctx.drawImage(MINIMAP,VW/2-bigmap.cx*z,VH/2+10-bigmap.cy*z,MW*z,MH*z);
   bigmap.miss=z>=2.2?drawMapDetail(VW/2-bigmap.cx*z,VH/2+10-bigmap.cy*z,z,20,40,VW-20,VH-20):0;
+  nightMapLayer(VW/2-bigmap.cx*z,VH/2+10-bigmap.cy*z,z,20,40,VW-20,VH-20,z>=2.2);
   const BX=t=>VW/2+(t-bigmap.cx)*z, BY=t=>VH/2+10+(t-bigmap.cy)*z;
   if(z>0.8) for(const v of traffic.vs){ ctx.fillStyle=v.heavy?'#ff9f1a':'#fff'; ctx.fillRect(BX(v.x/4)-1.5,BY(v.y/4)-1.5,3,3); }
   for(const t of world.trailers){ if(t.coupled) continue; if(z<0.8&&!t.target) continue; ctx.fillStyle=t.target?'#ffd600':'#4fd1ff'; ctx.fillRect(BX(t.x/4)-2,BY(t.y/4)-2,4,4); }
@@ -289,12 +290,12 @@ function drawBigMap(){
     const big=kind===1, wat=kind===2, city=!kind&&n===n.toUpperCase(), town=!kind&&!city;
     if(town && z<0.45 && !/Ashby|Millford|Redhill|Dustwater|Coppermine|Fenwick|Wendwood|Greyfell/.test(n)) continue;
     const LK=Math.min(big?1.4:1.7,mapLblK(z)); ctx.font= big?'900 '+Math.round(22*LK)+'px system-ui,sans-serif':wat?'italic 600 '+Math.round(13*LK)+'px Georgia,serif':city?'bold '+Math.round(15*LK)+'px system-ui,sans-serif':'600 '+Math.round(11*LK)+'px system-ui,sans-serif';
-    ctx.lineWidth=(big?5:3)*LK; ctx.lineJoin='round'; ctx.strokeStyle='rgba(0,0,0,0.75)'; ctx.strokeText(n,X,Y); ctx.fillStyle=big?'rgba(255,214,120,0.95)':wat?'#bfe3ff':city?'#ffffff':'#ffe9a8'; ctx.fillText(n,X,Y); }
+    ctx.lineWidth=(big?5:3)*LK*(1+nmK()*0.5); ctx.lineJoin='round'; ctx.strokeStyle='rgba(0,0,0,'+(0.75+0.2*nmK())+')'; ctx.strokeText(n,X,Y); ctx.fillStyle=big?'rgba(255,214,120,0.95)':wat?'#bfe3ff':city?'#ffffff':'#ffe9a8'; ctx.fillText(n,X,Y); }
   ctx.textBaseline='alphabetic';
   const lx=VW/2+(truck.x*PPM/TILE-bigmap.cx)*z, ly=VH/2+10+(truck.y*PPM/TILE-bigmap.cy)*z;
   { const pu=(timeS*1.6)%1; ctx.strokeStyle='rgba(255,221,51,'+(1-pu).toFixed(2)+')'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(lx,ly,12+pu*26,0,7); ctx.stroke();
     ctx.fillStyle='rgba(255,221,51,0.25)'; ctx.beginPath(); ctx.arc(lx,ly,14,0,7); ctx.fill(); }
-  ctx.translate(lx,ly); ctx.rotate(truck.h); const k=1.5+0.12*Math.sin(timeS*6); ctx.fillStyle='#ffdd33'; ctx.strokeStyle='#000'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(0,-11*k); ctx.lineTo(7.5*k,8*k); ctx.lineTo(0,4*k); ctx.lineTo(-7.5*k,8*k); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.translate(lx,ly); ctx.rotate(truck.h); if(nmK()>0.05){ ctx.shadowColor='rgba(255,221,51,1)'; ctx.shadowBlur=16; } const k=1.5+0.12*Math.sin(timeS*6); ctx.fillStyle='#ffdd33'; ctx.strokeStyle='#000'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(0,-11*k); ctx.lineTo(7.5*k,8*k); ctx.lineTo(0,4*k); ctx.lineTo(-7.5*k,8*k); ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.restore();
   FT_BTN=NAV_BTN=null; if(NAV.sel){ const hv=NAV.sel, e=hv.o.entrance||hv.o, X=mBX(e.x/M_T), Y=mBY(e.y/M_T), tch=document.body.classList.contains('touch'), cr=ctx.canvas.getBoundingClientRect(), PK=Math.max(1,Math.min(2.5,cr.height>0?VH/cr.height:1)), bh=(tch?54:40)*PK, H=bh+80*PK; ctx.font='bold '+Math.round(18*PK)+'px system-ui,sans-serif'; const t1=hv.kind+': '+hv.name, why=ftBlock(hv.o), t2=why?why.replace(/^Fast travel:? ?/,''):'Fast travel fee \u00a3'+ftFee(hv.o); const tw=Math.min(VW-32,Math.max(300*PK,ctx.measureText(t1).width+28*PK)), tx=Math.max(16,Math.min(VW-tw-16,X+16)), ty=Math.max(44,Math.min(VH-H-16,Y-H/2));
     ctx.fillStyle='rgba(10,14,22,0.95)'; ctx.fillRect(tx,ty,tw,H); ctx.strokeStyle='#f5b82e'; ctx.lineWidth=1.5; ctx.strokeRect(tx,ty,tw,H); ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText(t1,tx+14*PK,ty+26*PK,tw-28*PK); ctx.font=Math.round(14*PK)+'px system-ui,sans-serif'; ctx.fillStyle=why?'#ffb020':'#9be7a8'; ctx.fillText(t2,tx+14*PK,ty+48*PK,tw-28*PK);
@@ -319,7 +320,7 @@ let LEG_BTN=null;
 function mapLblK(z){ return Math.max(1,Math.min(1.9,0.85+0.1*z)); }
 const MAPLBL=[]; function mapLabel(t,x,y,col,bold){ if(!t) return false; const k=mapLblK(bigmap.z), fs=Math.round(11*k); ctx.font=(bold?'bold ':'600 ')+fs+'px system-ui,sans-serif'; const w=ctx.measureText(t).width, r=[x-2,y-fs*0.72,w+4,fs*1.45];
   for(const q of MAPLBL) if(r[0]<q[0]+q[2]&&q[0]<r[0]+r[2]&&r[1]<q[1]+q[3]&&q[1]<r[1]+r[3]) return false; MAPLBL.push(r);
-  ctx.save(); ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.lineWidth=3*mapLblK(bigmap.z); ctx.lineJoin='round'; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.strokeText(t,x,y); ctx.fillStyle=col; ctx.fillText(t,x,y); ctx.restore(); return true; }
+  ctx.save(); ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.lineWidth=3*mapLblK(bigmap.z)*(1+nmK()*0.5); ctx.lineJoin='round'; ctx.strokeStyle='rgba(0,0,0,'+(0.8+0.15*nmK())+')'; ctx.strokeText(t,x,y); ctx.fillStyle=col; ctx.fillText(t,x,y); ctx.restore(); return true; }
 function canvasPos(e){ const r=cv.getBoundingClientRect(); return [(e.clientX-r.left)*VW/r.width,(e.clientY-r.top)*VH/r.height]; }
 let downAt=null;
 cv.addEventListener('pointerdown',e=>{ const [x,y]=canvasPos(e); downAt=[x,y,performance.now()];

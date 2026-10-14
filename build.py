@@ -1,7 +1,7 @@
 import os, zipfile, shutil
 d=os.path.dirname(os.path.abspath(__file__)); s=os.path.join(d,'src')
 js=open(os.path.join(s,'peerjs.min.js')).read()+"\n;\n"+"const ENGINE_WAV_B64='"+open(os.path.join(s,'engine_b64.txt')).read().strip()+"';\n"
-for f in ['keyguard.js','world.js','render.js','bldg2.js','lorry.js','physics.js','audio.js','traffic.js','markings.js','signals.js','depots.js','fuel.js','sites.js','career.js','ui.js','ambient.js','satnav.js','gamepad.js','mp.js','mobile.js','haptics.js','breakdown.js','indicators.js','beams.js','fx.js','port.js','rail.js','daynight.js','weather.js','main.js']: js+=open(os.path.join(s,f)).read()+"\n"
+for f in ['keyguard.js','world.js','render.js','bldg2.js','lorry.js','physics.js','audio.js','traffic.js','markings.js','signals.js','depots.js','fuel.js','sites.js','career.js','ui.js','ambient.js','satnav.js','gamepad.js','mp.js','mobile.js','haptics.js','breakdown.js','indicators.js','beams.js','fx.js','port.js','rail.js','daynight.js','nightmap.js','weather.js','main.js']: js+=open(os.path.join(s,f)).read()+"\n"
 html=open(os.path.join(s,'template.html')).read().replace('/*SCRIPT*/',js)
 open(os.path.join(d,'BigRig.html'),'w').write(html)
 open(os.path.join(d,'index.html'),'w').write(html)
