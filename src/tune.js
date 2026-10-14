@@ -168,33 +168,83 @@ function czIcon(g,p,W,H){ g.clearRect(0,0,W,H); const bg=g.createLinearGradient(
     g.restore(); return; }
   if(typeof czIcon2==='function') czIcon2(g,p,W,H,cx,cy,s,lv); }
 // ---- the customiser UI
-const CZ_CSS=`#ui .mback .modal.tz{width:min(1060px,98vw)!important;height:min(680px,96vh)!important;max-height:none!important;padding:0!important;display:flex;flex-direction:column;overflow:hidden;background:#0f141e;border-radius:18px}
-.tz .czh{display:flex;align-items:center;gap:8px;padding:8px 10px;flex:none;background:linear-gradient(90deg,rgba(245,184,46,.16),transparent 60%);border-bottom:1px solid rgba(255,255,255,.07)}
-.tz .czh h2{margin:0;font-size:18px;letter-spacing:1px;flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tz .czh h2 small{display:block;font-size:11px;letter-spacing:0;opacity:.65;font-weight:600}
-.tz .czb{width:48px;height:48px;flex:none;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#fff;font-size:22px;cursor:pointer}
-.tz .czm{flex:1;min-height:0;display:flex;flex-direction:column}.tz .czt{flex:none;display:flex;flex-direction:column;min-height:0;overflow:hidden}
-.tz .czp{position:relative;flex:none;height:clamp(130px,23vh,280px);background:radial-gradient(ellipse at 50% 70%,#33435f 0%,#18202f 60%,#0d121b 100%);touch-action:none;cursor:grab}.tz .czp canvas{width:100%;height:100%;display:block}
-.tz .czp .vt{position:absolute;right:8px;top:8px;font-size:11px;font-weight:800;padding:4px 9px;border-radius:99px;background:rgba(0,0,0,.45);color:#fff;pointer-events:none}.tz .czp .vh{position:absolute;left:8px;bottom:6px;font-size:10px;opacity:.6;pointer-events:none}
-.tz .czs{flex:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px 10px;padding:6px 10px;background:#121a27}.tz .czs .r{font-size:10.5px}.tz .czs .l b{white-space:nowrap}.tz .czs .l span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tz .czs .l{display:flex;justify-content:space-between}.tz .czs .l b{font-weight:800}.tz .czs .b{position:relative;height:8px;border-radius:4px;background:#222a36;overflow:hidden;margin-top:2px}
-.tz .czs .b i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#2f81f7,#7ee0ff)}.tz .czs .b em{position:absolute;top:0;bottom:0}.tz .czs .up{color:#7dff9a}.tz .czs .dn{color:#ff7b72}
-.tz .czk{flex:1;min-height:0;display:flex;flex-direction:column}.tz .cztabs{flex:none;display:flex;gap:6px;overflow-x:auto;padding:8px 10px;scrollbar-width:none;touch-action:pan-x}.tz .cztabs::-webkit-scrollbar{display:none}
-.tz .cztabs .chip{flex:none;padding:9px 14px;border-radius:99px;font-weight:800;font-size:13px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);cursor:pointer;white-space:nowrap}.tz .cztabs .chip.on{background:#f5b82e;color:#111}
-.tz .czg{flex:1;min-height:0;overflow-y:auto;padding:4px 10px 10px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}.tz .czsl{font-size:11px;font-weight:900;letter-spacing:.14em;opacity:.6;margin:8px 2px 6px}
-.tz .czcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}.tz .card{position:relative;border-radius:12px;background:#1a2231;border:2px solid rgba(255,255,255,.07);overflow:hidden;cursor:pointer;text-align:left;padding:0;color:#fff}
-.tz .card canvas{width:100%;aspect-ratio:5/2;display:block}.tz .card .ci{padding:6px 8px 8px}.tz .card .cn{font-weight:800;font-size:13px;line-height:1.15}.tz .card .cl{font-size:10px;opacity:.65}.tz .card .cp{font-weight:900;font-size:13px;color:#7dff9a;margin-top:2px}.tz .card .cf{font-size:10px;color:#9fd8ff;margin-top:1px}
-.tz .card.sel{border-color:#f5b82e;box-shadow:0 0 0 2px rgba(245,184,46,.35)}.tz .card .ok{position:absolute;right:6px;top:6px;width:26px;height:26px;border-radius:50%;background:#2ecc71;color:#06210f;font-weight:900;display:flex;align-items:center;justify-content:center}
-.tz .card.lock{opacity:.55}.tz .card .lk{color:#ffb38a}.tz .czf{flex:none;display:flex;gap:10px;align-items:center;padding:8px 10px calc(8px + env(safe-area-inset-bottom));border-top:1px solid rgba(255,255,255,.07);background:#0f141e}
-.tz .czf .btn{flex:1;min-height:54px;font-size:17px;font-weight:900;border-radius:14px}.tz .czf .msg{font-size:11px;opacity:.75}
-#ui:has(.modal.tz) .toast{top:auto;bottom:88px}
-@media (max-width:760px) and (orientation:portrait){.modal.tz .czcards{grid-template-columns:1fr;gap:6px}.modal.tz .czcards .card{display:flex!important;flex-direction:row!important;align-items:center;min-height:68px!important;height:auto!important;padding:6px 10px!important;gap:10px!important}.modal.tz .czcards .card canvas{width:112px!important;height:56px!important;aspect-ratio:auto;flex:none;margin:0;border-radius:8px}.modal.tz .czcards .card .ci{padding:0;min-width:0;flex:1}.tz .card .cn{font-size:12.5px}.tz .card .ok{width:20px;height:20px;font-size:12px;right:4px;top:4px}}
-@media (min-width:761px),(orientation:landscape){.tz .czm{flex-direction:row}.tz .czt{width:46%;border-right:1px solid rgba(255,255,255,.07)}.tz .czp{flex:1;height:auto}.tz .czk{width:54%}}
-@media (orientation:landscape) and (max-height:460px){.tz .czs{gap:2px 10px;padding:4px 10px}.tz .czs .b{height:6px}.tz .czh{padding:4px 8px}.tz .czb{width:42px;height:42px}.tz .czf .btn{min-height:44px}}`;
+const CZ_CSS=`#ui .mback .modal.tz{width:min(1060px,100vw)!important;height:min(720px,100dvh)!important;max-height:none!important;padding:0!important;display:flex;flex-direction:column;overflow:hidden;background:#0c111a;border-radius:16px;border:1px solid rgba(245,184,46,.22)}
+.tz .czh{display:flex;align-items:center;gap:6px;padding:6px 8px;flex:none;background:linear-gradient(90deg,rgba(245,184,46,.14),transparent 55%);border-bottom:1px solid rgba(255,255,255,.07)}
+.tz .czh .cztl{flex:1 1 0;min-width:0}.tz .czh h2{margin:0;font-size:15px;letter-spacing:.08em;font-weight:900;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tz .czh h2 small,.tz .czh .cztl small{display:block;font-size:11px;letter-spacing:0;opacity:.7;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.tz .czb{width:40px;height:40px;flex:none;border-radius:11px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#fff;font-size:20px;cursor:pointer}
+.tz .wallet{flex:none;display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:99px;background:rgba(0,0,0,.45);border:1px solid rgba(125,255,154,.35);font-size:12px;font-weight:800;color:#7dff9a;white-space:nowrap;max-width:42%;overflow:hidden;text-overflow:ellipsis}
+.tz .wallet b{font-weight:900}
+.tz .czm{flex:1;min-height:0;display:flex;flex-direction:column}
+.tz .czt{flex:none;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.tz .czp{position:relative;flex:none;height:clamp(168px,28vh,300px);background:
+ radial-gradient(ellipse at 50% 78%,rgba(245,184,46,.12) 0%,transparent 55%),
+ radial-gradient(ellipse at 50% 70%,#3a4a66 0%,#18202f 55%,#0a0e16 100%);
+ touch-action:none;cursor:grab;border-bottom:1px solid rgba(255,255,255,.06)}
+.tz .czp canvas{width:100%;height:100%;display:block}
+.tz .czp .vt{position:absolute;right:8px;top:8px;font-size:10px;font-weight:800;letter-spacing:.06em;padding:3px 8px;border-radius:99px;background:rgba(0,0,0,.5);border:1px solid rgba(245,184,46,.4);color:#f5d48a;pointer-events:none}
+.tz .czp .vh{position:absolute;left:8px;bottom:6px;font-size:10px;opacity:.55;pointer-events:none}
+.tz .czs{flex:none;display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;padding:6px 10px 4px;background:#101722}
+.tz .czs .r{font-size:10px;min-width:0}.tz .czs .l{display:flex;justify-content:space-between;gap:4px;align-items:baseline}
+.tz .czs .l span{opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tz .czs .l b{font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums}
+.tz .czs .b{position:relative;height:5px;border-radius:3px;background:#1c2432;overflow:hidden;margin-top:2px}
+.tz .czs .b i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#2f81f7,#7ee0ff)}
+.tz .czs .b em{position:absolute;top:0;bottom:0}.tz .czs .up{color:#7dff9a}.tz .czs .dn{color:#ff7b72}
+.tz .czk{flex:1;min-height:0;display:flex;flex-direction:column}
+.tz .cztabs{position:relative;flex:none;display:flex;gap:5px;overflow-x:auto;padding:7px 28px 7px 10px;scrollbar-width:thin;scrollbar-color:rgba(245,184,46,.55) transparent;touch-action:pan-x;-webkit-overflow-scrolling:touch;
+ mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 28px),transparent);-webkit-mask-image:linear-gradient(90deg,#000 0,#000 calc(100% - 28px),transparent)}
+.tz .cztabs::-webkit-scrollbar{height:3px}.tz .cztabs::-webkit-scrollbar-thumb{background:rgba(245,184,46,.55);border-radius:3px}
+.tz .cztabs::after{content:'\u203A';position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:18px;font-weight:900;color:#f5b82e;opacity:.85;pointer-events:none;text-shadow:0 0 8px rgba(0,0,0,.8)}
+.tz .cztabs .chip{flex:none;padding:7px 12px;border-radius:99px;font-weight:800;font-size:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);cursor:pointer;white-space:nowrap}
+.tz .cztabs .chip.on{background:#f5b82e;color:#111;border-color:#f5b82e}
+.tz .czg{flex:1;min-height:0;overflow-y:auto;padding:2px 8px 8px;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.tz .czsl{font-size:10px;font-weight:900;letter-spacing:.12em;opacity:.55;margin:6px 2px 4px}
+.tz .czcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px}
+.tz .card{position:relative;border-radius:10px;background:#151c29;border:1.5px solid rgba(255,255,255,.08);overflow:hidden;cursor:pointer;text-align:left;padding:0;color:#fff}
+.tz .card canvas{width:100%;aspect-ratio:5/2;display:block;background:#0d121b}
+.tz .card .ci{padding:4px 7px 6px}.tz .card .cn{font-weight:800;font-size:12px;line-height:1.15}
+.tz .card .cl{font-size:9.5px;opacity:.6}.tz .card .cp{font-weight:900;font-size:12px;color:#7dff9a;margin-top:1px}
+.tz .card .cf{font-size:9.5px;color:#9fd8ff;margin-top:0}
+.tz .card.sel{border-color:#f5b82e;box-shadow:0 0 0 1px rgba(245,184,46,.4)}
+.tz .card.own .cp{color:#cfe8d2}.tz .card.fit{border-color:rgba(46,204,113,.55)}
+.tz .card .ok{position:absolute;right:5px;top:5px;width:20px;height:20px;border-radius:50%;background:#2ecc71;color:#06210f;font-weight:900;font-size:12px;display:flex;align-items:center;justify-content:center}
+.tz .card.lock{opacity:.5}.tz .card .lk{color:#ffb38a}
+.tz .czf{flex:none;display:flex;gap:8px;align-items:center;padding:6px 8px calc(6px + env(safe-area-inset-bottom));border-top:1px solid rgba(255,255,255,.07);background:#0c111a}
+.tz .czf .btn{flex:1;min-height:42px!important;height:42px;font-size:14px!important;font-weight:900;border-radius:11px!important;padding:0 10px!important;margin:0!important;line-height:1}
+.tz .czf .msg{font-size:10px;opacity:.7;line-height:1.2}
+#ui:has(.modal.tz) .toast{top:auto;bottom:72px}
+@media (max-width:760px) and (orientation:portrait){
+ #ui .mback .modal.tz{width:100vw!important;height:100dvh!important;border-radius:0;border:0}
+ .modal.tz .czcards{grid-template-columns:1fr;gap:5px}
+ .modal.tz .czcards .card{display:flex!important;flex-direction:row!important;align-items:center;min-height:52px!important;height:auto!important;padding:4px 8px!important;gap:8px!important}
+ .modal.tz .czcards .card canvas{width:88px!important;height:44px!important;aspect-ratio:auto;flex:none;margin:0;border-radius:7px}
+ .modal.tz .czcards .card .ci{padding:0;min-width:0;flex:1}
+ .tz .card .cn{font-size:12px}.tz .card .ok{width:18px;height:18px;font-size:11px;right:4px;top:4px}
+ .tz .czp{height:clamp(150px,26vh,240px)}
+ .tz .czs{grid-template-columns:1fr 1fr;gap:2px 10px;padding:5px 8px 3px}
+}
+@media (min-width:761px),(orientation:landscape){
+ .tz .czm{flex-direction:row}.tz .czt{width:44%;border-right:1px solid rgba(255,255,255,.07)}
+ .tz .czp{flex:1;height:auto;min-height:0}.tz .czk{width:56%}
+ .tz .czcards{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+}
+@media (orientation:landscape) and (max-height:460px){
+ .tz .czs{gap:1px 8px;padding:3px 8px}.tz .czs .b{height:4px}
+ .tz .czh{padding:3px 6px}.tz .czb{width:36px;height:36px}.tz .czf .btn{min-height:38px;font-size:13px}
+ .tz .czh h2{font-size:13px}.tz .wallet{font-size:11px;padding:3px 8px}
+ #ui .mback .modal.tz{width:100vw!important;height:100dvh!important;border-radius:0;border:0}
+ .tz .czcards{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))!important;gap:5px}
+ .modal.tz .czcards .card{display:flex!important;flex-direction:row!important;align-items:center;min-height:48px;padding:3px 6px!important;gap:6px}
+ .modal.tz .czcards .card canvas{width:72px!important;height:36px!important;aspect-ratio:auto;flex:none;border-radius:6px}
+ .modal.tz .czcards .card .ci{padding:0;min-width:0;flex:1}
+ .tz .czp .vh{display:none}
+}`
 function czCss(){ if(document.getElementById('czcss')) return; const s=document.createElement('style'); s.id='czcss'; s.textContent=CZ_CSS; document.head.appendChild(s); }
 function czOpen(){ if(!started||career.uiOpen) return; czCss(); const m=modelById(career.cur); CZ.sel=null; CZ.view='top'; CZ.tab=CZ.tab||'engine';
-  const b=openModal('tune',`<div class="czh"><button class="czb x" id="czBack" aria-label="Back">\u2039</button><h2>TUNE SHOP<small>${esc(m.name)}${CZ.bay?' \u2022 '+esc(CZ.bay.name):''}</small></h2><div class="wallet">\u{1F45B} Bank <b id="czBank"></b></div><button class="czb x" aria-label="Close">\u2715</button></div>
+  const b=openModal('tune',`<div class="czh"><button class="czb x" id="czBack" aria-label="Back">\u2039</button><div class="cztl"><h2>TUNE SHOP</h2><small>${esc(m.name)}${CZ.bay?' \u2022 '+esc(CZ.bay.name):''}</small></div><div class="wallet" title="Bank"><span aria-hidden="true">\u{1F437}</span> <b id="czBank"></b></div><button class="czb x" aria-label="Close">\u2715</button></div>
    <div class="czm"><div class="czt"><div class="czp"><canvas></canvas><span class="vt"></span><span class="vh">drag / right stick to rotate \u2022 tap: top / side</span></div><div class="czs"></div></div>
    <div class="czk"><div class="cztabs"></div><div class="czg"></div></div></div>
-   <div class="czf"><div style="flex:0 1 40%;min-width:0"><div id="czSelN" style="font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div><div class="msg" id="czMsg"></div></div><button class="btn sel" id="czAct"></button></div>`,'tz');
+   <div class="czf"><div style="flex:0 1 38%;min-width:0"><div id="czSelN" style="font-weight:800;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div><div class="msg" id="czMsg"></div></div><button class="btn sel" id="czAct"></button></div>`,'tz');
   b.querySelector('#czBack').addEventListener('click',()=>{ if(CZ.sel){ CZ.sel=null; czRender(); } else closeUI(); });
   b.querySelector('#czAct').addEventListener('click',czAction);
   const pv=b.querySelector('.czp'); pv.addEventListener('pointerdown',e=>{ CZ.drag={x:e.clientX,a:CZ.ang,t:performance.now(),mv:0}; pv.setPointerCapture(e.pointerId); });
@@ -215,7 +265,7 @@ function czRender0(b){ const m=modelById(career.cur), lvl=levelOf(career.xp);
   const on=b.querySelector('.cztabs .chip.on'); if(on) on.scrollIntoView({inline:'center',block:'nearest',behavior:'instant'});
   const groups=czTabParts(CZ.tab);
   b.querySelector('.czg').innerHTML=groups.map(G=>`<div class="czsl">${esc(CZ_SLOTS[G.slot]||G.slot)}</div><div class="czcards">${G.parts.map(p=>{ const own=czOwned(m.id,p), fit=czIsFit(m.id,p), lock=!own&&lvl<(p.req||1);
-      return `<button class="card ${CZ.sel&&CZ.sel.id===p.id?'sel':''} ${lock?'lock':''}" data-p="${p.id}"><canvas width="240" height="120"></canvas>${fit?'<span class="ok">\u2713</span>':''}<div class="ci"><div class="cn">${esc(p.n)}</div><div class="cl">${p.lv?'Level '+p.lv:(p.stock?'Factory':'Style')}${lock?` \u2022 <span class="lk">\u{1F512} driver level ${p.req}</span>`:''}</div><div class="cp" style="${own?'color:#cfe':''}">${p.stock?'Free':own?(fit?'FITTED':'OWNED'):money(p.p)}</div><div class="cf">${esc(czFxText(p))}</div></div></button>`; }).join('')}</div>`).join('');
+      return `<button class="card ${CZ.sel&&CZ.sel.id===p.id?'sel':''} ${own?'own':''} ${fit?'fit':''} ${lock?'lock':''}" data-p="${p.id}"><canvas width="200" height="100"></canvas>${fit?'<span class="ok">\u2713</span>':''}<div class="ci"><div class="cn">${esc(p.n)}</div><div class="cl">${p.lv?'Lv '+p.lv:(p.stock?'Factory':'Style')}${lock?` \u2022 <span class="lk">\u{1F512} Lv ${p.req}</span>`:''}</div><div class="cp">${p.stock?'Free':own?(fit?'FITTED':'OWNED'):money(p.p)}</div><div class="cf">${esc(czFxText(p))}</div></div></button>`; }).join('')}</div>`).join('');
   b.querySelectorAll('.czg .card').forEach(el=>{ const p=el.dataset.p.endsWith('_0')?{id:el.dataset.p,slot:el.dataset.p.slice(0,-2),n:'Stock',p:0,req:1,stock:1}:czPart(el.dataset.p); czIcon(el.querySelector('canvas').getContext('2d'),p,240,120);
     el.addEventListener('click',()=>{ CZ.sel=(CZ.sel&&CZ.sel.id===p.id)?null:p; czRender(); }); });
   czFooter(b,m,lvl); czStatsHTML(b,m); }
@@ -239,9 +289,9 @@ function czPreview(b){ const cv=b.querySelector('.czp canvas'); if(!cv) return; 
   g.clearRect(0,0,W,H); if(!CZ.drag) CZ.ang+=CZ.spin*0.016; const lights=CZ.tab==='lights';
   b.querySelector('.vt').textContent=CZ.view==='top'?'TOP VIEW':'SIDE VIEW';
   // turntable
-  const cx=W/2, cy=H*0.52, R=Math.min(W*0.44,H*0.46), sq=CZ.view==='top'?1:0.22; g.save(); g.translate(cx,CZ.view==='top'?cy:H*0.8); g.scale(1,sq); const tg=g.createRadialGradient(0,0,R*0.2,0,0,R); tg.addColorStop(0,'#46536b'); tg.addColorStop(0.92,'#2a3243'); tg.addColorStop(1,'#151b26'); g.fillStyle=tg; g.beginPath(); g.arc(0,0,R,0,7); g.fill();
-  g.strokeStyle='rgba(245,184,46,0.5)'; g.lineWidth=3; g.beginPath(); g.arc(0,0,R*0.97,0,7); g.stroke(); g.strokeStyle='rgba(255,255,255,0.06)'; g.lineWidth=2; for(let k=0;k<12;k++){ const a=k/12*Math.PI*2+CZ.ang; g.beginPath(); g.moveTo(Math.cos(a)*R*0.3,Math.sin(a)*R*0.3); g.lineTo(Math.cos(a)*R*0.95,Math.sin(a)*R*0.95); g.stroke(); } g.restore();
-  if(CZ.view==='top'){ const A=czArt(m,career.colors[m.id]||m.cols[0],fit), sc=R*1.8/Math.max(A.H,A.W); g.save(); g.translate(cx,cy); g.rotate(CZ.ang);
+  const cx=W/2, cy=H*0.5, R=Math.min(W*0.5,H*0.52), sq=CZ.view==='top'?1:0.22; g.save(); g.translate(cx,CZ.view==='top'?cy:H*0.8); g.scale(1,sq); const tg=g.createRadialGradient(0,0,R*0.2,0,0,R); tg.addColorStop(0,'rgba(90,110,140,.55)'); tg.addColorStop(0.7,'rgba(42,50,67,.35)'); tg.addColorStop(1,'rgba(21,27,38,0)'); g.fillStyle=tg; g.beginPath(); g.arc(0,0,R,0,7); g.fill();
+  g.strokeStyle='rgba(245,184,46,0.22)'; g.lineWidth=1.5; g.setLineDash([6,8]); g.beginPath(); g.arc(0,0,R*0.97,0,7); g.stroke(); g.setLineDash([]); g.strokeStyle='rgba(255,255,255,0.035)'; g.lineWidth=2; for(let k=0;k<12;k++){ const a=k/12*Math.PI*2+CZ.ang; g.beginPath(); g.moveTo(Math.cos(a)*R*0.3,Math.sin(a)*R*0.3); g.lineTo(Math.cos(a)*R*0.95,Math.sin(a)*R*0.95); g.stroke(); } g.restore();
+  if(CZ.view==='top'){ const A=czArt(m,career.colors[m.id]||m.cols[0],fit), sc=R*1.95/Math.max(A.H,A.W); g.save(); g.translate(cx,cy); g.rotate(CZ.ang);
       g.globalAlpha=0.4; g.filter='blur(6px)'; g.drawImage(A.c,-A.W*sc/2+8,-A.H*sc/2+10,A.W*sc,A.H*sc); g.filter='none'; g.globalAlpha=1; g.drawImage(A.c,-A.W*sc/2,-A.H*sc/2,A.W*sc,A.H*sc);
       if(lights&&typeof czLightsPreview==='function') czLightsPreview(g,A,sc,fit,m); g.restore(); }
   else { const sc=Math.min(W/12,H/6.0), flip=Math.cos(CZ.ang)<0; g.save(); g.translate(cx,H*0.8); if(flip) g.scale(-1,1); czSide(g,1.8*sc,0,sc,m,career.colors[m.id]||m.cols[0],fit); if(lights&&typeof czLightsSide==='function') czLightsSide(g,1.8*sc,0,sc,m,fit); g.restore(); } }

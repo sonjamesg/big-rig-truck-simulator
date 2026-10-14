@@ -33,7 +33,7 @@ function toggleRefuel(){ const s=truck; if(refuel.active){ stopRefuel('Refuellin
 function drawFuelHUD(){
   const s=truck, x=14, y=14, w=190, h=74;
   ctx.save(); ctx.fillStyle='rgba(8,12,20,0.72)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(x,y,w,h,8):ctx.rect(x,y,w,h); ctx.fill();
-  ctx.fillStyle='#7dff9a'; ctx.font='bold 18px system-ui,sans-serif'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText('\u00a3'+s.money.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2}),x+10,y+24);
+  ctx.fillStyle='#7dff9a'; ctx.font='bold 18px system-ui,sans-serif'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText(money(s.money),x+10,y+24);
   const fr=s.fuel/s.tank; ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.font='bold 10px system-ui,sans-serif'; ctx.fillText('FUEL',x+10,y+44); ctx.fillText('E',x+48,y+44); ctx.fillText('F',x+174,y+44);
   ctx.fillStyle='#222'; ctx.fillRect(x+58,y+35,112,10); ctx.fillStyle=fr<0.15?(timeS%1<0.5?'#ff4d3a':'#7a1a10'):fr<0.3?'#ffb020':'#5fd36d'; ctx.fillRect(x+58,y+35,112*fr,10);
   ctx.strokeStyle='rgba(255,255,255,0.4)'; for(let k=1;k<4;k++){ ctx.beginPath(); ctx.moveTo(x+58+28*k,y+35); ctx.lineTo(x+58+28*k,y+45); ctx.stroke(); }

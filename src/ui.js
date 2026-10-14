@@ -126,7 +126,7 @@ function openModal(kind,html,cls){ uiInit(); const old=uiRoot.querySelector('.mb
   const b=document.createElement('div'); b.className='mback'; b.innerHTML=`<div class="modal ${cls||''}">${html}</div>`; uiRoot.appendChild(b); requestAnimationFrame(()=>b.classList.add('on'));
   b.addEventListener('pointerdown',e=>{ if(e.target===b&&kind!=='result') closeUI(); }); const x=b.querySelector('.x'); if(x) x.addEventListener('click',closeUI); return b; }
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const money=n=>'\u00a3'+Math.round(n).toLocaleString('en-GB');
+const money=n=>{n=+n||0;const a=Math.abs(n),s=n<0?'-':'';if(a>=1e9){const v=a/1e9;return s+'\u00a3'+(Math.abs(v-Math.round(v))<0.05?Math.round(v):+v.toFixed(1))+'B';}if(a>=1e6){const v=a/1e6;return s+'\u00a3'+(Math.abs(v-Math.round(v))<0.05?Math.round(v):+v.toFixed(1))+'M';}if(a>=10000){const v=a/1e3;return s+'\u00a3'+(Math.abs(v-Math.round(v))<0.05?Math.round(v):+v.toFixed(1))+'k';}return s+'\u00a3'+Math.round(a).toLocaleString('en-GB');};
 function trlSVG(type,col){ const body={curtain:`<rect x="14" y="6" width="58" height="20" rx="2" fill="${col}"/><g stroke="rgba(0,0,0,.25)">${[22,30,38,46,54,62].map(x=>`<line x1="${x}" y1="7" x2="${x}" y2="25"/>`).join('')}</g>`,
   box:`<rect x="14" y="5" width="58" height="21" rx="2" fill="#f4f4f4"/><rect x="14" y="20" width="58" height="3" fill="${col}"/>`,
   fridge:`<rect x="14" y="5" width="58" height="21" rx="2" fill="#eef3f8"/><rect x="10" y="9" width="5" height="10" fill="#4a4f57"/><text x="43" y="19" font-size="8" text-anchor="middle" fill="${col}" font-weight="900">\u2744 FRESH</text>`,
