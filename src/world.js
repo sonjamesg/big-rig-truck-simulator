@@ -301,9 +301,9 @@ function* genWorldSteps(){
   // winding country roads
   const wwA=road('h',MF.ys[1]+1,MF.X1+1,MF.X1+8,2,'lane'), wwB=road('h',900,500,540,2,'lane');
   link('lane',2,wwA,1,wwB,0,[[420,770],[470,850]],8,'Wendwood Lane');
-  const mA=road('h',1599,103,139,2,'rural'), mS=road('h',1599,MTN.x-14,MTN.x+8,2,'rural'); const spiral=[];
-  for(let a=Math.PI+0.35;a<7*Math.PI-0.5;a+=0.12){ const r=150-118*(a-Math.PI)/(6*Math.PI); spiral.push([MTN.x+r*Math.cos(a),MTN.y+r*Math.sin(a)]); }
-  link('rural',2,mA,1,mS,0,spiral,5,'Greyfell Summit Road');
+  const mA=road('h',1599,103,139,2,'rural'), mS=road('h',1599,MTN.x-14,MTN.x+8,2,'rural'); 
+  // v32: Greyfell Summit Road — direct, gently curving climb from the west road to the summit (old concentric spiral arcs removed: they read as disconnected dead-end rings — James 14 Oct)
+  link('rural',2,mA,1,mS,0,[[180,1592],[230,1606]],12,'Greyfell Summit Road');
   const dwN=road('v',900,103,300,2,'rural'); link('rural',2,dwN,1,DW.rows[1],0,[[880,360],[940,420]],10,'Old Desert Road');
   link('town',RW,DW.cols[1],0,apRoad,0,[],10);
   const fwS=road('v',FW.xs[1]+1,FW.Y1+1,FW.Y1+18,2,'rural'); link('rural',2,fwS,1,rbN,0,[[1480,1262],[1400,1252]],10,'Fenwick Road');
