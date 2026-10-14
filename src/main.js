@@ -248,6 +248,7 @@ function drawMinimap(){
   mpDrawMap(m=>x+(m/4-(cxT-span/2))*sc, m=>y+(m/4-(cyT-sh/2))*sc, false);
   for(const t of world.trailers){ if(t.coupled) continue; const mx=x+(t.x/4-(cxT-span/2))*sc, my=y+(t.y/4-(cyT-sh/2))*sc; if(mx<x||my<y||mx>x+w||my>y+h) continue; ctx.fillStyle=t.target?'#ffd600':'#4fd1ff'; ctx.fillRect(mx-2,my-3,4,6); }
   if(typeof railMapTrains==='function') railMapTrains(m=>x+(m-(cxT-span/2))*sc, m=>y+(m-(cyT-sh/2))*sc, sc, true);
+  if(typeof portMapTrucks==='function') portMapTrucks(m=>x+(m-(cxT-span/2))*sc, m=>y+(m-(cyT-sh/2))*sc, sc*0.6);
   for(const v of traffic.vs){ const mx=x+(v.x/4-(cxT-span/2))*sc, my=y+(v.y/4-(cyT-sh/2))*sc; if(mx<x||my<y||mx>x+w||my>y+h) continue; ctx.fillStyle=v.heavy?'#ff9f1a':'#ffffff'; ctx.fillRect(mx-1.5,my-1.5,3,3); }
   ctx.translate(x+w/2,y+h/2); ctx.rotate(s.h); if(nmK()>0.05){ ctx.shadowColor='rgba(255,221,51,0.95)'; ctx.shadowBlur=10; } ctx.fillStyle='#ffdd33'; ctx.strokeStyle='#000'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(0,-8); ctx.lineTo(6,7); ctx.lineTo(0,3); ctx.lineTo(-6,7); ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.restore();
