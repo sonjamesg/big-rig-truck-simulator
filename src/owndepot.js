@@ -289,8 +289,12 @@ function rlDrawExt(vx0,vy0,vx1,vy1,dark){ const S=PPM;
       if(c.k==='loco'){ ctx.fillStyle='#d35400'; ctx.fillRect(-l/2,-w/2,l,w); ctx.fillStyle='#2c3e50'; ctx.fillRect(l/2-0.9*M_T*S,-w*0.38,0.7*M_T*S,w*0.76); ctx.fillStyle='#f1c40f'; ctx.fillRect(l/2-4,-w/2,4,w); if(dark>0.05) dnLight(l/2+30,0,120,'rgba(255,250,220,0.95)',0.8); }
       else { ctx.fillStyle='#3d4249'; ctx.fillRect(-l/2,-w*0.42,l,w*0.84); if(c.box){ ctx.fillStyle=c.box; ctx.fillRect(-l/2+3,-w/2,l-6,w); ctx.fillStyle='rgba(0,0,0,.18)'; for(let q=6;q<l-6;q+=8) ctx.fillRect(-l/2+q,-w/2,2,w); } }
       ctx.restore(); } } }
-function ownMap(BX,BY,z){ if(!world.forSale) return; ctx.save(); for(const yd of ownYards()){ if(yd.rc){ ctx.strokeStyle='#5d4c3c'; ctx.lineWidth=Math.max(2,0.9*z); ctx.beginPath(); yd.rc.P.forEach((p,k)=>k?ctx.lineTo(BX(p[0]/M_T),BY(p[1]/M_T)):ctx.moveTo(BX(p[0]/M_T),BY(p[1]/M_T))); ctx.stroke();
+function ownMap(BX,BY,z){ if(!world.forSale) return; ctx.save(); ctx.lineCap='round'; ctx.lineJoin='round'; for(const yd of ownYards()){ if(yd.rc){
+    // rl2: draw the spur in the same style as the main line (dark bed + white sleeper dashes) so it reads as real track joining the network
+    const sp=()=>{ ctx.beginPath(); yd.rc.P.forEach((p,k)=>k?ctx.lineTo(BX(p[0]/M_T),BY(p[1]/M_T)):ctx.moveTo(BX(p[0]/M_T),BY(p[1]/M_T))); ctx.stroke(); };
+    ctx.strokeStyle='#1e1e1e'; ctx.lineWidth=Math.max(3.5,1.1*z); sp(); ctx.strokeStyle='#e8e8e8'; ctx.lineWidth=Math.max(1.2,0.35*z); ctx.setLineDash([Math.max(3,z),Math.max(3,z)]); sp(); ctx.setLineDash([]);
+    const J=yd.rc.P[yd.rc.P.length-1]; ctx.fillStyle='#f5b82e'; ctx.strokeStyle='#000'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(BX(J[0]/M_T),BY(J[1]/M_T),Math.max(3,0.8*z),0,7); ctx.fill(); ctx.stroke();
     const R=yd.rt; if(R&&(R.st==='ext'||R.st==='hold'||R.st==='main'||R.st==='back')){ const p=rlPos(yd,R.d); ctx.fillStyle='#ff6a13'; ctx.strokeStyle='#000'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(BX(p[0]/M_T),BY(p[1]/M_T),Math.max(4,1.2*z),0,7); ctx.fill(); ctx.stroke(); } } const y=BY(yd.y0+RAIL_Y), x0=BX(yd.x0), x1=BX(yd.x0+20);
-  ctx.strokeStyle='#5d4c3c'; ctx.lineWidth=Math.max(2,0.9*z); ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x1,y); ctx.stroke(); ctx.strokeStyle='#d0d4d8'; ctx.lineWidth=1; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x1,y); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle=yd.rc?'#1e1e1e':'#5d4c3c'; ctx.lineWidth=yd.rc?Math.max(3.5,1.1*z):Math.max(2,0.9*z); ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x1,y); ctx.stroke(); ctx.strokeStyle='#d0d4d8'; ctx.lineWidth=1; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x1,y); ctx.stroke(); ctx.setLineDash([]);
   const R=yd.rt; if(R&&R.x!=null&&R.x<19.5){ ctx.fillStyle='#d35400'; ctx.fillRect(BX(yd.x0+R.x),y-Math.max(2,0.6*z),Math.max(4,(Math.min(19.5,R.x+17)-R.x)*z),Math.max(4,1.2*z)); } }
   ctx.restore(); }
