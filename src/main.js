@@ -225,7 +225,7 @@ function drawHUD(){
 const MM={x:VW-14-220,y:VH-14-140,w:220,h:140};
 function mmColorsReady(){ return MINIMAP; }
 function drawMinimap(){
-  const s=truck, {x,y,w,h}=MM; const span=90;  // tiles across
+  MM.x=VW-14-MM.w; MM.y=VH-14-MM.h; const s=truck, {x,y,w,h}=MM; const span=90;  // tiles across
   ctx.save(); ctx.fillStyle='rgba(10,14,22,0.8)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(x-4,y-4,w+8,h+8,10):ctx.rect(x-4,y-4,w+8,h+8); ctx.fill();
   ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip();
   const cxT=s.x*PPM/TILE, cyT=s.y*PPM/TILE, sc=w/span, sh=h/sc;
