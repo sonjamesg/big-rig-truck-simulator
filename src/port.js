@@ -104,6 +104,8 @@ function drawPortLow(vx0,vy0,vx1,vy1){ for(const P of portList()){ if(!P.berths|
   // ships (beneath the tall bridge decks) + the decks' shadow and piers
   const ships=(P.cur&&P.cur.ships)||[]; ctx.save(); if(P.brg.length) portClipBridges(P);
   for(const o of ships) if(o.s&&portShipVis(P,o,vx0,vy0,vx1,vy1)) drawShip(P,o);
+  if(typeof DN!=='undefined'&&DN.dark>0.05) for(const o of ships) if(o.s&&portShipVis(P,o,vx0,vy0,vx1,vy1)){ const p=o.pose, f=[Math.cos(p.h),Math.sin(p.h)];   // deck floodlights cut the darkness over the whole ship
+    for(let a=-SHIP.L/2+2;a<=SHIP.L/2-3;a+=6){ const w=PL(P,p.u+f[0]*a,p.v+f[1]*a); dnLight(w[0]*TILE,w[1]*TILE,SHIP.W*TILE*1.5,'rgba(255,228,170,0.9)',0.75); } }
   ctx.restore(); ctx.restore();
   if(P.brgW&&P.brgW.box){ const b=P.brgW.box; if(b[2]*TILE>vx0-200&&b[0]*TILE<vx1+200&&b[3]*TILE>vy0-200&&b[1]*TILE<vy1+200){ ctx.save(); ctx.beginPath(); ctx.rect(-1e5,-1e5,2e5,2e5); for(const r of P.brgW.runs) ctx.rect(r[0]*TILE,r[1]*TILE,r[2]*TILE,1*TILE); ctx.clip('evenodd');
     const off=2.4*TILE; ctx.fillStyle='rgba(0,0,0,0.33)'; for(const r of P.brgW.runs) ctx.fillRect(r[0]*TILE+off,r[1]*TILE+off,r[2]*TILE,TILE);
@@ -167,11 +169,37 @@ function drawPortNight(vx0,vy0,vx1,vy1){ const K=typeof DN!=='undefined'?DN.dark
       for(const [bv,occ] of [[P.vA,!!(P.cur&&P.cur.shA)],[P.vB,!!(P.cur&&P.cur.shB)]]) for(const e of [-14,14]) dot(-0.4,bv+e,P,null,34,1);
       dot(P.lorU-1.2,P.lor[0],P,null,90,0.8); }
     for(const o of (P.cur?P.cur.ships:[])){ const p=o.pose, f=[Math.cos(p.h),Math.sin(p.h)], l=[-f[1],f[0]];
-      dot(p.u+f[0]*12,p.v+f[1]*12,P,null,26,1); dot(p.u-f[0]*11.5,p.v-f[1]*11.5,P,null,70,0.6); } }
+      dot(p.u+f[0]*12,p.v+f[1]*12,P,null,26,1); dot(p.u-f[0]*11.5,p.v-f[1]*11.5,P,null,40,0.35); } }
   ctx.globalAlpha=1; ctx.restore();
-  // coloured sidelights (normal compositing so they read red / green)
-  for(const P of portList()) for(const o of (P.cur?P.cur.ships:[])){ const p=o.pose, f=[Math.cos(p.h),Math.sin(p.h)], l=[-f[1],f[0]]; const det=P.U[0]*P.V[1]-P.U[1]*P.V[0]; for(const [sd0,col] of [[-1,'#ff3b30'],[1,'#34c759']]){ const sd=sd0*det; const w=PL(P,p.u+f[0]*9+l[0]*sd*2.3,p.v+f[1]*9+l[1]*sd*2.3); const x=w[0]*TILE,y=w[1]*TILE; if(x<vx0||x>vx1||y<vy0||y>vy1) continue; ctx.globalAlpha=K; ctx.fillStyle=col; ctx.beginPath(); ctx.arc(x,y,5,0,7); ctx.fill(); } }
+  // ship night dressing (drawn above darkness, rain and fog): hull outline + glow, lit containers, deck floods, bridge windows, nav lights
+  for(const P of portList()) for(const o of (P.cur?P.cur.ships:[])) if(o.s&&portShipVis(P,o,vx0,vy0,vx1,vy1)) shipNight(P,o,K);
   ctx.globalAlpha=1; }
+function shipNight(P,o,K){ const T_=TILE, p=o.pose, s=o.s, L=SHIP.L*T_, W=SHIP.W*T_, G_=portGlow(), det=Math.sign(P.U[0]*P.V[1]-P.U[1]*P.V[0])||1;
+  ctx.save(); portFrame(P); if(P.brg&&P.brg.length) portClipBridges(P); ctx.translate(p.u*T_,p.v*T_); ctx.rotate(p.h);
+  const hull=()=>{ ctx.beginPath(); ctx.moveTo(-L/2+6,-W/2); ctx.lineTo(L/2-4*T_,-W/2); ctx.quadraticCurveTo(L/2-0.5*T_,-W/2,L/2,0); ctx.quadraticCurveTo(L/2-0.5*T_,W/2,L/2-4*T_,W/2); ctx.lineTo(-L/2+6,W/2); ctx.quadraticCurveTo(-L/2,W/2,-L/2,W/2-8); ctx.lineTo(-L/2,-W/2+8); ctx.quadraticCurveTo(-L/2,-W/2,-L/2+6,-W/2); ctx.closePath(); };
+  // soft halo + crisp light outline so the hull shape reads on dark water
+  ctx.globalCompositeOperation='lighter'; hull(); ctx.lineJoin='round'; ctx.strokeStyle='rgba(120,170,255,'+(0.22*K)+')'; ctx.lineWidth=14; ctx.stroke(); ctx.lineWidth=6; ctx.strokeStyle='rgba(150,195,255,'+(0.3*K)+')'; ctx.stroke();
+  ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=0.55*K; hull(); ctx.fillStyle=s.hull; ctx.fill(); ctx.globalAlpha=1; hull(); ctx.strokeStyle='rgba(225,236,255,'+(0.85*K)+')'; ctx.lineWidth=2.2; ctx.stroke();
+  // containers re-lit by the deck floods
+  ctx.globalAlpha=0.7*K; for(let j=0;j<SHIP.N;j++){ const c=s.has[j]; if(c) drawBox(boxAx(j)*T_,0,3*T_-3,2.4*T_,c); } ctx.globalAlpha=1;
+  ctx.globalCompositeOperation='lighter'; ctx.fillStyle='rgba(255,215,150,'+(0.16*K)+')'; ctx.fillRect(boxAx(0)*T_-1.6*T_,-1.4*T_,(boxAx(SHIP.N-1)-boxAx(0)+3.2)*T_,2.8*T_);
+  // bridge house: lit and windowed
+  ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=0.45*K; ctx.fillStyle='#ecf0f1'; ctx.fillRect(-L/2+0.6*T_,-W/2+8,2.8*T_,W-16); ctx.globalAlpha=1;
+  ctx.shadowColor='rgba(255,210,120,1)'; ctx.shadowBlur=8; ctx.fillStyle='rgba(255,224,140,'+K+')';
+  for(let y=-W/2+11;y<W/2-12;y+=5) ctx.fillRect(-L/2+3.0*T_,y,0.35*T_,3);   // forward-facing bridge windows
+  for(let x=-L/2+1.0*T_;x<-L/2+2.9*T_;x+=5) for(const y of [-W/2+9,W/2-11]) ctx.fillRect(x,y,3,2);   // side windows
+  ctx.shadowBlur=0;
+  // deck flood posts along both rails
+  ctx.globalCompositeOperation='lighter'; const glow=(x,y,r,a)=>{ ctx.globalAlpha=a*K; ctx.drawImage(G_,x-r,y-r,2*r,2*r); };
+  for(let x=boxAx(0)*T_;x<=boxAx(SHIP.N-1)*T_+1;x+=6*T_) for(const y of [-W/2+3,W/2-3]) glow(x,y,26,0.55);
+  // white masthead (forward + aft mast) and stern light
+  ctx.globalAlpha=1; const lamp=(x,y,col,r,h)=>{ ctx.globalCompositeOperation='lighter'; glow(x,y,h,0.9); ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=K; ctx.fillStyle=col; ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.fill(); ctx.globalAlpha=1; };
+  lamp(L/2-3.2*T_,0,'#ffffff',3,26); lamp(-L/2+1.6*T_,0,'#ffffff',2.6,16); lamp(-L/2+1,0,'#fff6e0',2.4,12);
+  // sidelights: red to port, green to starboard (on the bridge wings)
+  ctx.globalCompositeOperation='source-over'; for(const [sd0,col,hc] of [[-1,'#ff3b30','rgba(255,50,40,'],[1,'#34e070','rgba(40,230,100,']]){ const y=sd0*det*(W/2+1), x=-L/2+2.2*T_;
+    const g=ctx.createRadialGradient(x,y,0,x,y,22); g.addColorStop(0,hc+(0.85*K)+')'); g.addColorStop(1,hc+'0)'); ctx.fillStyle=g; ctx.fillRect(x-22,y-22,44,44);
+    ctx.globalAlpha=K; ctx.fillStyle=col; ctx.beginPath(); ctx.arc(x,y,3.6,0,7); ctx.fill(); ctx.globalAlpha=1; }
+  ctx.restore(); ctx.globalCompositeOperation='source-over'; ctx.globalAlpha=1; }
 // world map: shipping lanes + live ships
 function portBigMap(BX,BY,z){ for(const P of portList()){ if(!P.ph) continue; ctx.save(); ctx.setLineDash([5,5]); ctx.lineWidth=Math.max(1.5,z*0.8);
   for(const [q,col] of [[P.ph[0],'rgba(120,220,255,0.85)'],[P.ph[P.ph.length-1],'rgba(255,200,120,0.85)']]){ ctx.strokeStyle=col; ctx.beginPath(); q.pts.forEach((p,i)=>{ const w=PL(P,p[0],p[1]); i?ctx.lineTo(BX(w[0]),BY(w[1])):ctx.moveTo(BX(w[0]),BY(w[1])); }); ctx.stroke(); }

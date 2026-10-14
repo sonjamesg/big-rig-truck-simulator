@@ -229,6 +229,10 @@ function railBuild(objs){
   const cum=[0]; for(let i=1;i<=raw.length;i++){ const a=raw[i-1],b=raw[i%raw.length]; cum.push(cum[i-1]+Math.hypot(b[0]-a[0],b[1]-a[1])); }
   const L=Math.floor(cum[raw.length]); RAIL.L=L; const X=new Float32Array(L),Y=new Float32Array(L),NX=new Float32Array(L),NY=new Float32Array(L);
   let j=0; for(let s=0;s<L;s++){ const S=s*cum[raw.length]/L; while(cum[j+1]<S) j++; const a=raw[j],b=raw[(j+1)%raw.length],f=(S-cum[j])/((cum[j+1]-cum[j])||1); X[s]=a[0]+(b[0]-a[0])*f; Y[s]=a[1]+(b[1]-a[1])*f; }
+  { const L0=L; let A=X, B=Y; for(let pass=0;pass<3;pass++){ const A2=new Float32Array(L0), B2=new Float32Array(L0), K=5; let sx=0, sy=0; for(let d=-K;d<=K;d++){ sx+=A[(d+L0)%L0]; sy+=B[(d+L0)%L0]; }
+      for(let i=0;i<L0;i++){ A2[i]=sx/(2*K+1); B2[i]=sy/(2*K+1); const o=(i-K+L0)%L0, n=(i+K+1)%L0; sx+=A[n]-A[o]; sy+=B[n]-B[o]; } A=A2; B=B2; }
+    const c2=new Float64Array(L0+1); for(let i=1;i<=L0;i++){ const a=i-1, b=i%L0; c2[i]=c2[i-1]+Math.hypot(A[b]-A[a],B[b]-B[a]); }
+    let q=0; const tot=c2[L0]; for(let s=0;s<L0;s++){ const S2=s*tot/L0; while(c2[q+1]<S2) q++; const b=(q+1)%L0, f=(S2-c2[q])/((c2[q+1]-c2[q])||1); X[s]=A[q]+(A[b]-A[q])*f; Y[s]=B[q]+(B[b]-B[q])*f; } }   // smoothed centreline: no kinks at straight/arc joins
   for(let s=0;s<L;s++){ const a=(s-2+L)%L,b=(s+2)%L, tx=X[b]-X[a], ty=Y[b]-Y[a], l=Math.hypot(tx,ty)||1; NX[s]=ty/l; NY[s]=-tx/l; }   // left normal of +s travel
   Object.assign(RAIL,{X,Y,NX,NY});
   // stations
@@ -421,7 +425,7 @@ function drawRailBridges(vx0,vy0,vx1,vy1){ const S=PPM;
     ctx.restore(); } }
 function railQuad(g,s0,s1,w0,w1,wf){ const L=RAIL.L; g.beginPath(); for(let s=s0;s<=s1;s+=2){ const i=rlMod(Math.round(s),L), w=wf?wf(s,w0):w0; const x=(RAIL.X[i]+RAIL.NX[i]*w)*PPM, y=(RAIL.Y[i]+RAIL.NY[i]*w)*PPM; s===s0?g.moveTo(x,y):g.lineTo(x,y); }
   for(let s=s1;s>=s0;s-=2){ const i=rlMod(Math.round(s),L), w=wf?wf(s,w1):w1; g.lineTo((RAIL.X[i]+RAIL.NX[i]*w)*PPM,(RAIL.Y[i]+RAIL.NY[i]*w)*PPM); } g.closePath(); }
-function railPt(s,w){ const L=RAIL.L, sf=rlMod(s,L), i=Math.floor(sf), j=(i+1)%L, f=sf-i; const x=RAIL.X[i]+(RAIL.X[j]-RAIL.X[i])*f, y=RAIL.Y[i]+(RAIL.Y[j]-RAIL.Y[i])*f; return [x+RAIL.NX[i]*w,y+RAIL.NY[i]*w]; }
+function railPt(s,w){ const L=RAIL.L, sf=rlMod(s,L), i=Math.floor(sf), j=(i+1)%L, f=sf-i; const x=RAIL.X[i]+(RAIL.X[j]-RAIL.X[i])*f, y=RAIL.Y[i]+(RAIL.Y[j]-RAIL.Y[i])*f; if(!w) return [x,y]; let nx=RAIL.NX[i]+(RAIL.NX[j]-RAIL.NX[i])*f, ny=RAIL.NY[i]+(RAIL.NY[j]-RAIL.NY[i])*f; const nl=Math.hypot(nx,ny)||1; return [x+nx/nl*w,y+ny/nl*w]; }
 function railPlats(st){ const hub=st.kind==='hub'; return hub?[[3.6,7.5],[12.7,16.6]]:[[3.6,7.4]]; }
 function railBakeStation(g,st){ const a=st.s-st.len/2, b=st.s+st.len/2, S=PPM, hub=st.kind==='hub';
   for(const [w0,w1] of railPlats(st)){ const ww=(s,w)=>w; railQuad(g,a,b,w0,w1,ww); g.fillStyle='rgba(0,0,0,0.3)'; g.save(); g.translate(5,6); g.fill(); g.restore(); g.fillStyle='#cfc9bd'; g.fill(); g.strokeStyle='#8f897d'; g.lineWidth=2; g.stroke();
@@ -498,7 +502,9 @@ function railSprite(c,lit){ const key=c.k+'|'+c.liv+'|'+(c.flip?1:0)+'|'+(c.seed
   sp={c:cv,S,W,L}; RAIL.spr[key]=sp; return sp; }
 // ---------- dynamic drawing
 function railCarPose(tr,c,head,trk){ const dir=tr.pax?1:-1, sc=head-dir*c.off, w=s=>tr.pax?(tr.plat?RW_P+HUB_W*RAIL.hubB(s):RW_P):RW_F;
-  const a=railPt(sc+dir*c.L/2,w(sc+dir*c.L/2)), b=railPt(sc-dir*c.L/2,w(sc-dir*c.L/2)); return {x:(a[0]+b[0])/2,y:(a[1]+b[1])/2,ang:Math.atan2(a[1]-b[1],a[0]-b[0]),fx:a[0],fy:a[1]}; }
+  const bo=c.L/2-3.2, sf=sc+dir*bo, sr=sc-dir*bo, a=railPt(sf,w(sf)), b=railPt(sr,w(sr)), ang=Math.atan2(a[1]-b[1],a[0]-b[0]), x=(a[0]+b[0])/2, y=(a[1]+b[1])/2, ca=Math.cos(ang), sa=Math.sin(ang);   // front + rear bogies sit on the curve
+  return {x,y,ang,fx:x+ca*c.L/2,fy:y+sa*c.L/2,rx:x-ca*c.L/2,ry:y-sa*c.L/2}; }
+function railTrainPoses(tr,t){ const head=railHead(tr,t); return tr.cars.map(c=>Object.assign(railCarPose(tr,c,head),{c})); }
 function drawRail(vx0,vy0,vx1,vy1){ if(!RAIL.ready) return; railFrame(); const t=railTime(), S=PPM, m=300, lit=DN.dark>0.3;
   const inV=(x,y,r)=>x*S>vx0-r&&x*S<vx1+r&&y*S>vy0-r&&y*S<vy1+r;
   // motorway overbridges (rails cross above the motorway)
@@ -510,7 +516,9 @@ function drawRail(vx0,vy0,vx1,vy1){ if(!RAIL.ready) return; railFrame(); const t
   if(RAIL.hub&&inV(RAIL.X[RAIL.hub.s],RAIL.Y[RAIL.hub.s],2400)){ const H=RAIL.hub.s; [[-6.7,RAIL_FRT[0],60],[-11.3,RAIL_FRT[1],70]].forEach(([w,sp,s0],q)=>{ const cs=railConsist(Object.assign({},sp,{cars:5+q*2}),true); for(const c of cs.cars){ const sc=H+s0-c.off, a=railPt(sc+c.L/2,w), b=railPt(sc-c.L/2,w); railBlit(c,(a[0]+b[0])/2,(a[1]+b[1])/2,Math.atan2(a[1]-b[1],a[0]-b[0]),lit); } }); }
   // trains
   for(const tr of RAIL.trains){ const head=railHead(tr,t); const hp=railPt(head,0); const nearAny=inV(hp[0],hp[1],tr.len*S+m)||inV(...railPt(head-(tr.pax?1:-1)*tr.len,0),m); if(!nearAny) continue;
-    for(let i=0;i<tr.cars.length;i++){ const c=tr.cars[i], P=railCarPose(tr,c,head); if(!inV(P.x,P.y,m)) continue; railBlit(c,P.x,P.y,P.ang,lit);
+    let prev=null; for(let i=0;i<tr.cars.length;i++){ const c=tr.cars[i], P=railCarPose(tr,c,head), pv=prev; prev=P; if(!inV(P.x,P.y,m)) continue;
+      if(pv){ ctx.save(); ctx.lineCap='butt'; ctx.strokeStyle=tr.pax?'#2b2f36':'#3a3530'; ctx.lineWidth=(tr.pax?2.3:0.5)*S; ctx.beginPath(); ctx.moveTo(pv.rx*S,pv.ry*S); ctx.lineTo(P.fx*S,P.fy*S); ctx.stroke(); ctx.restore(); }   // gangway bellows / coupler bridge the gap on curves
+      railBlit(c,P.x,P.y,P.ang,lit);
       if(i===0&&DN.dark>0.05){ dnLight(P.fx*S+Math.cos(P.ang)*14,P.fy*S+Math.sin(P.ang)*14,70,'rgba(255,250,225,0.95)',0.9); }
       if(i===tr.cars.length-1&&DN.dark>0.05){ const bx=(P.x-Math.cos(P.ang)*c.L/2)*S, by=(P.y-Math.sin(P.ang)*c.L/2)*S; dnLight(bx,by,24,'rgba(255,40,30,0.9)',0.8); }
       if(lit&&c.k!=='hop'&&c.k!=='flat'&&c.k!=='tank'&&c.k!=='loco') dnLight(P.x*S,P.y*S,c.L*S*0.55,'rgba(255,220,150,0.5)',0.5); }
@@ -548,7 +556,38 @@ function railMinimap(){ if(!RAIL.ready||!MINIMAP) return; const g=MINIMAP.getCon
   g.fillStyle='#ffffff'; for(const st of RAIL.stations){ g.fillRect(Math.floor(RAIL.X[st.s]/M_T)-1,Math.floor(RAIL.Y[st.s]/M_T)-1,3,3); } }
 function railBigMap(BX,BY,z,R){ R=R||5; if(!RAIL.ready) return; ctx.save(); ctx.lineWidth=Math.max(2,z*1.2); ctx.strokeStyle='rgba(40,30,25,0.9)'; ctx.setLineDash([]); ctx.beginPath(); for(let s=0;s<=RAIL.L;s+=8){ const i=s%RAIL.L, x=BX(RAIL.X[i]/M_T), y=BY(RAIL.Y[i]/M_T); s?ctx.lineTo(x,y):ctx.moveTo(x,y); } ctx.stroke();
   ctx.strokeStyle='rgba(255,255,255,0.85)'; ctx.lineWidth=Math.max(1,z*0.5); ctx.setLineDash([6,6]); ctx.stroke(); ctx.setLineDash([]);
-  const t=railTime(); for(const tr of RAIL.trains){ const h=railHead(tr,t); ctx.fillStyle=tr.pax?'#4fd1ff':'#ff9f1a'; ctx.beginPath(); ctx.arc(BX(RAIL.X[Math.floor(h)]/M_T),BY(RAIL.Y[Math.floor(h)]/M_T),4,0,7); ctx.fill(); }
+  railMapTrains(BX,BY,z,false);
   for(const st of RAIL.stations){ const x=BX(RAIL.X[st.s]/M_T), y=BY(RAIL.Y[st.s]/M_T); ctx.fillStyle='#fff'; ctx.strokeStyle='#16335c'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,st.kind==='hub'?R:R*0.75,0,7); ctx.fill(); ctx.stroke(); if(R>=9){ ctx.fillStyle='#16335c'; ctx.font='bold '+Math.round(R*0.95)+'px system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(st.kind==='hub'?'H':'R',x,y+0.5); ctx.textBaseline='alphabetic'; }
     if(z>0.9) mapLabel('\u{1F686} '+st.name,x+R*0.75+4,y,'#d9ecff'); }
   ctx.restore(); }
+
+// ---------- trains on the world map / minimap: dots when zoomed out, a loco + coaches/wagons along the track when zoomed in
+const RAIL_MAPC={pax:{body:'#4fd1ff',cab:'#0f6fb8',edge:'#e9fbff'},frt:{loco:'#ff9f1a',edge:'#2a1a08',hop:'#8a5a3c',tank:'#aab3bd',flat:'#6b6f75'}};
+const RAIL_BOX=['#d63b2f','#2e86de','#f5b82e','#27ae60','#8e44ad','#e67e22'];
+function railTrainInfo(tr){ if(tr.pax){ const h=railHead(tr,railTime()), L=RAIL.L; let nx=null, bd=1e18; for(const st of RAIL.stations){ const d=rlMod(st.s-h,L); if(d>2&&d<bd){ bd=d; nx=st; } } const dw=railDwelling(tr,railTime());
+    return ['Passenger train: '+tr.sp.n, (dw?'At '+dw.st.name:'Next stop '+(nx?nx.name:'-'))+' \u00b7 '+tr.cars.length+' cars']; }
+  return ['Freight train: '+tr.sp.n, (tr.sp.c==='hop'?'Coal hoppers':tr.sp.c==='tank'?'Fuel tankers':tr.sp.c==='flat'?'Container flats':'Mixed wagons')+' \u00b7 '+tr.cars.filter(c=>c.k!=='loco').length+' wagons \u00b7 runs non-stop']; }
+function railMapTrains(BX,BY,z,mini){ if(!RAIL.ready) return; const t=railTime(); const hits=mini?null:(RAIL.mapHits=[]); const night=typeof nmK==='function'?nmK():0;
+  ctx.save(); ctx.lineJoin='round';
+  for(const tr of RAIL.trains){ const ps=railTrainPoses(tr,t), lenPx=tr.len/M_T*z, mid=ps[ps.length>>1];
+    if(lenPx<26){ const q=ps[0], x=BX(q.x/M_T), y=BY(q.y/M_T); ctx.fillStyle=tr.pax?RAIL_MAPC.pax.body:RAIL_MAPC.frt.loco; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.lineWidth=1.5; ctx.beginPath(); if(tr.pax) ctx.arc(x,y,4.5,0,7); else ctx.rect(x-4,y-4,8,8); ctx.fill(); ctx.stroke(); if(hits) hits.push([x,y,10,tr]); continue; }
+    const W=Math.max(mini?3.6:4.5,Math.min(14,0.95*z)), sel=RAIL.mapSel===tr;
+    if(night>0.05||sel){ ctx.shadowColor=sel?'rgba(255,255,255,1)':tr.pax?'rgba(80,210,255,0.9)':'rgba(255,160,40,0.9)'; ctx.shadowBlur=sel?14:8*Math.max(night,0.5); }
+    for(const P of ps){ const c=P.c, x=BX(P.x/M_T), y=BY(P.y/M_T), l=Math.max(2,c.L/M_T*z-Math.max(1,0.3*z)); ctx.save(); ctx.translate(x,y); ctx.rotate(P.ang);
+      const loco=c.k==='loco'||c.k==='hst'||c.first||(c.flip&&!c.mid&&c.k!=='coach'), nose=c.k==='loco'||c.k==='hst'||c.first||c.flip;
+      const rr=(a,b,w,h,r)=>{ ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(a,b,w,h,r); else ctx.rect(a,b,w,h); };
+      if(tr.pax){ rr(-l/2,-W/2,l,W,W*0.45); ctx.fillStyle=RAIL_MAPC.pax.body; ctx.fill(); ctx.lineWidth=Math.max(1,W*0.14); ctx.strokeStyle='#0a3358'; ctx.stroke(); ctx.shadowBlur=0;
+        if(W>=6){ ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.fillRect(-l/2+W*0.4,-W*0.14,l-W*0.8,W*0.28); }   // window band
+        if(nose){ const sgn=c.flip?-1:1; ctx.fillStyle=RAIL_MAPC.pax.cab; ctx.beginPath(); ctx.moveTo(sgn*(l/2),0); ctx.lineTo(sgn*(l/2-W*1.1),-W/2+0.5); ctx.lineTo(sgn*(l/2-W*1.1),W/2-0.5); ctx.closePath(); ctx.fill(); } }
+      else { const k=c.k; if(k==='loco'){ rr(-l/2,-W/2,l,W,W*0.2); ctx.fillStyle=RAIL_MAPC.frt.loco; ctx.fill(); ctx.lineWidth=Math.max(1,W*0.14); ctx.strokeStyle=RAIL_MAPC.frt.edge; ctx.stroke(); ctx.shadowBlur=0; ctx.fillStyle='#2a1a08'; ctx.fillRect(l/2-W*0.9,-W/2+1,W*0.45,W-2); }
+        else { ctx.fillStyle=k==='hop'?RAIL_MAPC.frt.hop:k==='tank'?RAIL_MAPC.frt.tank:RAIL_MAPC.frt.flat; if(k==='tank') rr(-l/2,-W*0.42,l,W*0.84,W*0.42); else ctx.beginPath(), ctx.rect(-l/2,-W*0.42,l,W*0.84); ctx.fill(); ctx.lineWidth=Math.max(1,W*0.12); ctx.strokeStyle='#ff9f1a'; ctx.stroke(); ctx.shadowBlur=0;
+          if(k==='flat'){ ctx.fillStyle=RAIL_BOX[(c.seed||0)%RAIL_BOX.length]; ctx.fillRect(-l/2+1,-W*0.32,l-2,W*0.64); }
+          if(k==='hop'&&W>=6){ ctx.fillStyle='#1d1a18'; ctx.fillRect(-l/2+W*0.25,-W*0.25,l-W*0.5,W*0.5); } } }
+      ctx.restore(); if(night>0.05||sel){ ctx.shadowColor=sel?'rgba(255,255,255,1)':tr.pax?'rgba(80,210,255,0.9)':'rgba(255,160,40,0.9)'; ctx.shadowBlur=sel?14:8*Math.max(night,0.5); }
+      if(hits) hits.push([x,y,Math.max(9,l/2),tr]); }
+    ctx.shadowBlur=0; }
+  ctx.restore();
+  if(!mini&&RAIL.mapSel){ const tr=RAIL.mapSel, q=railTrainPoses(tr,t)[0], x=BX(q.x/M_T), y=BY(q.y/M_T), [l1,l2]=railTrainInfo(tr); ctx.save(); ctx.font='bold 15px system-ui,sans-serif'; const w=Math.max(ctx.measureText(l1).width,(ctx.font='13px system-ui,sans-serif',ctx.measureText(l2).width))+26, h=50;
+    const bx=Math.max(24,Math.min(VW-w-96,x+14)), by=Math.max(46,Math.min(VH-h-24,y-h-12)); ctx.fillStyle='rgba(10,14,22,0.95)'; ctx.fillRect(bx,by,w,h); ctx.strokeStyle=tr.pax?RAIL_MAPC.pax.body:RAIL_MAPC.frt.loco; ctx.lineWidth=2; ctx.strokeRect(bx,by,w,h);
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillStyle=tr.pax?RAIL_MAPC.pax.body:RAIL_MAPC.frt.loco; ctx.font='bold 15px system-ui,sans-serif'; ctx.fillText(l1,bx+13,by+21); ctx.fillStyle='#e8eef5'; ctx.font='13px system-ui,sans-serif'; ctx.fillText(l2,bx+13,by+40); ctx.restore(); } }
+function railMapTrainAt(x,y){ let best=null, bd=1e9; for(const [hx,hy,r,tr] of (RAIL.mapHits||[])){ const d=Math.hypot(x-hx,y-hy); if(d<r+8&&d<bd){ bd=d; best=tr; } } return best; }
