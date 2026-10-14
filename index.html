@@ -1509,7 +1509,17 @@ function stepTruck(s,inp,dt){ if(typeof FX!=='undefined'&&FX.boom){ s.v=0; s.thr
   // max articulation ~87 deg: at the limit the cab pushes the trailer round (angle held) instead of freezing.
   // (old code halved reverse speed every frame here, which stalled the rig on full-lock reversing)
   let rel=Math.atan2(Math.sin(s.h-s.th),Math.cos(s.h-s.th)); const JK=1.52;
-  if(Math.abs(rel)>JK){ s.th=s.h-Math.sign(rel)*JK; s.jkLimit=true; } else s.jkLimit=false;
+  if(Math.abs(rel)>JK){
+    // Jackknife limit: cab and trailer lock together as one rigid body. Both the cab drive axle and the trailer axle
+    // must roll along their own headings (no sideways slide), so the rig pivots about the point where the two axle
+    // lines cross - the steer wheels just scrub. (Old code clamped th to the cab, which slid the trailer sideways and
+    // made the whole rig crab backwards instead of turning.)
+    const pr=Math.atan2(Math.sin(prev.h-prev.th),Math.cos(prev.h-prev.th)), lr=Math.sign(rel)*Math.min(JK,Math.abs(pr));   // keep the angle we had: no snap
+    Object.assign(s,{x:prev.x,y:prev.y,h:prev.h}); s.th=prev.h-lr;
+    const cr=Math.cos(lr), sr=Math.sin(lr), AdotT=0.3*cr-TRL.axle, a=AdotT/(-sr);   // signed distance along cab right to pivot
+    const w=s.v/a, ph=w*dt, rc=rgt(s.h), Px=s.x+rc[0]*a, Py=s.y+rc[1]*a, dx=s.x-Px, dy=s.y-Py, c=Math.cos(ph), sn=Math.sin(ph);
+    s.x=Px+dx*c-dy*sn; s.y=Py+dx*sn+dy*c; s.h+=ph; s.th+=ph; s.jkLimit=true;
+  } else s.jkLimit=false;
   }
   // ----- collisions
   const hit=hitTest(s)||(typeof trafficHitTruck==='function'&&trafficHitTruck(s)?'veh':null)||(typeof railBarrierHit==='function'&&railBarrierHit(s,prev)?'barrier':null);
