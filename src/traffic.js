@@ -440,8 +440,8 @@ function stepVeh(v,dt,pbs){
     }
     else if(m.kind==='major'&&m.turn&&!m.swOk){ const gap=m.d-front-0.8; if(gap<8&&gap>-0.5){ if(turnSweepBlocked(v,m)) acc=Math.min(acc,idmAcc(v,v0,Math.max(0.1,gap),0)); else if(gap<2) m.swOk=true; } }
   }
-  if(v.L>8||v.trl){ for(const m of v.mk){ if(!m.turn||m.dEnd===undefined||v.s+v.L/2<m.d||v.s+v.L/2>m.dEnd) continue;   // v25: long vehicle mid-turn - stop rather than sweep into a car stood in the way
-      if(turnSweepBlocked(v,{d:v.s+v.L/2+0.5,dEnd:Math.min(m.dEnd,v.s+v.L/2+8)})) acc=Math.min(acc,-6); break; } }
+  { for(const m of v.mk){ if(!m.turn||m.dEnd===undefined||v.s+v.L/2<m.d||v.s-v.L/2-(v.trl?14:0)>m.dEnd) continue;   // v25: long vehicle mid-turn - stop rather than sweep into a car stood in the way
+      if(turnSweepBlocked(v,{d:v.s+v.L/2+0.5,dEnd:Math.min(m.dEnd,v.s+v.L/2+6)})) acc=Math.min(acc,idmAcc(v,v0,0.3,0)); break; } }
   if(typeof railStopAcc==='function'){ const ra=railStopAcc(v,v0); if(ra<acc) acc=ra; }
   v.sig=sig;
   // leader search along own path
@@ -453,9 +453,9 @@ function stepVeh(v,dt,pbs){
     for(let k=0;k<17;k++){ const sd=front+0.4+k*2.5; const p=pathAt(v,sd); const px=p[0]+v.offX, py=p[1]+v.offY;
       for(const b of cands){ if(ptBoxDist(px,py,b)<half){ const g=sd-front; if(g<lgap){ lgap=g; const rel=Math.cos(b.h-v.h); lvel=Math.max(0,(b.vel||0)*rel); lplayer=!!b.player; lveh=b.veh||null; } } }
       if(lgap<1e8) break; } }
-  if(sig&&cands.length&&lgap>0.5){ const half=v.W/2+0.3;   // v25: mid lane change — never slide sideways into a car alongside in the target lane
-    for(let sd=v.s-v.L/2+0.5;sd<front+0.4&&lgap>0.5;sd+=1.5){ const p=pathAt(v,sd+3), q=pathAt(v,sd); const px=p[0]+v.offX, py=p[1]+v.offY;
-      for(const b of cands){ if(b.veh&&b.veh.lead===v) continue; if(ptBoxDist(px,py,b)<half&&ptBoxDist(q[0]+v.offX,q[1]+v.offY,b)>=half-0.2){ lgap=0.5; lvel=0; lveh=b.veh||null; lplayer=!!b.player; break; } } } }
+  if(sig&&cands.length&&lgap>0.5){   // v25: mid lane change — never slide sideways into a car alongside in the target lane (exact body sweep, next 4 m)
+    const body=sd=>{ const a=pathAt(v,sd+1.2), b=pathAt(v,sd-1.2), c=pathAt(v,sd); return {x:c[0]+v.offX,y:c[1]+v.offY,h:ang(a[0]-b[0],a[1]-b[1]),L:v.L+0.4,W:v.W+0.3}; };
+    const now=body(v.s); for(let sd=v.s+1;sd<=v.s+4&&lgap>0.5;sd+=1){ const B=body(sd); for(const b of cands){ if(b.veh&&b.veh.lead===v) continue; if(obbMTV(B,b)&&!obbMTV(now,b)){ lgap=0.5; lvel=0; lveh=b.veh||null; lplayer=!!b.player; break; } } } }
   if(lgap<1e8) acc=Math.min(acc,idmAcc(v,v0,lgap,lvel));
   acc=Math.min(acc,idmAcc(v,v0,1e9,0));
   if(typeof indYield==='function') acc=indYield(v,v0,acc);
@@ -491,9 +491,11 @@ function oppTurnIn(v,J){ if(v.stopT>15) return false; const x0=J.x*M_T-2, y0=J.y
   for(const o of traffic.vs){ if(o===v) continue; const inb=o.x>x0&&o.x<x1&&o.y>y0&&o.y<y1;
     if(o.filterJ===J&&o.id<v.id&&inb&&o.v<3) return true;   // tie-break: two opposing right-turners arriving together - lower id goes first
     if(o.turnJ!==J) continue; if(inb) return true; o.turnJ=null; } return false; }
-function turnSweepBlocked(v,m){ if(v.stopT>20) return false; const long=v.trl||v.L>8, clr=v.W/2+(v.trl?2.4:long?1.8:0.6);
-  for(let sd=m.d;sd<=m.dEnd;sd+=2){ const p=pathAt(v,sd);
-    for(const o of traffic.vs){ if(o===v||o.v>0.6||Math.abs(o.x-p[0])>14||Math.abs(o.y-p[1])>14) continue; for(const b of boxesOf(o)) if(ptBoxDist(p[0],p[1],b)<clr) return true; } }
+function turnSweepBlocked(v,m){ if(v.stopT>20) return false;   // v25: exact swept path of our body (and trailer) through the turn vs anything stood still
+  const near=traffic.vs.filter(o=>o!==v&&o.v<0.6&&o.h!==undefined&&Math.abs(o.x-v.x)<70&&Math.abs(o.y-v.y)<70); if(!near.length) return false; const ob=[]; for(const o of near) for(const b of boxesOf(o)) ob.push(b);
+  for(let sd=Math.max(v.s+0.5,m.d-v.L/2);sd<=m.dEnd+v.L/2;sd+=1.5){ const a=pathAt(v,sd+1.2), b=pathAt(v,sd-1.2), c=pathAt(v,sd), h=ang(a[0]-b[0],a[1]-b[1]);
+    const me=[{x:c[0],y:c[1],h,L:v.L+0.6,W:v.W+0.5}]; if(v.trl){ const k=pathAt(v,sd-1.6), ax=pathAt(v,sd-12.1), th=ang(k[0]-ax[0],k[1]-ax[1]), f=fwd(th); me.push({x:k[0]-f[0]*5.6,y:k[1]-f[1]*5.6,h:th,L:14,W:3}); }
+    for(const A of me) for(const B of ob){ if(Math.abs(A.x-B.x)>20||Math.abs(A.y-B.y)>20) continue; if(obbMTV(A,B)) return true; } }
   return false; }
 // v25: a queue held up by the player truck is not a deadlock - never ghost the followers into each other
 function queueLocked(v){ const seen=new Set([v]); let c=v.lead, n=0;
