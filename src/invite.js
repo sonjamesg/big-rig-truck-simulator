@@ -1,8 +1,10 @@
 'use strict';
 // ===================== Invite landing: opened via ?join=TRUCK-1234 -> dedicated "You're invited" card (log in / create / guest / remembered), then straight into the host's game =====================
 (function(){
-const Q=new URLSearchParams(location.search), RAW=(Q.get('join')||'').replace(/\D/g,'').slice(0,6); if(RAW.length<4) return;
-const CODE='TRUCK-'+RAW, HOST=String(Q.get('h')||'').replace(/[<>&"]/g,'').trim().slice(0,16);
+const Q=new URLSearchParams(location.search), HQ=new URLSearchParams(location.hash.replace(/^#/,''));
+const pick=k=>Q.get(k)||HQ.get(k)||'', RAW=(pick('join')||pick('room')||pick('code')||'').replace(/\D/g,'').slice(0,6); if(RAW.length<4) return;
+document.documentElement.classList.add('invmode');
+const CODE='TRUCK-'+RAW, HOST=String(pick('h')||pick('host')||'').replace(/[<>&"]/g,'').trim().slice(0,16);
 const INV={on:true,view:'pick',busy:false,joining:false};
 window.INV=INV;
 const css=`#invite{width:min(460px,90vw);margin:12px auto 6px;padding:16px 18px 12px;border-radius:16px;background:linear-gradient(180deg,rgba(22,30,46,.95),rgba(10,15,25,.95));border:1px solid rgba(245,184,46,.55);box-shadow:0 10px 30px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.06);text-align:center;display:flex;flex-direction:column;gap:9px;cursor:default;box-sizing:border-box}
@@ -23,7 +25,8 @@ const css=`#invite{width:min(460px,90vw);margin:12px auto 6px;padding:16px 18px 
 #invite a{color:#9fb3c8;font-size:13px;text-decoration:underline;cursor:pointer;align-self:center;padding:4px 8px}
 #invite .spin{width:34px;height:34px;border-radius:50%;border:4px solid rgba(255,255,255,.15);border-top-color:#7dff9a;animation:invspin .9s linear infinite;align-self:center}
 @keyframes invspin{to{transform:rotate(360deg)}}
-body.invmode #overlay>#lobby,body.invmode #overlay>#acct,body.invmode #overlay>#wbCard,body.invmode #overlay>.go{display:none!important}
+html.invmode #lobby,html.invmode #acct,html.invmode #wbCard,html.invmode #overlay>.go{display:none!important}
+#invite .home{position:absolute;left:10px;top:10px;font-size:12px;font-weight:800;min-height:0;padding:5px 10px;border-radius:9px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22)} #invite{position:relative}
 @media (orientation:landscape) and (max-height:500px){ body.touch #overlay>#invite{grid-column:2;grid-row:1/span 5;align-self:center;width:min(46vw,440px);padding:10px 12px;gap:6px} body.touch #invite .it{font-size:19px} body.touch #invite button{min-height:40px;padding:8px} body.touch #invite .opts{gap:6px} }`;
 const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
 const esc=s=>String(s||'').replace(/[<>&"]/g,'');
@@ -38,12 +41,12 @@ function render(){ if(!card) return; const who=HOST?`Join <b>${esc(HOST)}</b>'s 
   else if(v==='gst') body=`<input id="ivName" maxlength="16" placeholder="Driver name" autocapitalize="off" spellcheck="false" value="${esc(localStorage.getItem('bigrig.name')||'')}"><div class="note">Guests can drive together, but progress isn't saved to an account.</div><button class="go" id="ivSub">JOIN AS GUEST</button><div class="im"></div><a id="ivBack" tabindex="0">\u2190 Back</a>`;
   else if(v==='wait') body=`<div class="spin"></div><div class="im">Connecting to ${esc(HOST||'the host')}\u2026</div><a id="ivCancel" tabindex="0">Cancel</a>`;
   else if(v==='err') body=`<div class="im e">${esc(INV.err)}</div><div class="opts"><button class="go" id="ivRetry">\u21BB TRY AGAIN</button></div>`;
-  card.innerHTML=`<div class="ib">YOU'RE INVITED</div><div class="it">${who}</div>${HOST?`<div class="ic">${CODE}</div>`:''}${body}${v==='wait'?'':'<a id="ivSolo" tabindex="0">Not now, play solo</a>'}`;
+  card.innerHTML=`<button class="home" id="ivHome">\u2302 Home</button><div class="ib">YOU'RE INVITED</div><div class="it">${who}</div>${HOST?`<div class="ic">${CODE}</div>`:''}${body}${v==='wait'?'':'<a id="ivSolo" tabindex="0">Not now, play solo</a>'}`;
   for(const p of card.querySelectorAll('.pin')) p.addEventListener('input',()=>{ p.value=p.value.replace(/\D/g,'').slice(0,4); });
   const on=(id,f)=>{ const e=card.querySelector('#'+id); if(e) e.addEventListener('click',ev=>{ ev.preventDefault(); f(); }); };
   on('ivGo',()=>join(ACC.name)); on('ivSwitch',()=>{ accClear(); ACC.refresh&&ACC.refresh(); go('pick'); });
   on('ivLog',()=>go('log')); on('ivNew',()=>go('new')); on('ivGst',()=>go('gst')); on('ivBack',()=>go('pick')); on('ivSub',submit);
-  on('ivRetry',()=>join(INV.name)); on('ivCancel',()=>{ INV.joining=false; try{ mpReset(); }catch(e){} go('pick'); }); on('ivSolo',solo);
+  on('ivRetry',()=>join(INV.name)); on('ivCancel',()=>{ INV.joining=false; try{ mpReset(); }catch(e){} go('pick'); }); on('ivSolo',()=>{ solo(); startGame(); }); on('ivHome',solo);
   for(const i of card.querySelectorAll('input')) i.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); const n=i.nextElementSibling&&i.nextElementSibling.tagName==='INPUT'?i.nextElementSibling:null; if(n&&!n.value) n.focus(); else submit(); } });
   for(const a of card.querySelectorAll('a')) a.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); a.click(); } });
   const f=card.querySelector('input,button.go,button'); if(f&&!(document.body.classList.contains('touch')&&f.tagName==='INPUT')) setTimeout(()=>f.focus(),0); }
@@ -65,7 +68,7 @@ function join(name){ INV.name=name; try{ localStorage.setItem('bigrig.name',name
   INV.joining=true; go('wait');
   const start=()=>{ if(!INV.joining) return; if(!world.ready||!document.getElementById('lbName')){ const p=document.getElementById('loadPct'); msg('Loading the world'+(p?' \u2022 '+p.textContent.split(' ')[0]:'')+'\u2026'); setTimeout(start,300); return; } document.getElementById('lbName').value=name; mpJoin(CODE); }; start();
   const kick=setInterval(()=>{ if(!INV.joining){ clearInterval(kick); return; } if(MP.on&&!started&&world.ready){ startGame(); } if(started){ clearInterval(kick); INV.joining=false; finish(); } },250); }
-function finish(){ INV.on=false; document.body.classList.remove('invmode'); if(card) card.remove(); card=null; try{ history.replaceState(null,'',location.pathname); }catch(e){} }
+function finish(){ INV.on=false; document.documentElement.classList.remove('invmode'); if(card) card.remove(); card=null; try{ history.replaceState(null,'',location.pathname); }catch(e){} }
 function solo(){ INV.joining=false; try{ if(MP.peer) mpReset(); }catch(e){} const cd=document.getElementById('lbCode'); if(cd) cd.value=''; mpStatus(''); finish(); }
 INV.solo=solo;
 // surface mpJoin's status (it writes to the hidden lobby line) on the card
@@ -74,7 +77,7 @@ const ms=mpStatus; mpStatus=function(t){ ms(t); if(!INV.on||!INV.joining||!card)
   else msg(/retrying/i.test(t)?'Still looking for '+(HOST||'the host')+'\u2026':'Connecting to '+(HOST||'the host')+'\u2026'); };
 // lobby can't start solo play behind the card (overlay tap, Enter, pad A) until the visitor joins or says "not now"
 setTimeout(()=>{ const sg=startGame; startGame=function(){ if(INV.on&&!MP.on) return; return sg.apply(this,arguments); }; },0);
-function mount(){ const ov=document.getElementById('overlay'); if(!ov||card) return; document.body.classList.add('invmode'); card=document.createElement('div'); card.id='invite';
+function mount(){ const ov=document.getElementById('overlay'); if(!ov||card) return; card=document.createElement('div'); card.id='invite';
   const lg=document.getElementById('logo'); if(lg&&lg.nextSibling) ov.insertBefore(card,lg.nextSibling); else ov.appendChild(card);
   for(const ev of ['pointerdown','click','touchstart','keydown']) card.addEventListener(ev,e=>e.stopPropagation()); render();
   // session check from accounts.js may clear a stale token after load: re-render the pick view if it changed

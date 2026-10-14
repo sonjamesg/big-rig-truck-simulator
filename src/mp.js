@@ -139,7 +139,7 @@ function mpInit(){ const st=document.createElement('style'); st.textContent=MPCS
   const pl=document.createElement('div'); pl.id='mplist'; host.appendChild(pl); const ch=document.createElement('div'); ch.id='mpchat'; ch.innerHTML='<div id="mpLines"></div><input id="mpChatIn" maxlength="140" placeholder="Say something\u2026 (Enter to send, Esc to cancel)">'; host.appendChild(ch);
   { const tg=ch.querySelector('#mpChatIn'); tg.addEventListener('keydown',e=>{ if(e.key==='Enter'){ mpChatSend(tg.value); tg.value=''; tg.style.display='none'; tg.blur(); } else if(e.key==='Escape'){ tg.value=''; tg.style.display='none'; tg.blur(); } }); }
   const bd=document.createElement('div'); bd.id='mpbadge'; bd.onclick=mpToggleList; host.appendChild(bd); }
-function mpLobbyHosted(){ const b=document.getElementById('lbHostBox'); b.style.display='flex'; document.getElementById('lbCodeOut').textContent=MP.code; const base=location.href.split('?')[0].split('#')[0]; document.getElementById('lbLink').textContent=base+'?join='+MP.code+'&h='+encodeURIComponent(String(MP.name||'').slice(0,16)); mpRender(); }
+function mpLobbyHosted(){ const b=document.getElementById('lbHostBox'); b.style.display='flex'; document.getElementById('lbCodeOut').textContent=MP.code; const base=location.href.split('?')[0].split('#')[0]; document.getElementById('lbLink').textContent=base+'?join='+MP.code+'&v='+Date.now().toString(36).slice(-5)+'&h='+encodeURIComponent(String(MP.name||'').slice(0,16)); mpRender(); }
 function mpLobbyClose(){ const b=document.getElementById('lbHostBox'); if(b) b.style.display='none'; }
 function mpLobbyOpen(){ mpLobbyClose(); }
 function mpStatus(t){ const s=document.getElementById('lbStatus'); if(s) s.textContent=t; }
