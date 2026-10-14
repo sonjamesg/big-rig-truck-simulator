@@ -114,7 +114,7 @@ function mpInit(){ const st=document.createElement('style'); st.textContent=MPCS
    <div class="row"><input id="lbCode" placeholder="TRUCK-0000" value="${jq?(jq.startsWith('TRUCK-')?jq:'TRUCK-'+jq.replace(/\D/g,'')):''}" style="width:160px"><button class="lb join" id="lbJoin">JOIN</button></div>
    <div class="hostbox" id="lbHostBox"><div style="font-size:12px;opacity:.7;letter-spacing:2px">ROOM CODE</div><div class="code" id="lbCodeOut"></div><div class="link" id="lbLink"></div><div class="row"><button class="lb" id="lbCopy">\u{1F4CB} Copy invite link</button><button class="lb solo" id="lbDrive">\u25B6 START DRIVING</button></div><div style="font-size:11px;opacity:.6">Friends can join any time. Up to 8 players.</div></div>
    <div class="st" id="lbStatus"></div>`;
-  ov.insertBefore(lb,document.getElementById('loading'));
+  { const ref=document.getElementById('loadBox')||document.getElementById('loading'); ref.parentNode.insertBefore(lb,ref); }
   const stop=e=>e.stopPropagation(); lb.addEventListener('pointerdown',stop);
   const nameIn=lb.querySelector('#lbName'); nameIn.addEventListener('input',()=>localStorage.setItem('bigrig.name',nameIn.value.trim()));
   const need=()=>{ const n=nameIn.value.trim(); if(!n){ mpStatus('Choose a username first'); nameIn.focus(); return false; } localStorage.setItem('bigrig.name',n); return true; };

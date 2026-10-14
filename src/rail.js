@@ -36,7 +36,8 @@ function railHardMask(objs){ const N=MW*MH, H=new Uint8Array(N);
   for(const b of world.funcFP||[]) box(b[0],b[1],b[2],b[3]);
   for(const o of objs){ if(!RR_HARDO[o.kind]||o._dead) continue; const r=o.r||0; if(o.w!==undefined) box(o.x/TILE,o.y/TILE,(o.x+o.w)/TILE,(o.y+o.h)/TILE); else box((o.x-r)/TILE,(o.y-r)/TILE,(o.x+r*2.2)/TILE,(o.y+r*2.2)/TILE); }
   return H; }
-function railRoute(objs){ const t0=performance.now(), N=MW*MH;
+function railRoute(objs){ const it=railRouteSteps(objs); for(;;){ const r=it.next(); if(r.done) return r.value; } }
+function* railRouteSteps(objs){ const t0=performance.now(), N=MW*MH;
   const H=railHardMask(objs); RAIL.hard=H;
   const RD=new Uint8Array(N), WT=new Uint8Array(N);
   for(let i=0;i<N;i++){ const g=G[i]; if(g===T.ROAD||g===T.BRIDGE||g===T.WALK||g===T.ISLAND) RD[i]=1; if(g===T.WATER) WT[i]=1; }
@@ -44,6 +45,7 @@ function railRoute(objs){ const t0=performance.now(), N=MW*MH;
   for(const t of world.tapers||[]) for(const [px,py] of t.pts) for(let dy=-3;dy<=3;dy++) for(let dx=-3;dx<=3;dx++){ const x=Math.floor(px+dx),y=Math.floor(py+dy); if(inb(x,y)&&Math.hypot(x+0.5-px,y+0.5-py)<=t.wW/2+0.5) RD[y*MW+x]=1; }
   const JM=new Uint8Array(N); for(const J of world.junctions||[]) for(let y=J.y;y<J.y+J.h;y++) for(let x=J.x;x<J.x+J.w;x++) if(inb(x,y)) JM[y*MW+x]=1;
   if(world.jMask) for(let i=0;i<N;i++) if(world.jMask[i]) JM[i]=1;
+  yield 'Routing the railway';
   const dH=rlDT(H), dR=rlDT(RD), dW=rlDT(WT), dJ=rlDT(JM);
   // road orientation of the nearest road tile: 1 = h (cross with a vertical move), 2 = v, 0 = not crossable (junction, curve, bridge, roundabout)
   const ori=i=>{ const g=G[i]; if(g===T.BRIDGE||(world.jMask&&world.jMask[i])||world.cornerAt&&world.cornerAt[i]>=0) return 0; const a=world.roadH[i]>=0, b=world.roadV[i]>=0; if(a===b) return 0; return a?1:2; };
@@ -55,6 +57,7 @@ function railRoute(objs){ const t0=performance.now(), N=MW*MH;
     if(n<6) return 0; sx/=n; sy/=n; const a=sxx/n-sx*sx, b=syy/n-sy*sy, cc=sxy/n-sx*sy, tr=a+b, det=a*b-cc*cc, l1=tr/2+Math.sqrt(Math.max(0,tr*tr/4-det)), l2=tr-l1;
     if(l1<3*Math.max(l2,0.05)) return 0; const phi=0.5*Math.atan2(2*cc,a-b); let m=0;
     for(let d=0;d<8;d++){ const ang=d*Math.PI/4; let df=Math.abs(((ang-phi-Math.PI/2)%Math.PI+Math.PI*1.5)%Math.PI-Math.PI/2); if(df<0.4) m|=1<<d; } return m; };
+  yield 'Routing the railway';
   const GW=MW/RR_C, GH=MH/RR_C, NC=GW*GH, CL=new Uint8Array(NC), CO=new Float32Array(NC), CR=new Uint8Array(NC);  // CL: 0 blocked 1 land 2 road(crossing) 3 water
   const HUBT=RAIL_ST.find(s=>s[3]==='hub'), hubX=HUBT[1]/RR_C, hubY=HUBT[2]/RR_C;
   for(let cy=0;cy<GH;cy++) for(let cx=0;cx<GW;cx++){ const c=cy*GW+cx, ti=(cy*RR_C+1)*MW+cx*RR_C+1;
@@ -70,6 +73,7 @@ function railRoute(objs){ const t0=performance.now(), N=MW*MH;
     if(G[ti]===T.ROCK) k+=0.6;
     { const jm=dJ.D[ti]*M_T; if(jm<RR_JR) k+=2.2*(1-jm/RR_JR); }
     CL[c]=1; CO[c]=1+k; }
+  yield 'Routing the railway';
   // stations: nearest good corridor cell to each named spot
   const used=new Uint8Array(NC);
   const HINT={'Sound Coast':[840,330],'Albion Central':[110,540]};
@@ -84,6 +88,7 @@ function railRoute(objs){ const t0=performance.now(), N=MW*MH;
     for(let dy=-HR;dy<=HR;dy++) for(let dx=-HR;dx<=HR;dx++){ if(dx*dx+dy*dy>HR*HR) continue; const cx=hx+dx, cy=hy+dy; if(cx<0||cy<0||cx>=GW||cy>=GH) continue; const c=cy*GW+cx, ti=(cy*RR_C+1)*MW+cx*RR_C+1;
       if(CL[c]===2||dH.D[ti]*M_T-1.5<24||dR.D[ti]*M_T-1.5<20) CL[c]=0; } }
   RAIL._CL=CL; RAIL._CO=CO; RAIL._tgt=tgt; RAIL._GW=GW;
+  yield 'Routing the railway';
   // A*
   const DX=[1,1,0,-1,-1,-1,0,1], DY=[0,1,1,1,0,-1,-1,-1], NS=NC*8, g=new Float32Array(NS), pv=new Int8Array(NS), stamp=new Uint16Array(NS);
   let heap=new Int32Array(1<<20), hk=new Float32Array(1<<20), hn=0;
@@ -119,7 +124,7 @@ function railRoute(objs){ const t0=performance.now(), N=MW*MH;
   const markUsed=(path,keepStart)=>{ for(const s of path){ const c=s>>3, cx=c%GW, cy=(c/GW)|0; for(let dy=-3;dy<=3;dy++) for(let dx=-3;dx<=3;dx++){ const q=(cy+dy)*GW+cx+dx; if(q>=0&&q<NC) used[q]=1; } }
     if(keepStart){ const sx=startC%GW, sy=(startC/GW)|0; for(let dy=-4;dy<=4;dy++) for(let dx=-4;dx<=4;dx++) used[(sy+dy)*GW+sx+dx]=0; } };
   let prev=null, closeSet=null, closeCells=null;
-  for(let k=1;k<=tgt.length+1;k++){ const goal=k<=tgt.length?tgt[k%tgt.length].c:startC; const gd=-1;
+  for(let k=1;k<=tgt.length+1;k++){ yield 'Routing the railway'; const goal=k<=tgt.length?tgt[k%tgt.length].c:startC; const gd=-1;
     let path;
     if(k===1) path=leg([0,1,2,3,4,5,6,7].map(d=>startC*8+d),goal,-1);
     else { // release the cells around the previous leg's end so we can continue out of it
@@ -219,12 +224,14 @@ function railRoute(objs){ const t0=performance.now(), N=MW*MH;
   RAIL.route.tgt=tgt; RAIL.route.ms=Math.round(performance.now()-t0);
   return raw; }
 // ---------- geometry
-function railBuild(objs){
-  let raw=railRoute(objs);
+function railBuild(objs){ for(const _ of railBuildSteps(objs)); }
+function* railBuildSteps(objs){
+  let raw=yield* railRouteSteps(objs);
   if(!raw){ raw=[]; const W=RAIL_WP.map(p=>[p[0]*M_T,p[1]*M_T]), n=W.length; console.warn('rail router failed',RAIL.routeFail);   // fallback: legacy spline
   for(let i=0;i<n;i++){ const p0=W[(i-1+n)%n],p1=W[i],p2=W[(i+1)%n],p3=W[(i+2)%n], seg=Math.hypot(p2[0]-p1[0],p2[1]-p1[1]), k=Math.ceil(seg/2);
     for(let j=0;j<k;j++){ const t=j/k,t2=t*t,t3=t2*t; raw.push([0.5*((2*p1[0])+(-p0[0]+p2[0])*t+(2*p0[0]-5*p1[0]+4*p2[0]-p3[0])*t2+(-p0[0]+3*p1[0]-3*p2[0]+p3[0])*t3),
       0.5*((2*p1[1])+(-p0[1]+p2[1])*t+(2*p0[1]-5*p1[1]+4*p2[1]-p3[1])*t2+(-p0[1]+3*p1[1]-3*p2[1]+p3[1])*t3)]); } } }
+  yield 'Laying the railway';
   // resample at exactly 1 m
   const cum=[0]; for(let i=1;i<=raw.length;i++){ const a=raw[i-1],b=raw[i%raw.length]; cum.push(cum[i-1]+Math.hypot(b[0]-a[0],b[1]-a[1])); }
   const L=Math.floor(cum[raw.length]); RAIL.L=L; const X=new Float32Array(L),Y=new Float32Array(L),NX=new Float32Array(L),NY=new Float32Array(L);
@@ -235,6 +242,7 @@ function railBuild(objs){
     let q=0; const tot=c2[L0]; for(let s=0;s<L0;s++){ const S2=s*tot/L0; while(c2[q+1]<S2) q++; const b=(q+1)%L0, f=(S2-c2[q])/((c2[q+1]-c2[q])||1); X[s]=A[q]+(A[b]-A[q])*f; Y[s]=B[q]+(B[b]-B[q])*f; } }   // smoothed centreline: no kinks at straight/arc joins
   for(let s=0;s<L;s++){ const a=(s-2+L)%L,b=(s+2)%L, tx=X[b]-X[a], ty=Y[b]-Y[a], l=Math.hypot(tx,ty)||1; NX[s]=ty/l; NY[s]=-tx/l; }   // left normal of +s travel
   Object.assign(RAIL,{X,Y,NX,NY});
+  yield 'Placing stations';
   // stations
   const STT=RAIL.route&&RAIL.route.stations?RAIL_ST.map((r,i)=>[r[0],RAIL.route.stations[i][1],RAIL.route.stations[i][2],r[3]]):RAIL_ST;
   for(const [name,tx,ty,kind] of STT){ let best=0,bd=1e18; for(let s=0;s<L;s++){ const d=(X[s]-tx*M_T)**2+(Y[s]-ty*M_T)**2; if(d<bd){ bd=d; best=s; } }
@@ -257,6 +265,7 @@ function railBuild(objs){
   RAIL.tracks=[{id:'up',w:()=>RW_P,s0:0,s1:L,main:1},{id:'down',w:()=>RW_F,s0:0,s1:L,main:1},
     {id:'loop',w:s=>RW_P+HUB_W*RAIL.hubB(s),s0:H-HUB_HALF-HUB_RAMP,s1:H+HUB_HALF+HUB_RAMP},
     {id:'sid1',w:s=>RW_F-4.6*hb(s,110,60),s0:H-170,s1:H+170},{id:'sid2',w:s=>RW_F-9.2*hb(s,90,70),s0:H-160,s1:H+160}];
+  yield 'Surveying the track';
   // sample tracks, classify ground under each sample
   const band=new Set();
   for(const tr of RAIL.tracks){ const P=[]; for(let s=Math.floor(tr.s0);s<=Math.ceil(tr.s1);s++){ const i=rlMod(s,L), w=tr.w(s), x=X[i]+NX[i]*w, y=Y[i]+NY[i]*w; const tx=Math.floor(x/M_T), ty=Math.floor(y/M_T);
@@ -265,11 +274,13 @@ function railBuild(objs){
     tr.P=P; }
   // stations' platforms keep their land clear too
   for(const st of RAIL.stations) for(let s=st.s-st.len/2-10;s<=st.s+st.len/2+10;s+=2){ const i=rlMod(Math.round(s),L); for(let w=0;w<=(st.kind==='hub'?20:10);w+=2){ const tx=Math.floor((X[i]+NX[i]*w)/M_T), ty=Math.floor((Y[i]+NY[i]*w)/M_T); band.add(ty*MW+tx); } }
+  yield 'Clearing the rail corridor';
   // clear buildings/trees from the band (never roads, water or functional sites)
   const KILL={bldg:1,tree:1,hedge:1,bush:1,rock:1,scrub:1,cactus:1,bale:1,fountain:1,pond:1,silo:1,tank:1,field:1};
   for(const o of objs){ if(!KILL[o.kind]||o._dead) continue; const x0=Math.floor(o.x/TILE),y0=Math.floor(o.y/TILE),x1=Math.floor((o.x+(o.w||0))/TILE),y1=Math.floor((o.y+(o.h||0))/TILE);
     let hit=false; for(let ty=y0;ty<=y1&&!hit;ty++) for(let tx=x0;tx<=x1;tx++) if(band.has(ty*MW+tx)){ hit=true; break; } if(hit) o._dead=1; }
   for(const k of band){ const t=G[k]; if(t===T.BLDG||t===T.TREE||t===T.HEDGE||t===T.PGRASS||t===T.PARK||t===T.TANK||t===T.PUMP||t===T.CONT) G[k]=T.GRAVEL; }
+  yield 'Building level crossings';
   // crossings (from the centreline + both main tracks)
   const up=RAIL.tracks[0].P, dn=RAIL.tracks[1].P; let run=null;
   for(let s=0;s<=L;s++){ const i=s%L, k=Math.max(up[i].k===1||up[i].k===3?up[i].k:0, dn[i].k===1||dn[i].k===3?dn[i].k:0);
@@ -282,7 +293,7 @@ function railBuild(objs){
       for(let cy=Math.floor((py-m)/CHUNK);cy<=Math.floor((py+m)/CHUNK);cy++) for(let cx=Math.floor((px-m)/CHUNK);cx<=Math.floor((px+m)/CHUNK);cx++){ const key=cx+','+cy; let a=RAIL.chunkRuns.get(key); if(!a) RAIL.chunkRuns.set(key,a=[]);
         const last=a[a.length-1]; if(last&&last[0]===ti&&last[2]===i-1) last[2]=i; else a.push([ti,i,i]); } } }
   for(const st of RAIL.stations){ const i=st.s; const key=Math.floor(X[i]*PPM/CHUNK)+','+Math.floor(Y[i]*PPM/CHUNK); }
-  railBridges(); railTimetable(); RAIL.ready=true;
+  yield 'Building rail bridges'; railBridges(); yield 'Writing the timetable'; railTimetable(); RAIL.ready=true;
 }
 function roadSegAt(tx,ty){ if(!inb(tx,ty)) return null; const i=idx(tx,ty), a=world.roadH[i], b=world.roadV[i]; const k=a>=0?a:b>=0?b:-1; return k>=0?world.segs[k]:null; }
 // ---------- timetable (pure functions of t in [0,cyc))

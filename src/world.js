@@ -102,11 +102,12 @@ function rbPaint(rb){ if(!world.rbMask) world.rbMask=new Uint8Array(MW*MH); cons
     if(a===5){ if(!road) G[i]=world.water&&world.water[i]?T.BRIDGE:T.ROAD; world.roadH[i]=world.roadV[i]=-2; }
     else if(isl===5&&Math.hypot(tx+0.5-rb.cx,ty+0.5-rb.cy)<rb.rin){ G[i]=T.ISLAND; world.roadH[i]=world.roadV[i]=-1; }
     else if(G[i]!==T.WATER){ G[i]=(world.water&&world.water[i])?T.BRIDGE:(isDesert(tx,ty)?T.SAND:T.GRASS); if(G[i]!==T.BRIDGE) world.roadH[i]=world.roadV[i]=-1; } } }
-function genWorld(){
+function genWorld(){ for(const _ of genWorldSteps()); }
+function* genWorldSteps(){
   const t0=performance.now();
   const R = mulberry(20261012);
   const water = new Uint8Array(MW*MH); world.water=water; const CE=new Float32Array(MW), CEH=new Float32Array(MW); for(let x=0;x<MW;x++){ CE[x]=cE(x); CEH[x]=cEh(x); }
-  for(let y=0;y<MH;y++){ const cw=cW(y), cwh=cWh(y); for(let x=0;x<MW;x++){
+  for(let y=0;y<MH;y++){ if((y&127)===0) yield 'Shaping coastline & terrain'; const cw=cW(y), cwh=cWh(y); for(let x=0;x<MW;x++){
     const d=Math.min(x,y,MW-1-x,MH-1-y); let w= d<22 || (d<107 && d < 22+fbm(x*1.4,y*1.4)*85);
     if(!w){ const dc=Math.abs(x-cw); if(dc<cwh+9 && dc<cwh+(vnoise(x,y,25)-0.5)*18) w=true; }
     if(!w && x>cw){ const ce=CE[x], dc=Math.abs(y-ce), eh=CEH[x]; if(dc<eh+8 && dc<eh+(vnoise(x+9,y,25)-0.5)*16) w=true; }
@@ -127,18 +128,20 @@ function genWorld(){
   for(let y=1930;y<MH;y++) for(let x=1738;x<1783;x++) water[idx(x,y)]=1;   // v26 Kingsbridge ship channel: harbour -> Outer Sea (M1 crosses on a tall bridge)
   (world.tm=world.tm||[]).push(['// ground: water',performance.now()-t0|0]);
   const CW=new Float32Array(MH); for(let y=0;y<MH;y++) CW[y]=cW(y);
+  
   // ground: water / desert sand / mountain rock / grass
-  for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){ const i=idx(x,y); if(water[i]){ G[i]=T.WATER; continue; }
+  for(let y=0;y<MH;y++){ if((y&255)===0) yield 'Shaping coastline & terrain'; for(let x=0;x<MW;x++){ const i=idx(x,y); if(water[i]){ G[i]=T.WATER; continue; }
     let t=(x>CW[y]+20&&y<CE[x]+40&&isDesert(x,y))?T.SAND:T.GRASS;
     for(const h of HILLS){ const dx=x-h.x, dy=y-h.y; if(Math.abs(dx)>h.r*1.2||Math.abs(dy)>h.r*1.2) continue; if(Math.hypot(dx,dy)<h.r*(0.82+0.3*vnoise(x,y,40))) t=T.ROCK; }
-    G[i]=t; }
+    G[i]=t; } }
   (world.tm=world.tm||[]).push(['// beaches:',performance.now()-t0|0]);
   // beaches: 1-5 tiles of sand along the coasts
   const bd=new Uint8Array(MW*MH);
-  for(let pass=1;pass<=5;pass++) for(let y=1;y<MH-1;y++) for(let x=1;x<MW-1;x++){ const i=idx(x,y); if(water[i]||bd[i]) continue;
+  for(let pass=1;pass<=5;pass++){ yield 'Painting beaches'; for(let y=1;y<MH-1;y++) for(let x=1;x<MW-1;x++){ const i=idx(x,y); if(water[i]||bd[i]) continue;
     const n=(j)=> pass===1? water[j] : bd[j]===pass-1;
-    if(n(i-1)||n(i+1)||n(i-MW)||n(i+MW)){ if(pass>1+Math.floor(vnoise(x,y,45)*5.5)) continue; bd[i]=pass; if(G[i]!==T.ROCK) G[i]=T.SAND; } }
+    if(n(i-1)||n(i+1)||n(i-MW)||n(i+MW)){ if(pass>1+Math.floor(vnoise(x,y,45)*5.5)) continue; bd[i]=pass; if(G[i]!==T.ROCK) G[i]=T.SAND; } } }
   (world.tm=world.tm||[]).push(['// ---------------- ',performance.now()-t0|0]);
+  yield 'Laying roads';
   // ---------------- roads ----------------
   function road(dir,a,b0,b1,w,type){
     const id=world.segs.length; const sg={id,dir,a,b0,b1,w,type,js:[]}; world.segs.push(sg);
@@ -225,6 +228,7 @@ function genWorld(){
   const grid=(x0,y0,nx,ny,p)=>{ const xs=[],ys=[], jx=jit(nx,p), jy=jit(ny,p); for(let k=0;k<nx;k++) xs.push(x0+k*p+jx[k]); for(let k=0;k<ny;k++) ys.push(y0+k*p+jy[k]); return {xs,ys,X1:xs[nx-1]+RW-1,Y1:ys[ny-1]+RW-1}; };
   function gridRoads(g,type,walk){ if(walk){ for(let y=g.ys[0]-1;y<=g.Y1+1;y++) for(let x=g.xs[0]-1;x<=g.X1+1;x++){ if(!inb(x,y)) continue; const i=idx(x,y); if(world.roadH[i]!==-1||world.roadV[i]!==-1) continue; G[i]=T.WALK; } } g.rows=[]; g.cols=[];   // v24: never pave over a road that is already there (was leaving pavement strips across the Kingsbridge dual carriageways)
     for(const y of g.ys) g.rows.push(road('h',y,g.xs[0],g.X1,RW,type)); for(const x of g.xs) g.cols.push(road('v',x,g.ys[0],g.Y1,RW,type)); }
+  yield 'Placing cities & towns';
   // --- cities (corners of the landmasses) & towns
   const C1=grid(150,140,11,11,28), SV=grid(1460,170,13,12,30), KB=grid(1560,1560,6,5,22);   // v17 Kingsbridge downtown core (inside the loop)
   gridRoads(C1,'city',true); gridRoads(SV,'city',true); gridRoads(KB,'city',true);
@@ -235,6 +239,7 @@ function genWorld(){
   mway([[100,100],[1945,100],[1945,720,'rb'],[1945,1945],[900,1945,'rb'],[100,1945],[100,980,'rb']],true,70,'M1');
   mway([[100,980,'rb'],[600,980],[600,1060],[1250,1060],[1250,720],[1945,720,'rb']],false,60,'M2');
   mway([[900,1945,'rb'],[900,1380],[1360,1380,'rb']],false,60,'M3');
+  yield 'Connecting towns';
   // --- city & town connections
   for(const k of [3,7]) road('h',C1.ys[k],103,C1.xs[0]-1,RW,'city');
   for(const k of [2,8]) road('v',C1.xs[k],103,C1.ys[0]-1,RW,'city');
@@ -310,6 +315,7 @@ function genWorld(){
   const fwS=road('v',FW.xs[1]+1,FW.Y1+1,FW.Y1+18,2,'rural'); link('rural',2,fwS,1,rbN,0,[[1480,1262],[1400,1252]],10,'Fenwick Road');
   const rhE=road('h',RH.ys[2]+1,RH.X1+1,RH.X1+8,2,'rural'), fwW=road('h',FW.ys[2]+1,FW.xs[0]-10,FW.xs[0]-1,2,'rural');
   link('rural',2,rhE,1,fwW,0,[[1200,1232],[1350,1150]],10,'Moor Lane');
+  yield 'Building country roads';
   // v12: Sound Coast Road — hugs the west shore of Albion Sound from the airport road down to Wendwood
   { const ap=world.segs.find(s=>s.dir==='h'&&s.a===460&&s.b1===600); const cst=[]; for(let y=520;y<=860;y+=34) cst.push([Math.min(cW(y)-cWh(y)-16,y<700?700:9999),y]); cst.push([600,880]);
     windLink('rural',2,ap,1,wwB,1,cst,0,'Sound Coast Road'); }
@@ -385,6 +391,7 @@ function genWorld(){
     const off=((W.a+W.w/2)-c)*(W.dir==='h'?d:-d);
     const tp=taper(W,end,N.w,path,URB(W.type),null,off); if(tp) (W.tap=W.tap||{})[end]=tp; }
   (world.tm=world.tm||[]).push(['// ---------------- ',performance.now()-t0|0]);
+  yield 'Building junctions';
   // ---------------- junctions & lorry-friendly kerb radii ----------------
   const reserved=new Uint8Array(MW*MH); world.reserved=reserved; world.jMask=new Uint8Array(MW*MH); world.cornerAt=new Int32Array(MW*MH).fill(-1);
   const S=world.segs;
@@ -418,6 +425,7 @@ function genWorld(){
   for(const rb of world.rbs) rbPaint(rb);
   for(const sg of S) sg.js.sort((a,b)=> sg.dir==='h'? a.x-b.x : a.y-b.y);
   (world.tm=world.tm||[]).push(['// ---------------- ',performance.now()-t0|0]);
+  yield 'Raising buildings';
   // ---------------- buildings & landmarks ----------------
   const objs=world.objects;
   world.roadLock=true;
@@ -525,6 +533,7 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
       if(!ok||R()<0.25) continue;
       fill(x,y,6,2,T.CONT); objs.push({kind:'cont',x:x*TILE,y:y*TILE,w:6*TILE,h:2*TILE,c1:cols[(R()*8)|0],c2:cols[(R()*8)|0],c3:cols[(R()*8)|0],seed:(R()*1e9)|0}); }
   }
+  yield 'Building the docks';
   { // v14 Albion container terminal: quay apron + 3 berths, neat stack rows between the aisles, gate, loading-bay terminal
     const P=world.port; for(let y=P.y0;y<P.y1;y++) for(let x=P.x0;x<P.edge;x++){ const t=G[idx(x,y)]; if(t===T.GRASS||t===T.SAND||t===T.WALK||t===T.PGRASS||t===T.TREE) set(x,y,T.QUAY); }
     const cols=['#c0392b','#2e86c1','#e67e22','#27ae60','#8e44ad','#d4ac0d','#7f8c8d','#16a085'], H=P.hole, A=P.aisles;
@@ -545,6 +554,7 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
   // v26: keep the crane portal strip clear for the lorry lane, stack blocks and tractor loop (both ports)
   for(const [x0,y0,x1,y1] of [[1546,1874,1752,1885],[586,260,600,416]]){ for(let i=objs.length-1;i>=0;i--){ const o=objs[i]; if(o.kind!=='cont') continue; const ox=o.x/TILE, oy=o.y/TILE; if(ox+o.w/TILE>x0&&ox<x1&&oy+o.h/TILE>y0&&oy<y1) objs.splice(i,1); }
     for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++) if(get(x,y)===T.CONT) set(x,y,T.QUAY); }
+  yield 'Building airports';
   // airports: concrete apron, runways, terminal, hangars
   function airport(name,x0,y0,x1,y1,rws,term){ for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++){ const t=G[idx(x,y)]; if(t!==T.ROAD&&t!==T.WATER&&t!==T.BRIDGE&&t!==T.WALK) set(x,y,T.CONC); }
     const ap={name,rw:[]}; for(const [rx,ry,rw] of rws){ objs.push({kind:'runway',x:rx*TILE,y:ry*TILE,w:rw*TILE,h:12*TILE}); ap.rw.push({x:rx*TILE,y:(ry+6)*TILE,len:rw*TILE}); for(let k=0;k<rw;k+=10) world.beacons.push({x:(rx+k)*TILE,y:(ry-0.5)*TILE,col:'#ffd23f',ph:k*0.05,run:1}); }
@@ -557,6 +567,7 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
     for(let k=0;k<14;k++) objs.push({kind:'rock',x:(x+3+R()*22)*TILE,y:(y-9+R()*20)*TILE,r:14+R()*24,seed:(R()*1e9)|0,desert:true}); building(x+18,y-9,6,4,'warehouse',16,{logo:'QUARRY'}); }
   if(world.dam){ const d=world.dam; objs.push({kind:'dam',x:d.x0*TILE,y:(d.y-1)*TILE,w:(d.x1-d.x0)*TILE,h:5*TILE,d}); }
   (world.tm=world.tm||[]).push(['// ---- farmland',performance.now()-t0|0]);
+  yield 'Planting farmland';
   // ---- farmland with hedgerows, pasture with livestock
   const crops=['wheat','green','plough','rape','pasture','wheat','pasture','green'];
   function farmland(x0,y0,x1,y1){
@@ -580,6 +591,7 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
   farmland(110,680,600,960); farmland(110,1000,560,1250); farmland(450,1300,640,1900); farmland(700,1100,1350,1370); farmland(1250,950,1950,1420);
   farmland(700,1400,1350,1780); farmland(780,560,1000,850); farmland(110,1780,880,1930);
   for(let k=0;k<90;k++){ const tx=40+((R()*1960)|0), ty=40+((R()*1960)|0); const t=G[idx(tx,ty)]; if((t!==T.GRASS&&t!==T.SAND)||reserved[idx(tx,ty)]) continue; set(tx,ty,T.TANK); world.overhead.push({kind:'turbine',x:(tx+0.5)*TILE,y:(ty+0.5)*TILE,ph:R()*6}); }
+  yield 'Growing forests';
   // ---- forests (varied species), roadside trees, bushes, rocks, desert scrub & cacti
   (world.tm=world.tm||[]).push(['const DES=world.des',performance.now()-t0|0]);
   const DES=world.des=new Uint8Array(MW*MH);
@@ -600,6 +612,7 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
       else if(h>0.993&&h<0.9945) objs.push({kind:'cactus',x:(x+0.5)*TILE,y:(y+0.5)*TILE,seed:(h*1e9)|0}); }
   }
   (world.tm=world.tm||[]).push(['// ---- boats',performance.now()-t0|0]);
+  yield 'Launching boats';
   // ---- boats & ferries on the sea channels, river and harbours (ping-pong routes, tiles)
   const route=(f,a,b,st)=>{ const p=[]; for(let s=a;s<=b;s+=st) p.push(f(s)); return p; };
   const okW=p=>p.every(([x,y])=>get(Math.round(x),Math.round(y))===T.WATER||get(Math.round(x),Math.round(y))===T.BRIDGE);
@@ -611,12 +624,14 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
     const n=kind==='tug'?1:2+((R()*2)|0); for(let k=0;k<n;k++) world.boats.push({kind,pts:P.map(p=>[p[0]*TILE,p[1]*TILE]),d:d.map(v=>v*TILE),L:L*TILE,s:R()*L*TILE*2,v:(kind==='yacht'?5:kind==='ferry'?7:kind==='cargo'?4:3)*PPM,col:['#ecf0f1','#c0392b','#2c3e50','#f1c40f'][(R()*4)|0]}); }
   (world.tm=world.tm||[]).push(['world.genMs=',performance.now()-t0|0]);
   world.genMs=performance.now()-t0;
+  yield 'Carving kerbs';
   // ---- kerb radii carving
   for(const c of world.corners){
     for(let k=0;k<c.R;k++) for(let q=0;q<c.R;q++){ const tx=c.px+(c.dx<0?-1-k:k), ty=c.py+(c.dy<0?-1-q:q); if(!inb(tx,ty)||G[idx(tx,ty)]===T.WATER) continue;
       const d=Math.hypot(tx+0.5-c.cx,ty+0.5-c.cy); if(d>c.R-0.15) set(tx,ty,T.ROAD); else if(SOLID[get(tx,ty)]) set(tx,ty,T.WALK); }
     objs.push({kind:'kerb',x:Math.min(c.px,c.cx)*TILE,y:Math.min(c.py,c.cy)*TILE,w:c.R*TILE,h:c.R*TILE,c});
   }
+  yield 'Installing traffic lights';
   // v9: American-style mast arms — one per approach, pole on the near-side (left, we drive on the left) pavement, arm spanning the inbound lanes, one head per lane
   for(const J of world.junctions) if(J.lights){ const C=[J.x+J.w/2,J.y+J.h/2]; const isR=t=>t===T.ROAD||t===T.BRIDGE;
     for(const f of [[0,-1],[0,1],[1,0],[-1,0]]){ const l=[f[1],-f[0]], e=f[0]?J.w/2:J.h/2, hw=f[0]?J.h/2:J.w/2, E=[C[0]-f[0]*e,C[1]-f[1]*e];
@@ -635,15 +650,16 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
           for(const tu of [S.t0,S.t1]){ const q=P(tu,S.a+S.w/2); world.overhead.unshift({kind:'stower',S,u:tu,x:q[0],y:q[1]}); } }
         r0=-1; } } }
   (world.tm=world.tm||[]).push(['if(typeof buildMarki',performance.now()-t0|0]);
-  if(typeof buildMarkings==='function') buildMarkings(objs);
+  yield 'Painting road markings'; if(typeof buildMarkings==='function') buildMarkings(objs);
   (world.tm=world.tm||[]).push(['if(typeof buildDepot',performance.now()-t0|0]);
-  if(typeof buildDepots==='function') buildDepots(objs,R);
+  yield 'Building depots & shops'; if(typeof buildDepotsSteps==='function') yield* buildDepotsSteps(objs,R); else if(typeof buildDepots==='function') buildDepots(objs,R);
   { const URB={[T.BLDG]:1,[T.PLAZA]:1,[T.PGRASS]:1,[T.LOT]:1,[T.PARK]:1}, D=[[1,0],[-1,0],[0,1],[0,-1]];   // street trees on the outer pavement edge + planted central reservations
     for(let y=2;y<MH-2;y++) for(let x=2;x<MW-2;x++){ const t=G[idx(x,y)];
       if(t===T.WALK){ for(const [dx,dy] of D){ if(G[idx(x+dx,y+dy)]!==T.ROAD||!URB[G[idx(x-dx,y-dy)]]) continue; const along=dx?y:x; if(along%4) break; const px=dy?1:0, py=dx?1:0;
           let ok=true; for(const s of [-2,-1,1,2]) if(G[idx(x+px*s,y+py*s)]!==T.WALK||G[idx(x+px*s+dx,y+py*s+dy)]!==T.ROAD) ok=false;
           if(ok) objs.push({kind:'tree',x:(x+0.5-dx*0.15)*TILE,y:(y+0.5-dy*0.15)*TILE,r:8+R()*3,sp:(R()*3)|0,seed:(R()*1e9)|0,street:1}); break; } }
       else if(t===T.ISLAND&&(x+y)%3===0){ const h=G[idx(x-1,y)]===T.ISLAND&&G[idx(x+1,y)]===T.ISLAND, v=G[idx(x,y-1)]===T.ISLAND&&G[idx(x,y+1)]===T.ISLAND; if(h!==v) objs.push(R()<0.5?{kind:'hedge',x:(x+0.5)*TILE,y:(y+0.5)*TILE,seed:(R()*1e9)|0}:{kind:'tree',x:(x+0.5)*TILE,y:(y+0.5)*TILE,r:7+R()*2,sp:(R()*3)|0,seed:(R()*1e9)|0}); } } }
+  yield 'Finishing towns';
   // v24: functional areas stay paved: no trees/parks/fountains/ponds/hedges inside depots, fuel, garages, dealers, malls, port
   { const FP=[], M=v=>v/M_T; const box=(x0,y0,x1,y1)=>FP.push([Math.min(x0,x1),Math.min(y0,y1),Math.max(x0,x1),Math.max(y0,y1)]);
     for(const d of world.depots||[]){ if(d.w!==undefined) box(d.x-1,d.y-1,d.x+d.w+1,d.y+d.h+1); const e=d.entrance; if(e) box(M(e.x)-4,M(e.y)-4,M(e.x)+4,M(e.y)+4); for(const b of d.bays||[]) box(M(b.kx)-5,M(b.ky)-5,M(b.kx)+5,M(b.ky)+5); }
@@ -663,10 +679,11 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
     ['Mount Greyfell',MTN.x,MTN.y-40],['River Moor',riverX(1500)+30,1500],['Albion Airport',400,560],['Sandvale Intl',1260,250],['Kingsbridge Field',1290,1830],['Albion Port',540,PORT_Y0-6],['Kingsbridge Harbour',1600,1905],
     ['M1',1000,94],['M1',1951,1300],['M1',94,1500],['M1',1400,1951],['M2',900,1054],['M2',1600,714],['M3',906,1650],['Moor Reservoir',1172,1540,2],['Greyfell Pass',395,1740],['Sound Coast Road',690,600],['Quarry',1170,590]];
   (world.tm=world.tm||[]).push(['// spatial index',performance.now()-t0|0]);
-  if(typeof railBuild==='function') railBuild(objs);
+  yield 'Routing the railway'; if(typeof railBuildSteps==='function') yield* railBuildSteps(objs); else if(typeof railBuild==='function') railBuild(objs);
   // v25: keep every solid decoration (trees, bushes, rocks, hedges, cacti, scrub) >=3 m clear of any road surface or railway.
   // Exact-ish distance field (two-pass 8-neighbour Euclidean propagation) from every ROAD/BRIDGE tile (straights, diagonals,
   // curves, tapers, junctions, roundabouts) plus the rail polyline; then a sweep removes anything overlapping that clearance.
+  yield 'Clearing roadsides';
   { const N=MW*MH, NX=new Int16Array(N).fill(-1), NY=new Int16Array(N), D=new Float32Array(N).fill(1e9);
     const src=(x,y)=>{ if(!inb(x,y)) return; const i=idx(x,y); NX[i]=x; NY[i]=y; D[i]=0; };
     for(let i=0;i<N;i++){ const t=G[i]; if(t===T.ROAD||t===T.BRIDGE){ NX[i]=i%MW; NY[i]=(i/MW)|0; D[i]=0; } }
@@ -675,8 +692,8 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
     for(const c of world.curves) poly(c.pts,c.w/2); for(const t of world.tapers||[]) poly(t.pts,t.wW/2);
     if(typeof RAIL!=='undefined'&&RAIL.X&&RAIL.L){ for(let s2=0;s2<RAIL.L;s2++){ const cx=RAIL.X[s2]/M_TILE, cy=RAIL.Y[s2]/M_TILE; for(let oy=-1;oy<=1;oy++) for(let ox=-1;ox<=1;ox++) src(Math.floor(cx+ox*0.5),Math.floor(cy+oy*0.5)); } }
     const relax=(i,j)=>{ if(NX[j]<0) return; const x=i%MW,y=(i/MW)|0, dx=x-NX[j], dy=y-NY[j], d=dx*dx+dy*dy; if(d<D[i]){ D[i]=d; NX[i]=NX[j]; NY[i]=NY[j]; } };
-    for(let y=0;y<MH;y++){ for(let x=0;x<MW;x++){ const i=idx(x,y); if(x>0) relax(i,i-1); if(y>0){ relax(i,i-MW); if(x>0) relax(i,i-MW-1); if(x<MW-1) relax(i,i-MW+1); } } for(let x=MW-2;x>=0;x--) relax(idx(x,y),idx(x,y)+1); }
-    for(let y=MH-1;y>=0;y--){ for(let x=MW-1;x>=0;x--){ const i=idx(x,y); if(x<MW-1) relax(i,i+1); if(y<MH-1){ relax(i,i+MW); if(x<MW-1) relax(i,i+MW+1); if(x>0) relax(i,i+MW-1); } } for(let x=1;x<MW;x++) relax(idx(x,y),idx(x,y)-1); }
+    for(let y=0;y<MH;y++){ if((y&127)===0) yield 'Clearing roadsides'; for(let x=0;x<MW;x++){ const i=idx(x,y); if(x>0) relax(i,i-1); if(y>0){ relax(i,i-MW); if(x>0) relax(i,i-MW-1); if(x<MW-1) relax(i,i-MW+1); } } for(let x=MW-2;x>=0;x--) relax(idx(x,y),idx(x,y)+1); }
+    for(let y=MH-1;y>=0;y--){ if((y&127)===0) yield 'Clearing roadsides'; for(let x=MW-1;x>=0;x--){ const i=idx(x,y); if(x<MW-1) relax(i,i+1); if(y<MH-1){ relax(i,i+MW); if(x<MW-1) relax(i,i+MW+1); if(x>0) relax(i,i+MW-1); } } for(let x=1;x<MW;x++) relax(idx(x,y),idx(x,y)-1); }
     // clearance in tiles from a point (tile units) to the nearest road/rail tile's square edge
     const clear=(px,py)=>{ const tx=Math.floor(px),ty=Math.floor(py); if(!inb(tx,ty)) return 0; const i=idx(tx,ty); if(NX[i]<0) return 1e9; const qx=NX[i],qy=NY[i];
       const ex=Math.max(qx-px,0,px-(qx+1)), ey=Math.max(qy-py,0,py-(qy+1)); return Math.max(0,Math.hypot(ex,ey)-0.35); };   // -0.35: slack for the neighbour approximation

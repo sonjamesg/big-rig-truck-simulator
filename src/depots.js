@@ -56,7 +56,8 @@ function makeTrailer(type,r,opt={}){
 }
 function trailerBox(t){ const ft=fwd(t.th); return {x:t.x-ft[0]*TRL_KP_TO_CENTRE,y:t.y-ft[1]*TRL_KP_TO_CENTRE,h:t.th,L:TRL_LEN,W:TRL_W}; }
 // ---------- world generation
-function buildDepots(objs,R){
+function buildDepots(objs,R){ for(const _ of buildDepotsSteps(objs,R)); }
+function* buildDepotsSteps(objs,R){
   world.depots=[]; world.trailers=[];
   // bucket index of clearable scenery so clearing a site doesn't scan every object in the world
   const BK=16*TILE, bucket=new Map(), CLR={tree:1,hedge:1,bale:1,rock:1,scrub:1,cactus:1,field:1};
@@ -103,6 +104,7 @@ function buildDepots(objs,R){
   for(const [n,c,tier,tx,ty] of plan){ const s=findSpot(tx,ty,20,15); if(!s){ console.warn('no depot spot',n); continue; } const [x,y,gap]=s;
     access(x,y,20,gap); const dp=makeDepot(n,c,tier,x,y,20,15,{entrance:{x:(x+10)*M_T,y:(y-gap)*M_T}}); dp.region=region(x,y); }
   D0.region='Westmere';
+  yield 'Building fuel stations';
   // ---- petrol / truck stops
   world.fuel=[]; world.garages=[];
   const BRANDS=[['ROADSTAR','#c0392b'],['FUELWAY','#1e8449'],['TRUCKSTOP','#2471a3'],['NORTHGAS','#d68910']];
@@ -143,6 +145,7 @@ function buildDepots(objs,R){
       entIn:[M(x+12.5),M(y-gap)-1.5],entOut:[M(x+15.5),M(y-gap)-1.5],aisleIn:M(x+12.5),aisleOut:M(x+15.5),region:region(x,y)}); }
   const tf0=performance.now(); for(const [n,tx,ty] of fplan){ let s=findSpot(tx,ty,26,20); if(s){ forecourt(n,s[0],s[1],s[2],+(1.49+R()*0.25).toFixed(2)); continue; }
     s=findSpot(tx,ty,18,12); if(!s){ console.warn('no fuel spot',n); continue; } fuelStation(n,s[0],s[1],s[2],+(1.49+R()*0.25).toFixed(2)); }
+  yield 'Building garages';
   // ---- repair garages (stub for later: damage repairs)
   function garage(name,x,y,gap,w=14,h=10){ access(x,y,w,gap); clearObjs(x,y,w,h); fill(x,y,w,h,T.CONC); for(let j=y;j<y+h;j++) for(let i=x;i<x+w;i++) world.reserved[idx(i,j)]=1;
     fill(x+w-13,y+h-5,12,5,T.BLDG); objs.push({kind:'bldg',x:(x+w-13)*TILE,y:(y+h-5)*TILE,w:12*TILE,h:5*TILE,style:'warehouse',height:20,seed:(R()*1e9)|0,logo:'TRUCK REPAIRS'});
@@ -150,6 +153,7 @@ function buildDepots(objs,R){
     world.garages.push({id:'G'+(world.garages.length+1),name,x:(x+w/2)*M_T,y:(y+h/2)*M_T,bay:{x:(x+w/2)*M_T,y:(y+2.5)*M_T},ratePerPct:45,region:region(x,y)}); }
   for(const [n,tx,ty] of [['Albion Truck Repairs',420,470],['Millford Motors',360,900],['Sandvale Heavy Repairs',1700,520],['Dustwater Garage',1000,520],['Kingsbridge Commercial',1600,1760],['Redhill Garage',980,1260]]){ const s=findSpot(tx,ty,14,10); if(s) garage(n,s[0],s[1],s[2]); }
 if(typeof buildCareerSites==='function') buildCareerSites({findSpot,access,clearObjs,region,R,objs,okT});
+  yield 'Building city fuel & garages';
   // v13: every city gets 4 fuel stations (HGV bays + car pumps) and 4 artic-friendly repair garages, spread over its districts
   { const CN={C1:'Albion',SV:'Sandvale',KB:'Kingsbridge',MF:'Millford',DW:'Dustwater',CM:'Coppermine',RH:'Redhill',FW:'Fenwick',AB:'Ashby'}, Q=['North','East','South','West','Central','Park','Ring','Bridge'];
     world.cityPOI={};
@@ -167,6 +171,7 @@ if(typeof buildCareerSites==='function') buildCareerSites({findSpot,access,clear
       for(let t=0;gs().length<4&&t<10;t++){ const [tx,ty]=tg[(t+2)%16]; tryG(CN[k]+' '+Q[(t+2)%8]+((t+2)%16>=8?' Road':'')+' Truck Repairs',tx,ty,sep); }
       world.cityPOI[CN[k]]={fuel:fs().length,garages:gs().length}; }
     console.log('[sites] per city fuel+garages',JSON.stringify(world.cityPOI)); }
+  yield 'Parking trailers';
   // fill bays with parked trailers
   const types=['curtain','curtain','fridge','cont','flat','tank'];
   for(const dp of world.depots) dp.bays.forEach((bay,i)=>{ if(R()<(dp===D0?0.7:0.55)){ const tr=makeTrailer(types[(R()*types.length)|0],R); tr.x=bay.kx; tr.y=bay.ky; tr.th=bay.th; tr.bay=bay; tr.depot=dp; bay.trailer=tr; world.trailers.push(tr); } });
