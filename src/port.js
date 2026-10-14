@@ -268,7 +268,7 @@ function portCfg(P){
       lor:[293,388],appr:[[540,286.4],[578,286.4],[582,286.4],[585,286.4],[587,286.4],[589,286.4],[590.9,286.4],[591.0,288.2]],dpth:[[590.0,391.5],[590.6,393.6],[590.8,395.4],[589,395.4],[587,395.4],[585,395.4],[578,395.4],[540,395.4]],impV:[350,380],expV:[316,346],chan:[700,60,830,140],piers:[748,772,798],off:0,tracN:8};
   Object.assign(P,C); const hs=-C.ex; P.hs=hs; P.dockU=3.6;
   // lanes inside the crane portal (u from landside leg to waterside leg): lorry lane | 2-col stack block | tractor lane 1 | tractor lane 2
-  P.lorU=L+2.7; P.blkU=[L+4.4,L+5.8]; P.tl1=L+7.6; P.tl2=kb?-1.9:L+10.8;   // dg: roomier (fence at L+1..L+2) P.cap=16; P.ecap=16;
+  P.lorU=L+2.7; P.blkU=[L+4.4,L+5.8]; P.tl1=L+7.6; P.tl2=kb?-1.9:L+10.8; P.cap=16; P.ecap=16;   // dg: roomier (fence at L+1..L+2)
   P.blocks=[[L+3.7,C.impV[0],2.8,C.impV[1]-C.impV[0]],[L+3.7,C.expV[0],2.8,C.expV[1]-C.expV[0]]];
   P.slots=[]; for(const V of [C.impV,C.expV]) for(let r=0;r<8;r++) for(const u of P.blkU) P.slots.push([u,V[0]+1.8+r*3.6]);
   P.impC=(C.impV[0]+C.impV[1])/2; P.expC=(C.expV[0]+C.expV[1])/2;
