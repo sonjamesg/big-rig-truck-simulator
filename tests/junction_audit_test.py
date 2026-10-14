@@ -18,6 +18,7 @@ STATIC=r"""(()=>{ const W=world, S=W.segs, bad=[]; let nJ=0,nT=0,nC=0;
         for(const m of mv) if(!ap.lanes.some(L=>L.indexOf(m)>=0)) bad.push({J:J.id,why:'move-unmarked',key:sg.id+':'+d,m,lanes:ap.lanes});
         if(ap.lanes.length>1){ const iL=ap.lanes.findIndex(L=>L.indexOf('L')>=0), iR=ap.lanes.findIndex(L=>L.indexOf('R')>=0); if(iL>=0&&iR>=0&&iL>iR) bad.push({J:J.id,why:'L-right-of-R',key:sg.id+':'+d}); } }
       if(J.lights){ const f=sg.dir==='h'?[d,0]:[0,d]; if(!W.overhead.some(o=>o.kind==='mast'&&o.J===J&&o.f[0]===f[0]&&o.f[1]===f[1])) bad.push({J:J.id,why:'no-signal-head',key:sg.id+':'+d}); } } }
+  { const seen=new Map(); for(const J of W.junctions){ const k=J.x+','+J.y; if(seen.has(k)) bad.push({J:J.id,why:'duplicate-junction',with:seen.get(k)}); else seen.set(k,J.id); } }
   for(const sg of S) for(const d of [-1,1]){ const p=lanePt(sg,d,0,(sg.b0+sg.b1)/2), c=(sg.a+sg.w/2)*M_T;
     if(nLanes(sg)>1||sg.w>=2){ if(sg.dir==='h'){ if(Math.sign(p[1]-c)!==-d) bad.push({seg:sg.id,why:'right-hand',d}); } else if(Math.sign(p[0]-c)!==d) bad.push({seg:sg.id,why:'right-hand',d}); } }
   for(const t of W.tapers||[]){ nT++; let g=0; for(const p of t.pts) if(!onTarmacT(p[0],p[1])) g++; if(g) bad.push({taper:t.id,why:'taper-gap',g}); }
@@ -25,8 +26,8 @@ STATIC=r"""(()=>{ const W=world, S=W.segs, bad=[]; let nJ=0,nT=0,nC=0;
   return {nJ,nT,nC,nRb:W.rbs.length,bad}; })()"""
 NAVT=r"""((i)=>{ const S=world.segs,J=world.junctions[i]; const arms=[]; for(const sg of [S[J.hs],S[J.vs]]) for(const d of [-1,1]){ const o=jOptions(J,sg,d); const far=Math.round(o.stop-d*8); if(d>0?sg.b0>far:sg.b1<far) continue; const c=sg.a+(sg.w>>1); arms.push(sg.dir==='h'?[far,c]:[c,far]); }
   const out=[]; for(let a=0;a<arms.length;a++) for(let b=0;b<arms.length;b++) if(a!==b){ const p=navAStar(arms[a][0],arms[a][1],arms[b][0],arms[b][1]); const m=Math.abs(arms[a][0]-arms[b][0])+Math.abs(arms[a][1]-arms[b][1]); if(!p||p.length>m*4+20) out.push({J:i,from:arms[a],to:arms[b],len:p?p.length:null,m}); } return {n:arms.length*(arms.length-1),bad:out}; })"""
-SOAK=r"""((cx,cy,R)=>{ const B=__bigrig, tk=B.truck; tk.x=cx*M_T; tk.y=cy*M_T; tk.v=0; { const n=navSnap(cx+30,cy+30,60); if(n){ tk.x=(n[0]+0.5)*M_T; tk.y=(n[1]+0.5)*M_T; } }
-  const T={coll:new Set(),seen:new Set(),stuck:new Set(),last:new Map(),t0:timeS,rec0:B.traffic.recovers||0,pairs:[],why:[]}; const STUCK=window.__STUCK||60;
+SOAK=r"""((cx,cy,R)=>{ const B=__bigrig, tk=B.truck; tk.x=cx*M_T; tk.y=cy*M_T; tk.v=0; { let best=null; for(let r=6;r<40&&!best;r++) for(let k=0;k<64&&!best;k++){ const x=Math.floor(cx+Math.cos(k/64*6.283)*r), y=Math.floor(cy+Math.sin(k/64*6.283)*r); let ok=true; for(let dy=-3;dy<=3&&ok;dy++) for(let dx=-3;dx<=3;dx++){ const t=get(x+dx,y+dy); if(t===1||t===4||t===3||world.roadH[idx(x+dx,y+dy)]!==-1){ ok=false; break; } } if(ok) best=[x,y]; } if(best){ tk.x=(best[0]+0.5)*M_T; tk.y=(best[1]+0.5)*M_T; } }   // park the test truck off the road so it never blocks the traffic it is watching
+  const T={coll:new Set(),seen:new Set(),stuck:new Set(),last:new Map(),t0:timeS,rec0:B.traffic.recovers||0,pairs:[],why:[],hist:new Map()}; const STUCK=window.__STUCK||60;
   const zone=v=>Math.hypot(v.x/M_T-cx,v.y/M_T-cy)<R;
   const box=(x,y,h,L,Wd)=>{ const f=fwd(h), r=rgt(h); return [[L,Wd],[L,-Wd],[-L,-Wd],[-L,Wd]].map(([a,b])=>[x+f[0]*a+r[0]*b,y+f[1]*a+r[1]*b]); };
   const corners=v=>{ const o=[box(v.x,v.y,v.h||0,v.L*0.42,v.W*0.4)]; if(v.trl) o.push(box(v.trl.x,v.trl.y,v.trl.h,13.6*0.42,2.5*0.4)); return o; };
@@ -34,9 +35,9 @@ SOAK=r"""((cx,cy,R)=>{ const B=__bigrig, tk=B.truck; tk.x=cx*M_T; tk.y=cy*M_T; t
   const hit=(A,Bq)=>A.some(a=>Bq.some(b=>!sep(a,b)));
   window.__jaT=T; clearInterval(window.__jaI);
   window.__jaI=setInterval(()=>{ const vs=B.traffic.vs.filter(zone);
-    for(const v of vs){ T.seen.add(v.id); const L=T.last.get(v.id); if(!L||Math.hypot(v.x-L.x,v.y-L.y)>1) T.last.set(v.id,{x:v.x,y:v.y,t:timeS}); else if(timeS-L.t>STUCK&&!v.parked&&!T.stuck.has(v.id)){ T.stuck.add(v.id); let h=v,n=0; while(h.lead&&n<30){ h=h.lead; n++; } const m=h.mk&&h.mk.find(m=>(m.kind==='light'||m.kind==='gw'||m.kind==='rb')&&!m.go&&m.d>h.s);
+    for(const v of vs){ if(window.__DBG){ let H=T.hist.get(v.id); if(!H){H=[];T.hist.set(v.id,H);} H.push([+(v.x/M_T).toFixed(1),+(v.y/M_T).toFixed(1),+v.v.toFixed(1)]); if(H.length>40) H.shift(); } T.seen.add(v.id); const L=T.last.get(v.id); if(!L||Math.hypot(v.x-L.x,v.y-L.y)>1) T.last.set(v.id,{x:v.x,y:v.y,t:timeS}); else if(timeS-L.t>STUCK&&!v.parked&&!T.stuck.has(v.id)){ T.stuck.add(v.id); let h=v,n=0; while(h.lead&&n<30){ h=h.lead; n++; } const m=h.mk&&h.mk.find(m=>(m.kind==='light'||m.kind==='gw'||m.kind==='rb')&&!m.go&&m.d>h.s);
       T.why.push({id:v.id,at:[v.x/M_T|0,v.y/M_T|0],queue:n,head:[h.x/M_T|0,h.y/M_T|0],headPlayer:!h.mk,mk:m&&m.kind,st:m&&m.kind==='light'?sigState(m.J,m.key,m.move):null,J:m&&m.J&&m.J.id,rb:m&&m.rb&&m.rb.id,headStop:+(h.stopT||0).toFixed(0)}); } }
-    for(let i=0;i<vs.length;i++) for(let j=i+1;j<vs.length;j++){ const a=vs[i],b=vs[j]; if(a.ghostT>0||b.ghostT>0||(a.layer|0)!==(b.layer|0)||Math.hypot(a.x-b.x,a.y-b.y)>30) continue; if(hit(corners(a),corners(b))){ const k=Math.min(a.id,b.id)+'-'+Math.max(a.id,b.id); if(!T.coll.has(k)){ T.coll.add(k); const d=o=>({id:o.id,k:o.kind,h:+(o.h||0).toFixed(2),v:+o.v.toFixed(1),seg:o.plan&&o.plan.seg,lane:o.plan&&o.plan.lane,trl:!!o.trl,ring:o.ring&&o.ring.id}); T.pairs.push({at:[a.x/M_T|0,a.y/M_T|0],a:d(a),b:d(b)}); } } }
+    for(let i=0;i<vs.length;i++) for(let j=i+1;j<vs.length;j++){ const a=vs[i],b=vs[j]; if(a.ghostT>0||b.ghostT>0||(a.layer|0)!==(b.layer|0)||Math.hypot(a.x-b.x,a.y-b.y)>30) continue; if(hit(corners(a),corners(b))){ const k=Math.min(a.id,b.id)+'-'+Math.max(a.id,b.id); if(!T.coll.has(k)){ T.coll.add(k); const d=o=>({hist:(T.hist.get(o.id)||[]).slice(-12),age:+(timeS-o.born).toFixed(1),lead:o.lead&&o.lead.id,mk:o.mk.map(m=>m.kind+':'+(m.d!==undefined?(m.d-o.s).toFixed(0):(m.d0-o.s).toFixed(0))).join(' '),id:o.id,k:o.kind,h:+(o.h||0).toFixed(2),v:+o.v.toFixed(1),seg:o.plan&&o.plan.seg,lane:o.plan&&o.plan.lane,trl:!!o.trl,ring:o.ring&&o.ring.id}); T.pairs.push({at:[a.x/M_T|0,a.y/M_T|0],a:d(a),b:d(b)}); } } }
     if(vs.length<12 && Math.random()<0.5){ const segs=B.world.segs.filter(s=>s.dir==='h'?(Math.abs(s.a-cy)<R&&s.b0<cx+R&&s.b1>cx-R):(Math.abs(s.a-cx)<R&&s.b0<cy+R&&s.b1>cy-R)); if(segs.length){ const sg=segs[(Math.random()*segs.length)|0], c=sg.dir==='h'?cx:cy, al=Math.max(sg.b0+1,Math.min(sg.b1-1,c+(Math.random()*2-1)*R*0.8)), dir=Math.random()<0.5?1:-1;
       if(!sg.js.some(j=>{ const [a,b]=jRange(sg,j); return al>a-3&&al<b+3; })){ const x=sg.dir==='h'?al:sg.a+sg.w/2, y=sg.dir==='h'?sg.a+sg.w/2:al; try{ B.spawnVehicle(x*M_T,y*M_T,true,{seg:sg.id,along:al,dir}); }catch(e){} } } } },250); })"""
 STOP="""(()=>{ clearInterval(window.__jaI); const T=window.__jaT; return {seen:T.seen.size,stuck:T.why,coll:T.pairs,recov:(__bigrig.traffic.recovers||0)-T.rec0}; })()"""
@@ -46,6 +47,7 @@ async def main():
     pg.on('pageerror',lambda e: errs.append(str(e)[:300])); pg.on('console',lambda m: errs.append(m.text[:200]) if m.type=='error' else None)
     await pg.goto('file://'+os.path.abspath(HTML)); await pg.wait_for_function("window.__bigrig&&__bigrig.world.ready",timeout=120000)
     await pg.keyboard.press('Enter'); await pg.wait_for_timeout(500)
+    if os.environ.get("DBG"): await pg.evaluate("window.__DBG=1")
     st=await pg.evaluate(STATIC); print('STATIC',json.dumps({k:st[k] for k in ['nJ','nT','nC','nRb']}),'issues',len(st['bad']),flush=True)
     for x in st['bad'][:80]: print('  ',json.dumps(x))
     nav=[]; nn=0

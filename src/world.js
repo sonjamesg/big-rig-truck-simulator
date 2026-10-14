@@ -338,7 +338,10 @@ function genWorld(){
     // ...and any two in-line streets of the same width/type that simply butt end to end become one street (one junction per crossing, not two
     // half-junctions with separate lights)
     const live=S.filter(q=>!kill.has(q)&&q.type!=='hwy'&&q.type!=='dual'), byK=new Map(); for(const q of live){ const k=q.dir+q.a+','+q.w+q.type; if(!byK.has(k)) byK.set(k,[]); byK.get(k).push(q); }
-    for(const arr of byK.values()){ arr.sort((a,b)=>a.b0-b.b0); for(let i=0;i<arr.length-1;i++){ const P=arr[i], Q=arr[i+1]; if(Q.b0!==P.b1+1||P.cv1||Q.cv0||P.rbEnd||Q.dam||P.dam) continue;
+    for(const arr of byK.values()){ arr.sort((a,b)=>a.b0-b.b0); for(let i=0;i<arr.length-1;i++){ const P=arr[i], Q=arr[i+1]; if(P.cv1||Q.cv0||P.rbEnd||Q.dam||P.dam) continue;
+        if(Q.b0!==P.b1+1){ // v25 audit: two in-line halves either side of a crossing street (one crossroads, not two T-junctions with no straight-on)
+          const g=Q.b0-P.b1-1; if(g<1||g>8) continue; const X=S.find(x=>!kill.has(x)&&x.dir!==P.dir&&x.a===P.b1+1&&x.w===g&&x.b0<=P.a&&x.b1>=P.a+P.w-1&&x.type!=='hwy'); if(!X) continue;
+          for(let b=P.b1+1;b<Q.b0;b++) for(let k=0;k<P.w;k++){ const x=P.dir==='h'?b:P.a+k, y=P.dir==='h'?P.a+k:b; if(!inb(x,y)) continue; if(P.dir==='h') world.roadH[idx(x,y)]=P.id; else world.roadV[idx(x,y)]=P.id; } }
         for(let b=Q.b0;b<=Q.b1;b++) for(let k=0;k<Q.w;k++){ const x=Q.dir==='h'?b:Q.a+k, y=Q.dir==='h'?Q.a+k:b; if(!inb(x,y)) continue; if(Q.dir==='h'){ if(world.roadH[idx(x,y)]===Q.id) world.roadH[idx(x,y)]=P.id; } else if(world.roadV[idx(x,y)]===Q.id) world.roadV[idx(x,y)]=P.id; }
         P.b1=Q.b1; if(Q.cv1) P.cv1=Q.cv1; if(Q.name&&!P.name) P.name=Q.name; kill.set(Q,P); arr[i+1]=P; } }
     if(kill.size){ const map=new Int32Array(S.length).fill(-1); const keep=S.filter(q=>!kill.has(q)); keep.forEach((q,i)=>{ map[q.id]=i; });
@@ -388,7 +391,7 @@ function genWorld(){
   for(const hs of S){ if(hs.dir!=='h') continue; for(const vs of S){ if(vs.dir!=='v') continue;
     if(vs.a+vs.w-1<hs.b0-1||vs.a>hs.b1+1||hs.a+hs.w-1<vs.b0-1||hs.a>vs.b1+1) continue;
     { // v24: a stub that merely abuts a road another in-line street of the same width already crosses would make a duplicate junction
-      const ov=(lo,hi,a0,a1)=>!(hi<a0||lo>a1), same=(q,sg)=>q>=0&&q!==sg.id&&S[q].a===sg.a&&S[q].w===sg.w;
+      const ov=(lo,hi,a0,a1)=>!(hi<a0||lo>a1), same=(q,sg)=>q>=0&&q!==sg.id&&S[q].dir===sg.dir&&S[q].a<=sg.a&&S[q].a+S[q].w>=sg.a+sg.w;   // v25: also a narrower in-line continuation (lane drop) of a street that already crosses
       if(!ov(vs.b0,vs.b1,hs.a,hs.a+hs.w-1)&&same(world.roadV[idx(vs.a,hs.a)],vs)) continue;
       if(!ov(hs.b0,hs.b1,vs.a,vs.a+vs.w-1)&&same(world.roadH[idx(vs.a,hs.a)],hs)) continue; }
     const jx=vs.a, jy=hs.a, jw=vs.w, jh=hs.w;

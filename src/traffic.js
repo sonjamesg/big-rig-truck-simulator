@@ -260,6 +260,7 @@ function planRB(v,rb,sg,d,r,forceArm){
   const ex=rbExit(rb,arm,lane); aOut=ex.phi;
   let del=mod2pi(aOut-aIn); if(del<0.4) del+=6.283185307;
   const mrb={kind:'rb',d:dGw,rb,ang:aIn+0.18,key:sg.id+':'+d}; v.mk.push(mrb);
+  { const P=ex.pts, n=P.length; if(n>1){ const a=P[n-2], b=P[n-1], l=Math.hypot(b[0]-a[0],b[1]-a[1])||1; mrb.ex=[b[0]*M_T,b[1]*M_T,(b[0]-a[0])/l,(b[1]-a[1])/l]; } }
   const d0=pathEnd(v), k=Math.ceil(del*R/2); mrb.join=d0+6;
   for(let i=1;i<=k;i++){ const a=aIn+del*i/k; pathPush(v,C[0]+Math.cos(a)*R,C[1]+Math.sin(a)*R); }
   const d1=pathEnd(v);
@@ -413,12 +414,13 @@ function stepVeh(v,dt,pbs){
     if(m.kind==='slow'){ const gap=m.d0-front; if(gap<=0) v0=Math.min(v0,m.v); else v0=Math.min(v0,Math.sqrt(m.v*m.v+2*2.2*gap)); }
     else if(m.kind==='sig'){ if(v.s>m.d0&&v.s<m.d1) sig=m.side; }
     else if(m.kind==='ring'){ if(v.s>m.d0&&v.s<m.d1){ v.ring=m.rb; } }
-    else if(m.kind==='major'){ }
     else if(m.kind==='fo'){ if(v.s+v.L/2>m.d0&&v.s-v.L/2<m.d1) v.layer=1; }
     else if(m.kind==='filter'){ const gap=m.d-front; if(gap<-1.5||m.go) { v.filtering=false; continue; } if(gap>14) continue;
       // UK filtering right turn: pull forward into the junction, wait for a gap in oncoming traffic; when the stage ends, clear the junction
       const st=sigState(m.J,m.key,'R'); let wait=false; if(st==='g'&&sigFilter(m.J,m.key,'R')&&sigOncoming(v,m.J,m.opp)) wait=true;
-      if(wait){ v.filtering=gap<4; acc=Math.min(acc,idmAcc(v,v0,Math.max(0.1,gap),0)); } else if(gap<2){ m.go=true; v.filtering=false; } }
+      if(!wait&&gap<3&&oppTurnIn(v,m.J)) wait=true;   // v25: an opposing right-turner already committed in the box goes first
+      if(gap<6) v.filterJ=m.J;
+      if(wait){ v.filtering=gap<4; acc=Math.min(acc,idmAcc(v,v0,Math.max(0.1,gap),0)); } else if(gap<2){ m.go=true; v.filtering=false; v.turnJ=m.J; v.filterJ=null; } }
     else if(m.kind==='light'||m.kind==='gw'||m.kind==='rb'){
       const gap=m.d-front-(m.kind==='rb'?0.8:2.0); if(gap<-0.5||m.go) continue; if(gap>70) continue;   // v25 audit: hold 2 m behind the stop line so long vehicles sweeping round the corner clear the waiting cars
       let stop=false;
@@ -431,9 +433,12 @@ function stepVeh(v,dt,pbs){
           if(!busy){ const t=truck, dr=Math.hypot(t.x-m.rb.cx*M_T,t.y-m.rb.cy*M_T); if(dr<(m.rb.rout+1)*M_T&&Math.abs(t.v)>0.8){ const a=Math.atan2(t.y-m.rb.cy*M_T,t.x-m.rb.cx*M_T), df=mod2pi(m.ang-a); if(df<1.6&&df>0.05) busy=true; } }
           if(busy&&v.stopT>12){ busy=false; for(const o of traffic.vs){ if(o===v||o.ring!==m.rb) continue; const a=Math.atan2(o.y-m.rb.cy*M_T,o.x-m.rb.cx*M_T), df=mod2pi(m.ang-a); if(df<0.5&&df>-0.15&&o.v>0.5){ busy=true; break; } } }   // long wait: only a car right at the merge still blocks
           if(!busy) for(const o of traffic.vs){ const e=o.rbIn; if(o!==v&&e&&e.m.rb===m.rb&&e.m.key===m.key&&o.mk.indexOf(e.m)>=0&&o.s-o.L/2<e.m.join){ busy=true; break; } }   // one car per entry at a time: side-by-side lanes never squeeze onto the ring together
+          if(!busy&&m.ex&&rbExitBlocked(v,m.ex)) busy=true;   // v25: don't enter the ring while our exit is queued back to the ring (no gridlock)
           if(!busy){ if(gap<2.5){ m.go=true; if(!m.join) m.join=m.d+20; v.rbIn={m}; } } else stop=true; } }
+      if(!stop&&m.turn&&gap<8&&!m.go&&turnSweepBlocked(v,m)) stop=true;   // v25: hold the turn while a stopped car sits in our swept path
       if(stop) acc=Math.min(acc,idmAcc(v,v0,Math.max(0.1,gap),0));
     }
+    else if(m.kind==='major'&&m.turn&&!m.swOk){ const gap=m.d-front-0.8; if(gap<8&&gap>-0.5){ if(turnSweepBlocked(v,m)) acc=Math.min(acc,idmAcc(v,v0,Math.max(0.1,gap),0)); else if(gap<2) m.swOk=true; } }
   }
   if(typeof railStopAcc==='function'){ const ra=railStopAcc(v,v0); if(ra<acc) acc=ra; }
   v.sig=sig;
@@ -446,6 +451,9 @@ function stepVeh(v,dt,pbs){
     for(let k=0;k<17;k++){ const sd=front+0.4+k*2.5; const p=pathAt(v,sd); const px=p[0]+v.offX, py=p[1]+v.offY;
       for(const b of cands){ if(ptBoxDist(px,py,b)<half){ const g=sd-front; if(g<lgap){ lgap=g; const rel=Math.cos(b.h-v.h); lvel=Math.max(0,(b.vel||0)*rel); lplayer=!!b.player; lveh=b.veh||null; } } }
       if(lgap<1e8) break; } }
+  if(sig&&cands.length&&lgap>0.5){ const half=v.W/2+0.3;   // v25: mid lane change — never slide sideways into a car alongside in the target lane
+    for(let sd=v.s-v.L/2+0.5;sd<front+0.4&&lgap>0.5;sd+=1.5){ const p=pathAt(v,sd+3), q=pathAt(v,sd); const px=p[0]+v.offX, py=p[1]+v.offY;
+      for(const b of cands){ if(b.veh&&b.veh.lead===v) continue; if(ptBoxDist(px,py,b)<half&&ptBoxDist(q[0]+v.offX,q[1]+v.offY,b)>=half-0.2){ lgap=0.5; lvel=0; lveh=b.veh||null; lplayer=!!b.player; break; } } } }
   if(lgap<1e8) acc=Math.min(acc,idmAcc(v,v0,lgap,lvel));
   acc=Math.min(acc,idmAcc(v,v0,1e9,0));
   if(typeof indYield==='function') acc=indYield(v,v0,acc);
@@ -475,8 +483,19 @@ function stepVeh(v,dt,pbs){
   if(Math.hypot(v.offX,v.offY)>3.5 && v.stopT>2){ v.ghostT=Math.max(v.ghostT,2); }
   placeVeh(v); trimPath(v);
 }
+function rbExitBlocked(v,e){ for(const o of traffic.vs){ if(o===v||o.v>1.2) continue; const dx=o.x-e[0], dy=o.y-e[1]; if(Math.abs(dx)>16||Math.abs(dy)>16) continue;
+    const u=dx*e[2]+dy*e[3], w=-dx*e[3]+dy*e[2]; if(u>-2&&u<v.L+4&&Math.abs(w)<4.5) return true; } return false; }
+function oppTurnIn(v,J){ if(v.stopT>15) return false; const x0=J.x*M_T-2, y0=J.y*M_T-2, x1=(J.x+J.w)*M_T+2, y1=(J.y+J.h)*M_T+2;
+  for(const o of traffic.vs){ if(o===v) continue; const inb=o.x>x0&&o.x<x1&&o.y>y0&&o.y<y1;
+    if(o.filterJ===J&&o.id<v.id&&inb&&o.v<3) return true;   // tie-break: two opposing right-turners arriving together - lower id goes first
+    if(o.turnJ!==J) continue; if(inb) return true; o.turnJ=null; } return false; }
+function turnSweepBlocked(v,m){ if(v.stopT>20) return false; const long=v.trl||v.L>8, clr=v.W/2+(v.trl?2.4:long?1.8:0.6);
+  for(let sd=m.d;sd<=m.dEnd;sd+=2){ const p=pathAt(v,sd);
+    for(const o of traffic.vs){ if(o===v||o.v>0.6||Math.abs(o.x-p[0])>14||Math.abs(o.y-p[1])>14) continue; for(const b of boxesOf(o)) if(ptBoxDist(p[0],p[1],b)<clr) return true; } }
+  return false; }
+// v25: a queue held up by the player truck is not a deadlock - never ghost the followers into each other
 function queueLocked(v){ const seen=new Set([v]); let c=v.lead, n=0;
-  while(c&&n<40){ if(seen.has(c)) return true; seen.add(c); if(traffic.vs.indexOf(c)<0) return true; if(!c.lead) return (c.stopT||0)>60; c=c.lead; n++; }
+  while(c&&n<40){ if(seen.has(c)) return true; seen.add(c); if(traffic.vs.indexOf(c)<0) return true; if(!c.lead) return (c.stopT||0)>60 && !(c.blockT>0); c=c.lead; n++; }
   return n>=40; }
 // ---------------- parked cars ----------------
 function initParked(){
