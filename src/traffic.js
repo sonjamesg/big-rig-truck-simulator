@@ -509,7 +509,7 @@ function initParked(){
   const add=(x,y,h,kind)=>{ const t=VTYPES[kind]; const v={parked:true,kind,L:t.L,W:t.W,heavy:false,x,y,h,offX:0,offY:0,art:artFor(kind,r),v:0}; traffic.parked.push(v);
     const k=Math.floor(x/64)+','+Math.floor(y/64); let a=traffic.parkedIdx.get(k); if(!a){ a=[]; traffic.parkedIdx.set(k,a); } a.push(v); };
   for(const o of world.objects){
-    if(o.kind==='lot'){ const x0=o.x/PPM, y0=o.y/PPM, w=o.w/PPM, h=o.h/PPM; const vert=h>w;
+    if(o.kind==='lot'&&!o._dead){ const x0=o.x/PPM, y0=o.y/PPM, w=o.w/PPM, h=o.h/PPM; const vert=h>w;
       if(!vert){ for(let row=0; row*6+5.5<=h; row++) for(let x=x0+1.6; x<x0+w-1.6; x+=2.8){ if(r()<0.55) add(x,y0+row*6+2.8,(row%2?0:Math.PI)+(r()-0.5)*0.06,pickW({hatch:3,sedan:3,estate:2,suv:2,van:1},r())); } }
       else { for(let col=0; col*6+5.5<=w; col++) for(let y=y0+1.6; y<y0+h-1.6; y+=2.8){ if(r()<0.55) add(x0+col*6+2.8,y,(col%2?Math.PI/2:-Math.PI/2)+(r()-0.5)*0.06,pickW({hatch:3,sedan:3,estate:2,suv:2,van:1},r())); } } }
   }

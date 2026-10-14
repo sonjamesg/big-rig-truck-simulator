@@ -189,9 +189,12 @@ function drawObject(g,o){
   case 'fountain': { const R2=o.big?44:22; g.fillStyle='#9aa3ad'; g.beginPath(); g.arc(o.x,o.y,R2+5,0,7); g.fill(); g.fillStyle='#4a90d9'; g.beginPath(); g.arc(o.x,o.y,R2,0,7); g.fill(); g.fillStyle='#c8e6ff'; g.beginPath(); g.arc(o.x,o.y,R2*0.3,0,7); g.fill(); g.strokeStyle='rgba(255,255,255,0.6)'; g.beginPath(); g.arc(o.x,o.y,R2*0.6,0,7); g.stroke(); break; }
   case 'rb': drawRB(g,o); break;
   case 'tree': drawTree(g,o); break;
-  case 'lot': { g.strokeStyle='#e6e6e0'; g.lineWidth=2; const bay=24, r=mulberry(o.seed);
-    for(const row of [0,1]){ const y0=o.y+(row?o.h/2:0); for(let x=o.x+4;x<o.x+o.w-4;x+=bay){ g.beginPath(); g.moveTo(x,y0+(row?o.h/2-40:4)); g.lineTo(x,y0+(row?o.h/2-4:40)); g.stroke();
-      if(r()<0.45){ const c=['#c0392b','#ecf0f1','#2c3e50','#2980b9','#f1c40f','#7f8c8d'][(r()*6)|0]; const cy=y0+(row?o.h/2-38:6); g.fillStyle='rgba(0,0,0,0.3)'; g.fillRect(x+6,cy+3,14,32); g.fillStyle=c; g.fillRect(x+4,cy,14,32); g.fillStyle='rgba(30,40,60,0.8)'; g.fillRect(x+5,cy+7,12,6); g.fillRect(x+5,cy+22,12,4); } } }
+  case 'lot': { // car park: tarmac surface + bay lines matching the parked-car grid in traffic.js initParked (6 m rows, 2.8 m bays)
+    g.fillStyle='#5d6066'; g.fillRect(o.x,o.y,o.w,o.h); g.strokeStyle='#9a9ca0'; g.lineWidth=2; g.strokeRect(o.x+1,o.y+1,o.w-2,o.h-2);
+    g.strokeStyle='#e6e6e0'; g.lineWidth=Math.max(1.5,PPM*0.12); const vert=o.h>o.w, U=vert?o.w:o.h, V=vert?o.h:o.w, A=vert?o.x:o.y, B=vert?o.y:o.x;
+    const seg=(a0,b0,a1,b1)=>{ g.beginPath(); if(vert){ g.moveTo(a0,b0); g.lineTo(a1,b1); } else { g.moveTo(b0,a0); g.lineTo(b1,a1); } g.stroke(); };
+    for(let row=0; row*6+5.5<=U/PPM; row++){ const r0=A+row*6*PPM+0.2*PPM, r1=r0+5.2*PPM; seg(row%2?r1:r0,B+0.2*PPM,row%2?r1:r0,B+V-0.2*PPM);
+      for(let b=0.2; b<V/PPM-0.2; b+=2.8) seg(r0,B+b*PPM,r1,B+b*PPM); }
     g.lineWidth=1; break; }
   case 'kerb': { const c=o.c, X=c.cx*TILE, Y=c.cy*TILE, Rr=c.R*TILE; g.save(); g.beginPath(); g.rect(o.x,o.y,o.w,o.h); g.clip();
     // asphalt everywhere outside the kerb circle, paving inside

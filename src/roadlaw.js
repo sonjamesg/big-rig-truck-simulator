@@ -23,14 +23,23 @@ function slSegAt(x,y){ const tx=Math.floor(x/M_T), ty=Math.floor(y/M_T); if(type
 
 // ---- speed cameras
 const CAM={list:[],built:false,flash:0,cd:22};
+const CAM_VERGE=new Set([T.GRASS,T.WALK,T.CONC,T.PGRASS,T.GRAVEL]);
+function camLotNear(x,y,m){ const X=x*TILE,Y=y*TILE,M=m*TILE; return world.objects.some(o=>!o._dead&&(o.kind==='lot'||(o.kind==='bldg'&&o.st==='carpark'))&&o.w!=null&&X>o.x-M&&X<o.x+o.w+M&&Y>o.y-M&&Y<o.y+o.h+M); }
+function camVerge(sg,al,h){ const tl=(u,v)=>h?get(Math.floor(v),Math.floor(u)):get(Math.floor(u),Math.floor(v));   // u across, v along (tiles)
+  for(const side of [-1,1]){ const edge=side<0?sg.a:sg.a+sg.w, u=edge+side*0.9;
+    let ok=true; for(let d=-3;d<=3&&ok;d++){ if(!CAM_VERGE.has(tl(u,al+d))) ok=false; if(tl(edge-side*0.4,al+d)!==T.ROAD) ok=false; } if(!ok) continue;
+    const px=h?al:u, py=h?u:al; if(camLotNear(px,py,3)) continue;
+    // nearside lane: pick the travel direction whose lane runs closest to the post; lens points against it (at the oncoming traffic)
+    let best=null; for(const dir of [1,-1]){ try{ const q=lanePt(sg,dir,0,al), dd=Math.hypot(q[0]/M_T-px,q[1]/M_T-py); if(!best||dd<best.d) best={d:dd,dir}; }catch(e){} }
+    const dv=best?dirVec(sg,best.dir):[h?1:0,h?0:1]; return [px,py,Math.atan2(-dv[1],-dv[0])]; }
+  return null; }
 function camBuild(){ if(CAM.built||!world.ready) return; CAM.built=true; let seed=91; const R=()=>{ seed=(seed*16807)%2147483647; return (seed-1)/2147483646; };
   const reg=new Map(), RG=420; const nearJ=(x,y)=>(world.junctions||[]).some(J=>x>J.x-9&&x<J.x+J.w+9&&y>J.y-9&&y<J.y+J.h+9);
   const cand=world.segs.filter(sg=>sg&&sg.b1-sg.b0>=50&&['city','town','hwy','dual','rural'].includes(sg.type)).map(sg=>({sg,w:(sg.type==='city'||sg.type==='town'?3:sg.type==='rural'?1:2)*R()})).sort((a,b)=>b.w-a.w);
   for(const {sg} of cand){ const al=Math.round(sg.b0+(sg.b1-sg.b0)*(0.3+R()*0.4)), h=sg.dir==='h'; const cx=h?al:sg.a+sg.w/2, cy=h?sg.a+sg.w/2:al; if(nearJ(cx,cy)) continue;
     const k=Math.floor(cx/RG)+','+Math.floor(cy/RG), n=reg.get(k)||0; if(n>=3) continue; if(CAM.list.some(c=>Math.hypot(c.cx-cx,c.cy-cy)<60)) continue;
-    reg.set(k,n+1); const px=h?al:sg.a-0.9, py=h?sg.a-0.9:al;   // post on the verge
-    if(typeof get==='function'&&(get(Math.floor(px),Math.floor(py))===T.WATER||get(Math.floor(px),Math.floor(py))===T.BLDG)) continue;
-    CAM.list.push({sg,al,h,cx,cy,px,py,last:-1e9}); if(CAM.list.length>=60) break; } }
+    const pos=camVerge(sg,al,h); if(!pos) continue; reg.set(k,n+1); const [px,py,face]=pos;   // post on the verge right beside the kerb, lens facing oncoming traffic
+    CAM.list.push({sg,al,h,cx,cy,px,py,face,last:-1e9}); if(CAM.list.length>=60) break; } }
 function camSound(){ try{ const c=audio.ctx; if(!c||!(SETTINGS.vol>0)) return; if(typeof noiseBurst==='function') noiseBurst(0.08,3200,0.8,0.5,'highpass'); const o=c.createOscillator(), g=c.createGain(), t=c.currentTime; o.type='square'; o.frequency.setValueAtTime(1800,t); o.frequency.exponentialRampToValueAtTime(600,t+0.12); g.gain.setValueAtTime(0.12,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.15); o.connect(g); g.connect(audio.master||c.destination); o.start(t); o.stop(t+0.16); }catch(e){} }
 let CAMP=null;
 function updateRoadLaw(dt){ if(!world.ready||!started) return; camBuild(); CAM.flash=Math.max(0,CAM.flash-dt*3);
@@ -55,7 +64,7 @@ function drawCameras(vx0,vy0,vx1,vy1){ const S=TILE, K=typeof DN!=='undefined'?D
     ctx.save(); // calibration marks across the carriageway
     ctx.fillStyle='rgba(255,255,255,0.7)'; for(let k=0;k<4;k++){ const q=(c.al+1.5+k*1.6)*S; for(const e of [c.sg.a+0.25,c.sg.a+c.sg.w-0.25]){ if(c.h) ctx.fillRect(q-0.25*S,e*S-2,0.5*S,4); else ctx.fillRect(e*S-2,q-0.25*S,4,0.5*S); } }
     ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fillRect(x-7+6,y-12+6,14,24); ctx.fillStyle='#555'; ctx.beginPath(); ctx.arc(x,y,4,0,7); ctx.fill();
-    ctx.translate(x,y); if(!c.h) ctx.rotate(Math.PI/2); ctx.fillStyle='#f7c600'; ctx.fillRect(-11,-7,22,14); ctx.strokeStyle='#222'; ctx.lineWidth=1.5; ctx.strokeRect(-11,-7,22,14);
+    ctx.translate(x,y); ctx.rotate(c.face!=null?c.face:(c.h?0:Math.PI/2)); ctx.fillStyle='#f7c600'; ctx.fillRect(-11,-7,22,14); ctx.strokeStyle='#222'; ctx.lineWidth=1.5; ctx.strokeRect(-11,-7,22,14);
     ctx.fillStyle='#222'; ctx.fillRect(-11,-1.5,22,3); ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(6,0,3.5,0,7); ctx.fill(); ctx.restore();
     if(K>0.05&&typeof dnLight==='function') dnLight(x,y,30,'rgba(255,220,120,0.7)',0.35);
     if(timeS-c.last<0.25&&typeof dnLight==='function') dnLight(x,y,220,'rgba(255,255,255,1)',1); } }
