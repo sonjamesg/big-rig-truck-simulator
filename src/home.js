@@ -20,6 +20,7 @@ const css=`#overlay{background:#070b13!important}
 #homeVer{position:relative;margin-top:14px;padding-bottom:4px;font-size:10px;letter-spacing:1px;opacity:.45;color:#cfd6e0}
 body.touch #overlay #loadBox{width:min(380px,90vw)}
 @media (orientation:landscape) and (max-height:500px){ body.touch #overlay #logo{max-height:30vh!important} body.touch #overlay #loadBox{margin-top:10px} body.touch #setPanel{margin-top:10px;padding:8px 14px} }
+#overlay.hidden,body.touch #overlay.hidden{display:none!important}
 body:has(#overlay:not(.hidden)) #hudbtns,body:has(#overlay:not(.hidden)) #mpbadge{display:none!important}
 @media (orientation:landscape) and (max-height:500px){
  body.touch #overlay{display:grid!important;grid-template-columns:1fr 1fr;grid-auto-rows:min-content;column-gap:18px;row-gap:6px;align-content:center;justify-items:center;padding:10px 18px!important}

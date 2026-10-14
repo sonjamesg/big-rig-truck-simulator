@@ -71,7 +71,7 @@ function frame(ts){
   if(!paused){ updateTraffic(dt); updateFuel(dt); updateForecourts(dt); if(started) updateCareer(dt); if(started) updateIndicators(dt); updateFX(dt); } updatePort(dt);
   { const z=cam.z; updateAmbient(dt,[cam.x-VW/2/z,cam.y-VH/2/z,cam.x+VW/2/z,cam.y+VH/2/z]); }
   if(started&&!paused) updateNav(dt);
-  if(truck.bump>0.05&&!truck._dmg){ truck.damage=Math.min(100,truck.damage+truck.bump*6*(truck.dmgM||1)); truck._dmg=true; } if(truck.bump<=0.01) truck._dmg=false;
+  if(truck.bump>0.05&&!truck._dmg){ truck.damage=Math.min(100,truck.damage+Math.min(3,truck.bump*2.4)*(truck.dmgM||1)); truck._dmg=true; } if(truck.bump<=0.01) truck._dmg=false;
   updateBreakdown(dt); if(typeof czTick==='function') czTick(); updateDayNight(dt,started&&!paused); updateWeather(dt,started&&!paused);
   // camera: look-ahead + zoom-out with speed
   const f=fwd(truck.h), sp=Math.abs(truck.v);
