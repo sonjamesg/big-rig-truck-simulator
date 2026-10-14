@@ -144,7 +144,7 @@ function ownUpCard(yd){ ownCss(); const o=ownedYard(yd); if(!o) return; const cu
 addEventListener('keydown',e=>{ const k=career.uiOpen; if(k!=='ownbuy'&&k!=='owndash'&&k!=='ownup') return; if(e.code==='Enter'||e.code==='NumpadEnter'){ const b=document.querySelector('.btn.sel')||document.getElementById(k==='ownbuy'?'ownBuy':k==='ownup'?'ownUp':'ownUpg'); if(b&&!b.disabled){ e.preventDefault(); e.stopPropagation(); b.click(); } } else if(e.code==='Escape'){ e.preventDefault(); closeUI(); } },true);
 // ---- in-game yard art
 function ydText(t,x,y,px,col,font){ ctx.font=(font||'900 ')+px+'px Arial Black,Arial'; ctx.fillStyle=col; ctx.fillText(t,x,y); }
-function drawOwnDepots(vx0,vy0,vx1,vy1){ if(!world.forSale) return; const S=PPM, Tt=TILE, dark=typeof DN!=='undefined'?DN.dark:0;
+function drawOwnDepots(vx0,vy0,vx1,vy1){ if(!world.forSale) return; const S=PPM, Tt=TILE, dark=typeof DN!=='undefined'?DN.dark:0; rlDrawExt(vx0,vy0,vx1,vy1,dark);
   for(const yd of ownYards()){ const X0=yd.x0*Tt, Y0=yd.y0*Tt, W=yd.w*Tt, H=yd.h*Tt; if(X0>vx1+120||X0+W<vx0-120||Y0>vy1+120||Y0+H<vy0-120) continue; const own=ownedYard(yd), B=ydBrand(yd), X=t=>(yd.x0+t)*Tt, Y=t=>(yd.y0+t)*Tt;
     ctx.save(); ctx.textAlign='center'; ctx.textBaseline='middle';
     // tarmac with patching + kerb
@@ -195,11 +195,11 @@ function ownDrawBack(yd,X,Y,Tt,dark,own,B,tr){
   const ry=Y(RAIL_Y); ctx.fillStyle='#6d5a48'; ctx.fillRect(X(0),ry-0.75*Tt,20*Tt,1.5*Tt); ctx.fillStyle='#4a3a2c'; for(let t=0.2;t<20;t+=0.5) ctx.fillRect(X(t),ry-0.6*Tt,0.18*Tt,1.2*Tt);
   ctx.fillStyle='#c4cad0'; ctx.fillRect(X(0),ry-0.42*Tt,20*Tt,4); ctx.fillRect(X(0),ry+0.42*Tt-4,20*Tt,4);
   ctx.fillStyle='#c0392b'; ctx.fillRect(X(0.3),ry-0.6*Tt,0.4*Tt,1.2*Tt);
-  ctx.fillStyle='#4b4f55'; ctx.fillRect(X(19.2),ry-1.4*Tt,1.6*Tt,2.8*Tt); ctx.fillStyle='#0b0c0e'; ctx.fillRect(X(19.5),ry-0.9*Tt,1.3*Tt,1.8*Tt);
+  if(!yd.rc){ ctx.fillStyle='#4b4f55'; ctx.fillRect(X(19.2),ry-1.4*Tt,1.6*Tt,2.8*Tt); ctx.fillStyle='#0b0c0e'; ctx.fillRect(X(19.5),ry-0.9*Tt,1.3*Tt,1.8*Tt); }
   // crane rails
   ctx.fillStyle='#9aa1a8'; ctx.fillRect(X(0),Y(19.4)-2,20*Tt,4); ctx.fillRect(X(0),Y(23.6)-2,20*Tt,4);
   const R=yd.rt||{}; // train
-  if(R.x!=null){ ctx.save(); ctx.beginPath(); ctx.rect(X(0),ry-2*Tt,19.5*Tt,4*Tt); ctx.clip(); const tx=t=>X(R.x+t);
+  if(R.x!=null){ ctx.save(); ctx.beginPath(); ctx.rect(X(0),ry-2*Tt,(yd.rc?20:19.5)*Tt,4*Tt); ctx.clip(); const tx=t=>X(R.x+t);
     ctx.fillStyle='rgba(0,0,0,.3)'; ctx.fillRect(tx(0)+8,ry-0.55*Tt+8,3.4*Tt,1.1*Tt); ctx.fillStyle='#d35400'; ctx.fillRect(tx(0),ry-0.55*Tt,3.4*Tt,1.1*Tt); ctx.fillStyle='#2c3e50'; ctx.fillRect(tx(0.3),ry-0.4*Tt,0.8*Tt,0.8*Tt); ctx.fillStyle='#f1c40f'; ctx.fillRect(tx(0),ry-0.55*Tt,0.15*Tt,1.1*Tt);
     if(dark>0.05){ dnLight(tx(-0.3),ry,120,'rgba(255,250,220,0.95)',0.8); }
     for(let k=0;k<4;k++){ const fx=FLAT0+k*FLAT_L; ctx.fillStyle='#3d4249'; ctx.fillRect(tx(fx-1.2),ry-0.4*Tt,(FLAT_L-0.2)*Tt,0.8*Tt); ctx.fillStyle='#22262b'; ctx.fillRect(tx(fx-1.2),ry-0.4*Tt,(FLAT_L-0.2)*Tt,3); ctx.fillRect(tx(fx-1.2),ry+0.4*Tt-3,(FLAT_L-0.2)*Tt,3);
@@ -216,7 +216,11 @@ function ownDrawBack(yd,X,Y,Tt,dark,own,B,tr){
   if(dark>0.05){ dnLight(gx,Y(21.5),180,'rgba(255,240,205,0.95)',own?0.8:0.4); }
 }
 function ownTrain(yd,dt){ const o=ownedYard(yd); let R=yd.rt; if(!R) R=yd.rt={st:'away',t:8+Math.random()*10,x:null,gx:10,gy:RAIL_Y,box:[0,0,0,0]};
+  if(yd.rc===undefined) yd.rc=rlConnect(yd);
   if(!o){ return; }
+  if(yd.rc&&R.st==='away'){ R.st='in'; R.x=TR_STOP+3; }   // connected yards keep their train at home between runs
+  if(yd.rc&&R.st==='out'){ R.st='ext'; R.x=null; R.d=(TR_STOP+TR_LEN-20)*M_T; R.v=0; R.gy=RAIL_Y; }
+  if(yd.rc&&(R.st==='ext'||R.st==='hold'||R.st==='main'||R.st==='back')){ rlTrainStep(yd,R,dt); return; }
   const near=(a,b,v)=>{ const d=b-a; return Math.abs(d)<=v*dt?b:a+Math.sign(d)*v*dt; };
   if(R.st==='away'){ R.x=null; R.t-=dt; if(R.t<=0){ R.st='in'; R.x=21; R.box=[0,0,0,0]; } }
   else if(R.st==='in'){ R.x=near(R.x,TR_STOP,Math.max(0.6,Math.min(4,(R.x-TR_STOP)*0.6))); if(R.x===TR_STOP){ R.st='load'; R.k=0; R.ph='go'; R.t=6; } }
@@ -224,7 +228,69 @@ function ownTrain(yd,dt){ const o=ownedYard(yd); let R=yd.rt; if(!R) R=yd.rt={st
     if(R.ph==='go'){ R.gy=near(R.gy,19.9,1.5); R.gx=near(R.gx,10,2.5); if(R.gx===10&&R.gy===19.9){ if((o.stock||0)>0){ o.stock--; R.cb=YARD_COLS[(Math.random()*8)|0]; R.ph='up'; } else { R.t-=dt; if(R.t<=0||R.k>0&&R.t<=3) { R.st='out'; } } } }
     else if(R.ph==='up'){ R.gx=near(R.gx,fx,2.2); R.gy=near(R.gy,RAIL_Y,1.2); if(R.gx===fx&&R.gy===RAIL_Y){ R.box[R.k]=R.cb; R.cb=null; R.k++; R.t=6; R.ph=R.k>=4?'done':'go'; if(R.k>=4) R.st='out'; } } }
   else if(R.st==='out'){ R.gy=near(R.gy,RAIL_Y,1.2); R.x+=Math.min(5,0.5+(R.x-TR_STOP)*0.4)*dt; if(R.x>21){ R.st='away'; R.x=null; R.t=70+Math.random()*40; if(R.k) toast(ydBrand(yd).name+': freight train left with '+R.k+' container'+(R.k>1?'s':'')); } } }
-function ownMap(BX,BY,z){ if(!world.forSale) return; ctx.save(); for(const yd of ownYards()){ const y=BY(yd.y0+RAIL_Y), x0=BX(yd.x0), x1=BX(yd.x0+20);
+
+// ---- rl: siding joins the main line (freight track) through a turnout; block reservation against the timetabled freight trains
+const TR_LEN=16.2, RL_V=9, RL_HOLD=125, RL_AHEAD=500, RL_BEHIND=1200;
+function rlConnect(yd){ if(typeof RAIL==='undefined'||!RAIL.ready) return undefined; const sx=yd.x0+20, sy=yd.y0+21, E=[(yd.x0+20)*M_T,(yd.y0+21.5)*M_T];
+  let bi=0,bd=1e18; for(let i=0;i<RAIL.L;i+=2){ const d=Math.hypot(RAIL.X[i]-E[0],RAIL.Y[i]-E[1]); if(d<bd){bd=d;bi=i;} }
+  if(bd>320*M_T){ console.log('[rl] '+yd.name+': main line '+Math.round(bd)+' m away - keeps its spur'); return null; }
+  const R=Math.round(bd/M_T)+70, x0=Math.max(1,sx-R), y0=Math.max(1,sy-R), x1=Math.min(MW-2,sx+R), y1=Math.min(MH-2,sy+R), W=x1-x0+1, H=y1-y0+1, blk=new Uint8Array(W*H), goal=new Map();
+  const at=(i,j)=>(j-y0)*W+(i-x0), inR=(i,j)=>i>=x0&&i<=x1&&j>=y0&&j<=y1;
+  for(let s=0;s<RAIL.L;s+=1.5){ const c=railPt(s,0); const ti=c[0]/M_T, tj=c[1]/M_T; if(ti<x0-4||ti>x1+4||tj<y0-4||tj>y1+4) continue;
+    for(let a=-3;a<=3;a++) for(let b=-3;b<=3;b++){ const i=Math.floor(ti)+a, j=Math.floor(tj)+b; if(inR(i,j)&&Math.hypot(i+0.5-ti,j+0.5-tj)<3.2) blk[at(i,j)]=1; }
+    const f=railPt(s,RW_F-3.4); const gi=Math.floor(f[0]/M_T), gj=Math.floor(f[1]/M_T); if(inR(gi,gj)) goal.set(at(gi,gj),s); }
+  const bad=(i,j)=>{ const k=idx(i,j); return isSolidTile(i,j)||(world.water&&world.water[k])||world.roadH[k]>=0||world.roadV[k]>=0||G[k]===T.ROAD||G[k]===T.BRIDGE||(world.reserved[k]&&!(i>=yd.x0&&i<yd.x0+yd.w&&j>=yd.y0&&j<yd.y0+yd.h)); };
+  const prev=new Int32Array(W*H).fill(-2), q=[at(sx,sy)]; if(!inR(sx,sy)||bad(sx,sy)){ console.log('[rl] '+yd.name+': siding exit blocked'); return null; } prev[q[0]]=-1; let hit=-1;
+  for(let h=0;h<q.length&&hit<0;h++){ const c=q[h], i=c%W+x0, j=(c/W|0)+y0; for(const [a,b] of [[1,0],[0,1],[0,-1],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]]){ const ni=i+a, nj=j+b; if(!inR(ni,nj)) continue; const n=at(ni,nj); if(prev[n]!==-2) continue;
+      if(a&&b&&(bad(i+a,j)||bad(i,j+b))) continue; if(goal.has(n)&&!bad(ni,nj)){ prev[n]=c; hit=n; break; } if(blk[n]||bad(ni,nj)) continue; prev[n]=c; q.push(n); } }
+  if(hit<0){ console.log('[rl] '+yd.name+': no clear route to the main line (roads/buildings/water in the way) - keeps its spur'); return null; }
+  const path=[]; for(let c=hit;c>=0;c=prev[c]) path.push([(c%W+x0+0.5)*M_T,((c/W|0)+y0+0.5)*M_T]); path.reverse(); if(path.length>360){ console.log('[rl] '+yd.name+': route too long'); return null; }
+  const sn=goal.get(hit), Q=[E]; for(let k=3;k<path.length-1;k+=3) Q.push(path[k]); Q.push(path[path.length-1]);
+  // turnout: swing in along the freight track so the train joins tangentially, running with the freight direction (-s)
+  const sj=sn-70; Q.push(railPt(sn-25,RW_F-1.6)); Q.push(railPt(sj,RW_F));
+  // smooth (Chaikin x2) keeping the ends
+  let P=Q; for(let it=0;it<2;it++){ const N=[P[0]]; for(let k=0;k<P.length-1;k++){ const a=P[k], b=P[k+1]; if(k>0) N.push([a[0]*0.75+b[0]*0.25,a[1]*0.75+b[1]*0.25]); if(k<P.length-2) N.push([a[0]*0.25+b[0]*0.75,a[1]*0.25+b[1]*0.75]); } N.push(P[P.length-1]); P=N; }
+  const cum=[0]; for(let k=1;k<P.length;k++) cum.push(cum[k-1]+Math.hypot(P[k][0]-P[k-1][0],P[k][1]-P[k-1][1]));
+  if(typeof DOCK_FENCE!=='undefined'){ if(!DOCK_FENCE) DOCK_FENCE=new Uint8Array(MW*MH); for(const p of path){ const i=Math.floor(p[0]/M_T), j=Math.floor(p[1]/M_T); if(!blk[at(i,j)]) DOCK_FENCE[idx(i,j)]=1; } }
+  // nearest station = the terminal the train serves on its lap
+  let st=null, sb=1e18; for(const S of RAIL.stations||[]){ const d=rlMod(sj-S.s,RAIL.L); if(d>2000&&d<sb){ sb=d; st=S; } }
+  console.log('[rl] '+yd.name+': connected, '+Math.round(cum[cum.length-1])+' m spur to arc '+Math.round(sj)+(st?' via '+st.name:''));
+  return {P,cum,Lq:cum[cum.length-1],sj,dest:st?st.name:'the main line',ds:sb}; }
+function rlQ(rc,d){ const P=rc.P, c=rc.cum; d=Math.max(0,Math.min(rc.Lq,d)); let k=1; while(k<c.length-1&&c[k]<d) k++; const f=(d-c[k-1])/((c[k]-c[k-1])||1); return [P[k-1][0]+(P[k][0]-P[k-1][0])*f,P[k-1][1]+(P[k][1]-P[k-1][1])*f]; }
+function rlPos(yd,d){ const rc=yd.rc, Lq=rc.Lq, L=RAIL.L, ex=(yd.x0+20)*M_T, ey=(yd.y0+21.5)*M_T;
+  if(d<0) return [ex+d,ey]; if(d<=Lq) return rlQ(rc,d); if(d<=Lq+L) return railPt(rc.sj-(d-Lq),RW_F); if(d<=2*Lq+L) return rlQ(rc,2*Lq+L-d); return [ex-(d-2*Lq-L),ey]; }
+function rlCars(yd,R){ const out=[]; const add=(k,off,len,box)=>{ const a=rlPos(yd,R.d-(off-len/2)*M_T), b=rlPos(yd,R.d-(off+len/2)*M_T); out.push({k,x:(a[0]+b[0])/2,y:(a[1]+b[1])/2,ang:Math.atan2(a[1]-b[1],a[0]-b[0]),L:len*M_T,box}); };
+  add('loco',1.7,3.4); for(let k=0;k<4;k++) add('flat',3.6+k*3.2+1.5,3.0,R.box[k]); return out; }
+// arc span this train occupies on the main line (for crossings + reservation), or null
+function rlSpan(yd,R){ const rc=yd.rc, Lq=rc.Lq, L=RAIL.L, h=R.d, t=R.d-TR_LEN*M_T; if(h<Lq||t>Lq+L) return null; const a=rc.sj-(Math.min(h,Lq+L)-Lq), b=rc.sj-(Math.max(t,Lq)-Lq); return [a,b]; }
+function rlClear(rc,t){ for(const tr of RAIL.trains){ if(tr.pax) continue; const [a,b]=railSpan(tr,t,0); if(rlOvl(a,b,rc.sj-RL_AHEAD,rc.sj+TR_LEN*M_T+RL_BEHIND)) return false; } return true; }
+function rlTrainStep(yd,R,dt){ const rc=yd.rc, Lq=rc.Lq, L=RAIL.L, acc=(vt,a)=>{ R.v=R.v<vt?Math.min(vt,R.v+a*dt):Math.max(vt,R.v-a*1.5*dt); };
+  if(R.st==='ext'){ const hp=Lq-RL_HOLD, rem=hp-R.d; acc(Math.min(RL_V,Math.max(1.2,Math.sqrt(2*0.8*Math.max(0,rem)))),0.8); R.d=Math.min(hp,R.d+R.v*dt); if(R.d>=hp-0.01){ R.st='hold'; R.v=0; R.wait=0; } }
+  else if(R.st==='hold'){ R.wait+=dt; if(rlClear(rc,railTime())){ R.st='main'; R.v=RL_V*0.6; } }
+  else if(R.st==='main'){ const vt=R.d<Lq+L-400?RAIL.vF:RL_V; acc(vt,R.d<Lq+200?1.1:0.9); R.d+=R.v*dt;
+    if(!R.unl&&R.d>Lq+rc.ds){ R.unl=1; const n=R.box.filter(Boolean).length; R.box=[0,0,0,0]; if(n) toast(ydBrand(yd).name+': '+n+' container'+(n>1?'s':'')+' delivered by rail to '+rc.dest); }
+    if(R.d>=Lq+L) R.st='back'; }
+  else if(R.st==='back'){ const end=2*Lq+L+(20-TR_STOP)*M_T, rem=end-R.d; acc(Math.min(RL_V,Math.max(0.8,Math.sqrt(2*0.7*Math.max(0,rem)))),0.9); R.d=Math.min(end,R.d+R.v*dt);
+    if(R.d>=end-0.01){ R.st='load'; R.x=TR_STOP; R.k=0; R.ph='go'; R.t=6; R.unl=0; R.box=[0,0,0,0]; } } }
+function rlExtSpans(){ const out=[]; for(const yd of ownYards()){ const R=yd.rt; if(yd.rc&&R&&(R.st==='main'||R.st==='back'||R.st==='hold')){ const sp=rlSpan(yd,R); if(sp) out.push(sp); } } return out; }
+function rlDrawExt(vx0,vy0,vx1,vy1,dark){ const S=PPM;
+  for(const yd of ownYards()){ const rc=yd.rc; if(!rc) continue;
+    // spur track: ballast, sleepers, rails, turnout
+    ctx.save(); ctx.lineCap='round'; ctx.lineJoin='round'; const line=(w,c,dash)=>{ ctx.strokeStyle=c; ctx.lineWidth=w; ctx.setLineDash(dash||[]); ctx.beginPath(); rc.P.forEach((p,k)=>k?ctx.lineTo(p[0]*S,p[1]*S):ctx.moveTo(p[0]*S,p[1]*S)); ctx.stroke(); };
+    line(1.0*M_T*S,'#6d5a48'); line(0.8*M_T*S,'#4a3a2c',[0.12*M_T*S,0.26*M_T*S]); line(0.5*M_T*S,'#c4cad0'); line(0.38*M_T*S,'#5a4a3c'); ctx.setLineDash([]);
+    const j=railPt(rc.sj,RW_F), j2=railPt(rc.sj-12,RW_F), sg=rlPos(yd,rc.Lq-RL_HOLD+6); ctx.fillStyle='#f5b82e'; ctx.beginPath(); ctx.arc(j[0]*S,j[1]*S,0.35*M_T*S,0,7); ctx.fill();
+    // block signal at the hold point: green when the train holds a reservation / runs, red otherwise
+    const R=yd.rt||{}, go=R.st==='main'||R.st==='back'; ctx.fillStyle='#222'; ctx.fillRect(sg[0]*S-6,sg[1]*S-14,12,24); ctx.fillStyle=go?'#2ecc71':'#e74c3c'; ctx.beginPath(); ctx.arc(sg[0]*S,sg[1]*S-6,4.5,0,7); ctx.fill(); if(dark>0.05) dnLight(sg[0]*S,sg[1]*S-6,40,go?'rgba(80,255,140,0.9)':'rgba(255,80,60,0.9)',0.7);
+    if(dark>0.05){ for(const d of [rc.Lq*0.33,rc.Lq*0.66,rc.Lq-6]){ const p=rlPos(yd,d); dnLight(p[0]*S,p[1]*S,120,'rgba(255,240,205,0.95)',0.6); ctx.fillStyle='#fff6d8'; ctx.fillRect(p[0]*S-4,p[1]*S-2,8,4); } }
+    ctx.restore();
+    if(!(R.st==='ext'||R.st==='hold'||R.st==='main'||R.st==='back')) continue;
+    for(const c of rlCars(yd,R)){ if(c.x*S<vx0-200||c.x*S>vx1+200||c.y*S<vy0-200||c.y*S>vy1+200) continue; ctx.save(); ctx.translate(c.x*S,c.y*S); ctx.rotate(c.ang); const l=c.L*S, w=0.95*M_T*S;
+      ctx.fillStyle='rgba(0,0,0,.3)'; ctx.fillRect(-l/2+6,-w/2+6,l,w);
+      if(c.k==='loco'){ ctx.fillStyle='#d35400'; ctx.fillRect(-l/2,-w/2,l,w); ctx.fillStyle='#2c3e50'; ctx.fillRect(l/2-0.9*M_T*S,-w*0.38,0.7*M_T*S,w*0.76); ctx.fillStyle='#f1c40f'; ctx.fillRect(l/2-4,-w/2,4,w); if(dark>0.05) dnLight(l/2+30,0,120,'rgba(255,250,220,0.95)',0.8); }
+      else { ctx.fillStyle='#3d4249'; ctx.fillRect(-l/2,-w*0.42,l,w*0.84); if(c.box){ ctx.fillStyle=c.box; ctx.fillRect(-l/2+3,-w/2,l-6,w); ctx.fillStyle='rgba(0,0,0,.18)'; for(let q=6;q<l-6;q+=8) ctx.fillRect(-l/2+q,-w/2,2,w); } }
+      ctx.restore(); } } }
+function ownMap(BX,BY,z){ if(!world.forSale) return; ctx.save(); for(const yd of ownYards()){ if(yd.rc){ ctx.strokeStyle='#5d4c3c'; ctx.lineWidth=Math.max(2,0.9*z); ctx.beginPath(); yd.rc.P.forEach((p,k)=>k?ctx.lineTo(BX(p[0]/M_T),BY(p[1]/M_T)):ctx.moveTo(BX(p[0]/M_T),BY(p[1]/M_T))); ctx.stroke();
+    const R=yd.rt; if(R&&(R.st==='ext'||R.st==='hold'||R.st==='main'||R.st==='back')){ const p=rlPos(yd,R.d); ctx.fillStyle='#ff6a13'; ctx.strokeStyle='#000'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(BX(p[0]/M_T),BY(p[1]/M_T),Math.max(4,1.2*z),0,7); ctx.fill(); ctx.stroke(); } } const y=BY(yd.y0+RAIL_Y), x0=BX(yd.x0), x1=BX(yd.x0+20);
   ctx.strokeStyle='#5d4c3c'; ctx.lineWidth=Math.max(2,0.9*z); ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x1,y); ctx.stroke(); ctx.strokeStyle='#d0d4d8'; ctx.lineWidth=1; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(x0,y); ctx.lineTo(x1,y); ctx.stroke(); ctx.setLineDash([]);
   const R=yd.rt; if(R&&R.x!=null&&R.x<19.5){ ctx.fillStyle='#d35400'; ctx.fillRect(BX(yd.x0+R.x),y-Math.max(2,0.6*z),Math.max(4,(Math.min(19.5,R.x+17)-R.x)*z),Math.max(4,1.2*z)); } }
   ctx.restore(); }

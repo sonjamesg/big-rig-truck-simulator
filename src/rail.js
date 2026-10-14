@@ -342,7 +342,7 @@ function railSelfTest(days,step){ const L=RAIL.L, NB=Math.max(8,Math.floor(L/600
       for(let i=0;i<grp.length;i++) for(let j=0;j<grp.length;j++){ if(i===j) continue; const A=railSpan(grp[i],t,0), B=railSpan(grp[j],t,0); const g=rlMod(B[0]-A[1],L); if(g<minGap) minGap=g; if(rlOvl(A[0],A[1],B[0],B[1])) viol++; } } }
   return {ok:viol===0,viol,minGap:Math.round(minGap),samples,days,blocks:NB,trains:RAIL.trains.length}; }
 // ---------- crossings: barrier state from whole-train occupancy (front to back + margin)
-function railOcc(c,t){ for(const tr of RAIL.trains){ const [a,b]=railSpan(tr,t,4); if(rlOvl(a,b,c.za,c.zb)) return true; } return false; }
+function railOcc(c,t){ for(const tr of RAIL.trains){ const [a,b]=railSpan(tr,t,4); if(rlOvl(a,b,c.za,c.zb)) return true; } if(typeof rlExtSpans==='function') for(const q of rlExtSpans()) if(rlOvl(q[0]-4,q[1]+4,c.za,c.zb)) return true; return false; }   // rl: yard trains on the main line close crossings too
 function railCrossState(c,t){ if(railOcc(c,t)){ // failsafe: never closed for more than 150 s
     let closed=true; for(let k=10;k<=150;k+=10) if(!railOcc(c,t-k)){ closed=false; break; } return closed?{f:0,lit:0}:{f:1,lit:1}; }
   let ahead=99; for(let k=0.5;k<=9;k+=0.5) if(railOcc(c,t+k)){ ahead=k; break; }
