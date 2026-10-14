@@ -152,8 +152,14 @@ function ftFee(o){ const e=o.entrance||o, km=Math.hypot(e.x-truck.x,e.y-truck.y)
 function ftBlock(o){ const s=truck; if(Math.abs(s.v)>0.3) return 'Fast travel: stop the truck first'; if(typeof BREAKDOWN!=='undefined'&&BREAKDOWN.active) return 'Fast travel unavailable while broken down';
   const a=typeof career!=='undefined'&&career.active; if(a&&(a.phase==='deliver'||a.phase==='unloading'||a.phase==='recouple')) return 'No fast travel while delivering a load \u2014 drive it there or cancel the job';
   const f=ftFee(o); if(s.money<f) return 'Fast travel costs \u00a3'+f+' \u2014 not enough money'; return null; }
+// where fast travel puts the rig: inside a depot / yard (tile rect), else the nearest kerbside lane to the entrance
+function ftTarget(dp){ const e=dp.entrance||dp;
+  if(dp.x0!==undefined&&dp.w){ const p=ftSpot({x:dp.x0,y:dp.y0,w:dp.w,h:dp.h,entrance:e,bays:dp.bays}); if(p) return p; }   // haulage yards store x/y in metres, rect in x0/y0 tiles
+  else if(dp.bays&&dp.x!==undefined&&dp.w&&Math.abs(dp.x*M_T-e.x)<(dp.w+40)*M_T){ const p=ftSpot(dp); if(p) return p; }
+  return ftRoadSpot(e.x,e.y); }
+BigRig.ftTarget=ftTarget;
 function fastTravel(dp){ const s=truck; const why=ftBlock(dp); if(why){ flash(why); return false; }
-  const e=dp.entrance||dp, p=(dp.bays&&dp.x!==undefined)?ftSpot(dp):ftRoadSpot(e.x,e.y); if(!p){ flash('Fast travel: no clear spot at '+dp.name); return false; }
+  const p=ftTarget(dp); if(!p){ flash('Fast travel: no clear spot at '+dp.name); return false; }
   const fee=ftFee(dp);
   const fr=document.getElementById('frame')||document.body; let ov=document.getElementById('ftfade'); if(!ov){ ov=document.createElement('div'); ov.id='ftfade'; ov.style.cssText='position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .28s;z-index:50'; fr.appendChild(ov); }
   ov.style.opacity='1'; if(typeof closeMap==='function') closeMap();

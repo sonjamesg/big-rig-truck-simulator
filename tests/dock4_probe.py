@@ -11,6 +11,8 @@ async def main():
     for step in JS.split('|||'):
       if step.startswith('WAIT'): await pg.wait_for_timeout(int(step[4:])); continue
       if step.startswith("PRESS"): await pg.keyboard.press(step[5:]); continue
+      if step.startswith("CLK"):
+        xy=await pg.evaluate(step[3:]); await pg.mouse.move(xy[0],xy[1]); await pg.mouse.down(); await pg.wait_for_timeout(90); await pg.mouse.up(); print('click',[round(v) for v in xy]); continue
       if step.startswith("SHOT"): await pg.screenshot(path=step[4:]); continue
       r=await pg.evaluate(step); print(json.dumps(r)[:3000])
     print('ERR',errs[:5]); await b.close()
