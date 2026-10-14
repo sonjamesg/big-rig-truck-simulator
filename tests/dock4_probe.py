@@ -10,7 +10,8 @@ async def main():
     await pg.keyboard.press('Enter'); await pg.mouse.click(640,500); await pg.wait_for_timeout(800)
     for step in JS.split('|||'):
       if step.startswith('WAIT'): await pg.wait_for_timeout(int(step[4:])); continue
-      if step.startswith('SHOT'): await pg.screenshot(path=step[4:]); continue
+      if step.startswith("PRESS"): await pg.keyboard.press(step[5:]); continue
+      if step.startswith("SHOT"): await pg.screenshot(path=step[4:]); continue
       r=await pg.evaluate(step); print(json.dumps(r)[:3000])
     print('ERR',errs[:5]); await b.close()
 asyncio.run(main())
