@@ -44,7 +44,9 @@ STOP="""(()=>{ clearInterval(window.__jaI); const T=window.__jaT; return {seen:T
 async def main():
   async with async_playwright() as p:
     b=await p.chromium.launch(executable_path='/usr/bin/google-chrome'); pg=await b.new_page(viewport={'width':900,'height':700}); errs=[]
-    pg.on('pageerror',lambda e: errs.append(str(e)[:300])); pg.on('console',lambda m: errs.append(m.text[:200]) if m.type=='error' else None)
+    pg.on('pageerror',lambda e: errs.append(str(e)[:300])); pg.on('console',lambda m: errs.append(m.text[:200]) if m.type=='error' and not m.text.startswith('Failed to load resource') else None)
+    OPT=('favicon.ico','apple-touch-icon.png','manifest.webmanifest')   # page icons: absent when the HTML is copied elsewhere, not a game error
+    pg.on('requestfailed',lambda r: None if r.url.split('?')[0].endswith(OPT) else errs.append('requestfailed '+r.url[:160]))
     await pg.goto('file://'+os.path.abspath(HTML)); await pg.wait_for_function("window.__bigrig&&__bigrig.world.ready",timeout=120000)
     await pg.keyboard.press('Enter'); await pg.wait_for_timeout(500)
     if os.environ.get("DBG"): await pg.evaluate("window.__DBG=1")
@@ -64,7 +66,9 @@ async def main():
     print('CLUSTERS',len(cl),flush=True); dyn=[]; thin=0; seen=0
     for x,y,names in cl:
       if SECS<=0: break
-      await pg.evaluate(SOAK+f"({x},{y},40)"); await pg.wait_for_timeout(int(SECS*1000)); r=await pg.evaluate(STOP); seen+=r['seen']; thin+=r['seen']<3
+      slow=os.environ.get('SLOW','').split(','); t=max(SECS,float(os.environ.get('SLOW_SECS',60))) if any(n in slow for n in names) else SECS
+      await pg.evaluate(SOAK+f"({x},{y},40)"); await pg.wait_for_timeout(int(t*1000)); r=await pg.evaluate(STOP); seen+=r['seen']; thin+=r['seen']<3
+      print('  progress',cl.index([x,y,names])+1,'/',len(cl),names[0],'secs',t,'seen',r['seen'],flush=True)
       if os.environ.get('V'): print('  ',names[:4],json.dumps(r),flush=True)
       if r['stuck'] or r['coll']: dyn.append({'at':[x,y],'names':names,**r}); print('  DYN',json.dumps(dyn[-1]),flush=True)
     await b.close()
