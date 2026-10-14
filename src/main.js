@@ -288,18 +288,18 @@ function drawBigMap(){
   for(const [n,lx2,ly2,kind] of world.labels){ const X=BX(lx2), Y=BY(ly2);
     const big=kind===1, wat=kind===2, city=!kind&&n===n.toUpperCase(), town=!kind&&!city;
     if(town && z<0.45 && !/Ashby|Millford|Redhill|Dustwater|Coppermine|Fenwick|Wendwood|Greyfell/.test(n)) continue;
-    ctx.font= big?'900 22px system-ui,sans-serif':wat?'italic 600 13px Georgia,serif':city?'bold 15px system-ui,sans-serif':'600 11px system-ui,sans-serif';
-    ctx.lineWidth=big?5:3; ctx.strokeStyle='rgba(0,0,0,0.75)'; ctx.strokeText(n,X,Y); ctx.fillStyle=big?'rgba(255,214,120,0.95)':wat?'#bfe3ff':city?'#ffffff':'#ffe9a8'; ctx.fillText(n,X,Y); }
+    const LK=Math.min(big?1.4:1.7,mapLblK(z)); ctx.font= big?'900 '+Math.round(22*LK)+'px system-ui,sans-serif':wat?'italic 600 '+Math.round(13*LK)+'px Georgia,serif':city?'bold '+Math.round(15*LK)+'px system-ui,sans-serif':'600 '+Math.round(11*LK)+'px system-ui,sans-serif';
+    ctx.lineWidth=(big?5:3)*LK; ctx.lineJoin='round'; ctx.strokeStyle='rgba(0,0,0,0.75)'; ctx.strokeText(n,X,Y); ctx.fillStyle=big?'rgba(255,214,120,0.95)':wat?'#bfe3ff':city?'#ffffff':'#ffe9a8'; ctx.fillText(n,X,Y); }
   ctx.textBaseline='alphabetic';
   const lx=VW/2+(truck.x*PPM/TILE-bigmap.cx)*z, ly=VH/2+10+(truck.y*PPM/TILE-bigmap.cy)*z;
   { const pu=(timeS*1.6)%1; ctx.strokeStyle='rgba(255,221,51,'+(1-pu).toFixed(2)+')'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(lx,ly,12+pu*26,0,7); ctx.stroke();
     ctx.fillStyle='rgba(255,221,51,0.25)'; ctx.beginPath(); ctx.arc(lx,ly,14,0,7); ctx.fill(); }
   ctx.translate(lx,ly); ctx.rotate(truck.h); const k=1.5+0.12*Math.sin(timeS*6); ctx.fillStyle='#ffdd33'; ctx.strokeStyle='#000'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(0,-11*k); ctx.lineTo(7.5*k,8*k); ctx.lineTo(0,4*k); ctx.lineTo(-7.5*k,8*k); ctx.closePath(); ctx.fill(); ctx.stroke();
   ctx.restore();
-  FT_BTN=NAV_BTN=null; if(NAV.sel){ const hv=NAV.sel, e=hv.o.entrance||hv.o, X=mBX(e.x/M_T), Y=mBY(e.y/M_T), tch=document.body.classList.contains('touch'), bh=tch?40:26, H=bh+56; ctx.font='bold 13px system-ui,sans-serif'; const t1=hv.kind+': '+hv.name, why=ftBlock(hv.o), t2=why?why.replace(/^Fast travel:? ?/,''):'Fast travel fee \u00a3'+ftFee(hv.o); const tw=Math.min(VW-48,Math.max(230,ctx.measureText(t1).width+20)), tx=Math.max(24,Math.min(VW-tw-24,X+16)), ty=Math.max(50,Math.min(VH-H-30,Y-H/2));
-    ctx.fillStyle='rgba(10,14,22,0.95)'; ctx.fillRect(tx,ty,tw,H); ctx.strokeStyle='#f5b82e'; ctx.lineWidth=1.5; ctx.strokeRect(tx,ty,tw,H); ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText(t1,tx+10,ty+19,tw-20); ctx.font='11px system-ui,sans-serif'; ctx.fillStyle=why?'#ffb020':'#9be7a8'; ctx.fillText(t2,tx+10,ty+36,tw-20);
-    const pad2=typeof pad!=='undefined'&&pad.active; NAV_BTN=[tx+10,ty+46,(tw-30)/2,bh]; FT_BTN=[tx+20+(tw-30)/2,ty+46,(tw-30)/2,bh];
-    for(const [b,l,c] of [[NAV_BTN,(pad2?'X ':'')+'Sat nav','#2e86de'],[FT_BTN,(pad2?'A ':'')+'Fast travel','#27ae60']]){ ctx.fillStyle=c; ctx.beginPath(); ctx.roundRect?ctx.roundRect(b[0],b[1],b[2],b[3],6):ctx.rect(b[0],b[1],b[2],b[3]); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='bold 12px system-ui,sans-serif'; ctx.textAlign='center'; ctx.fillText(l,b[0]+b[2]/2,b[1]+b[3]/2+4); } ctx.textAlign='left'; }
+  FT_BTN=NAV_BTN=null; if(NAV.sel){ const hv=NAV.sel, e=hv.o.entrance||hv.o, X=mBX(e.x/M_T), Y=mBY(e.y/M_T), tch=document.body.classList.contains('touch'), bh=tch?56:40, H=bh+80; ctx.font='bold 18px system-ui,sans-serif'; const t1=hv.kind+': '+hv.name, why=ftBlock(hv.o), t2=why?why.replace(/^Fast travel:? ?/,''):'Fast travel fee \u00a3'+ftFee(hv.o); const tw=Math.min(VW-32,Math.max(300,ctx.measureText(t1).width+28)), tx=Math.max(16,Math.min(VW-tw-16,X+16)), ty=Math.max(44,Math.min(VH-H-16,Y-H/2));
+    ctx.fillStyle='rgba(10,14,22,0.95)'; ctx.fillRect(tx,ty,tw,H); ctx.strokeStyle='#f5b82e'; ctx.lineWidth=1.5; ctx.strokeRect(tx,ty,tw,H); ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillText(t1,tx+14,ty+26,tw-28); ctx.font='14px system-ui,sans-serif'; ctx.fillStyle=why?'#ffb020':'#9be7a8'; ctx.fillText(t2,tx+14,ty+48,tw-28);
+    const pad2=typeof pad!=='undefined'&&pad.active; NAV_BTN=[tx+12,ty+64,(tw-40)/2,bh]; FT_BTN=[tx+28+(tw-40)/2,ty+64,(tw-40)/2,bh];
+    for(const [b,l,c] of [[NAV_BTN,(pad2?'X ':'')+'Sat nav','#2e86de'],[FT_BTN,(pad2?'A ':'')+'Fast travel','#27ae60']]){ ctx.fillStyle=c; ctx.beginPath(); ctx.roundRect?ctx.roundRect(b[0],b[1],b[2],b[3],10):ctx.rect(b[0],b[1],b[2],b[3]); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='bold '+(tch?18:16)+'px system-ui,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(l,b[0]+b[2]/2,b[1]+b[3]/2,b[2]-8); ctx.textBaseline='alphabetic'; } ctx.textAlign='left'; }
   if(NAV.hover&&!(NAV.sel&&NAV.sel.o===NAV.hover.o)){ const hv=NAV.hover, t=hv.kind+': '+hv.name+'  (click: sat nav / fast travel)'; ctx.font='bold 12px system-ui,sans-serif'; const tw=ctx.measureText(t).width; const tx=Math.min(VW-tw-30,NAV.hx+14), ty=NAV.hy-12; ctx.fillStyle='rgba(10,14,22,0.92)'; ctx.fillRect(tx-6,ty-14,tw+12,22); ctx.strokeStyle='#f5b82e'; ctx.strokeRect(tx-6,ty-14,tw+12,22); ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.fillText(t,tx,ty+1); }
   ctx.fillStyle='#f5b82e'; ctx.font='bold 18px system-ui,sans-serif'; ctx.textAlign='left'; ctx.fillText('WORLD MAP',24,28); ctx.font='11px system-ui,sans-serif'; ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.fillText('1 km ≈ '+Math.round(250*bigmap.z)+' px',150,28);
   // buttons
@@ -316,9 +316,10 @@ function drawBigMap(){
 }
 let LEG_BTN=null;
 // big-map labels with simple collision avoidance (skips any label that would overlap one already drawn this frame)
-const MAPLBL=[]; function mapLabel(t,x,y,col,bold){ if(!t) return false; ctx.font=(bold?'bold ':'600 ')+'11px system-ui,sans-serif'; const w=ctx.measureText(t).width, r=[x-2,y-8,w+4,16];
+function mapLblK(z){ return Math.max(1,Math.min(1.9,0.85+0.1*z)); }
+const MAPLBL=[]; function mapLabel(t,x,y,col,bold){ if(!t) return false; const k=mapLblK(bigmap.z), fs=Math.round(11*k); ctx.font=(bold?'bold ':'600 ')+fs+'px system-ui,sans-serif'; const w=ctx.measureText(t).width, r=[x-2,y-fs*0.72,w+4,fs*1.45];
   for(const q of MAPLBL) if(r[0]<q[0]+q[2]&&q[0]<r[0]+r[2]&&r[1]<q[1]+q[3]&&q[1]<r[1]+r[3]) return false; MAPLBL.push(r);
-  ctx.save(); ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.strokeText(t,x,y); ctx.fillStyle=col; ctx.fillText(t,x,y); ctx.restore(); return true; }
+  ctx.save(); ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.lineWidth=3*mapLblK(bigmap.z); ctx.lineJoin='round'; ctx.strokeStyle='rgba(0,0,0,0.8)'; ctx.strokeText(t,x,y); ctx.fillStyle=col; ctx.fillText(t,x,y); ctx.restore(); return true; }
 function canvasPos(e){ const r=cv.getBoundingClientRect(); return [(e.clientX-r.left)*VW/r.width,(e.clientY-r.top)*VH/r.height]; }
 let downAt=null;
 cv.addEventListener('pointerdown',e=>{ const [x,y]=canvasPos(e); downAt=[x,y,performance.now()];
