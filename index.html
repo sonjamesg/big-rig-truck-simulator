@@ -1883,8 +1883,9 @@ function spawnVehicle(x,y,force,opt){
   if(along<sg.b0+2||along>sg.b1-1) return null;
   const dir=opt&&opt.dir?opt.dir:(r()<0.5?1:-1), lane=opt?0:(r()*nLanes(sg))|0;
   const p=lanePt(sg,dir,lane,along);
-  for(const o of traffic.vs) if(Math.abs(o.x-p[0])<16&&Math.abs(o.y-p[1])<16) return null;
   const kind=opt&&opt.kind?opt.kind:pickW(MIX[sg.type]||MIX.city,r()), t=VTYPES[kind];
+  { const dv=dirVec(sg,dir), back=kind==='lorry'?17:t.L/2+1, cx=p[0]-dv[0]*back/2, cy=p[1]-dv[1]*back/2, R=back/2+15;   // v25: clearance covers our own trailer and theirs (no spawning on top of a lorry's trailer)
+    for(const o of traffic.vs){ for(const b of boxesOf(o)) if(Math.abs(b.x-cx)<R&&Math.abs(b.y-cy)<R) return null; } }
   const v={id:traffic.nextId++,kind,L:t.L,W:t.W,heavy:t.heavy,amax:t.acc,art:artFor(kind,r),px:[],py:[],pd:[],i:0,s:0,mk:[],
     plan:{seg:sid,dir,lane,pos:along},v:0,x:p[0],y:p[1],offX:0,offY:0,stopT:0,honkT:0,blockT:0,shakeT:0,ghostT:0,pinT:0,brake:false,sig:0,h:undefined,
     drv:0.88+r()*0.22, r:mulberry((r()*1e9)|0), born:timeS, dist:0};
@@ -2162,10 +2163,10 @@ function drawTraffic(vx0,vy0,vx1,vy1){
     ctx.fillStyle=p.hair; ctx.beginPath(); ctx.arc(0,0.2,1.7,0,7); ctx.fill(); ctx.restore(); }
   const lo=list.filter(v=>!v.layer), hi=list.filter(v=>v.layer);
   const drawL=list=>{
-  for(const v of list){ blitV(v.art.body.sh,v.x,v.y,v.h,v.L,v.W,4,4); if(v.trl) blitV(v.art.trl.sh,v.trl.x,v.trl.y,v.trl.h,13.6,2.55,6,6); }
+  for(const v of list){ blitV(v.art.body.sh,v.x,v.y,v.h,v.L,v.W,4,4); if(v.trl&&v.art.trl) blitV(v.art.trl.sh,v.trl.x,v.trl.y,v.trl.h,13.6,2.55,6,6); }
   const blink=(timeS%0.8)<0.4;
   for(const v of list){
-    if(v.trl){ blitV(v.art.trl.c,v.trl.x,v.trl.y,v.trl.h,13.6,2.55,0,0); }
+    if(v.trl&&v.art.trl){ blitV(v.art.trl.c,v.trl.x,v.trl.y,v.trl.h,13.6,2.55,0,0); }
     blitV(v.art.body.c,v.x,v.y,v.h,v.L,v.W,0,0);
     if(v.parked) continue;
     const rx=v.trl||v; const rL=v.trl?13.6:v.L, rW=v.trl?2.55:v.W;
@@ -2351,7 +2352,7 @@ function sigOncoming(v,J,oppKey){ for(const o of traffic.vs){ if(o===v) continue
 // vehicles (AI or the player) already inside the junction on a crossing heading
 function jBusy(v,J){ const x0=J.x*M_T-1, y0=J.y*M_T-1, x1=(J.x+J.w)*M_T+1, y1=(J.y+J.h)*M_T+1, fv=fwd(v.h||0);
   const chk=(x,y,h)=>{ if(x<x0||x>x1||y<y0||y>y1) return false; const f=fwd(h); return Math.abs(f[0]*fv[0]+f[1]*fv[1])<0.8; };
-  for(const o of traffic.vs){ if(o!==v&&!o.filtering&&chk(o.x,o.y,o.h||0)) return true; }
+  for(const o of traffic.vs){ if(o!==v&&!o.filtering&&(chk(o.x,o.y,o.h||0)||(o.trl&&chk(o.trl.x,o.trl.y,o.trl.h)))) return true; }   // v25: a lorry's trailer still crossing counts
   if(chk(truck.x,truck.y,truck.h)) return true; if(truck.trl&&chk(truck.trl.x,truck.trl.y,truck.trl.th||0)) return true; return false; }
 
 'use strict';
@@ -2774,7 +2775,7 @@ function updateForecourts(dt){
   for(let k=fcv.cars.length-1;k>=0;k--){ const c=fcv.cars[k];
     if(c.phase==='pump'){ c.t-=dt; if(c.t<=0){ c.phase='out'; fcv.stats.refuelled++; const st=c.st, y1=st.y0+M_T*11; c.wp=[[c.sp.x,y1],[st.aisleOut,y1],[st.aisleOut,st.entOut[1]+3],[st.entOut[0],st.entOut[1]]]; c.i=0; } continue; }
     const w=c.wp[c.i]; if(!w){ // reached the road again: hand back to traffic
-      if(c.phase==='out'){ const nv=spawnVehicle(c.x,c.y-2)||spawnVehicle(c.x,c.y-6); if(nv){ nv.art=c.art; nv.kind=c.v.kind; nv.L=c.L; nv.W=c.W; nv.v=2; } if(nv||!onScreen(c.x,c.y,20)||(c.wait=(c.wait||0)+dt)>6){ c.sp.busy=null; fcv.cars.splice(k,1); fcv.stats.left++; } }
+      if(c.phase==='out'){ const nv=spawnVehicle(c.x,c.y-2)||spawnVehicle(c.x,c.y-6); if(nv){ nv.art=Object.assign({},nv.art,c.art,{trl:(c.art&&c.art.trl)||nv.art.trl}); nv.kind=c.v.kind; nv.L=c.L; nv.W=c.W; nv.v=2; } if(nv||!onScreen(c.x,c.y,20)||(c.wait=(c.wait||0)+dt)>6){ c.sp.busy=null; fcv.cars.splice(k,1); fcv.stats.left++; } }
       else { c.phase='pump'; c.t=4+Math.random()*4; c.spd=0; } continue; }
     const dx=w[0]-c.x, dy=w[1]-c.y, d=Math.hypot(dx,dy); const last=c.i===c.wp.length-1;
     // yield to the player's lorry
