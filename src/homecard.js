@@ -3,6 +3,7 @@
 // (no reset, no username form, no name box). Not signed in -> account form; a guest local save gets a small guest card with a guarded reset.
 (function(){
 const css=`#wbCard,#lobby #lbHost,html.invmode #homeCard{display:none!important}
+#lobby>.row{display:none!important}
 body.acctin #overlay>#acct{display:none!important} body.acctin #lobby .row:has(#lbName){display:none!important}
 #homeCard{width:min(440px,88vw);margin:10px auto 4px;padding:14px 16px;border-radius:14px;background:rgba(14,20,32,.88);border:1px solid rgba(245,184,46,.5);box-shadow:0 8px 24px rgba(0,0,0,.45);text-align:center;display:flex;flex-direction:column;gap:8px;box-sizing:border-box;cursor:default}
 #homeCard .hw{font-size:21px;font-weight:900;color:#f5b82e} #homeCard .hs{font-size:12.5px;opacity:.85}
@@ -13,7 +14,9 @@ body.acctin #overlay>#acct{display:none!important} body.acctin #lobby .row:has(#
 const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st);
 const esc=s=>String(s||'').replace(/[<>&"]/g,'');
 let sig='', prefilled=false;
-function hasSave(){ try{ return !!localStorage.getItem(saveKey()); }catch(e){ return false; } }
+function hasSave(){ try{ return localStorage.getItem('bigrig.guestPlayed')==='1'&&!!localStorage.getItem(saveKey()); }catch(e){ return false; } }
+// a guest save only counts once someone has actually started driving without an account
+setTimeout(()=>{ const sg=startGame; startGame=function(){ const was=typeof started!=='undefined'&&started; const r=sg.apply(this,arguments); if(!was&&started&&!ACC.tok) try{ localStorage.setItem('bigrig.guestPlayed','1'); }catch(e){} return r; }; },0);
 function stats(){ try{ return `${money(truck.money)} \u2022 Level ${levelOf(career.xp)} \u2022 ${esc(modelById(career.cur).name)}${career.active?' \u2022 job in progress':''}`; }catch(e){ return ''; } }
 function go(){ ACC.padT=0; startGame(); }
 function render(force){ const ov=document.getElementById('overlay'); if(!ov||typeof world==='undefined'||!world.ready||(typeof started!=='undefined'&&started)) return;

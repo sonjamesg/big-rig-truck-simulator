@@ -29,7 +29,7 @@ async function boot(){
   truck.fuel=260; truck.tank=400; truck.money=2500; truck.damage=0;
   const hadSave=loadGame(); if(!hadSave) applyModel('rigger'); uiInit(); padInstall(); mpInit(); mobInit();
   Object.assign(window.__bigrig,{BREAKDOWN,MP,mpHost,mpJoin,mpChatSend,startGame,getChunk,renderChunk,MAPC,drawMapDetail,pad,padUpdate,career,acceptJob,abandonJob,tryUnload,bayAlign,buyTruck,openBoard,openDealer,closeUI,fcv,addXP,saveGame,loadGame,applyModel,TRUCK_MODELS,TIERS,CARGOS,levelOf,uncouple,couple,fillBoard,jobRoute});
-  tim[cur]=(performance.now()-curT); world.loadMs=performance.now()-tb; world.ready=true; window.__bigrig.loadStages=tim; if(typeof homeProgress==='function') homeProgress(100,'World ready ('+(world.loadMs/1000).toFixed(1)+' s) \u2014 tap to drive'); else { const ld=document.getElementById('loading'); if(ld) ld.textContent='World ready'; } if(hadSave) welcomeCard();
+  tim[cur]=(performance.now()-curT); world.loadMs=performance.now()-tb; world.ready=true; window.__bigrig.loadStages=tim; if(typeof homeProgress==='function') homeProgress(100,'World ready ('+(world.loadMs/1000).toFixed(1)+' s)'); else { const ld=document.getElementById('loading'); if(ld) ld.textContent='World ready'; } if(hadSave) welcomeCard();
   requestAnimationFrame(frame);
 }
 // ---------- input

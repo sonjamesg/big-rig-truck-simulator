@@ -25,8 +25,8 @@ function srvCard(){ const lb=document.getElementById('lobby'); if(!lb) return; l
   c.innerHTML='<div class="sh">\u{1F310} PUBLIC SERVERS</div>'+SERVERS.map(S=>{ const n=SRV.peek[S.id]; const off=n===undefined||n<0, full=!off&&n>=SRV.cap;
     return `<div class="sv"><div class="sn">${S.name} \u2022 ${S.region}<small><span class="dot ${off?'off':full?'full':''}"></span>${n===undefined?'Checking\u2026':n<0?'Offline':full?'FULL':'Online'}</small></div><div class="ct">${off?'\u2013':n} / ${SRV.cap}</div><button data-s="${S.id}" ${full||n<0?'disabled':''}>${full?'FULL':'JOIN'}</button></div>`; }).join('');
   for(const b of c.querySelectorAll('button')) b.onclick=()=>srvJoin(SERVERS.find(S=>S.id===b.dataset.s)); }
-function srvName(){ if(typeof ACC!=='undefined'&&ACC.tok&&ACC.name) return ACC.name; const n=((document.getElementById('lbName')||{}).value||'').trim(); return n; }
-async function srvJoin(S){ if(MP.on||SRV.ch) return; const name=srvName(); if(!name){ mpStatus('Type a driver name first (or log in), then press JOIN'); const i=document.getElementById('lbName'); if(i) i.focus(); return; }
+function srvName(){ if(typeof ACC!=='undefined'&&ACC.tok&&ACC.name) return ACC.name; let n=((document.getElementById('lbName')||{}).value||localStorage.getItem('bigrig.name')||'').trim(); if(!n){ n=(prompt('Driver name for '+SERVERS[0].name+' (guest)')||'').trim().slice(0,16); if(n){ const i=document.getElementById('lbName'); if(i) i.value=n; } } return n; }
+async function srvJoin(S){ if(MP.on||SRV.ch) return; const name=srvName(); if(!name){ mpStatus('Log in, or pick a guest name, to join'); return; }
   if(!world.ready){ mpStatus('Loading the world\u2026 try again in a moment'); return; }
   try{ localStorage.setItem('bigrig.name',name); }catch(e){}
   mpStatus('Joining '+S.name+'\u2026'); let sb; try{ sb=await srvLib(); }catch(e){ mpStatus('Couldn\'t load the server library \u2014 check your connection'); return; }

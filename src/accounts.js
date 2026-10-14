@@ -57,7 +57,7 @@ function build(){ const ov=document.getElementById('overlay'); if(!ov||document.
       else { accSetSession(j); await accPull(); refresh(); msg(''); } }catch(e){ msg('Offline \u2022 you can play as guest',1); } busy=false; };
   $('acGo').addEventListener('click',submit);
   for(const id of ['acName','acPin','acPin2']) $(id).addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); submit(); } });
-  $('acGuest').addEventListener('click',()=>{ ACC.mode='guest'; accClear(); a.style.display='none'; });
+  $('acGuest').addEventListener('click',()=>{ ACC.mode='guest'; accClear(); ACC.padT=0; if(typeof MP!=='undefined'&&MP.on&&typeof mpLeave==='function') mpLeave(); startGame(); });
   function refresh(){ a.classList.toggle('in',!!ACC.tok); document.body.classList.toggle('acctin',!!ACC.tok); $('acWho').innerHTML=ACC.tok?`Signed in as <b>${String(ACC.name).replace(/[<>&"]/g,'')}</b>${ACC.admin?' \u2022 admin':''} \u2022 cloud save on`:''; }
   ACC.refresh=refresh; refresh();
   // logout in the settings panel
@@ -68,8 +68,8 @@ function build(){ const ov=document.getElementById('overlay'); if(!ov||document.
 addEventListener('load',()=>setTimeout(()=>{ build(); if(ACC.tok) accRpc('session_touch',{token:ACC.tok}).then(j=>{ if(j.ok){ ACC.name=j.name; ACC.admin=!!j.is_admin; accPull(); } else { accClear(true); if(typeof toast==='function') toast('Session expired \u2022 enter your PIN to log back in'); } ACC.refresh&&ACC.refresh(); }).catch(()=>{ ACC.online=false; }); },50));
 // hooks: debounced cloud push after each local save, push on exit, admin perks while signed in
 setTimeout(()=>{ const sg=saveGame; saveGame=function(){ const r=sg.apply(this,arguments); if(r&&ACC.tok){ clearTimeout(ACC.timer); ACC.timer=setTimeout(()=>accPush(false),5000); } return r; };
-  addEventListener('pagehide',()=>{ try{ saveGame(); }catch(e){} accPush(true); });
-  document.addEventListener('visibilitychange',()=>{ if(document.hidden){ try{ saveGame(); }catch(e){} accPush(true); } });
+  addEventListener('pagehide',()=>{ if(started) try{ saveGame(); }catch(e){} accPush(true); });
+  document.addEventListener('visibilitychange',()=>{ if(document.hidden){ if(started) try{ saveGame(); }catch(e){} accPush(true); } });
   const sgm=startGame; startGame=function(){ const ae=document.activeElement; if(ae&&ae.closest&&ae.closest('#overlay')&&ae.tagName!=='CANVAS'&&Date.now()<(ACC.padT||0)) return; return sgm.apply(this,arguments); };
   // Xbox: D-pad up/down moves through the account card, A presses the focused button (inputs open the on-screen keyboard)
   let prev=[]; (function pp(){ requestAnimationFrame(pp); if(typeof started!=='undefined'&&started) return; const a=document.getElementById('overlay'); if(!a||(window.INV&&INV.on)) return;
