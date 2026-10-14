@@ -192,12 +192,13 @@ function ownDrawBack(yd,X,Y,Tt,dark,own,B,tr){
   if(tr>=2&&own) ownBld(yd.wh2,yd,X,Y,Tt,dark,'#8a9a7a','#7d8c6e','MAINTENANCE & STORE',B.col,3); else plot(yd.wh2);
   if(tr>=3&&own){ ownBld(yd.hq,yd,X,Y,Tt,dark,'#e6e9ee','#d5dae0','DISTRIBUTION HQ',B.col,2); ydLogo(ctx,X(3.5),Y(18.15),0.45*Tt,B); } else plot(yd.hq);
   // rail siding: ballast, sleepers, rails, buffer stop, tunnel portal on the east fence
-  const ry=Y(RAIL_Y); ctx.fillStyle='#6d5a48'; ctx.fillRect(X(0),ry-0.75*Tt,20*Tt,1.5*Tt); ctx.fillStyle='#4a3a2c'; for(let t=0.2;t<20;t+=0.5) ctx.fillRect(X(t),ry-0.6*Tt,0.18*Tt,1.2*Tt);
-  ctx.fillStyle='#c4cad0'; ctx.fillRect(X(0),ry-0.42*Tt,20*Tt,4); ctx.fillRect(X(0),ry+0.42*Tt-4,20*Tt,4);
-  ctx.fillStyle='#c0392b'; ctx.fillRect(X(0.3),ry-0.6*Tt,0.4*Tt,1.2*Tt);
+  const ry=Y(RAIL_Y), S=PPM;
+  // gantry crane rails: concrete runway beams with a steel rail + clips, either side of the track
+  for(const cy of [19.4,23.6]){ const yy=Y(cy); ctx.fillStyle='#8b8f94'; ctx.fillRect(X(0.2),yy-0.55*S,19.6*Tt,1.1*S); ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(X(0.2),yy-0.23*S,19.6*Tt,0.46*S); ctx.fillStyle='#8e959e'; ctx.fillRect(X(0.2),yy-0.15*S,19.6*Tt,0.3*S); ctx.fillStyle='#f6f9fc'; ctx.fillRect(X(0.2),yy-0.055*S,19.6*Tt,0.11*S); ctx.fillStyle='#3f4347'; for(let t=0.6;t<19.8;t+=0.75){ ctx.fillRect(X(t)-1.5,yy-0.4*S,3,0.8*S); } ctx.fillStyle='#c0392b'; ctx.fillRect(X(0.2),yy-0.6*S,0.5*S,1.2*S); ctx.fillRect(X(19.8)-0.5*S,yy-0.6*S,0.5*S,1.2*S); }
+  railDrawPlain(ctx,ownSidingP(yd),yd.x0*7+yd.y0,X(-2),Y(17),X(23),Y(26));
+  // buffer stop (main-line style: red beam on a steel frame)
+  ctx.fillStyle='#2c3036'; ctx.fillRect(X(0.25),ry-1.1*S,0.5*S,2.2*S); ctx.fillStyle='#c0392b'; ctx.fillRect(X(0.45),ry-1.0*S,0.45*S,2.0*S); ctx.fillStyle='#f5f5f5'; ctx.fillRect(X(0.45),ry-0.15*S,0.45*S,0.3*S);
   if(!yd.rc){ ctx.fillStyle='#4b4f55'; ctx.fillRect(X(19.2),ry-1.4*Tt,1.6*Tt,2.8*Tt); ctx.fillStyle='#0b0c0e'; ctx.fillRect(X(19.5),ry-0.9*Tt,1.3*Tt,1.8*Tt); }
-  // crane rails
-  ctx.fillStyle='#9aa1a8'; ctx.fillRect(X(0),Y(19.4)-2,20*Tt,4); ctx.fillRect(X(0),Y(23.6)-2,20*Tt,4);
   const R=yd.rt||{}; // train
   if(R.x!=null){ ctx.save(); ctx.beginPath(); ctx.rect(X(0),ry-2*Tt,(yd.rc?20:19.5)*Tt,4*Tt); ctx.clip(); const tx=t=>X(R.x+t);
     ctx.fillStyle='rgba(0,0,0,.3)'; ctx.fillRect(tx(0)+8,ry-0.55*Tt+8,3.4*Tt,1.1*Tt); ctx.fillStyle='#d35400'; ctx.fillRect(tx(0),ry-0.55*Tt,3.4*Tt,1.1*Tt); ctx.fillStyle='#2c3e50'; ctx.fillRect(tx(0.3),ry-0.4*Tt,0.8*Tt,0.8*Tt); ctx.fillStyle='#f1c40f'; ctx.fillRect(tx(0),ry-0.55*Tt,0.15*Tt,1.1*Tt);
@@ -273,12 +274,16 @@ function rlTrainStep(yd,R,dt){ const rc=yd.rc, Lq=rc.Lq, L=RAIL.L, acc=(vt,a)=>{
   else if(R.st==='back'){ const end=2*Lq+L+(20-TR_STOP)*M_T, rem=end-R.d; acc(Math.min(RL_V,Math.max(0.8,Math.sqrt(2*0.7*Math.max(0,rem)))),0.9); R.d=Math.min(end,R.d+R.v*dt);
     if(R.d>=end-0.01){ R.st='load'; R.x=TR_STOP; R.k=0; R.ph='go'; R.t=6; R.unl=0; R.box=[0,0,0,0]; } } }
 function rlExtSpans(){ const out=[]; for(const yd of ownYards()){ const R=yd.rt; if(yd.rc&&R&&(R.st==='main'||R.st==='back'||R.st==='hold')){ const sp=rlSpan(yd,R); if(sp) out.push(sp); } } return out; }
+function ownSidingP(yd){ if(yd.sP) return yd.sP; const y=(yd.y0+RAIL_Y)*M_T; return yd.sP=railSample([[(yd.x0+0.3)*M_T,y],[(yd.x0+(yd.rc?20:19.4))*M_T,y]]); }
+function ownSpurP(yd){ const rc=yd.rc; if(!rc) return null; if(yd.spP) return yd.spP; const P=railSample(rc.P,200);
+  // where the spur runs over the main line's own track bed only redraw the rails, so the main ballast/sleepers show through seamlessly
+  const ref=[]; for(let s=rc.sj-20;s<=rc.sj+160;s+=1) ref.push(railPt(s,RW_F)); for(const p of P){ let d=1e9; for(const q of ref) d=Math.min(d,Math.hypot(p.x-q[0],p.y-q[1])); if(d<3.2) p.k=5; }
+  return yd.spP=P; }
 function rlDrawExt(vx0,vy0,vx1,vy1,dark){ const S=PPM;
   for(const yd of ownYards()){ const rc=yd.rc; if(!rc) continue;
     // spur track: ballast, sleepers, rails, turnout
-    ctx.save(); ctx.lineCap='round'; ctx.lineJoin='round'; const line=(w,c,dash)=>{ ctx.strokeStyle=c; ctx.lineWidth=w; ctx.setLineDash(dash||[]); ctx.beginPath(); rc.P.forEach((p,k)=>k?ctx.lineTo(p[0]*S,p[1]*S):ctx.moveTo(p[0]*S,p[1]*S)); ctx.stroke(); };
-    line(1.0*M_T*S,'#6d5a48'); line(0.8*M_T*S,'#4a3a2c',[0.12*M_T*S,0.26*M_T*S]); line(0.5*M_T*S,'#c4cad0'); line(0.38*M_T*S,'#5a4a3c'); ctx.setLineDash([]);
-    const j=railPt(rc.sj,RW_F), j2=railPt(rc.sj-12,RW_F), sg=rlPos(yd,rc.Lq-RL_HOLD+6); ctx.fillStyle='#f5b82e'; ctx.beginPath(); ctx.arc(j[0]*S,j[1]*S,0.35*M_T*S,0,7); ctx.fill();
+    ctx.save(); railDrawPlain(ctx,ownSpurP(yd),yd.x0*7+yd.y0+1,vx0,vy0,vx1,vy1);
+    const j=railPt(rc.sj,RW_F), j2=railPt(rc.sj-12,RW_F), sg=rlPos(yd,rc.Lq-RL_HOLD+6); 
     // block signal at the hold point: green when the train holds a reservation / runs, red otherwise
     const R=yd.rt||{}, go=R.st==='main'||R.st==='back'; ctx.fillStyle='#222'; ctx.fillRect(sg[0]*S-6,sg[1]*S-14,12,24); ctx.fillStyle=go?'#2ecc71':'#e74c3c'; ctx.beginPath(); ctx.arc(sg[0]*S,sg[1]*S-6,4.5,0,7); ctx.fill(); if(dark>0.05) dnLight(sg[0]*S,sg[1]*S-6,40,go?'rgba(80,255,140,0.9)':'rgba(255,80,60,0.9)',0.7);
     if(dark>0.05){ for(const d of [rc.Lq*0.33,rc.Lq*0.66,rc.Lq-6]){ const p=rlPos(yd,d); dnLight(p[0]*S,p[1]*S,120,'rgba(255,240,205,0.95)',0.6); ctx.fillStyle='#fff6d8'; ctx.fillRect(p[0]*S-4,p[1]*S-2,8,4); } }

@@ -406,6 +406,25 @@ function railChunk(g,ox,oy,top){ if(!RAIL.ready) return; const runs=RAIL.chunkRu
   // stations (platforms, shelters, canopies, signs)
   for(const st of RAIL.stations){ const px=RAIL.X[st.s]*S, py=RAIL.Y[st.s]*S; if(px<ox-2600||px>ox+CHUNK+2600||py<oy-2600||py>oy+CHUNK+2600) continue; railBakeStation(g,st); }
   g.restore(); }
+// rs: same look as the main line's plain-ground track (ballast bed, stones, sleepers, rails) for any sampled path P=[{x,y,nx,ny,s,k}] at 1 m spacing.
+// k:0 full track, k:5 rails only (where a spur overlays the main line at a turnout). Used by yard sidings / spurs (owndepot.js).
+function railDrawPlain(g,P,seed,vx0,vy0,vx1,vy1){ if(!P||P.length<2) return; const S=PPM, m=40;
+  const vis=p=>p.x*S>vx0-m&&p.x*S<vx1+m&&p.y*S>vy0-m&&p.y*S<vy1+m;
+  g.save(); g.lineCap='butt'; g.lineJoin='round';
+  const path=(a,b,w)=>{ g.beginPath(); for(let i=a;i<=b;i++){ const p=P[i]; const x=(p.x+p.nx*w)*S, y=(p.y+p.ny*w)*S; i===a?g.moveTo(x,y):g.lineTo(x,y); } };
+  const runs=test=>{ const out=[]; let a=-1; for(let i=0;i<=P.length;i++){ const ok=i<P.length&&test(P[i])&&vis(P[i]); if(ok&&a<0) a=Math.max(0,i-1); if(!ok&&a>=0){ out.push([a,Math.min(P.length-1,i)]); a=-1; } } return out; };
+  for(const [a,b] of runs(p=>p.k===0)){ path(a,b,0); g.strokeStyle='#463f38'; g.lineWidth=5.0*S; g.stroke(); g.strokeStyle='#5f564d'; g.lineWidth=4.2*S; g.stroke(); g.strokeStyle='#6a6056'; g.lineWidth=3.0*S; g.stroke(); }
+  for(let i=0;i<P.length;i++){ const p=P[i]; if(p.k!==0||!vis(p)) continue; const tx=-p.ny, ty=p.nx;
+    for(let q=0;q<14;q++){ const h=rlHash((p.s*13+q)*7919+seed*97), h2=rlHash(h*1e9|0), w=(h-0.5)*4.4, u=h2-0.5; const x=(p.x+p.nx*w+tx*u)*S, y=(p.y+p.ny*w+ty*u)*S; g.fillStyle=['#7d7266','#4b433b','#8e8478','#5a5148','#9c9286','#3f3832'][q%6]; g.fillRect(x,y,1.5+(q&1)*1.2,1.5+(q%3===0?1:0)); }
+    for(let k2=0;k2<2;k2++){ const u=k2*0.5; if(i===P.length-1) break; const q=P[i+1]; const cx=(p.x+(q.x-p.x)*u)*S, cy=(p.y+(q.y-p.y)*u)*S, hx=p.nx*1.35*S, hy=p.ny*1.35*S, ax=tx*0.15*S, ay=ty*0.15*S;
+      g.fillStyle='rgba(0,0,0,0.35)'; g.beginPath(); g.moveTo(cx-hx-ax+1,cy-hy-ay+1.5); g.lineTo(cx+hx-ax+1,cy+hy-ay+1.5); g.lineTo(cx+hx+ax+1,cy+hy+ay+1.5); g.lineTo(cx-hx+ax+1,cy-hy+ay+1.5); g.fill();
+      g.fillStyle='#2f2721'; g.beginPath(); g.moveTo(cx-hx-ax,cy-hy-ay); g.lineTo(cx+hx-ax,cy+hy-ay); g.lineTo(cx+hx+ax,cy+hy+ay); g.lineTo(cx-hx+ax,cy-hy+ay); g.fill();
+      g.fillStyle='#55473b'; g.fillRect(cx-hx*0.9-0.5,cy-hy*0.9-0.5,1,1); g.fillStyle='#5a5048'; g.fillRect(cx+hx*0.55-1,cy+hy*0.55-1,2,2); g.fillRect(cx-hx*0.55-1,cy-hy*0.55-1,2,2); } }
+  for(const [a,b] of runs(p=>p.k===0||p.k===5)) for(const w of [-0.75,0.75]){ path(a,b,w); g.strokeStyle='rgba(0,0,0,0.6)'; g.lineWidth=0.46*S; g.stroke(); g.strokeStyle='#8e959e'; g.lineWidth=0.3*S; g.stroke(); g.strokeStyle='#f6f9fc'; g.lineWidth=0.11*S; g.stroke(); }
+  g.restore(); }
+// sample a polyline (metres) at 1 m with unit normals, for railDrawPlain
+function railSample(pts,s0){ const out=[]; let s=s0||0; for(let k=0;k<pts.length-1;k++){ const a=pts[k], b=pts[k+1], L=Math.hypot(b[0]-a[0],b[1]-a[1]); if(L<1e-6) continue; const tx=(b[0]-a[0])/L, ty=(b[1]-a[1])/L; for(let d=(out.length?1-(s%1||1)+0:0);d<L;d+=1){ out.push({x:a[0]+tx*d,y:a[1]+ty*d,nx:-ty,ny:tx,s:Math.round(s+d),k:0}); } s+=L; }
+  const e=pts[pts.length-1], l=out[out.length-1]; if(l) out.push({x:e[0],y:e[1],nx:l.nx,ny:l.ny,s:Math.round(s),k:0}); return out; }
 // ---------- Golden-Gate-style suspension bridges (grey steel). Geometry precomputed once in railBridges(); towers/cables lean with height (parallax)
 const BR_H=58, BR_TW=7.2, BR_LAT=6.6, BR_PAR=0.008;
 function railBridges(){ const P=RAIL.tracks[0].P, out=[]; let a=-1;
