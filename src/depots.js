@@ -176,6 +176,9 @@ if(typeof buildCareerSites==='function') buildCareerSites({findSpot,access,clear
       const tryG=(nm,tx,ty,sep)=>{ for(const [w,h,b,f] of [[22,14,0,1],[22,14,1,.6],[14,10,1,.5],[14,10,1,.25]]){ const sp=findSpot(tx,ty,w,h,16,far(gs(),sep*f),!!b,MR); if(sp){ if(b) clrB(sp[0]-1,sp[1]-sp[2],w+2,h+sp[2]); garage(nm,sp[0],sp[1],sp[2],w,h); return true; } } return false; };
       const sep=Math.max(14,Math.min(hw,hh)*0.5);
       for(let t=0;fs().length<4&&t<10;t++){ const [tx,ty]=tg[t]; if(!tryF(CN[k]+' '+Q[t%8]+(t>=8?' Road':'')+' Fuel',tx,ty,sep)) t+=0; }
+      // ag: small towns (half-size < 40 tiles) get ONE repair garage of their own (Central first), none if a named one already exists; cities keep 4
+      const small=Math.max(hw,hh)<40, own=()=>world.garages.filter(g=>g.name.startsWith(CN[k]+' ')).length;
+      if(small){ for(const t of [2,0,1,3,4,5,6,7,8,9]){ if(own()>=1) break; const [tx,ty]=tg[(t+2)%16]; tryG(CN[k]+' '+Q[(t+2)%8]+((t+2)%16>=8?' Road':'')+' Truck Repairs',tx,ty,sep); } } else
       for(let t=0;gs().length<4&&t<10;t++){ const [tx,ty]=tg[(t+2)%16]; tryG(CN[k]+' '+Q[(t+2)%8]+((t+2)%16>=8?' Road':'')+' Truck Repairs',tx,ty,sep); }
       world.cityPOI[CN[k]]={fuel:fs().length,garages:gs().length}; }
     console.log('[sites] per city fuel+garages',JSON.stringify(world.cityPOI)); }
