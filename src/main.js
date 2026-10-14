@@ -277,7 +277,7 @@ function mapZoomTo(zt,mx,my){ bigmap.zt=Math.max(mapFitZ(),Math.min(14,zt)); big
 function mapFull(on){ if(!document.body.classList.contains('touch')) return; const c=document.getElementById('game'); document.body.classList.toggle('mapo',on);
   if(on){ VW=Math.round(innerWidth*1.6); VH=Math.round(innerHeight*1.6); } else { VW=VW0; VH=VH0; } c.width=VW; c.height=VH; if(!on&&typeof mobLayout==='function') mobLayout(); }
 addEventListener('resize',()=>{ if(bigmap.open) setTimeout(()=>mapFull(true),60); });
-function openMap(){ if(!started) return; bigmap.open=true; mapFull(true); bigmap.z=bigmap.zt=bigmap.saved||LOCAL_Z; mapCentreTruck(); }
+function openMap(){ if(!started) return; if(career.uiOpen) return; if(career.active&&career.active.phase==='unloading') return; bigmap.open=true; mapFull(true); bigmap.z=bigmap.zt=bigmap.saved||LOCAL_Z; mapCentreTruck(); }
 function closeMap(){ NAV.sel=null; if(bigmap.open) bigmap.saved=bigmap.zt||bigmap.z; bigmap.open=false; mapFull(false); }
 const MAPBTN=[['+',()=>mapZoomTo(bigmap.zt*1.6)],['−',()=>mapZoomTo(bigmap.zt/1.6)],['◎',mapCentreTruck],['✕',()=>closeMap()]];
 function mapBtnRect(i){ if(document.body.classList.contains('mapo')){ const i2=i===3?0:i+1; return [VW-96,(i===3?56:84+i2*76),76,68]; } return [VW-62,58+i*48,40,40]; }
@@ -365,7 +365,8 @@ addEventListener('keydown',e=>{ if(!world.ready) return;
   if(career.uiOpen){ if(e.code==='Escape'||(e.code==='KeyJ'&&career.uiOpen==='board')){ if(career.uiOpen!=='result') closeUI(); } e.stopImmediatePropagation(); if(e.code!=='F11') e.preventDefault(); return; }
   if(e.code==='KeyJ'&&!e.repeat){ if(!started) startGame(); openBoard(); e.stopImmediatePropagation(); e.preventDefault(); }
   if(e.code==='KeyU'&&!e.repeat&&started){ tryUnload(); e.preventDefault(); } },true);
-cv.addEventListener('pointerdown',e=>{ const b=career.unloadBtn; if(!b||bigmap.open) return; const [x,y]=canvasPos(e); if(x>=b[0]&&x<=b[0]+b[2]&&y>=b[1]&&y<=b[1]+b[3]&&career.active&&career.active.phase==='deliver') tryUnload(); });
+cv.addEventListener('pointerdown',e=>{ const b=career.unloadBtn; if(!b||bigmap.open) return; const [x,y]=canvasPos(e); if(x>=b[0]&&x<=b[0]+b[2]&&y>=b[1]&&y<=b[1]+b[3]&&career.active&&career.active.phase==='deliver'){ e.stopImmediatePropagation(); e.preventDefault(); downAt=null; career.unlTap=performance.now(); tryUnload(); } },true);
+cv.addEventListener('pointerup',e=>{ if(career.unlTap&&performance.now()-career.unlTap<800){ career.unlTap=0; e.stopImmediatePropagation(); } },true);
 
 // v27: two-finger pinch zoom (centred on midpoint) + pan on the world map
 { const P=new Map(); let pin=null;

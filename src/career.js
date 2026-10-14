@@ -156,9 +156,10 @@ function acceptJob(j){ if(j.tier>career.tier) return false; if(career.active) ab
   setRoute(dp); BigRig.emit('jobAccepted',{job:j}); flash('Job accepted: '+c.name+' \u2192 '+j.to.name+' \u2022 sat nav set to '+dp.name); saveGame(); return true; }
 function abandonJob(silent){ const a=career.active; if(!a) return; a.bay.assigned=false; if(a.pickBay) a.pickBay.target=false; a.trailer.target=false; a.trailer.job=null; career.active=null; clearRoute(); if(!silent) flash('Job abandoned'); }
 BigRig.on('couple',e=>{ const a=career.active; if(!a||e.trailer!==a.trailer) return; a.pickBay.target=false; a.trailer.target=false; a.phase='deliver'; a.dmg0=truck.damage; if(!a.tc) a.tc=timeS;
-  setRoute(a.job.to); flash('Cargo coupled \u2714 Deliver to '+a.job.to.name+' \u2022 bay '+a.bay.id); });
+  setRoute(jobBayTarget(a)); flash('Cargo coupled \u2714 Deliver to '+a.job.to.name+' \u2022 bay '+a.bay.id); });
 BigRig.on('uncouple',e=>{ const a=career.active; if(!a||e.trailer!==a.trailer||a.phase!=='deliver') return; a.phase='recouple'; a.trailer.target=true; setRoute({x:a.trailer.x,y:a.trailer.y,name:'Your cargo trailer'}); });
-BigRig.on('couple',e=>{ const a=career.active; if(a&&a.phase==='recouple'&&e.trailer===a.trailer){ a.trailer.target=false; a.phase='deliver'; setRoute(a.job.to); } });
+BigRig.on('couple',e=>{ const a=career.active; if(a&&a.phase==='recouple'&&e.trailer===a.trailer){ a.trailer.target=false; a.phase='deliver'; setRoute(jobBayTarget(a)); } });
+function jobBayTarget(a){ const b=a.bay, e=a.job.to.entrance; return b&&b.cx!=null?{x:b.cx,y:b.cy,name:a.job.to.name+' \u2022 bay '+b.id,ref:{entrance:e,name:a.job.to.name}}:a.job.to; }
 // ---------- bay alignment
 function bayAlign(b){ const s=truck; if(!s.trl) return null; const k=kingpin(s), ft=fwd(s.th); const box={x:k[0]-ft[0]*TRL_KP_TO_CENTRE,y:k[1]-ft[1]*TRL_KP_TO_CENTRE,h:s.th,L:TRL_LEN,W:TRL_W};
   const cs=obbCorners(box), m=0.06; let inside=true, worst=0; for(const p of cs){ const ox=Math.max(b.x0+m-p[0],p[0]-(b.x1-m),0), oy=Math.max(b.y0-p[1],p[1]-(b.y1+0.05),0); if(ox>0||oy>0){ inside=false; worst=Math.max(worst,ox,oy); } }
@@ -177,12 +178,12 @@ function finishJob(){ const a=career.active, j=a.job; const dmg=Math.max(0,truck
   truck.money+=total; career.done++; { const H=career.hist=career.hist||[], f=jobRef(j.from), tt=jobRef(j.to), o=H.find(h=>h.c===j.cargo.id&&h.f===f&&h.t===tt); if(o) o.n=(o.n||1)+1; else if(f&&tt){ H.push({c:j.cargo.id,f,t:tt,b:j.band||'med',n:1}); if(H.length>40) H.shift(); } } career.earned+=total; a.bay.assigned=false; a.bay.doorT=0;
   const tr=a.trailer; tr.cargo='Empty'; tr.cargoKg=0; tr.weight=tr.tareKg; tr.job=null;
   career.active=null; career.jobs=career.jobs.filter(x=>x!==j); fillBoard(); clearRoute();
-  BigRig.emit('jobComplete',{job:j,total,xp,lines}); const res={job:j,total,xp,lines,tierBefore:career.tier}; showResult(res, a.bay); addXP(xp); saveGame(); }
+  BigRig.emit('jobComplete',{job:j,total,xp,lines}); const res={job:j,total,xp,lines,tierBefore:career.tier}; if(typeof bigmap!=='undefined'&&bigmap.open) closeMap(); showResult(res, a.bay); addXP(xp); saveGame(); }
 function updateCareer(dt){ const a=career.active;
   for(const m of world.malls) for(const b of m.bays){ const t=b.doorT?1:0; b.door+=(t-b.door)*Math.min(1,dt*1.6); }
   if(a&&a.phase==='unloading'){ if(Math.abs(truck.v)>0.2||!truck.trl){ a.phase='deliver'; a.bay.doorT=0; flash('Unloading interrupted \u2014 the truck moved'); } else { a.ut+=dt; if(a.ut>=a.udur) finishJob(); } }
   // inside the destination site: the sat nav has done its job
-  if(a&&NAV.route){ const site=a.phase==='deliver'?a.job.to:a.phase==='pickup'?a.job.from:null; if(site){ const x0=(site.tx!==undefined?site.tx:site.x)*M_T, y0=(site.ty!==undefined?site.ty:site.y)*M_T; if(truck.x>x0&&truck.x<x0+site.w*M_T&&truck.y>y0-6&&truck.y<y0+site.h*M_T){ clearRoute(); flash(a.phase==='deliver'?'Arrived \u2014 reverse into bay '+a.bay.id:'Arrived \u2014 couple the marked trailer'); } } }
+  if(a&&NAV.route){ const site=a.phase==='deliver'?a.job.to:a.phase==='pickup'?a.job.from:null; if(site){ const x0=(site.tx!==undefined?site.tx:site.x)*M_T, y0=(site.ty!==undefined?site.ty:site.y)*M_T; if(truck.x>x0&&truck.x<x0+site.w*M_T&&truck.y>y0-6&&truck.y<y0+site.h*M_T&&!a.arrFlash){ a.arrFlash=a.phase; flash(a.phase==='deliver'?'Arrived \u2014 reverse into bay '+a.bay.id:'Arrived \u2014 couple the marked trailer'); } } }
   // dealership trigger
   const s=truck, f=fwd(s.h), cx=s.x+f[0]*1.9, cy=s.y+f[1]*1.9; let inPad=null; for(const d of world.dealers||[]){ const p=d.pad; if(cx>p.x0&&cx<p.x1&&cy>p.y0&&cy<p.y1) inPad=d; }
   if(inPad&&Math.abs(s.v)<0.2&&!career.padLatch&&!career.uiOpen){ career.padLatch=true; openDealer(inPad); } if(!inPad) career.padLatch=false;
@@ -233,21 +234,16 @@ function drawCareerHUD(){ career.unloadBtn=null; const lv=levelOf(career.xp), a0
   ctx.restore();
   if(a&&(a.phase==='deliver'||a.phase==='unloading')){ const al=bayAlign(a.bay); if(al&&al.dist<70) drawAlignPanel(a,al); }
 }
-function drawAlignPanel(a,al){ const W=372,H=118,x=VW/2-W/2,y=VH-H-58; ctx.save(); ctx.fillStyle='rgba(8,12,20,0.82)'; ctx.beginPath(); ctx.roundRect(x,y,W,H,10); ctx.fill();
-  const b=a.bay, sc=4.2, bx=x+16, byy=y+10, bw=b.w*sc, bh=b.L*sc*0.55;   // schematic: bay (scaled), trailer outline
-  ctx.save(); ctx.beginPath(); ctx.rect(x+6,y+6,80,H-12); ctx.clip(); ctx.translate(bx+30,byy+bh/2+4); ctx.fillStyle='#2b313b'; ctx.fillRect(-bw/2-8,-bh/2-6,bw+16,bh+12);
-  ctx.strokeStyle='#f4f4ee'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(-bw/2,-bh/2); ctx.lineTo(-bw/2,bh/2); ctx.moveTo(bw/2,-bh/2); ctx.lineTo(bw/2,bh/2); ctx.stroke(); ctx.fillStyle='#f2c230'; ctx.fillRect(-bw/2,bh/2-3,bw,4);
-  const sy=0.55, cx=al.lat*sc, cy=(al.box.y-b.cy)*sc*sy; ctx.translate(cx,cy); ctx.rotate(al.ang); ctx.strokeStyle=al.ok?'#3ddc84':'#ff5a4e'; ctx.lineWidth=2.5; ctx.strokeRect(-TRL_W*sc/2,-TRL_LEN*sc*sy/2,TRL_W*sc,TRL_LEN*sc*sy); ctx.restore();
-  const ok=al.ok, ready=al.ready, unl=a.phase==='unloading';
-  ctx.fillStyle=unl?'#2f81f7':ready?'#2ea043':ok?'#d29922':'#da3633'; ctx.beginPath(); ctx.roundRect(x+94,y+10,W-106,26,6); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='bold 14px system-ui,sans-serif'; ctx.textAlign='left';
-  ctx.fillText(unl?'UNLOADING\u2026 keep stationary':ready?'\u2714 WITHIN LINES \u2014 press U to unload':ok?'Within lines \u2014 STOP to unload':'\u2716 NOT WITHIN LINES',x+102,y+28);
-  ctx.font='12px system-ui,sans-serif'; ctx.fillStyle='rgba(255,255,255,0.9)';
-  const lr=al.lat>0.05?'steer trailer LEFT':al.lat<-0.05?'steer trailer RIGHT':'centred';
-  ctx.fillText(`Offset ${Math.abs(al.lat).toFixed(2)} m (${lr})`,x+96,y+54); ctx.fillText(`Angle ${(al.ang*57.3).toFixed(1)}\u00b0 ${al.angOk?'\u2714':'(max 5\u00b0)'}`,x+96,y+70); ctx.fillText(`To dock ${Math.max(0,al.gap).toFixed(1)} m ${al.gapOk?'\u2714':al.gap>0?'(reverse further)':'(too far)'}`,x+96,y+86);
-  ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.fillText(a.job.to.name+' \u2022 bay '+b.id,x+96,y+104);
-  ctx.fillStyle=ready?'#2ea043':'#444c56'; ctx.beginPath(); ctx.roundRect(x+W-92,y+48,80,32,6); ctx.fill(); ctx.fillStyle=ready?'#fff':'#8b949e'; ctx.font='bold 13px system-ui,sans-serif'; ctx.textAlign='center'; ctx.fillText('UNLOAD (U)',x+W-52,y+68);
-  career.unloadBtn=[x+W-92,y+48,80,32];
-  if(unl){ const p=Math.min(1,a.ut/a.udur); ctx.fillStyle='#222a36'; ctx.fillRect(x+96,y+92,W-200,8); ctx.fillStyle='#2f81f7'; ctx.fillRect(x+96,y+92,(W-200)*p,8); }
-  ctx.restore(); }
+function drawAlignPanel(a,al){ const unl=a.phase==='unloading', ready=al.ready&&!unl; career.unloadBtn=null;
+  if(unl){ const p=Math.min(1,a.ut/a.udur), W=220,x=VW/2-W/2,y=VH*0.30; ctx.save(); ctx.fillStyle='rgba(8,12,20,0.78)'; ctx.beginPath(); ctx.roundRect(x,y,W,40,10); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='bold 13px system-ui,sans-serif'; ctx.textAlign='center'; ctx.fillText('UNLOADING\u2026',VW/2,y+17); ctx.fillStyle='#222a36'; ctx.fillRect(x+14,y+25,W-28,7); ctx.fillStyle='#2f81f7'; ctx.fillRect(x+14,y+25,(W-28)*p,7); ctx.restore(); return; }
+  if(!ready) return;
+  const padOn=typeof pad!=='undefined'&&pad.active, W=240,H=64,x=VW/2-W/2,y=VH*0.28, pulse=0.5+0.5*Math.sin(timeS*5); ctx.save();
+  ctx.shadowColor='rgba(46,160,67,0.8)'; ctx.shadowBlur=14+pulse*12; ctx.fillStyle='#2ea043'; ctx.beginPath(); ctx.roundRect(x,y,W,H,16); ctx.fill(); ctx.shadowBlur=0; ctx.strokeStyle='rgba(255,255,255,0.85)'; ctx.lineWidth=2.5; ctx.stroke();
+  ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.font='900 24px system-ui,sans-serif'; ctx.fillText('\u{1F4E6} UNLOAD',VW/2,y+33); ctx.font='bold 12px system-ui,sans-serif'; ctx.fillStyle='rgba(255,255,255,0.9)';
+  const touch=document.body.classList.contains('touch'); ctx.fillText(touch?'tap here':padOn?'press \u24CE (Y)':'press U \u2022 or click',VW/2,y+52); ctx.restore(); career.unloadBtn=[x,y,W,H]; }
+// world: the target bay outline goes green when lined up, amber otherwise (minimal feedback, no numbers)
+function drawJobBay(){ const a=career.active; if(!a||!(a.phase==='deliver'||a.phase==='unloading')||!a.bay) return; const b=a.bay; if(b.x0==null) return; const al=bayAlign(b); if(!al||al.dist>70) return;
+  const S=PPM, col=a.phase==='unloading'||al.ready?'#2ee66b':al.ok?'#7be36a':'#f5b82e', p=0.6+0.4*Math.sin(timeS*4); ctx.save(); ctx.globalAlpha=0.35*p; ctx.fillStyle=col; ctx.fillRect(b.x0*S,b.y0*S,(b.x1-b.x0)*S,(b.y1-b.y0)*S); ctx.globalAlpha=1; ctx.strokeStyle=col; ctx.lineWidth=4; ctx.setLineDash(al.ok?[]:[10,7]); ctx.strokeRect(b.x0*S,b.y0*S,(b.x1-b.x0)*S,(b.y1-b.y0)*S); ctx.restore(); }
+setTimeout(()=>{ if(typeof drawPortTrucksLow==='function'){ const d=drawPortTrucksLow; drawPortTrucksLow=function(){ const r=d.apply(this,arguments); try{ drawJobBay(); }catch(e){} return r; }; } },0);
 
 addEventListener('visibilitychange',()=>{ if(document.hidden&&started&&!career.noSave) saveGame(); }); addEventListener('beforeunload',()=>{ if(started&&!career.noSave) saveGame(); });

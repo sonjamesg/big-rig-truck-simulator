@@ -122,7 +122,7 @@ function uiInit(){ if(uiRoot) return; const st=document.createElement('style'); 
   hb.querySelector('#bJobs').addEventListener('click',e=>{ e.stopPropagation(); if(!started) return; openBoard(); }); }
 function uiBlocking(){ return !!career.uiOpen; }
 function closeUI(){ const m=uiRoot&&uiRoot.querySelector('.mback,.celebrate'); career.uiOpen=null; for(const k in input) input[k]=false; if(m){ m.classList.remove('on'); setTimeout(()=>m.remove(),260); } }
-function openModal(kind,html,cls){ uiInit(); const old=uiRoot.querySelector('.mback,.celebrate'); if(old) old.remove(); career.uiOpen=kind; for(const k in input) input[k]=false;
+function openModal(kind,html,cls){ uiInit(); if(typeof bigmap!=='undefined'&&bigmap.open&&typeof closeMap==='function') closeMap(); const old=uiRoot.querySelector('.mback,.celebrate'); if(old) old.remove(); career.uiOpen=kind; for(const k in input) input[k]=false;
   const b=document.createElement('div'); b.className='mback'; b.innerHTML=`<div class="modal ${cls||''}">${html}</div>`; uiRoot.appendChild(b); requestAnimationFrame(()=>b.classList.add('on'));
   b.addEventListener('pointerdown',e=>{ if(e.target===b&&kind!=='result') closeUI(); }); const x=b.querySelector('.x'); if(x) x.addEventListener('click',closeUI); return b; }
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
