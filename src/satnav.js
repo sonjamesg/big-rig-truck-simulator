@@ -120,11 +120,33 @@ function ftSpot(dp){ const trl=truck.trl, ex=dp.entrance.x, ey=dp.entrance.y, ca
   for(const [,x,y,h] of cands){ if(ftClear(x,y,h,trl)){ const f=fwd(h); if(trl){ const rx=x-f[0]*12.3, ry=y-f[1]*12.3; if(rx<dp.x*M_T||rx>(dp.x+dp.w)*M_T||ry<dp.y*M_T||ry>(dp.y+dp.h-5)*M_T) continue; } return {x,y,h}; } }
   // no room in the yard: line the trailer up in a free bay, cab facing out
   for(const b of dp.bays){ if(b.trailer) continue; const h=b.th||0, f=fwd(h); return {x:b.kx-f[0]*0.3,y:b.ky-f[1]*0.3,h,bay:true}; } return null; }
-// generic: nearest clear straight road tile to a place, parked along the road
-function ftRoadSpot(mx,my){ const trl=truck.trl, tx=Math.floor(mx/M_T), ty=Math.floor(my/M_T), C=[];
-  const R=(x,y)=>inb(x,y)&&isRoadT(idx(x,y)); for(let dy=-130;dy<=130;dy++) for(let dx=-130;dx<=130;dx++){ const x=tx+dx,y=ty+dy; if(!R(x,y)) continue; const i=idx(x,y); let H=world.roadH[i]>=0, V=world.roadV[i]>=0; if(H===V){ H=R(x-1,y)&&R(x+1,y)&&R(x-2,y)&&R(x+2,y); V=R(x,y-1)&&R(x,y+1)&&R(x,y-2)&&R(x,y+2); if(H===V) continue; } C.push([dx*dx+dy*dy,x,y,H]); }
+// generic: nearest clear spot in the LEFT-hand (kerbside) lane of a straight segment, facing the way that lane's traffic flows (UK),
+// with the whole rig (cab + trailer) on that segment's own tiles, clear of junctions, buildings, trailers and AI traffic
+function rigHeading(sg,dir){ return sg.dir==='h'?(dir>0?Math.PI/2:-Math.PI/2):(dir>0?Math.PI:0); }
+function ftRoadSpot(mx,my){ const trl=truck.trl, back=trl?15:5, front=6, C=[];
+  for(const sg of world.segs){ if(!sg||sg.b1-sg.b0<(back+front)/M_T+6) continue; const lat=(sg.a+sg.w/2)*M_T;
+    const lo=sg.b0*M_T, hi=(sg.b1+1)*M_T, t=Math.max(lo,Math.min(hi,(sg.dir==='h'?mx:my))); const d0=Math.abs((sg.dir==='h'?my:mx)-lat)+Math.abs((sg.dir==='h'?mx:my)-t);
+    if(d0<2500) C.push([d0,sg]); }
   C.sort((a,b)=>a[0]-b[0]);
-  for(const [,x,y,H] of C){ const cx=(x+0.5)*M_T, cy=(y+0.5)*M_T; for(const h of H?[Math.PI/2,-Math.PI/2]:[0,Math.PI]){ if(ftClear(cx,cy,h,trl)) return {x:cx,y:cy,h}; } } return null; }
+  for(const [,sg] of C){ const tgt=(sg.dir==='h'?mx:my)/M_T, opts=[];
+    for(let al=sg.b0+2;al<=sg.b1-1;al+=1) opts.push(al+0.5); opts.sort((a,b)=>Math.abs(a-tgt)-Math.abs(b-tgt));
+    for(const al of opts) for(const dir of [1,-1]){ const p=rigLaneOK(sg,dir,al,back,front,trl); if(p) return p; } }
+  return null; }
+function rigLaneOK(sg,dir,al,back,front,trl){ const r0=al-dir*back/M_T, r1=al+dir*front/M_T, A=Math.min(r0,r1), B=Math.max(r0,r1);
+  if(A<sg.b0+1||B>sg.b1) return null;
+  for(const J of sg.js){ const [a,b]=jRange(sg,J); if(B>a-4&&A<b+4) return null; }
+  const lane=0, lat=laneLat(sg,dir,lane);
+  for(let q=Math.floor(A);q<=Math.floor(B);q++) for(let k=0;k<sg.w;k++){ const x=sg.dir==='h'?q:sg.a+k, y=sg.dir==='h'?sg.a+k:q; if(!inb(x,y)) return null; const i=idx(x,y);
+    if((sg.dir==='h'?world.roadH[i]:world.roadV[i])!==sg.id) return null; if(world.roadH[i]>=0&&world.roadV[i]>=0) return null; }
+  const p=lanePt(sg,dir,lane,al), h=rigHeading(sg,dir); if(!ftClear(p[0],p[1],h,trl)) return null;
+  if(typeof traffic!=='undefined') for(const v of traffic.vs){ const ap=sg.dir==='h'?v.x/M_T:v.y/M_T, lt=sg.dir==='h'?v.y/M_T:v.x/M_T; if(Math.abs(lt-(lat+0.5))<1.2&&ap>A-6&&ap<B+6) return null; }
+  return {x:p[0],y:p[1],h,seg:sg.id,dir,lane}; }
+// put the rig at a pose: cab, trailer lined up straight behind it, AI cars cleared out of the rig's footprint
+function rigPlace(p){ const s=truck; s.x=p.x; s.y=p.y; s.h=s.th=p.h; s.v=0; s.steer=0; if(s.vx!==undefined){ s.vx=0; s.vy=0; } if(s.av!==undefined) s.av=0;
+  if(s.trl){ const k=kingpin(s); s.trl.th=p.h; if(k){ s.trl.x=k[0]; s.trl.y=k[1]; } if(s.trl.v!==undefined) s.trl.v=0; }
+  if(typeof traffic!=='undefined'){ const f=fwd(p.h); for(let n=traffic.vs.length-1;n>=0;n--){ const v=traffic.vs[n]; for(let q=-16;q<=8;q+=2) if(Math.hypot(v.x-(p.x+f[0]*q),v.y-(p.y+f[1]*q))<4.5){ traffic.vs.splice(n,1); traffic.despawned++; break; } } }
+  if(typeof cam!=='undefined'){ cam.x=p.x*PPM; cam.y=p.y*PPM; } }
+BigRig.rigPlace=rigPlace; BigRig.ftRoadSpot=ftRoadSpot;
 function ftFee(o){ const e=o.entrance||o, km=Math.hypot(e.x-truck.x,e.y-truck.y)/1000; return Math.round(25+8*km); }
 // rules: stopped, not broken down, not carrying a job's cargo (deliver/unloading/recouple), can afford the fee
 function ftBlock(o){ const s=truck; if(Math.abs(s.v)>0.3) return 'Fast travel: stop the truck first'; if(typeof BREAKDOWN!=='undefined'&&BREAKDOWN.active) return 'Fast travel unavailable while broken down';
@@ -135,10 +157,10 @@ function fastTravel(dp){ const s=truck; const why=ftBlock(dp); if(why){ flash(wh
   const fee=ftFee(dp);
   const fr=document.getElementById('frame')||document.body; let ov=document.getElementById('ftfade'); if(!ov){ ov=document.createElement('div'); ov.id='ftfade'; ov.style.cssText='position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .28s;z-index:50'; fr.appendChild(ov); }
   ov.style.opacity='1'; if(typeof closeMap==='function') closeMap();
-  setTimeout(()=>{ s.x=p.x; s.y=p.y; s.h=p.h; cam.x=p.x*PPM; cam.y=p.y*PPM; s.th=p.h; s.v=0; s.steer=0; if(s.vx!==undefined){ s.vx=0; s.vy=0; } if(s.av!==undefined) s.av=0; s.money-=fee;
+  setTimeout(()=>{ rigPlace(p); s.money-=fee;
     if(NAV.route&&NAV.route.target){ const t=NAV.route.target; setRoute(t.ref||{x:t.x,y:t.y,name:t.name}); }
     flash('Fast travelled to '+dp.name+' (\u00a3'+fee+')'+(p.bay?' \u2014 parked at a bay':'')); BigRig.emit('fastTravel',{depot:dp.id,name:dp.name,x:p.x,y:p.y,fee}); setTimeout(()=>ov.style.opacity='0',60); },300); return true; }
-BigRig.fastTravel=fastTravel;
+BigRig.fastTravel=fastTravel; BigRig.ftSpotFor=dp=>{ const e=dp.entrance||dp; return (dp.bays&&dp.x!==undefined)?ftSpot(dp):ftRoadSpot(e.x,e.y); };
 // tooltip button hit-boxes (set when drawn)
 let FT_BTN=null, NAV_BTN=null;
 

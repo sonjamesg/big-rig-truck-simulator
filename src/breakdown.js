@@ -15,7 +15,7 @@ function bdFailMission(){ const a=career.active; if(!a) return null; const tr=a.
   abandonJob(true); BigRig.emit('missionFailed',{reason:'breakdown',cargo:name}); return name; }
 BREAKDOWN.addOption({id:'respawn',order:100,label:'RESPAWN',sub:()=>{ const s=bdNearestService(); return 'Tow to '+(s?s.name:'nearest garage')+' \u2022 \u00a3'+BREAKDOWN.fee()+' \u2022 damage reset'+(career.active?' \u2022 mission FAILED':''); },
   enabled:()=>true, run(){ const s=bdNearestService(), fee=BREAKDOWN.fee(); const lost=bdFailMission(); if(truck.trl) uncouple();
-    if(s){ truck.x=s.x; truck.y=s.y+6; } truck.v=0; truck.damage=0; truck.money-=fee; bdEnd();
+    if(s){ const p=ftRoadSpot(s.x,s.y); if(p) rigPlace(p); else { truck.x=s.x; truck.y=s.y+6; } } truck.v=0; truck.damage=0; truck.money-=fee; bdEnd();
     flash('Recovered to '+(s?s.name:'garage')+' \u2022 \u00a3'+fee+(lost?' \u2022 job failed':'')); BigRig.emit('respawn',{at:s,fee}); saveGame&&saveGame(); } });
 function bdStart(){ if(BREAKDOWN.active) return; BREAKDOWN.active=true; BREAKDOWN.t=0; BREAKDOWN.at={x:truck.x,y:truck.y};
   BREAKDOWN.smoke={x:0,y:0,s:1.2,bd:1}; world.smokers.push(BREAKDOWN.smoke); try{ thump(1); }catch(e){}
