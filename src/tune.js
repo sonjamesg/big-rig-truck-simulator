@@ -190,7 +190,7 @@ const CZ_CSS=`#ui .mback .modal.tz{width:min(1060px,98vw)!important;height:min(6
 @media (min-width:761px),(orientation:landscape){.tz .czm{flex-direction:row}.tz .czt{width:46%;border-right:1px solid rgba(255,255,255,.07)}.tz .czp{flex:1;height:auto}.tz .czk{width:54%}}
 @media (orientation:landscape) and (max-height:460px){.tz .czs{gap:2px 10px;padding:4px 10px}.tz .czs .b{height:6px}.tz .czh{padding:4px 8px}.tz .czb{width:42px;height:42px}.tz .czf .btn{min-height:44px}}`;
 function czCss(){ if(document.getElementById('czcss')) return; const s=document.createElement('style'); s.id='czcss'; s.textContent=CZ_CSS; document.head.appendChild(s); }
-function czOpen(){ if(!started||career.uiOpen) return; czCss(); const m=modelById(career.cur); CZ.sel=null; CZ.tab=CZ.tab||'engine';
+function czOpen(){ if(!started||career.uiOpen) return; czCss(); const m=modelById(career.cur); CZ.sel=null; CZ.view='top'; CZ.tab=CZ.tab||'engine';
   const b=openModal('tune',`<div class="czh"><button class="czb x" id="czBack" aria-label="Back">\u2039</button><h2>TUNE SHOP<small>${esc(m.name)}${CZ.bay?' \u2022 '+esc(CZ.bay.name):''}</small></h2><div class="wallet">\u{1F45B} Bank <b id="czBank"></b></div><button class="czb x" aria-label="Close">\u2715</button></div>
    <div class="czm"><div class="czt"><div class="czp"><canvas></canvas><span class="vt"></span><span class="vh">drag / right stick to rotate \u2022 tap: top / side</span></div><div class="czs"></div></div>
    <div class="czk"><div class="cztabs"></div><div class="czg"></div></div></div>

@@ -36,9 +36,11 @@
     g.fillStyle='rgba(0,0,0,0.5)'; rr(g,X(-0.3),Y(cab0+1.0),0.6*S,0.5*S,0.2*S); g.fill(); }
   g.strokeStyle='rgba(0,0,0,0.55)'; g.lineWidth=1.5; rr(g,X(-1.25),Y(cab0),2.5*S,(cab1-cab0)*S,0.35*S); g.stroke();
   return cache[key]={c,W:B.W,H:B.H,ox:B.ox,oy:B.oy}; }; }
-// dealer showroom: add a lit floor + a side-profile render under the top view
-{ const rd0=renderDealer; renderDealer=function(stageOnly){ rd0(stageOnly); const b=uiRoot.querySelector('.mback'); if(!b||career.uiOpen!=='dealer') return; const stg=b.querySelector('.stage'), fl=stg&&stg.querySelector('.floor'); if(!fl||stg.querySelector('.czds')) return;
-  const m=modelById(dealerState.sel), col=dealerState.col||career.colors[m.id]||m.cols[0]; const cv=document.createElement('canvas'); cv.className='czds'; cv.width=560; cv.height=220; cv.style.cssText='width:min(100%,280px);height:auto;display:block;margin:4px auto 0';
-  fl.insertAdjacentElement('afterend',cv); const g=cv.getContext('2d'), sg=g.createRadialGradient(280,190,10,280,190,260); sg.addColorStop(0,'rgba(255,240,200,0.28)'); sg.addColorStop(1,'rgba(255,240,200,0)'); g.fillStyle=sg; g.fillRect(0,0,560,220);
-  g.fillStyle='rgba(255,255,255,0.06)'; g.fillRect(0,196,560,24); const sc=54; czSide(g,280+1.8*sc,196,sc,m,col,czFitted(m.id));
-  g.save(); g.globalAlpha=0.12; g.translate(0,392); g.scale(1,-1); czSide(g,280+1.8*sc,196,sc,m,col,czFitted(m.id)); g.restore(); }; }
+// dealer: one large crisp bird's-eye image per truck, drawn with the in-game renderer (czArt = model art + fitted parts), no spin / side view
+function czDealerImg(cv,m,col,horiz){ const r=cv.getBoundingClientRect(), dpr=Math.min(3,devicePixelRatio||1), W=Math.max(1,Math.round(r.width*dpr)), H=Math.max(1,Math.round(r.height*dpr)); cv.width=W; cv.height=H;
+  const g=cv.getContext('2d'), A=czArt(m,col,czFitted(m.id)), aw=horiz?A.H:A.W, ah=horiz?A.W:A.H, sc=Math.min(W*0.92/aw,H*0.9/ah); g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high';
+  g.save(); g.translate(W/2,H/2); if(horiz) g.rotate(Math.PI/2); g.globalAlpha=0.35; g.filter='blur('+Math.round(5*dpr)+'px)'; g.drawImage(A.c,-A.W*sc/2+(horiz?6:4)*dpr,-A.H*sc/2+(horiz?-8:6)*dpr,A.W*sc,A.H*sc); g.filter='none'; g.globalAlpha=1; g.drawImage(A.c,-A.W*sc/2,-A.H*sc/2,A.W*sc,A.H*sc); g.restore(); }
+{ const rd0=renderDealer; renderDealer=function(stageOnly){ rd0(stageOnly); const b=uiRoot.querySelector('.mback'); if(!b||career.uiOpen!=='dealer') return;
+  b.querySelectorAll('.tl .ti').forEach((el,i)=>{ const m=TRUCK_MODELS[i], cv=el.querySelector('canvas'); if(!cv||!m) return; cv.style.width='68px'; cv.style.height='128px'; czDealerImg(cv,m,career.colors[m.id]||m.cols[0],false); });
+  const fl=b.querySelector('.stage .floor'); if(!fl) return; const old=fl.querySelector('canvas'); const m=modelById(dealerState.sel), col=dealerState.col||career.colors[m.id]||m.cols[0];
+  const cv=document.createElement('canvas'); cv.className='czdi'; cv.style.cssText='position:absolute;left:0;top:0;width:100%;height:100%;display:block;transform:none;animation:none;filter:none'; if(old) old.replaceWith(cv); else fl.appendChild(cv); czDealerImg(cv,m,col,true); setTimeout(()=>{ if(cv.isConnected) czDealerImg(cv,m,col,true); },400); }; }
