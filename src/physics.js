@@ -55,7 +55,7 @@ function stepTruck(s,inp,dt){ if(typeof FX!=='undefined'&&FX.boom){ s.v=0; s.thr
   s.rpm += (Math.min(REDLINE,rpm)-s.rpm)*Math.min(1,dt*8);
   let F=0;
   if(s.shiftT<=0){
-    let tq=torqueAt(s.rpm)*s.throttle*(s.power||1)*(av<14?(s.accM||1):1); if(av>(s.vmax||VMAX) && dir>0) tq=0; if(s.mode==='R' && av>3.5) tq=0;
+    let tq=torqueAt(s.rpm)*s.throttle*(s.power||1)*(av<14?(s.accM||1):1); if(s.govern&&av>(s.vmax||VMAX) && dir>0) tq=0;   // v40: no limiter unless s.govern (James: remove the 56 mph limiter) if(s.mode==='R' && av>3.5) tq=0;
     F += dir*tq*ratio*FINAL*0.9/WHEEL_R;
     if(s.throttle<0.05 && av>1) F -= Math.sign(s.v)*(250+0.35*s.rpm)*ratio*FINAL/WHEEL_R*0.6*(s.ebr||1);   // engine braking (cz: exhaust/jake brake)
   }
