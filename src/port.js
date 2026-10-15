@@ -264,7 +264,7 @@ function portCfg(P){
   const kb=P===world.kbPort, L=P.legL;
   const C=kb?{vA:1600,vB:1690,ex:1,inP:[[190,1770],[60,1770],[40,1768],[26,1755],[21,1738],[20,1720],[20,1600]],outT:[[33,1740],[42,1752],[60,1752],[190,1752]],
       lor:[1740,1551],appr:[[1805,1868.6],[1751,1868.6],[1747.5,1869.4],[1745.4,1871.4],[1745,1874],[1745,1876],[1745,1878],[1745,1879.6],[1743.4,1880.1]],dpth:[[1548.6,1879.3],[1546.2,1879.9],[1545.5,1878.6],[1545.5,1876.5],[1545.5,1874.5],[1545.1,1872],[1542.5,1869.6],[1536,1868.6],[1470,1868.6]],impV:[1615,1645],expV:[1647,1677],chan:[1730,1928,1790,2000],piers:[1740,1761,1781],off:137,tracN:7}
-    :{vA:378,vB:308,gIn:294,ex:-1,inP:[[185,-40],[185,168],[150,200],[90,228],[40,250],[21,264],[20,280],[20,378]],outT:[[33,240],[70,206],[160,170],[160,-40]],
+    :{vA:378,vB:308,gIn:294,ex:-1,inP:[[185,-40],[185,168],[150,200],[90,228],[40,250],[21,264],[20,280],[20,378]],outT:[[33,236],[44,200],[70,150],[110,100],[132,40],[136,-40]],
       lor:[293,388],appr:[[540,286.4],[578,286.4],[582,286.4],[585,286.4],[587,286.4],[589,286.4],[590.9,286.4],[591.0,288.2]],dpth:[[590.0,391.5],[590.6,393.6],[590.8,395.4],[589,395.4],[587,395.4],[585,395.4],[578,395.4],[540,395.4]],impV:[350,380],expV:[316,346],chan:[700,60,830,140],piers:[748,772,798],off:0,tracN:8};
   Object.assign(P,C); const hs=-C.ex; P.hs=hs; P.dockU=3.6;
   // lanes inside the crane portal (u from landside leg to waterside leg): lorry lane | 2-col stack block | tractor lane 1 | tractor lane 2
@@ -316,7 +316,18 @@ function shipPose(P,tl){ const ph=P.ph; let q=ph[0]; for(const p of ph) if(tl>=p
     // blend heading at the joins so it never snaps
     if(q.k==='out'&&s<2) h=H; if(q.k==='in'&&s>q.len-2) h=H; return {u:p[0],v:p[1],h,k:q.k,f}; }
   const a=q.a, b=q.b||q.a, e=f*f*(3-2*f); return {u:a[0]+(b[0]-a[0])*e,v:a[1]+(b[1]-a[1])*e,h:H,k:q.k,f}; }
-function portShips(P,t){ const o=[]; const k1=Math.floor((t-P.off)/SHIP.PER), k0=Math.floor((t-P.off-P.Ltot)/SHIP.PER)+1; for(let k=k0;k<=k1;k++){ const tl=t-(P.off+k*SHIP.PER); if(tl<0||tl>=P.Ltot) continue; o.push({k,tl,pose:shipPose(P,tl)}); } return o; }
+// v41: ships hold at an offshore anchorage until berth A is free and no earlier ship will be leaving berth B as they sail past; delay is kept per ship
+function portShips(P,t){ const o=[]; if(P.shT0==null) P.shT0=t-3; if(!P.anc){ const e=P.outT[P.outT.length-1], a=P.inP[0], d=Math.hypot(a[0]-e[0],a[1]-e[1])||1; P.anc=[(a[0]-e[0])/d*18,(a[1]-e[1])/d*18]; } const md=P.maxDelay||0, k1=Math.floor((t-P.off)/SHIP.PER), k0=Math.floor((t-P.off-P.Ltot-md)/SHIP.PER)+1;
+  for(let k=k0;k<=k1;k++){ const raw=t-(P.off+k*SHIP.PER); if(raw<0) continue; const s=P.sh&&P.sh.get(k), d=s&&s.delay||0; let tl=raw-d; if(tl>=P.Ltot) continue;
+    if(!(s&&s.rel)&&(P.off+k*SHIP.PER)>=P.shT0){ const a=P.inP[0], n=o.filter(q=>q.anch).length; if(n>=1) continue; o.push({k,tl:0,raw,anch:1,pose:{u:a[0]+P.anc[0],v:a[1]+P.anc[1],h:Math.atan2(P.inP[1][1]-a[1],P.inP[1][0]-a[0]),k:'anchor',f:0}}); continue; }
+    o.push({k,tl,raw,pose:shipPose(P,tl)}); } return o; }
+function portShipHold(P,ships){ const inD=P.ph[0].dur, side=P.ph[1].dur;
+  for(const o of ships){ if(!o.anch) continue; let hold=false;
+    for(const j of ships){ if(j===o||j.anch) continue; const tj=j.tl;
+      if(tj+inD<P.tA1+10) hold=true;                                           // berth A still occupied when we would arrive
+      if(tj+inD-160<P.tB1+220&&tj+inD+side>P.tB1-10) hold=true; }               // an earlier ship would be leaving berth B as we pass
+    for(const j of ships) if(j.anch&&j.k<o.k) hold=true;                       // first come, first served at the anchorage
+    const s=shipState(P,o.k,0); s.delay=o.raw; if(!hold){ s.rel=1; P.maxDelay=Math.max(P.maxDelay||0,s.delay); } } }
 const SHIP_HULL=['#1f4e79','#7b241c','#145a32','#4a235a','#2c3e50','#6e2c00'];
 function shipState(P,k,tl){ let s=P.sh.get(k); if(s) return s; const r=n=>pHash(k*31+n);
   s={k,hull:SHIP_HULL[(r(1)*6)|0],name:['ALBION STAR','NORTH SEA','MERIDIAN','KESTREL','SOUND TRADER','GREYFELL','HIGHMOOR','REDLINE'][(r(2)*8)|0],has:[],horn:0};
@@ -332,7 +343,7 @@ function loopPos(P,s){ const L=P.lLv, Tn=P.lTn, R=Math.abs(P.tl2-P.tl1)/2, um=(P
   if(s<L) return [P.tl2,P.lv1-s,-Math.PI/2]; s-=L; const a=s/R; return [um+sg*R*Math.cos(a),P.lv0-R*Math.sin(a),-Math.PI/2+sg*a]; }
 function loopFwd(P,from,to){ return ((to-from)%P.lLen+P.lLen)%P.lLen; }
 function loopStop(P,v,lane1Only,from){ const a=v-P.lv0, b=P.lLv+P.lTn+(P.lv1-v); if(lane1Only) return a; return loopFwd(P,from,a)<loopFwd(P,from,b)?a:b; }
-function updatePortLogistics(P,dt,t){ const ships=portShips(P,t); let shA=null, shB=null;
+function updatePortLogistics(P,dt,t){ const ships=portShips(P,t); portShipHold(P,ships); let shA=null, shB=null;
   for(const o of ships){ const s=shipState(P,o.k,o.tl); o.s=s; const k=o.pose.k;
     if(k==='dockA'||k==='sideIn') shA={s,rem:P.tA1-o.tl,pre:k!=='dockA'}; if(k==='dockB'||k==='shift') shB={s,rem:P.tB1-o.tl,pre:k!=='dockB'};
     if(k==='sideOut'&&!s.topped){ s.topped=1; for(let j=0;j<SHIP.N;j++) if(!s.has[j]){ s.has[j]=YARD_COLS[(pHash(o.k*7+j)*8)|0]; P.ex=Math.max(0,P.ex-1); P.ld++; P.topUp=(P.topUp||0)+1; } }   // dg: export ships always sail full
@@ -371,6 +382,8 @@ function updatePortLogistics(P,dt,t){ const ships=portShips(P,t); let shA=null, 
     if(k==='imp') tgt=loopStop(P,tr.task.crane.tv,false,tr.s);
     else if(k==='exp') tgt=tr.task.need?loopStop(P,P.expC,true):loopStop(P,tr.task.crane.tv,false,tr.s);
     else if(k==='toImp') tgt=loopStop(P,P.impC,true); else if(k==='retExp') tgt=loopStop(P,P.expC,true);
+    else if(!tr.box){ // v41: no job -> park in the waiting bay at the end of the quay lane instead of circling; only roll on to let a working tractor past
+      const W=(P.lLen-3)%P.lLen; let need=false; for(const o of TR) if(o!==tr&&o.task){ const g=loopFwd(P,o.s,tr.s); if(g>0.01&&g<7) need=true; } tgt=need?null:(loopFwd(P,tr.s,W)<P.lLen-0.5?W:tr.s); tr.waiting=!need; }
     tr.stop=tgt; const dist=tgt==null?1e9:loopFwd(P,tr.s,tgt); let gap=1e9; for(const o of TR) if(o!==tr){ const g=loopFwd(P,tr.s,o.s); if(g>0.01&&g<gap) gap=g; }
     const tq=loopPos(P,tr.s), pa=portPlayerAhead(P,tq[0],tq[1],tq[2],6); tr.yield=pa<6; const vmax=tgt==null?1.6:Math.min(6,0.3+dist*1.0), mv=Math.max(0,Math.min(vmax*dt,dist<0.04?0:dist,gap-4.6,tr.yield?Math.max(0,(pa-2.6)*dt):1e9)); tr.atStop=dist<0.05;
     tr.s=(tr.s+mv)%P.lLen; tr.mv=mv/dt; { const a=loopPos(P,tr.s+0.6), b=loopPos(P,tr.s-0.2), h=loopPos(P,tr.s); tr.h=Math.atan2(a[1]-b[1],a[0]-b[0]); tr.th=tr.h; } if(mv>0.001||!tr.task||tr.atStop) tr.still=0; else tr.still+=dt;
@@ -540,3 +553,12 @@ function dgPlayerApp(P,J){ if(!J) return null; const tx=truck.x/M_T, ty=truck.y/
   if(tx>=J.x-26&&tx<=J.x+J.w&&ty>=J.y-0.3&&ty<=J.y+J.h/2+0.6&&f[0]>0.5) return 'h';
   if(tx>=J.x+J.w/2-0.5&&tx<=J.x+J.w+0.3&&ty>=J.y+J.h-0.5&&ty<=J.y+J.h+22&&f[1]<-0.5&&(typeof IND==='undefined'||IND.side!==1)) return 'v';
   return null; }
+// v41: docks night lighting: kerb street lights every ~8 tiles on every road through/around a container yard (T.QUAY within 4 tiles) and
+// tall floodlight masts over every container stack block (one per 18x18-tile cell holding stacks). All ports share world tiles, so this covers every dock.
+function dockLightList(){ if(dockLightList.L) return dockLightList.L; const L=[], T_=TILE, near=new Uint8Array(MW*MH);
+  for(let y=0;y<MH;y++) for(let x=0;x<MW;x++){ const g=G[idx(x,y)]; if(g!==T.QUAY&&g!==T.CONT) continue; for(let dy=-4;dy<=4;dy++) for(let dx=-4;dx<=4;dx++){ const X=x+dx, Y=y+dy; if(X>=0&&Y>=0&&X<MW&&Y<MH) near[idx(X,Y)]=1; } }
+  for(let y=1;y<MH-1;y++) for(let x=1;x<MW-1;x++){ if(!near[idx(x,y)]||G[idx(x,y)]!==T.ROAD||(x+y)%8) continue; const kerb=[[1,0],[-1,0],[0,1],[0,-1]].find(([a,b])=>G[idx(x+a,y+b)]!==T.ROAD&&G[idx(x+a,y+b)]!==T.BRIDGE); if(kerb) L.push([(x+0.5+kerb[0]*0.4)*T_,(y+0.5+kerb[1]*0.4)*T_,190,'fl']); }
+  const cells=new Map(); for(const o of world.objects){ if(o.kind!=='cont') continue; const k=Math.floor(o.x/T_/18)+','+Math.floor(o.y/T_/18), c=cells.get(k)||{x:0,y:0,n:0}; c.x+=o.x+o.w/2; c.y+=o.y+o.h/2; c.n++; cells.set(k,c); }
+  for(const c of cells.values()) if(c.n>=2) L.push([c.x/c.n,c.y/c.n,440,'fl'],[c.x/c.n,c.y/c.n,120,'fl']);
+  dockLightList.L=L; return L; }
+setTimeout(()=>{ if(typeof siteLights!=='function') return; const sl=siteLights; siteLights=function(add){ sl.apply(this,arguments); try{ for(const l of dockLightList()) add(l[0],l[1],l[2],l[3]); }catch(e){} }; },0);
