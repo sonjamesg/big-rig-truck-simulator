@@ -430,6 +430,7 @@ function stepVeh(v,dt,pbs){
       const gap=m.d-front-(m.kind==='rb'?0.8:2.0); if(gap<-0.5||m.go) continue; if(gap>70) continue;   // v25 audit: hold 2 m behind the stop line so long vehicles sweeping round the corner clear the waiting cars
       let stop=false;
       if(m.kind==='light'){ const ls=sigState(m.J,m.key,m.move); if(ls==='r'||ls==='ra') stop=true; else if(ls==='a') stop= gap> v.v*v.v/(2*3.5)+1;
+        if(stop&&v.emResp){ stop=gap<6&&jBusy(v,m.J); v0=Math.min(v0,Math.sqrt(16+2*2.5*Math.max(0,gap))); }   // v29: blue lights creep through a red, only when the box is clear
         if(!stop&&gap<12&&boxBlocked(v,m)) stop=true;            // never enter unless the exit is clear
         if(!stop&&gap<6&&jBusy(v,m.J)) stop=true;                 // give way to anything still crossing the junction
         if(!stop&&gap<3){ m.go=true; m.goT=timeS; if(traffic.goLog) traffic.goLog.push({J:m.J.id,key:m.key,mv:m.move,t:timeS,st:ls,veh:v.id}); } }

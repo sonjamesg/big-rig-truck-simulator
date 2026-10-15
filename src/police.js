@@ -42,11 +42,11 @@ function polViewR(){ const v=viewRectM(); return Math.max(v[2]-v[0],v[3]-v[1])/2
 function polSpawn(){ const P=truck, R=polViewR(), f=fwd(P.h), mv=Math.abs(P.v)>3;
   for(let t=0;t<40;t++){ let a=Math.random()*6.283; if(mv&&Math.random()<0.7) a=Math.atan2(f[1],f[0])+(Math.random()-0.5)*1.8;
     const d=R*(1+Math.random()*0.5)+15, x=P.x+Math.cos(a)*d, y=P.y+Math.sin(a)*d; const tx=Math.floor(x/M_T), ty=Math.floor(y/M_T); if(!inb(tx,ty)) continue; const i=idx(tx,ty);
-    if(world.roadH[i]<0&&world.roadV[i]<0||onScreen(x,y,12)) continue; const v=spawnVehicle(x,y,true,{kind:'estate'}); if(v){ let st=null,bd=1e18; for(const s of polStations()){ const q=(s.x-x)**2+(s.y-y)**2; if(q<bd){ bd=q; st=s; } } POL.spawns=(POL.spawns||0)+1; return polMake(v,st); } }
+    if(world.roadH[i]<0&&world.roadV[i]<0||onScreen(x,y,12)) continue; if(POL.cars.length>=6) return null; const v=spawnVehicle(x,y,true,{kind:'estate'}); if(v&&onScreen(v.x,v.y,10)){ const k=traffic.vs.indexOf(v); if(k>=0) traffic.vs.splice(k,1); continue; } if(v){ let st=null,bd=1e18; for(const s of polStations()){ const q=(s.x-x)**2+(s.y-y)**2; if(q<bd){ bd=q; st=s; } } POL.spawns=(POL.spawns||0)+1; return polMake(v,st); } }
   return null; }
 function polUpdatePatrols(dt){ POL.cars=POL.cars.filter(v=>traffic.vs.includes(v)||v===(POL.chase&&POL.chase.v));
   const R=polViewR(); for(const v of POL.cars.slice()){ if(v===(POL.chase&&POL.chase.v)) continue; if(Math.hypot(v.x-truck.x,v.y-truck.y)>R*2.6+60&&!onScreen(v.x,v.y,20)){ const i=traffic.vs.indexOf(v); if(i>=0){ releaseJ(v); traffic.vs.splice(i,1); } POL.cars.splice(POL.cars.indexOf(v),1); } }
-  POL.spawnT-=dt*(Math.abs(truck.v)>2?1:0.3); if(POL.spawnT<=0){ POL.spawnT=12+Math.random()*48; POL.want=1+((Math.random()*3)|0); const n=POL.cars.filter(v=>Math.hypot(v.x-truck.x,v.y-truck.y)<R*2.6+60).length; if(n<POL.want) polSpawn(); }
+  POL.spawnT-=dt*(Math.abs(truck.v)>2?1:0.3); if(POL.spawnT<=0){ POL.spawnT=Math.random()<0.25?6+Math.random()*10:15+Math.random()*Math.random()*70; POL.want=1+((Math.random()*3)|0); const n=POL.cars.filter(v=>Math.hypot(v.x-truck.x,v.y-truck.y)<R*2.6+60).length; if(n<POL.want) polSpawn(); }
   for(const v of POL.cars){ const p=v.pol; if(!p||v===(POL.chase&&POL.chase.v)) continue;
     if(!p.home&&timeS>p.end&&p.st&&typeof aiGoal==='function'){ p.home=true; const e=emRoadPt(p.st); aiGoal(v,{entrance:e,name:p.st.name}); v.pinT=0; }
     if(p.home&&p.st){ const e=emRoadPt(p.st); if(Math.hypot(v.x-e.x,v.y-e.y)<14){ const i=traffic.vs.indexOf(v); if(i>=0){ releaseJ(v); traffic.vs.splice(i,1); }
@@ -96,15 +96,15 @@ function polUpdateChase(dt){ const c=POL.chase; if(!c) return; const v=c.v, P=tr
   if(c.siren) c.siren.set(emSirenVol(v.x,v.y));
   if(dP>500||!onView(v.x,v.y)&&dP>200){ POL.lostT+=dt; if(POL.lostT>25){ toast('\u{1F694} You lost the police'); polEndChase(true); return; } } else POL.lostT=0;
   if(Math.abs(P.v)<0.3&&dP<32&&!c.paying){ POL.stopT+=dt; if(POL.stopT>5) polFinePopup(); } else if(!c.paying) POL.stopT=0; }
-function polFinePopup(){ const c=POL.chase; if(!c||c.paying) return; c.paying=true; P_input_clear(); const tot=c.offs.reduce((a,o)=>a+o.amount,0);
+function polFinePopup(){ const c=POL.chase; if(!c||c.paying) return; c.paying=true; P_input_clear(); const tot0=c.offs.reduce((a,o)=>a+o.amount,0), tot=Math.min(tot0,Math.max(0,Math.floor(truck.money||0)));
   const rows=c.offs.map(o=>`<div style="display:flex;justify-content:space-between;gap:18px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.12)"><span>${esc(o.reason)}${o.type==='pedestrian'?' <b style="color:#ff6b6b">\u2022 ARREST</b>':''}</span><b>${money(o.amount)}</b></div>`).join('');
   const b=openModal('police',`<h2 style="margin:0 0 6px">\u{1F694} Police \u2014 Fixed Penalty</h2><p style="opacity:.8;margin:0 0 10px">You were pulled over. Offences:</p>${rows}
-    <div style="display:flex;justify-content:space-between;margin:10px 0 14px;font-size:1.15em"><span>Total</span><b>${money(tot)}</b></div>${c.arrest?'<p style="color:#ff8a8a;margin:0 0 10px">Hitting a pedestrian is a serious offence: you will be <b>arrested</b> and taken to the nearest police station.</p>':''}
+    <div style="display:flex;justify-content:space-between;margin:10px 0 14px;font-size:1.15em"><span>Total</span><b>${money(tot0)}</b></div>${tot<tot0?`<p style="color:#ffd27a;margin:0 0 10px">You only have ${money(tot)} — the officer takes what you have (no debt).</p>`:''}${c.arrest?'<p style="color:#ff8a8a;margin:0 0 10px">Hitting a pedestrian is a serious offence: you will be <b>arrested</b> and taken to the nearest police station.</p>':''}
     <button class="btn go" id="polPay" style="width:100%;font-size:1.1em;padding:12px">PAY ${money(tot)}${c.arrest?' & GO WITH OFFICER':''} <kbd>${typeof pad!=='undefined'&&pad.active?'\u24B6':'Enter'}</kbd></button>`,'polfine');
   if(!document.getElementById('polCss')){ const st=document.createElement('style'); st.id='polCss'; st.textContent='body #ui .mback .modal.polfine{width:min(420px,92vw)!important;height:auto!important;max-height:88dvh!important;border-radius:16px!important;border:1px solid rgba(255,255,255,.12)!important;padding:16px 18px!important;margin:auto!important;overflow:auto;box-sizing:border-box;font-size:15px} body #ui .mback .modal.polfine h2{font-size:20px} @media (orientation:landscape) and (max-height:500px){ body #ui .mback .modal.polfine{max-height:92dvh!important;padding:10px 14px!important;font-size:13px} body #ui .mback .modal.polfine h2{font-size:17px} }'; document.head.appendChild(st); }
   b.addEventListener('pointerdown',e=>e.stopPropagation(),true); const btn=b.querySelector('#polPay'); btn.addEventListener('click',()=>polPay()); }
 function P_input_clear(){ if(typeof input!=='undefined') for(const k in input) input[k]=false; }
-function polPay(){ const c=POL.chase; if(!c) return; for(const o of c.offs) if(typeof OFF!=='undefined') OFF.add({type:o.type,amount:o.amount,reason:o.reason,police:true}); else truck.money-=o.amount;
+function polPay(){ const c=POL.chase; if(!c) return; let left=Math.max(0,Math.floor(truck.money||0)); for(const o of c.offs){ const amt=Math.min(o.amount,left); left-=amt; if(typeof OFF!=='undefined') OFF.add({type:o.type,amount:amt,reason:o.reason,police:true}); else truck.money-=amt; }
   closeUI(); const arrest=c.arrest; if(arrest){ polArrest(); polEndChase(false); } else { toast('\u2714 Fine paid \u2014 drive safely'); polEndChase(true); } }
 function polArrest(){ let st=null,bd=1e18; for(const s of polStations()){ const q=(s.x-truck.x)**2+(s.y-truck.y)**2; if(q<bd){ bd=q; st=s; } }
   const ov=document.createElement('div'); ov.id='polArrest'; ov.style.cssText='position:fixed;inset:0;z-index:90;background:#000;opacity:0;transition:opacity .9s;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font:700 18px system-ui;text-align:center;pointer-events:none';
@@ -123,16 +123,16 @@ function polDrawParked(vx0,vy0,vx1,vy1){ for(const s of polStations()){ if(s.rec
 const EMY={src:[],n:0};
 function emSources(){ const out=[]; const c=POL.chase; if(c&&!c.paying) out.push(c.v); if(typeof AMBU!=='undefined') for(const j of AMBU.jobs){ if(j.st==='go'&&j.v) out.push(j.v); else if(j.st==='pull'&&j.k) out.push(j.k); } return out; }
 function emInJ(v){ const tx=v.x/M_T, ty=v.y/M_T; for(const J of world.junctions||[]) if(tx>J.x-1&&tx<J.x+J.w+1&&ty>J.y-1&&ty<J.y+J.h+1) return true; return false; }
-function emYield(v,acc,dt){ if(v.role==='police'||v.role==='ambulance'){ if(v.amb&&v.amb.st==='go'){ v.ghostT=Math.max(v.ghostT||0,0.3); emShift(v,1.3,dt); } return acc; }
-  let y=false; for(const E of EMY.src){ const f=fwd(E.h), dx=v.x-E.x, dy=v.y-E.y, al=dx*f[0]+dy*f[1], lat=Math.abs(dx*f[1]-dy*f[0]); if(al>-4&&al<110&&lat<14){ y=true; break; } }
-  if(y&&emInJ(v)) y=false;   // never stop inside a junction box (no deadlocks): clear it first
+function emYield(v,acc,dt){ if(v.role==='police'||v.role==='ambulance'){ v.emResp=!!(v.amb&&v.amb.st==='go'); if(v.emResp){ v.ghostT=Math.max(v.ghostT||0,0.3); emShift(v,1.3,dt); } return acc; }
+  let y=false; for(const E of EMY.src){ const f=fwd(E.h), dx=v.x-E.x, dy=v.y-E.y, al=dx*f[0]+dy*f[1], lat=Math.abs(dx*f[1]-dy*f[0]), par=Math.abs(Math.cos((v.h||0)-(E.h||0))); if(par>0.7&&al>-4&&al<110&&lat<14){ y=true; break; } }
+  if(y&&(emInJ(v)||v.ring!=null||v.jHeld)) y=false;   // never stop inside a junction box (no deadlocks): clear it first
   if(y){ v.emY=timeS; EMY.n++; emShift(v,-1.4,dt); return Math.min(acc,-Math.max(1.5,v.v*1.2)); }
   if(v.emO) emShift(v,0,dt); return acc; }
 // lateral shift relative to heading (+ = right / centre line, - = left / kerb), eased; tracked separately from crash offsets
 function emShift(v,to,dt){ const cur=v.emO||0, nw=cur+(to-cur)*Math.min(1,dt*1.6), d=nw-cur, r=rgt(v.h||0); v.offX+=r[0]*d; v.offY+=r[1]*d; v.emO=Math.abs(nw)<0.02&&to===0?0:nw; if(v.emO===0){ v.offX-=r[0]*nw; v.offY-=r[1]*nw; } }
 setTimeout(()=>{ const ub=updateBreakdown; updateBreakdown=function(dt){ EMY.src=emSources(); return ub.apply(this,arguments); }; },0);
 // ---------- per-frame + drawing
-function updatePolice(dt){ if(!world.ready||typeof started!=='undefined'&&!started) return; polUpdatePatrols(dt); polUpdateChase(dt); polDetect(dt); wantUpdate(dt); }
+function updatePolice(dt){ if(!world.ready||typeof started!=='undefined'&&!started||(typeof uiBlocking==='function'&&uiBlocking())) return; polUpdatePatrols(dt); polUpdateChase(dt); polDetect(dt); wantUpdate(dt); }
 function drawPolice(vx0,vy0,vx1,vy1){ polDrawParked(vx0,vy0,vx1,vy1); for(const v of POL.cars) if(v.pol&&traffic.vs.includes(v)) emDrawBar(v,false,'police');
   if(POL.parkIn) for(const k of POL.parkIn) emBlit(k,'police'); const c=POL.chase; if(c){ emBlit(c.v,'police'); emDrawBar(c.v,true,'police'); } }
 function drawPoliceHUD(){ const c=POL.chase; if(!c||c.paying) return; const w=Math.min(VW-30,360), x=VW/2-w/2, y=VH*0.13, ph=(timeS*3)%1<0.5;
