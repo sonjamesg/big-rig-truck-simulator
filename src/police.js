@@ -6,7 +6,31 @@ const POL_FINES={speeding:100,redlight:100,pedestrian:500};
 const POL={cars:[],chase:null,spawnT:6+Math.random()*14,want:2,stopT:0,pend:[],arrest:false,lostT:0,inJ:null,prev:null,seen:new Set(),fade:0,log:[]};
 // ---------- shared emergency-vehicle art / audio / helpers (also used by ambulance.js)
 const EMV={arts:{}};
-function emArt(type){ if(EMV.arts[type]) return EMV.arts[type];
+// v29 detailed police vehicles (top-down, procedural): saloon / 4x4 SUV / Sprinter-style van, white with crisp blue+yellow battenburg,
+// glass, mirrors, roof POLICE lettering and a red/blue light bar
+const POL_T=['pol_car','pol_suv','pol_van'];
+function polArt(type){ if(EMV.arts[type]) return EMV.arts[type]; const D={pol_car:[4.8,1.86,1.15,1.9,0.9],pol_suv:[4.9,2.0,1.0,2.4,0.75],pol_van:[5.9,2.06,0.95,3.9,0.15]}[type];
+  const [L,W,bon,roofL,rear]=D, c=vCanvas(L,W), g=c.getContext('2d'), cx=c.width/2, X=m=>cx+m*VS, Y=m=>0.15*VS+m*VS;
+  g.fillStyle='#101010'; for(const fy of [0.55+0.15,L-1.25]) for(const sd of [-1,1]) rr(g,X(sd*W/2-(sd>0?0.16:0.06)),Y(fy),0.22*VS,0.68*VS,2), g.fill();      // tyres
+  g.fillStyle=grad(g,X(-W/2),X(W/2),'#f6f6f4'); rr(g,X(-W/2),Y(0),W*VS,L*VS,(type==='pol_van'?0.28:0.45)*VS); g.fill(); g.strokeStyle='rgba(0,0,0,0.55)'; g.lineWidth=1.2; g.stroke();
+  g.fillStyle='#2b2f35'; g.fillRect(X(-W/2+0.15),Y(0.02),(W-0.3)*VS,0.12*VS); g.fillRect(X(-W/2+0.15),Y(L-0.14),(W-0.3)*VS,0.12*VS);     // bumpers
+  g.fillStyle='#fff6c8'; for(const sd of [-1,1]) g.fillRect(X(sd*(W/2-0.38)-0.16),Y(0.05),0.32*VS,0.1*VS); g.fillStyle='#d0222a'; for(const sd of [-1,1]) g.fillRect(X(sd*(W/2-0.34)-0.14),Y(L-0.13),0.28*VS,0.09*VS);   // lamps
+  const ws=bon, r0=ws+0.55, r1=r0+roofL;
+  g.fillStyle='#16202b'; g.beginPath(); g.moveTo(X(-W/2+0.2),Y(r0)); g.lineTo(X(-W/2+0.32),Y(ws)); g.lineTo(X(W/2-0.32),Y(ws)); g.lineTo(X(W/2-0.2),Y(r0)); g.closePath(); g.fill();   // windscreen
+  g.fillStyle='rgba(170,210,240,0.35)'; g.beginPath(); g.moveTo(X(-W/2+0.4),Y(ws+0.08)); g.lineTo(X(W/2-0.5),Y(ws+0.08)); g.lineTo(X(W/2-0.7),Y(ws+0.25)); g.lineTo(X(-W/2+0.45),Y(ws+0.25)); g.fill();
+  g.fillStyle='#1e2833'; for(const sd of [-1,1]) g.fillRect(sd<0?X(-W/2+0.06):X(W/2-0.2),Y(r0+0.05),0.14*VS,(type==='pol_van'?1.0:roofL-0.1)*VS);   // side glass
+  if(rear>0.3){ g.fillStyle='#16202b'; g.beginPath(); g.moveTo(X(-W/2+0.22),Y(r1)); g.lineTo(X(W/2-0.22),Y(r1)); g.lineTo(X(W/2-0.34),Y(r1+rear*0.55)); g.lineTo(X(-W/2+0.34),Y(r1+rear*0.55)); g.fill(); }
+  g.fillStyle='#f2f2ef'; rr(g,X(-W/2+0.22),Y(r0),(W-0.44)*VS,(roofL)*VS,3); g.fill(); g.strokeStyle='rgba(0,0,0,0.18)'; g.stroke();          // roof
+  g.fillStyle='#2b2f35'; for(const sd of [-1,1]){ g.beginPath(); g.ellipse(X(sd*(W/2+0.07)),Y(ws+0.25),0.13*VS,0.09*VS,0,0,7); g.fill(); }    // mirrors
+  // battenburg: two rows of crisp blue/yellow checks along each flank (below the glass line)
+  const cs=0.42, y0=type==='pol_van'?0.35:0.3, n=Math.floor((L-y0-0.25)/cs);
+  for(let k=0;k<n;k++) for(const sd of [-1,1]) for(let row=0;row<2;row++){ g.fillStyle=((k+row)%2)?'#1d4fbf':'#f2e600'; const xx=sd<0?X(-W/2+0.02+row*0.11):X(W/2-0.13-row*0.11); g.fillRect(xx,Y(y0+k*cs),0.11*VS,cs*VS+0.4); }
+  g.fillStyle='#1d4fbf'; g.fillRect(X(-W/2+0.22),Y(0.32),(W-0.44)*VS,0.07*VS);
+  g.save(); g.translate(X(0),Y(r0+roofL*0.62)); g.rotate(Math.PI); g.fillStyle='#14204a'; g.font='900 '+Math.round(0.4*VS)+'px Arial Black,Arial'; g.textAlign='center'; g.textBaseline='middle'; g.fillText('POLICE',0,0); g.restore();
+  if(type==='pol_van'){ g.strokeStyle='rgba(0,0,0,0.2)'; g.lineWidth=1; for(let k=1;k<4;k++){ g.beginPath(); g.moveTo(X(-W/2+0.3),Y(r0+k*roofL/4)); g.lineTo(X(W/2-0.3),Y(r0+k*roofL/4)); g.stroke(); } }
+  const by=r0+0.12; g.fillStyle='#1a1a1a'; rr(g,X(-W/2+0.3),Y(by),(W-0.6)*VS,0.3*VS,2); g.fill(); g.fillStyle='#7a1d22'; g.fillRect(X(-W/2+0.36),Y(by)+2,(W/2-0.42)*VS,0.3*VS-4); g.fillStyle='#1f3a8a'; g.fillRect(X(0.06),Y(by)+2,(W/2-0.42)*VS,0.3*VS-4);
+  const a={body:{c,sh:shadowOf(c)},L,W,kind:type==='pol_van'?'van':'estate',bar:L/2-by-0.15,rb:true}; return EMV.arts[type]=a; }
+function emArt(type){ if(EMV.arts[type]) return EMV.arts[type]; if(type==='police') return polArt('pol_car'); if(POL_T.includes(type)) return polArt(type);
   const kind=type==='police'?'estate':'van', t=VTYPES[kind], base=type==='police'?makeCarArt('estate','#f4f4f4'):makeVanArt('#f7f7f2',''), c=mkCanvas(base.width,base.height), g=c.getContext('2d'); g.drawImage(base,0,0);
   const cx=c.width/2, y0=0.15*VS, X=m=>cx+m*VS, Y=m=>y0+m*VS, W=t.W, L=t.L, A=type==='police'?['#1d4fbf','#f2e600']:['#2e9e3e','#f2e600'];
   // battenburg checks along both flanks
@@ -16,11 +40,12 @@ function emArt(type){ if(EMV.arts[type]) return EMV.arts[type];
   // light bar (unlit)
   const by=type==='police'?L*0.42:0.95; g.fillStyle='#222'; g.fillRect(X(-W/2+0.3),Y(by),(W-0.6)*VS,0.3*VS); g.fillStyle='#3a58a8'; g.fillRect(X(-W/2+0.35),Y(by)+2,(W/2-0.4)*VS,0.3*VS-4); g.fillRect(X(0.05),Y(by)+2,(W/2-0.4)*VS,0.3*VS-4);
   const a={body:{c,sh:shadowOf(c)},L,W,kind,bar:L/2-by-0.15}; return EMV.arts[type]=a; }
-function emDrawBar(v,on,type){ const a=emArt(type), f=fwd(v.h), r=rgt(v.h), off=a.bar, cx=v.x+f[0]*off, cy=v.y+f[1]*off; if(!on) return;
-  const ph=(timeS*4)%1<0.5; for(const s of [-1,1]){ const lit=(s<0)===ph; if(!lit) continue; const x=cx+r[0]*s*a.W*0.25, y=cy+r[1]*s*a.W*0.25;
+function emDrawBar(v,on,type){ if(type==='police'&&v.polT) type=v.polT; const a=emArt(type), f=fwd(v.h), r=rgt(v.h), off=a.bar, cx=v.x+f[0]*off, cy=v.y+f[1]*off; if(!on) return;
+  const ph=(timeS*4)%1<0.5; for(const s of [-1,1]){ const lit=(s<0)===ph; if(!lit) continue; const x=cx+r[0]*s*a.W*0.25, y=cy+r[1]*s*a.W*0.25, red=a.rb&&s<0;
+    if(red){ ctx.fillStyle='rgba(255,60,60,0.95)'; ctx.beginPath(); ctx.arc(x*PPM,y*PPM,4.5,0,7); ctx.fill(); ctx.fillStyle='rgba(255,40,40,0.25)'; ctx.beginPath(); ctx.arc(x*PPM,y*PPM,16,0,7); ctx.fill(); if(typeof dnLight==='function') dnLight(x*PPM,y*PPM,90,'rgba(255,40,40,1)',0.9); continue; }
     ctx.fillStyle='rgba(120,170,255,0.95)'; ctx.beginPath(); ctx.arc(x*PPM,y*PPM,4.5,0,7); ctx.fill(); ctx.fillStyle='rgba(80,140,255,0.25)'; ctx.beginPath(); ctx.arc(x*PPM,y*PPM,16,0,7); ctx.fill();
     if(typeof dnLight==='function') dnLight(x*PPM,y*PPM,90,'rgba(60,120,255,1)',0.9); } }
-function emBlit(v,type){ const a=emArt(type); blitV(a.body.sh,v.x,v.y,v.h,a.L,a.W,4,4); blitV(a.body.c,v.x,v.y,v.h,a.L,a.W,0,0); }
+function emBlit(v,type){ if(type==='police'&&v.polT) type=v.polT; const a=emArt(type); blitV(a.body.sh,v.x,v.y,v.h,a.L,a.W,4,4); blitV(a.body.c,v.x,v.y,v.h,a.L,a.W,0,0); }
 function emSiren(){ try{ const c=audio.ctx; if(!c||!audio.master) return null; const o=c.createOscillator(), l=c.createOscillator(), lg=c.createGain(), g=c.createGain(), f=c.createBiquadFilter();
     o.type='sawtooth'; o.frequency.value=810; l.type='square'; l.frequency.value=0.85; lg.gain.value=120; l.connect(lg); lg.connect(o.frequency); f.type='lowpass'; f.frequency.value=2200; o.connect(f); f.connect(g); g.gain.value=0; g.connect(audio.master); o.start(); l.start();
     return {g,stop(){ try{ g.gain.setTargetAtTime(0,c.currentTime,0.05); setTimeout(()=>{ try{ o.stop(); l.stop(); g.disconnect(); }catch(e){} },400); }catch(e){} }, set(v){ try{ g.gain.setTargetAtTime(v,c.currentTime,0.08); }catch(e){} }}; }catch(e){ return null; } }
@@ -36,7 +61,7 @@ function emToTraffic(x,y,role){ const s=navSnap(x/M_T,y/M_T,10); if(!s) return n
 const onView=(x,y)=>typeof onScreen==='function'&&onScreen(x,y,-2);
 // ---------- patrols
 function polStations(){ return typeof SVC!=='undefined'?SVC.byType.police:[]; }
-function polMake(v,st){ v.role='police'; v.art={body:emArt('police').body}; v.pol={st,end:timeS+90+Math.random()*480,home:false}; POL.cars.push(v); return v; }
+function polMake(v,st){ v.role='police'; v.polT=v.polT||POL_T[(Math.random()*3)|0]; v.art={body:emArt(v.polT).body}; v.pol={st,end:timeS+90+Math.random()*480,home:false}; POL.cars.push(v); return v; }
 // GTA2-style: patrols appear on roads just out of view (1-1.5 screens), biased ahead of the truck
 function polViewR(){ const v=viewRectM(); return Math.max(v[2]-v[0],v[3]-v[1])/2; }
 function polSpawn(){ const P=truck, R=polViewR(), f=fwd(P.h), mv=Math.abs(P.v)>3;
@@ -61,7 +86,7 @@ function polOffence(type,v,reason){ const c=POL.chase; if(c&&c.offs.some(o=>o.ty
 function polStartChase(v){ if(!v) return; const i=traffic.vs.indexOf(v); if(i>=0){ releaseJ(v); traffic.vs.splice(i,1); }
   POL.chase={v,offs:[],arrest:false,t:0,siren:emSiren(),sp:Math.abs(v.v||8)}; POL.stopT=0; POL.lostT=0; }
 function polEndChase(back){ const c=POL.chase; if(!c) return; if(c.siren) c.siren.stop(); POL.chase=null; POL.stopT=0;
-  if(back){ const nv=emToTraffic(c.v.x,c.v.y,'police'); if(nv){ polMake(nv,c.v.pol&&c.v.pol.st); nv.pol.end=timeS+60+Math.random()*300; } } }
+  if(back){ const nv=emToTraffic(c.v.x,c.v.y,'police'); if(nv){ nv.polT=c.v.polT; polMake(nv,c.v.pol&&c.v.pol.st); nv.pol.end=timeS+60+Math.random()*300; } } }
 function polDetect(dt){ if(POL.chase&&POL.chase.paying) return; const P=truck, mph=Math.abs(P.v)*(typeof MPH!=='undefined'?MPH:2.237), lim=(typeof SPL!=='undefined'&&SPL.cur)||30;
   // speeding past a police car
   if(mph>lim*1.1+2) for(const v of polCanSee()){ if(Math.hypot(v.x-P.x,v.y-P.y)<40){ polOffence('speeding',v,Math.round(mph)+' mph in a '+lim+' zone'); break; } }
@@ -120,7 +145,7 @@ function polPark(st){ polEndMission(); const pk=st.parts.park, x=(pk.x+pk.w/2)*M
 addEventListener('keydown',e=>{ if(typeof career!=='undefined'&&career.uiOpen==='police'&&(e.key==='Enter'||e.key===' ')){ e.preventDefault(); const b=document.getElementById('polPay'); if(b) b.click(); } });
 // ---------- parked cars in station bays (static decoration, cheap)
 function polDrawParked(vx0,vy0,vx1,vy1){ for(const s of polStations()){ if(s.rect.x1*PPM<vx0||s.rect.x0*PPM>vx1||s.rect.y1*PPM<vy0||s.rect.y0*PPM>vy1) continue;
-    s.bays.forEach((b,i)=>{ if((i*7+s.tx)%3) return; emBlit({x:b.x,y:b.y,h:b.h},'police'); }); } }
+    s.bays.forEach((b,i)=>{ if((i*7+s.tx)%3) return; emBlit({x:b.x,y:b.y,h:b.h,polT:POL_T[(i+s.tx)%3===2?1:0]},'police'); }); } }
 
 // ---------- v29 blue-light yield: traffic ahead (both directions) slows, pulls to its kerb and stops; the emergency vehicle takes the centre
 const EMY={src:[],n:0};
