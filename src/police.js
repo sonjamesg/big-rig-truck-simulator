@@ -112,7 +112,7 @@ function drawWantedHUD(){ if(!WANT.lvl) return; const x=VW-34, y=VH*0.13+70, fl=
   ctx.fillStyle=fl?'#ffd21e':'rgba(255,210,30,0.35)'; ctx.strokeStyle='#000'; ctx.lineWidth=3; ctx.stroke(); ctx.fill();
   ctx.fillStyle='#fff'; ctx.strokeStyle='#000'; ctx.lineWidth=3; ctx.font='bold 13px system-ui,sans-serif'; ctx.textAlign='center'; const tx=POL.chase?'CHASE':'WANTED '+Math.ceil(WANT.t)+'s'; ctx.strokeText(tx,0,32); ctx.fillText(tx,0,32); ctx.restore(); }
 function polMapDots(px,py){ const ph=(timeS*4)%1<0.5, L=POL.cars.filter(v=>v.pol&&(v.pol.search||WANT.lvl)&&traffic.vs.includes(v)).map(v=>v); if(POL.chase) L.push(POL.chase.v);
-  for(const v of L){ const X=px(v.x),Y=py(v.y); ctx.fillStyle=ph?'#ff2030':'#2a5bff'; ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(X,Y,4.5,0,7); ctx.fill(); ctx.stroke(); } }
+  for(const v of L){ const X=px(v.x),Y=py(v.y); const R=(typeof bigmap!=='undefined'&&bigmap.open)?8:5; ctx.fillStyle=ph?'rgba(255,32,48,0.35)':'rgba(42,91,255,0.35)'; ctx.beginPath(); ctx.arc(X,Y,R*2,0,7); ctx.fill(); ctx.fillStyle=ph?'#ff2030':'#2a5bff'; ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(X,Y,R,0,7); ctx.fill(); ctx.stroke(); } }
 // ---------- chase
 function polUpdateChase(dt){ const c=POL.chase; if(!c) return; const v=c.v, P=truck; c.t+=dt;
   const back=P.trl?20:9, f=fwd(P.trl?P.th:P.h), tx=(P.trl?P.trl.x:P.x)-f[0]*back, ty=(P.trl?P.trl.y:P.y)-f[1]*back, dx=tx-v.x, dy=ty-v.y, d=Math.hypot(dx,dy), dP=Math.hypot(P.x-v.x,P.y-v.y);
