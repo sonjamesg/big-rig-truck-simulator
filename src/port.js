@@ -384,12 +384,15 @@ function updatePortLogistics(P,dt,t){ const ships=portShips(P,t); portShipHold(P
     for(const tr of P.tracs){ if(tr.task||tr.box||tr.z!==(c.role==='A'?'I':'E')) continue; const L=tr.L, d=loopFwd(L,tr.s,loopStop(L,c.role==='A'?c.tv:P.expC,c.role==='B',tr.s)); if(d<bd){ bd=d; best=tr; } }
     if(best){ best.task={k:c.role==='A'?'imp':'exp',crane:c}; c.trac=best; if(c.role==='B'){ P.ex--; P.exRes++; best.task.need=1; } } }
   // ---- tractor movement on the one-way loop (keep 4.6 tiles behind the one ahead)
-  const TR=P.tracs; for(const tr of TR){ let tgt=null, k=tr.task&&tr.task.k; const L=tr.L;
+  const TR=P.tracs; { const need=new Set(); for(let it=0;it<TR.length;it++){ let ch=false; for(const tr of TR){ if(tr.task||tr.box||need.has(tr)) continue; const L=tr.L;
+      for(const o of TR){ if(o===tr||o.L!==L) continue; const g=loopFwd(L,o.s,tr.s); if(g<0.01) continue; if((o.task&&o.stop!=null&&g<loopFwd(L,o.s,o.stop)+5)||(need.has(o)&&g<6.5)){ need.add(tr); ch=true; break; } } } if(!ch) break; }
+    for(const tr of TR) tr._need=need.has(tr); }
+  for(const tr of TR){ let tgt=null, k=tr.task&&tr.task.k; const L=tr.L;
     if(k==='imp') tgt=loopStop(L,tr.task.crane.tv,false,tr.s);
     else if(k==='exp') tgt=tr.task.need?loopStop(L,P.expC,true):loopStop(L,tr.task.crane.tv,false,tr.s);
     else if(k==='toImp') tgt=loopStop(L,P.impC,true); else if(k==='retExp') tgt=loopStop(L,P.expC,true);
     else if(!tr.box){ // v41: no job -> park in the waiting bay at the end of the quay lane instead of circling; only roll on to let a working tractor past
-      const W=(L.lLen-3)%L.lLen; let need=false; for(const o of TR) if(o!==tr&&o.L===L&&o.task){ const g=loopFwd(L,o.s,tr.s); if(g>0.01&&(g<7||(o.stop!=null&&g<loopFwd(L,o.s,o.stop)+5))) need=true; } /* v42: clear the way for any working tractor whose path runs through this spot */ tgt=need?null:(loopFwd(L,tr.s,W)<L.lLen-0.5?W:tr.s); tr.waiting=!need; }
+      const W=(L.lLen-3)%L.lLen; let need=tr._need; /* v42: clear the way for working tractors (propagated along chains of parked ones) */ tgt=need?null:(loopFwd(L,tr.s,W)<L.lLen-0.5?W:tr.s); tr.waiting=!need; }
     tr.stop=tgt; const dist=tgt==null?1e9:loopFwd(L,tr.s,tgt); let gap=1e9; for(const o of TR) if(o!==tr&&o.L===L){ const g=loopFwd(L,tr.s,o.s); if(g>0.01&&g<gap) gap=g; }
     const tq=loopPos(L,tr.s), pa=portPlayerAhead(P,tq[0],tq[1],tq[2],6); tr.yield=pa<6; const vmax=tgt==null?1.6:Math.min(6,0.3+dist*1.0), mv=Math.max(0,Math.min(vmax*dt,dist<0.04?0:dist,gap-4.6,tr.yield?Math.max(0,(pa-2.6)*dt):1e9)); tr.atStop=dist<0.05;
     tr.s=(tr.s+mv)%L.lLen; tr.mv=mv/dt; { const a=loopPos(L,tr.s+0.6), b=loopPos(L,tr.s-0.2), h=loopPos(L,tr.s); tr.h=Math.atan2(a[1]-b[1],a[0]-b[0]); tr.th=tr.h; } if(mv>0.001||!tr.task||tr.atStop) tr.still=0; else tr.still+=dt;
