@@ -11,7 +11,8 @@ function updateDayNight(dt,run){ if(run){ gameT+=dt*24/DAY_LEN; if(gameT>=24){ g
   if(typeof MP!=='undefined'&&MP.on&&MP.host){ DN.sendT-=dt; if(DN.sendT<=0){ DN.sendT=5; try{ mpSendAll({t:'clock',g:gameT,d:gameDay,w:WX.st,wt:WX.timer}); }catch(e){} } } }
 function dnClock(){ const m=Math.floor(gameT*60)%1440; return String((m/60)|0).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
 function dnSprite(r,stops){ const c=document.createElement('canvas'); c.width=c.height=r*2; const g=c.getContext('2d'), gr=g.createRadialGradient(r,r,0,r,r,r); for(const [o,col] of stops) gr.addColorStop(o,col); g.fillStyle=gr; g.fillRect(0,0,r*2,r*2); return c; }
-function dnGlow(col){ return DN.glow[col]||(DN.glow[col]=dnSprite(32,[[0,col],[0.35,col.replace(/[\d.]+\)$/,'0.35)')],[1,col.replace(/[\d.]+\)$/,'0)')]])); }
+function dnRGBA(c){ if(typeof c!=='string'||c[0]!=='#') return c; let h=c.slice(1); if(h.length===3) h=h.replace(/./g,'$&$&'); const n=parseInt(h.slice(0,6),16); return 'rgba('+(n>>16&255)+','+(n>>8&255)+','+(n&255)+',1)'; }
+function dnGlow(c0){ const col=dnRGBA(c0); return DN.glow[c0]||(DN.glow[c0]=dnSprite(32,[[0,col],[0.35,col.replace(/[\d.]+\)$/,'0.35)')],[1,col.replace(/[\d.]+\)$/,'0)')]])); }
 function dnBuild(){ if(DN.grid) return; const G=new Map(), C=DN.cell; const add=(x,y,r,k,o)=>{ const key=((x/C)|0)+','+((y/C)|0); let a=G.get(key); if(!a) G.set(key,a=[]); a.push(Object.assign({x,y,r,k},o||{})); };
   for(const l of slBuild()) add(l.x,l.y,l.r,'st',{l});
   let s=7; const rnd=()=>{ s=(s*16807)%2147483647; return s/2147483647; };

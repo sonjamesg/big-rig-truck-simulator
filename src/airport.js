@@ -18,28 +18,28 @@ function apBuild(A){
   A.loop=apCR(AP_LOOP.map(p=>apT(A,p[0],p[1])),true,1);
   A.links=[-120,0,120].map(u=>[apT(A,u,-30),apT(A,u,34)]);
   // dispersals: north-west, south-west, east (HAS pads), each with a spur to the loop
-  A.has=[]; for(const u of [-182,-162,-142]) A.has.push({u,v:-48,side:-1}); for(const u of [-178,-156]) A.has.push({u,v:52,side:1}); for(const u of [150,172]) A.has.push({u,v:52,side:1});
+  A.has=[]; for(const u of [-182,-162,-142]) A.has.push({u,v:-48,side:-1}); for(const u of [-178,-156]) A.has.push({u,v:52,side:1}); for(const u of [176,196]) A.has.push({u,v:50,side:1});
   for(const h of A.has){ h.p=apT(A,h.u,h.v); h.q=apT(A,h.u,h.side*(h.side<0?31:35)); h.a=Math.atan2(h.q[1]-h.p[1],h.q[0]-h.p[0]); }
   // civil apron + stands (nose-in to the terminal, south), military apron + Type C hangars
   A.civ={x0:360,y0:582,x1:452,y1:640,lane:589}; A.civLink=[apT(A,0,34),[405,A.civ.lane,0]];
   A.stands=[0,1,2].map(k=>({k,x:376+k*28,big:true,sc:k===1?8.6:7.6,ph:k*87,col:['#c0392b','#1f4e9c','#117a65'][k],tail:['#e74c3c','#f1c40f','#16a085'][k]}));
-  A.mil={x0:468,y0:552,x1:604,y1:596}; A.milLink=[apT(A,120,34)];
-  A.hang=[0,1,2,3].map(k=>({x0:472+k*33,y0:600,x1:500+k*33,y1:618,k}));
-  A.fire={x0:296,y0:586,x1:322,y1:600}; A.tower=[338,596]; A.fuel={x0:612,y0:552,x1:632,y1:576};
+  A.mil={x0:468,y0:566,x1:590,y1:608}; A.milLink=[apT(A,120,34)];
+  A.hang=[0,1,2,3].map(k=>({x0:472+k*30,y0:614,x1:498+k*30,y1:632,k}));
+  A.fire={x0:290,y0:600,x1:316,y1:614}; A.tower=[338,600]; A.fuel={x0:592,y0:584,x1:614,y1:610};
   A.fighters=A.has.map((h,i)=>({h,i,ph:i*53,col:'#8e9aa4'}));
   // fence gaps where roads cross the perimeter
   const T_=TILE, gates=[]; const scan=(fx,fy,len,dx,dy)=>{ let run=null; for(let i=0;i<=len;i++){ const x=fx+dx*i, y=fy+dy*i, rd=inb(x,y)&&G[idx(x,y)]===T.ROAD;
       if(rd&&!run) run={i0:i}; if((!rd||i===len)&&run){ gates.push({x:fx+dx*(run.i0+i)/2,y:fy+dy*(run.i0+i)/2,w:i-run.i0,dx,dy}); run=null; } } };
   scan(A.x0,A.y0,A.x1-A.x0,1,0); scan(A.x0,A.y0,A.y1-A.y0,0,1); scan(A.x1,A.y0,A.y1-A.y0,0,1); scan(A.x0,A.y1,A.term.x0-A.x0,1,0); scan(A.term.x1,A.y1,A.x1-A.term.x1,1,0);
-  A.gates=gates.filter(g=>g.w>=2);
+  A.gates=gates.filter(g=>g.w>=2); if(!A.gates.length) A.gates.push({x:586,y:A.y1,w:3,dx:1,dy:0,svc:1});   // airside service gate on the south fence
   A.posts=[]; const edge=(x0,y0,x1,y1)=>{ const L=Math.hypot(x1-x0,y1-y0); for(let s=0;s<=L;s+=16){ const x=x0+(x1-x0)*s/L, y=y0+(y1-y0)*s/L; if(A.gates.some(g=>Math.hypot(g.x-x,g.y-y)<g.w/2+3)) continue; A.posts.push([x,y]); } };
   A.segs=[[A.x0,A.y0,A.x1,A.y0],[A.x0,A.y0,A.x0,A.y1],[A.x1,A.y0,A.x1,A.y1],[A.x0,A.y1,A.term.x0,A.y1],[A.term.x1,A.y1,A.x1,A.y1]]; for(const s of A.segs) edge(...s);
   const tb=A.term; for(const o of world.objects){ if(!/^(tree|bush|scrub|rock|hedge|cactus)$/.test(o.kind)) continue; const x=o.x/T_, y=o.y/T_;
     if(x>A.x0&&x<A.x1&&y>A.y0&&y<A.y1+2) o._dead=1; if(x>tb.x0-12&&x<tb.x1+2&&y>tb.y0-2&&y<tb.y1+32) o._dead=1; }
   // aircraft paths (tiles)
   const S0=[A.civ.lane];
-  A.pIn=A.stands.map(st=>{ const sy=A.civ.y1-1.5-30*st.sc/32; st.sy=sy; return apSm(A,[[-150,0],[100,0],[124,10],[130,30],[140,34],[60,34],[0,34],[405,566,0],[405,A.civ.lane,0],[st.x+4,A.civ.lane,0],[st.x,A.civ.lane+5,0],[st.x,sy,0]]); });
-  A.pOut=A.stands.map(st=>apSm(A,[[st.x,A.civ.lane,0],[st.x-4,A.civ.lane,0],[409,A.civ.lane,0],[405,A.civ.lane-6,0],[405,566,0],[0,34],[-140,34],[-194,28],[-200,6],[-196,0],[-190,0]]));
+  A.pIn=A.stands.map(st=>{ const sy=A.civ.y1-1.5-30*st.sc/32; st.sy=sy; return apSm(A,[[-150,0],[100,0],[124,10],[130,30],[140,34],[60,34],[0,34],[405,573,0],[405,A.civ.lane,0],[st.x+4,A.civ.lane,0],[st.x,A.civ.lane+5,0],[st.x,sy,0]]); });
+  A.pOut=A.stands.map(st=>apSm(A,[[st.x,A.civ.lane,0],[st.x-4,A.civ.lane,0],[409,A.civ.lane,0],[405,A.civ.lane-6,0],[405,573,0],[0,34],[-140,34],[-194,28],[-200,6],[-196,0],[-190,0]]));
   for(const f of A.fighters){ const h=f.h, out=[[h.p[0],h.p[1],0],[h.q[0],h.q[1],0]], inn=[]; 
     if(h.v<0){ out.push([-194,-24],[-200,-6],[-196,0],[-190,0]); inn.push([100,0],[150,0],[176,-10],[194,-24],[140,-30],[h.u+8,-30]); }
     else if(h.u<0){ out.push([-194,28],[-200,6],[-196,0],[-190,0]); inn.push([100,0],[124,10],[140,34],[0,34],[-140,34],[h.u+8,34]); }
@@ -106,7 +106,7 @@ function apDrawLow(vx0,vy0,vx1,vy1){ const A=apA(); if(!A) return; const T_=TILE
   g.fillStyle=CON; apRR(g,(A.mil.x0)*T_,(A.mil.y1-2)*T_,(A.mil.x1)*T_,(A.hang[0].y0+2)*T_,2*T_); g.fill();
   for(const h of A.has){ g.save(); g.translate(h.p[0]*T_,h.p[1]*T_); g.rotate(h.a); g.fillStyle=CON; apRR(g,-8*T_,-7*T_,8*T_,7*T_,3*T_); g.fill(); g.restore(); apStroke(g,[h.p,h.q],3.2*T_,PAVE,T_); }
   apStroke(g,A.loop.concat([A.loop[0]]),4*T_,PAVE,T_); for(const [a,b] of A.links) apStroke(g,[a,b],3.6*T_,PAVE,T_);
-  apStroke(g,[A.civLink[0],[405,566],[405,A.civ.lane]],3.6*T_,PAVE,T_); apStroke(g,[A.milLink[0],[A.milLink[0][0],A.mil.y0+2]],3.6*T_,PAVE,T_);
+  apStroke(g,[A.civLink[0],[405,573],[405,A.civ.lane]],3.6*T_,PAVE,T_); apStroke(g,[A.milLink[0],[A.milLink[0][0],A.mil.y0+2]],3.6*T_,PAVE,T_);
   apStroke(g,[apT(A,-120,0),apT(A,-20,0)],0,PAVE,T_);
   // true kerb fillets at every join: square-minus-quarter-circle pieces in both inside corners
   g.fillStyle=PAVE; const n=v=>{ const l=Math.hypot(v[0],v[1])||1; return [v[0]/l,v[1]/l]; };
@@ -134,7 +134,7 @@ function apDrawLow(vx0,vy0,vx1,vy1){ const A=apA(); if(!A) return; const T_=TILE
       if(night>0.05&&typeof dnLight==='function'){ const q=apT(A,(u/T_),0); const blink=((timeS*2-k*0.1)%1)<0.15; dnLight(q[0]*T_,q[1]*T_,blink?60:30,'rgba(255,250,220,0.95)',blink?1:0.6); } } }
   g.restore();
   // taxiway centrelines (yellow) + blue edge dots at night
-  const yel=(pts)=>apStroke(g,pts,0.22*T_,'#e8b923',T_); yel(A.loop.concat([A.loop[0]])); for(const [a,b] of A.links) yel([a,b]); yel([A.civLink[0],[405,566],[405,A.civ.lane]]); for(const h of A.has) yel([h.p,h.q]);
+  const yel=(pts)=>apStroke(g,pts,0.22*T_,'#e8b923',T_); yel(A.loop.concat([A.loop[0]])); for(const [a,b] of A.links) yel([a,b]); yel([A.civLink[0],[405,573],[405,A.civ.lane]]); for(const h of A.has) yel([h.p,h.q]);
   yel([[A.civ.x0+3,A.civ.lane],[A.civ.x1-3,A.civ.lane]]); for(const st of A.stands){ yel([[st.x,A.civ.lane],[st.x,A.civ.y1-2]]); const ny=st.sy+30*st.sc/32; g.fillStyle='#e8b923'; g.fillRect((st.x-2.2)*T_,(ny+0.2)*T_,4.4*T_,0.45*T_); g.fillStyle='#f0f0f0'; g.fillRect((st.x-1.4)*T_,(ny-1.6)*T_,2.8*T_,0.3*T_); g.font='bold 22px sans-serif'; g.fillStyle='#e8b923'; g.fillText('STOP',(st.x+2.6)*T_,(ny+0.8)*T_); }
   // holding points
   g.fillStyle='#e8b923'; for(const [a,b] of A.links) for(const p of [a,b]){ const q=[p[0]+(apT(A,0,0)[0]-p[0])*0.0,p[1]]; }
@@ -161,7 +161,7 @@ function apDrawLow(vx0,vy0,vx1,vy1){ const A=apA(); if(!A) return; const T_=TILE
   // landside forecourt: drop-off loop, multi-storey + surface car parks
   apLandside(A,night);
   // parked/static military: fighters on the apron + one in hangar C2's doorway, a fuel bowser, tugs
-  for(let k=0;k<4;k++){ const x=(A.mil.x0+16+k*32)*T_, y=(A.mil.y0+14)*T_; apDrawFighter({col:'#8e9aa4'},{x:x/T_,y:y/T_,h:Math.PI/2,alt:0,ph:'has'}); apVeh(g,x+70,y+40,0,'mil'); }
+  for(let k=0;k<3;k++){ const x=(A.mil.x0+16+k*32)*T_, y=(A.mil.y0+14)*T_; apDrawFighter({col:'#8e9aa4'},{x:x/T_,y:y/T_,h:Math.PI/2,alt:0,ph:'has'}); apVeh(g,x+70,y+40,0,'mil'); }
   apDrawFighter({col:'#7d8a95'},{x:A.hang[1].x0+14,y:A.hang[1].y0+3,h:-Math.PI/2,alt:0,ph:'has'});
   // aircraft on the ground
   for(const st of A.stands){ const p=apCivil(A,st,timeS); if(p&&p.alt<=0.05&&vis(p.x,p.y,900)){ apDrawCivil(st,p); if(p.ph==='park') apService(st,p,p.x*T_,p.y*T_); if(p.ph==='push') apVeh(g,p.x*T_,(p.y+33*st.sc/32)*T_,Math.PI/2,'push'); }
@@ -199,5 +199,5 @@ setTimeout(()=>{
   if(typeof drawPlanes==='function'){ const d=drawPlanes; drawPlanes=function(v){ const r=d.apply(this,arguments); try{ apDrawHigh(); }catch(err){ APX.err2=String(err); } return r; }; }
   if(typeof siteLights==='function'){ const sl=siteLights; siteLights=function(add){ sl.apply(this,arguments); const A=apA(); if(!A) return; const T_=TILE;
     A.posts.forEach(([x,y],i)=>{ if(i%2===0) add(x*T_,y*T_,170,'fl'); }); for(const q of A.gates) add(q.x*T_,q.y*T_,240,'fl');
-    for(const st of A.stands) add(st.x*T_,(A.civ.y1-12)*T_,320,'fl'); for(let k=0;k<4;k++) add((A.mil.x0+16+k*32)*T_,(A.mil.y0+10)*T_,300,'fl'); }; }
+    for(const st of A.stands) add(st.x*T_,(A.civ.y1-12)*T_,320,'fl'); for(let k=0;k<3;k++) add((A.mil.x0+16+k*32)*T_,(A.mil.y0+10)*T_,300,'fl'); }; }
 },0);

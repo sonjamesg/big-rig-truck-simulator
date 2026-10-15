@@ -586,8 +586,11 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
   airport('Albion Airport',160,470,640,660,[],null);
   // v34 Albion: landside terminal block straddling the main line (station inside), concourse forecourt south of it
   for(let y=505;y<694;y++) for(let x=190;x<600;x++){ if(y>=640&&(x<345||x>=525)) continue;{ const t=G[idx(x,y)]; if(t!==T.ROAD&&t!==T.WATER&&t!==T.BRIDGE&&t!==T.WALK) set(x,y,(y>=648&&y<=678)?T.GRAVEL:T.CONC); } }
+  for(let y=462;y<662;y++) for(let x=619;x<648;x++) if(G[idx(x,y)]===T.CONC) set(x,y,T.GRASS);   // v37: fence now at x=618; old apron strip outside it returns to grass
+  for(let y=640;y<720;y++) for(let x=345;x<525;x++){ const i=idx(x,y); if(water[i]||G[i]===T.WATER){ water[i]=0; set(x,y,(y>=648&&y<=678)?T.GRAVEL:T.CONC); } }   // v37: old pond under the terminal/landside is filled in (layout wins)
   for(let y=688;y<719;y++) for(let x=350;x<446;x++){ const t=G[idx(x,y)]; if(t!==T.ROAD&&t!==T.WATER&&t!==T.BRIDGE&&!water[idx(x,y)]) set(x,y,T.CONC); }
-  world.airports[world.airports.length-1].albion={x0:160,y0:470,x1:640,y1:640,term:{x0:360,x1:510,y0:640,y1:688},rwC:[400,522],rwA:-9*Math.PI/180,rwL:400,rwW:10.4};
+  world.airports[world.airports.length-1].albion={x0:160,y0:470,x1:618,y1:640,term:{x0:360,x1:510,y0:640,y1:688},rwC:[400,534],rwA:-9*Math.PI/180,rwL:400,rwW:10.4};
+  { const R_=world.reserved; for(let y=466;y<720;y++) for(let x=158;x<644;x++){ if(y>=642&&(x<345||x>=525)) continue; if(G[idx(x,y)]!==T.ROAD&&G[idx(x,y)]!==T.BRIDGE) R_[idx(x,y)]=1; } }   // v37: the Albion airport footprint is off-limits to later depots/shops/services (layout wins)
   airport('Sandvale Intl',1070,160,1445,340,[[1090,180,330],[1090,300,330]],[1110,215,80]);
   airport('Kingsbridge Field',1195,1792,1385,1905,[[1205,1860,175]],[1210,1812,40]);
   if(world.quarry){ const {x,y}=world.quarry; for(let j=y-10;j<y+12;j++) for(let i=x;i<x+26;i++){ const t=get(i,j); if(t!==T.ROAD&&t!==T.WATER&&t!==T.BRIDGE) set(i,j,T.GRAVEL); }

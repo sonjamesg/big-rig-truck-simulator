@@ -100,6 +100,7 @@ function draw(){
   }
   // prefetch one chunk ahead in travel direction
   if(budget>0){ const f=fwd(truck.h); const px=cam.x+f[0]*Math.sign(truck.v||1)*900, py=cam.y+f[1]*Math.sign(truck.v||1)*900; getChunk(Math.floor(px/CHUNK),Math.floor(py/CHUNK),true); }
+  try{ drawPuddles(vx0,vy0,vx1,vy1,z); }catch(e){}
   const VR=[vx0,vy0,vx1,vy1]; drawAmbientLow(VR); drawNavWorld();
   drawCareerWorld(vx0,vy0,vx1,vy1);
   drawParkedTrailers(vx0,vy0,vx1,vy1);
