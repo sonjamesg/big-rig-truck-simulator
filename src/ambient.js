@@ -85,7 +85,7 @@ function drawAmbientHigh(v){ const t=timeS;
     for(let k=6;k>=0;k--){ const u=k/6; ctx.lineTo(f.x+amb.wind[0]*u*30-amb.wind[1]*(Math.sin(t*6-u*5)*3*u+16), f.y+amb.wind[1]*u*30+amb.wind[0]*(Math.sin(t*6-u*5)*3*u+16)); }
     ctx.fillStyle=f.col; ctx.fill(); }
   // blinking beacons (towers, runway approach lights)
-  for(const b of world.beacons){ if(!inView(b.x,b.y,20,v)) continue; const on=b.run? ((t*3+b.ph)%1)<0.25 : Math.sin(t*3+b.ph)>0.55; if(!on) continue;
+  for(const b of world.beacons){ if(!inView(b.x,b.y,20,v)) continue; const on=b.run? ((t*3+b.ph)%1)<0.25 : b.warn? Math.sin(t*2.2)>-0.4 : Math.sin(t*3+b.ph)>0.55; if(!on) continue; if(b.warn&&typeof dnLight==='function'&&typeof DN!=='undefined'&&DN.dark>0.05) dnLight(b.x,b.y,46,'rgba(255,30,30,1)',0.9);
     ctx.fillStyle=b.col; ctx.globalAlpha=0.35; ctx.beginPath(); ctx.arc(b.x,b.y,9,0,7); ctx.fill(); ctx.globalAlpha=1; ctx.beginPath(); ctx.arc(b.x,b.y,3,0,7); ctx.fill(); }
   drawPlanes(v);
   // bird flocks (V formation, flapping), shadows on the ground

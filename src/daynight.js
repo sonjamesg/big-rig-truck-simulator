@@ -119,18 +119,19 @@ function slBuild(){ if(SL.list) return SL.list; const out=[], taken=new Set();
   const put=(kx,ky,nx,ny,dbl)=>{ const px=kx-nx*0.25, py=ky-ny*0.25; if(!dbl&&!okPost(px,py)) return; const ax=kx+nx*0.72, ay=ky+ny*0.72;
     out.push({px:px*TILE,py:py*TILE,hx:ax*TILE,hy:ay*TILE,x:ax*TILE,y:ay*TILE,r:110,dbl:!!dbl}); };
   const inJ=(tx,ty)=>{ for(const J of world.junctions) if(tx>J.x-1.5&&tx<J.x+J.w+1.5&&ty>J.y-1.5&&ty<J.y+J.h+1.5) return true; return false; };
-  for(const sg of world.segs||[]){ if(!sg||sg.b1===undefined||sg.type==='dirt'||sg.type==='lane') continue; const hwy=sg.type==='hwy';
-    for(let a=sg.b0+1, n=0;a<sg.b1;a++){ const cx=sg.dir==='h'?a+0.5:sg.a+sg.w/2, cy=sg.dir==='h'?sg.a+sg.w/2:a+0.5, z=slZone(cx,cy); if(z===2) continue;
-      const sp=z===0?5:12; if(((a-sg.b0)%sp)!==0||inJ(Math.floor(cx),Math.floor(cy))) continue; n++;
-      if(hwy&&sg.w>=6&&z===1){ // central reservation double lamp: arms either way over the fast lanes
+  for(const sg of world.segs||[]){ if(!sg||sg.b1===undefined||sg.type==='dirt'||sg.type==='lane') continue; const hwy=sg.type==='hwy', mw=sg.type==='hwy'||sg.type==='dual';
+    for(let a=sg.b0+1, n=0;a<sg.b1;a++){ const cx=sg.dir==='h'?a+0.5:sg.a+sg.w/2, cy=sg.dir==='h'?sg.a+sg.w/2:a+0.5, z=slZone(cx,cy), onB=inb(Math.floor(cx),Math.floor(cy))&&G[idx(Math.floor(cx),Math.floor(cy))]===T.BRIDGE; if(z===2&&!mw&&!onB) continue;
+      const sp=onB?6:z===0?5:mw&&z===2?10:12; if(((a-sg.b0)%sp)!==0||inJ(Math.floor(cx),Math.floor(cy))) continue; n++;
+      if(onB){ for(const sd of [-1,1]){ const e=sg.a+(sd<0?0.15:sg.w-0.15); if(sg.dir==='h') put(a+0.5,e,0,-sd,1); else put(e,a+0.5,-sd,0,1); } continue; }
+      if(mw&&sg.w>=6&&z>=1){ // central reservation double lamp: arms either way over the fast lanes
         const ox=sg.dir==='h'?0:1, oy=sg.dir==='h'?1:0; out.push({px:cx*TILE,py:cy*TILE,hx:(cx-ox*0.85)*TILE,hy:(cy-oy*0.85)*TILE,x:(cx-ox*0.85)*TILE,y:(cy-oy*0.85)*TILE,r:110,dbl:1});
         out.push({px:cx*TILE,py:cy*TILE,hx:(cx+ox*0.85)*TILE,hy:(cy+oy*0.85)*TILE,x:(cx+ox*0.85)*TILE,y:(cy+oy*0.85)*TILE,r:110,dbl:1,twin:1}); continue; }
       const sides=z===0?[-1,1]:[(n&1)?1:-1];
       for(const sd of sides){ const e=sg.a+(sd<0?0:sg.w); if(sg.dir==='h') put(a+0.5,e,0,-sd); else put(e,a+0.5,-sd,0); } } }
   for(const cv of world.curves||[]){ if(cv.type==='dirt'||cv.type==='lane'||!cv.pts||cv.pts.length<2) continue; let acc=0, n=0;
-    for(let i=1;i<cv.pts.length;i++){ const A=cv.pts[i-1],B=cv.pts[i], l=Math.hypot(B[0]-A[0],B[1]-A[1]); acc+=l; const z=slZone(B[0],B[1]); if(z===2){ acc=0; continue; } const sp=z===0?5:12; if(acc<sp) continue; acc=0; n++;
+    for(let i=1;i<cv.pts.length;i++){ const A=cv.pts[i-1],B=cv.pts[i], l=Math.hypot(B[0]-A[0],B[1]-A[1]); acc+=l; const mw=cv.type==='hwy'||cv.type==='dual', bt=inb(Math.floor(B[0]),Math.floor(B[1]))?G[idx(Math.floor(B[0]),Math.floor(B[1]))]:0, onB=bt===T.BRIDGE; const z=slZone(B[0],B[1]); if(z===2&&!mw&&!onB){ acc=0; continue; } const sp=onB?6:z===0?5:mw&&z===2?10:12; if(acc<sp) continue; acc=0; n++;
       const ux=(B[0]-A[0])/(l||1), uy=(B[1]-A[1])/(l||1), nx=-uy, ny=ux, hw=cv.w/2; if(inJ(Math.floor(B[0]),Math.floor(B[1]))) continue;
-      for(const sd of (z===0?[-1,1]:[(n&1)?1:-1])) put(B[0]+nx*sd*hw,B[1]+ny*sd*hw,-nx*sd,-ny*sd); } }
+      for(const sd of (z===0||onB?[-1,1]:[(n&1)?1:-1])) put(B[0]+nx*sd*(onB?hw-0.15:hw),B[1]+ny*sd*(onB?hw-0.15:hw),-nx*sd,-ny*sd,onB?1:0); } }
   // rural junctions + roundabouts: a lamp on each corner / around the ring
   for(const J of world.junctions){ const z=slZone(J.x+J.w/2,J.y+J.h/2); const hs=world.segs[J.hs], vs=world.segs[J.vs]; if(z===2&&(!hs||!vs||hs.type==='dirt'||vs.type==='dirt')) continue;
     for(const [cx,cy,dx,dy] of [[J.x,J.y,-1,-1],[J.x+J.w,J.y,1,-1],[J.x,J.y+J.h,-1,1],[J.x+J.w,J.y+J.h,1,1]]){ const k=Math.SQRT1_2; put(cx+dx*0.35,cy+dy*0.35,-dx*k,-dy*k); } }

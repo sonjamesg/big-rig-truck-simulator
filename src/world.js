@@ -710,7 +710,7 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
         if(L>=40){ const S={sg,r0:r0-6,r1:u+6,dir:sg.dir,a:sg.a,w:sg.w}; S.L=S.r1-S.r0; S.t0=S.r0+S.L*0.2; S.t1=S.r1-S.L*0.2; world.susp.push(S);
           const P=(uu,v)=>sg.dir==='h'?[uu*TILE,v*TILE]:[v*TILE,uu*TILE];
           for(let p=S.r0;p<S.r1;p+=8){ const q=P(p+4,S.a+S.w/2); world.overhead.push({kind:'susp',S,p0:p,p1:Math.min(S.r1,p+8),x:q[0],y:q[1]}); }
-          for(const tu of [S.t0,S.t1]){ const q=P(tu,S.a+S.w/2); world.overhead.unshift({kind:'stower',S,u:tu,x:q[0],y:q[1]}); } }
+          for(const tu of [S.t0,S.t1]){ const q=P(tu,S.a+S.w/2); world.overhead.unshift({kind:'stower',S,u:tu,x:q[0],y:q[1]});  for(const tu of [S.t0,S.t1]) for(const e of [S.a-0.9,S.a+S.w+0.9]){ const q=P(tu,e); world.beacons.push({x:q[0],y:q[1],col:'#ff2020',ph:0,warn:1}); } } }
         r0=-1; } } }
   (world.tm=world.tm||[]).push(['if(typeof buildMarki',performance.now()-t0|0]);
   yield 'Painting road markings'; if(typeof buildMarkings==='function') buildMarkings(objs);
