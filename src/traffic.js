@@ -566,7 +566,10 @@ function drawTraffic(vx0,vy0,vx1,vy1){
   for(const v of traffic.vs) if(inV(v.x,v.y)) list.push(v);
   // pedestrians
   for(const p of traffic.peds){ if(!inV(p.x,p.y)) continue; const X=p.x*PPM, Y=p.y*PPM;
-    if(p.down>0){ ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fillRect(X-6,Y-1,13,5); ctx.fillStyle=p.col; ctx.fillRect(X-7,Y-3,10,5); ctx.fillStyle='#e0b48c'; ctx.beginPath(); ctx.arc(X+5,Y-1,2.2,0,7); ctx.fill(); continue; }
+    if(p.down>0){ const S=p.cas?2.2:1; ctx.save(); ctx.translate(X,Y); ctx.scale(S,S); ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fillRect(-6,-1,13,5); ctx.fillStyle='#2b2b33'; ctx.fillRect(-11,-2.4,5,1.6); ctx.fillRect(-11,0,5,1.6); ctx.fillStyle=p.col; ctx.fillRect(-7,-3,10,5); ctx.fillRect(-4,-5,2,2); ctx.fillStyle='#e0b48c'; ctx.beginPath(); ctx.arc(5,-1,2.2,0,7); ctx.fill(); ctx.fillStyle=p.hair||'#222'; ctx.beginPath(); ctx.arc(5.6,-1.4,1.4,0,7); ctx.fill(); ctx.restore();
+      if(p.cas){ const pu=0.5+0.5*Math.sin(timeS*5), R=22+pu*5; ctx.save(); ctx.strokeStyle='rgba(255,190,40,'+(0.55+0.4*pu)+')'; ctx.lineWidth=3; ctx.setLineDash([7,5]); ctx.beginPath(); ctx.arc(X,Y,R,0,7); ctx.stroke(); ctx.setLineDash([]);
+        if(!(p.prog>0)){ const my=Y-R-14; ctx.fillStyle='#ffb020'; ctx.beginPath(); ctx.moveTo(X,my+12); ctx.lineTo(X-7,my); ctx.lineTo(X+7,my); ctx.closePath(); ctx.fill(); ctx.fillStyle='#fff'; ctx.strokeStyle='#d62828'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(X,my-4,8,0,7); ctx.fill(); ctx.stroke(); ctx.fillStyle='#d62828'; ctx.fillRect(X-1.5,my-9,3,10); ctx.fillRect(X-5,my-5.5,10,3); } ctx.restore(); }
+      continue; }
     const h=ang(p.dx,p.dy); ctx.save(); ctx.translate(X,Y); ctx.rotate(h); const sw=Math.sin(p.ph)*2.2;
     ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.beginPath(); ctx.ellipse(2,2,3.6,2.6,0,0,7); ctx.fill();
     ctx.fillStyle='#2b2b33'; ctx.fillRect(-2.2,-1+sw,1.6,3.2); ctx.fillRect(0.6,-1-sw,1.6,3.2);

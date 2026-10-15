@@ -43,14 +43,14 @@ function ambUpdate(dt){ if(!world.ready) return; ambParkedInit();
   AMBU.jobs=AMBU.jobs.filter(j=>!j.done);
   // casualties far from everything (player left): resolved off-screen so nothing is lost
   for(const p of traffic.peds) if(p.cas&&Math.hypot(p.x-truck.x,p.y-truck.y)>1400){ p.cas=false; p.down=0; } }
-function ambDrawMedic(m){ const X=m.x*PPM, Y=m.y*PPM; ctx.save(); ctx.translate(X,Y); ctx.rotate(m.dir?ang(m.dir[0],m.dir[1]):0);
+function ambDrawMedic(m){ const X=m.x*PPM, Y=m.y*PPM; ctx.save(); ctx.translate(X,Y); ctx.rotate(m.dir?ang(m.dir[0],m.dir[1]):0); ctx.scale(2.1,2.1);
   ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.beginPath(); ctx.ellipse(2,2,3.6,2.6,0,0,7); ctx.fill(); if(!m.kneel){ const sw=Math.sin(m.ph)*2.2; ctx.fillStyle='#1f3b2a'; ctx.fillRect(-2.2,-1+sw,1.6,3.2); ctx.fillRect(0.6,-1-sw,1.6,3.2); }
   ctx.fillStyle='#2e7d32'; ctx.beginPath(); ctx.ellipse(0,0,3.6,2.3,0,0,7); ctx.fill(); ctx.fillStyle='#f2e600'; ctx.fillRect(-3.4,-0.5,6.8,1.1); ctx.fillStyle='#3a2a1a'; ctx.beginPath(); ctx.arc(0,0.2,1.7,0,7); ctx.fill(); ctx.restore(); }
 function drawAmbulance(vx0,vy0,vx1,vy1){ ambParkedInit(); const inV=(x,y)=>x*PPM>vx0-80&&x*PPM<vx1+80&&y*PPM>vy0-80&&y*PPM<vy1+80;
   for(const [b,on] of AMBU.parked) if(on&&inV(b.x,b.y)) emBlit({x:b.x,y:b.y,h:b.h},'ambulance');
   for(const j of AMBU.jobs){ const v=j.st==='go'||j.st==='return'?j.v:j.k; if(!v) continue; if(j.k&&inV(j.k.x,j.k.y)) emBlit(j.k,'ambulance'); if(inV(v.x,v.y)) emDrawBar(v,j.st==='go'||j.st==='pull'||j.st==='treat','ambulance');
     for(const m of j.crew) if(inV(m.x,m.y)) ambDrawMedic(m);
-    for(const p of j.cas) if(p.cas&&p.prog>0&&inV(p.x,p.y)){ const X=p.x*PPM, Y=p.y*PPM-14; ctx.save(); ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.arc(X,Y,7,0,7); ctx.stroke(); ctx.strokeStyle='#3ddc84'; ctx.beginPath(); ctx.arc(X,Y,7,-Math.PI/2,-Math.PI/2+6.283*Math.min(1,p.prog)); ctx.stroke();
-      ctx.fillStyle='#fff'; ctx.fillRect(X-1,Y-4,2,8); ctx.fillRect(X-4,Y-1,8,2); ctx.restore(); } } }
+    for(const p of j.cas) if(p.cas&&p.prog>0&&inV(p.x,p.y)){ const X=p.x*PPM, Y=p.y*PPM-40; ctx.save(); ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.arc(X,Y,13,0,7); ctx.fill(); ctx.lineWidth=4; ctx.strokeStyle='#3ddc84'; ctx.beginPath(); ctx.arc(X,Y,11,-Math.PI/2,-Math.PI/2+6.283*Math.min(1,p.prog)); ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.fillRect(X-1.5,Y-6,3,12); ctx.fillRect(X-6,Y-1.5,12,3); ctx.restore(); } } }
 setTimeout(()=>{ const ub=updateBreakdown; updateBreakdown=function(dt){ ub.apply(this,arguments); try{ ambUpdate(dt); }catch(e){ console.warn('[ambulance]',e); } };
   if(typeof BigRig!=='undefined') BigRig.ambulance=()=>({jobs:AMBU.jobs.map(j=>j.st),treated:AMBU.treated,dispatched:AMBU.dispatched}); },0);
