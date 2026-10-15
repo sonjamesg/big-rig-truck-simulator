@@ -198,7 +198,7 @@ function emYield(v,acc,dt){ if(v.role==='police'||v.role==='ambulance'||v.role==
 function emShift(v,to,dt){ const cur=v.emO||0, nw=cur+(to-cur)*Math.min(1,dt*1.6), d=nw-cur, r=rgt(v.h||0); v.offX+=r[0]*d; v.offY+=r[1]*d; v.emO=Math.abs(nw)<0.02&&to===0?0:nw; if(v.emO===0){ v.offX-=r[0]*nw; v.offY-=r[1]*nw; } }
 setTimeout(()=>{ const ub=updateBreakdown; updateBreakdown=function(dt){ EMY.src=emSources(); return ub.apply(this,arguments); }; },0);
 // ---------- per-frame + drawing
-function updatePolice(dt){ if(!world.ready||typeof started!=='undefined'&&!started||(typeof uiBlocking==='function'&&uiBlocking())) return; polUpdatePatrols(dt); polUpdateChase(dt); polDetect(dt); wantUpdate(dt); }
+function updatePolice(dt){ if(!world.ready||typeof started!=='undefined'&&!started||(typeof uiBlocking==='function'&&uiBlocking())) return; polUpdatePatrols(dt); polUpdateChase(dt); if(POL.chase&&POL.chase.v) polSep(POL.chase); polDetect(dt); wantUpdate(dt); }
 function drawPolice(vx0,vy0,vx1,vy1){ try{ drawHideSpots(vx0,vy0,vx1,vy1); }catch(e){} polDrawParked(vx0,vy0,vx1,vy1); for(const v of POL.cars) if(v.pol&&traffic.vs.includes(v)) emDrawBar(v,false,'police');
   if(POL.parkIn) for(const k of POL.parkIn) emBlit(k,'police'); const c=POL.chase; if(c){ emBlit(c.v,'police'); emDrawBar(c.v,true,'police'); } }
 function drawPoliceHUD(){ const c=POL.chase; if(!c||c.paying) return; const w=Math.min(VW-30,360), x=VW/2-w/2, y=VH*0.13, ph=(timeS*3)%1<0.5;
@@ -255,6 +255,7 @@ setTimeout(()=>{ const dt0=drawTraffic; drawTraffic=function(){ for(const v of t
 // Blocked -> slow to the blocker's speed / queue; the only way past is a real gap (the steer-around above).
 function polObst(){ const L=[]; for(const o of traffic.vs) L.push([o,o.x,o.y,o.h||0,(o.L||4.6),(o.W||2)]);
   for(const t of world.trailers||[]) L.push([t,t.x,t.y,t.th||0,13.6,2.6]);
+  if(traffic.parkedIdx&&POL.chase){ const v=POL.chase.v, cx=Math.floor(v.x/64), cy=Math.floor(v.y/64); for(let i=-1;i<=1;i++) for(let j=-1;j<=1;j++){ const a=traffic.parkedIdx.get((cx+i)+','+(cy+j)); if(a) for(const o of a) L.push([o,o.x,o.y,o.h||0,o.L||4.4,o.W||1.9]); } }   // parked cars are solid too
   L.push([truck,truck.x,truck.y,truck.h,6.2,2.5]); if(truck.trl){ const t=truck.trl; L.push([t,t.x,t.y,truck.th!=null?truck.th:t.th,13.6,2.6]); } return L; }
 function polCaps(x,y,h,len){ const f=fwd(h), a=len/2; return [x-f[0]*a,y-f[1]*a,x+f[0]*a,y+f[1]*a]; }
 function polSegD(a,b){ let best=[1e9]; for(let i=0;i<=4;i++){ const px=a[0]+(a[2]-a[0])*i/4, py=a[1]+(a[3]-a[1])*i/4, ex=b[2]-b[0], ey=b[3]-b[1], l2=ex*ex+ey*ey||1, u=Math.max(0,Math.min(1,((px-b[0])*ex+(py-b[1])*ey)/l2)), qx=b[0]+ex*u, qy=b[1]+ey*u, d=Math.hypot(px-qx,py-qy); if(d<best[0]) best=[d,px-qx,py-qy]; }

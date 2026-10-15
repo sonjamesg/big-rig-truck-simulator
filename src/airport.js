@@ -199,21 +199,41 @@ function apLandside(A,night){ const g=ctx, T_=TILE, rnd=mulberry(77);
   // pedestrians between parks, drop-off and the terminal doors
   apPeds(A);
   if(night>0.05&&typeof dnLight==='function'){ for(let x=360;x<442;x+=10) dnLight(x*T_,690*T_,90,'rgba(255,225,170,0.7)',0.7); dnLight(431*T_,710*T_,160,'rgba(255,225,170,0.6)',0.6); dnLight(370*T_,702*T_,200,'rgba(255,225,170,0.55)',0.55); } }
-function apCar(g,x,y,h,col,L){ g.save(); g.translate(x,y); g.rotate(h); g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.roundRect(-L*0.45+4,-10,L*0.9,20,4); g.fill();
+function apCar(g,x,y,h,col,L){ g.save(); g.translate(x,y); g.rotate(h-Math.PI/2); g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.roundRect(-L*0.45+4,-10,L*0.9,20,4); g.fill();
   g.fillStyle=col; g.beginPath(); g.roundRect(-L*0.45,-9,L*0.9,18,4); g.fill(); g.fillStyle='#7f8c8d'; g.fillRect(-L*0.15,-7,L*0.35,14); g.restore(); }
-function apParkFlow(A){ const g=ctx, T_=TILE, cols=['#c0392b','#2980b9','#ecf0f1','#2c3e50','#f1c40f','#27ae60','#8e44ad'];
-  // cars circulating the drop-off loop
-  for(let k=0;k<5;k++){ const t=((timeS*0.18+k*0.2)%1), ang=t*Math.PI*2, cx=412*T_, cy=695.5*T_, rx=16*T_, ry=5*T_;
-    apCar(g,cx+Math.cos(ang)*rx,cy+Math.sin(ang)*ry,ang+Math.PI/2,cols[k%cols.length],28); }
-  // cars entering / leaving surface parks along the 708 road
-  for(let k=0;k<4;k++){ const t=((timeS*0.12+k*0.25)%1); const x=(414+t*70)*T_, y=(708.5+(k%2?0.8:-0.8))*T_; apCar(g,x,y,0,cols[(k+2)%cols.length],28); }
-  // cars on the MSCP ramp
-  { const t=(timeS*0.15)%1; apCar(g,(388+t*6)*T_,(702+t*4)*T_,0.5,cols[1],26); } }
-function apPeds(A){ const g=ctx, T_=TILE, cols=['#c0392b','#2980b9','#27ae60','#f1c40f','#8e44ad','#ecf0f1'];
-  // paths: surface park -> drop-off -> terminal doors (y~689)
-  const paths=[[[430,710],[430,700],[402,700],[402,689.5]],[[470,710],[470,700],[432,700],[432,689.5]],[[372,705],[372,689.5]],[[412,696],[412,689.5]]];
-  for(let i=0;i<10;i++){ const P=paths[i%paths.length], ph=((timeS*0.35+i*0.11)%1), len=P.length-1, u=ph*len, i0=Math.floor(u), f=u-i0, a=P[Math.min(i0,len)], b=P[Math.min(i0+1,len)];
-    const x=(a[0]+(b[0]-a[0])*f)*T_, y=(a[1]+(b[1]-a[1])*f)*T_; g.fillStyle=cols[i%cols.length]; g.beginPath(); g.arc(x,y,3.2,0,7); g.fill(); g.fillStyle='#2b1d0e'; g.beginPath(); g.arc(x,y-3.5,2.2,0,7); g.fill(); } }
+// v40: real park/leave cycle. Parked AI cars at a few kerb-row slots next to the 708 car-park road are lifted out of traffic.parked
+// and animated: drive in along the lane, swing into the slot, park (driver walks to the terminal), pull out and drive on.
+function apSlots(A){ if(A.slots) return A.slots; A.slots=[]; if(typeof traffic==='undefined'||!traffic.parked||!traffic.parked.length) return A.slots;
+  for(const L of A.lots||[]){ const xs=L.x0*4, xe=L.x1*4; const row=traffic.parked.filter(v=>v.x>xs+3&&v.x<xe-3&&v.y>2822&&v.y<2832).sort((a,b)=>a.x-b.x); if(!row.length) continue;
+    const ry=row[0].y, pick=[]; for(let x=xs+4;x<xe-4;x+=2.8){ if(pick.length>=5) break; if(((x*7)|0)%3===0) pick.push(x); }
+    for(const x of pick){ for(let k=traffic.parked.length-1;k>=0;k--){ const v=traffic.parked[k]; if(Math.abs(v.x-x)<1.6&&Math.abs(v.y-ry)<1.5) traffic.parked.splice(k,1); }
+      if(traffic.parkedIdx) for(const arr of traffic.parkedIdx.values()) for(let k=arr.length-1;k>=0;k--) if(Math.abs(arr[k].x-x)<1.6&&Math.abs(arr[k].y-ry)<1.5) arr.splice(k,1);
+      A.slots.push({x,y:ry,i:A.slots.length}); } }
+  return A.slots; }
+function apSlotState(sl,t){ const P=140+sl.i*23, tt=((t+sl.i*37)%P+P)%P, lane=2835, x0=1650, xEnd=1950, sp=8, E=Math.PI/2;   // headings: game convention (0 = north, PI/2 = east)
+  const tIn=(sl.x-4-x0)/sp; if(tt<tIn) return {x:x0+tt*sp,y:lane,h:E,ph:'in'}; let o=tt-tIn;
+  if(o<3.5){ const u=o/3.5, a=u*Math.PI/2; return {x:sl.x-4+4*Math.sin(a),y:lane-(lane-sl.y)*(1-Math.cos(a))*0.55-(lane-sl.y)*0.45*u*u,h:E*(1-u),ph:'turn'}; } o-=3.5;
+  if(o<80) return {x:sl.x,y:sl.y,h:0,ph:'park',tp:o}; o-=80;
+  if(o<3.5){ const u=o/3.5; return {x:sl.x+2*u*u,y:sl.y+(lane-sl.y)*Math.sin(u*Math.PI/2),h:E*u*u,ph:'out'}; } o-=3.5;   // reverse out, swing round to face east
+  const x=sl.x+2+o*sp; if(x>xEnd) return null; return {x,y:lane,h:E,ph:'away'}; }
+function apParkFlow(A){ const g=ctx, cols=['#c0392b','#2980b9','#ecf0f1','#2c3e50','#f1c40f','#27ae60','#8e44ad'];
+  // drop-off loop circulation
+  for(let k=0;k<4;k++){ const t=((timeS*0.05+k*0.25)%1), ang=t*Math.PI*2, cx=412*TILE, cy=695.5*TILE, rx=16*TILE, ry=5*TILE; const kerb=(t>0.7&&t<0.8);
+    apCar(g,cx+Math.cos(ang)*rx,cy+Math.sin(ang)*ry,ang+Math.PI,cols[k%cols.length],35); }
+  for(const sl of apSlots(A)){ const p=apSlotState(sl,timeS); if(!p) continue; apCar(g,p.x*PPM,p.y*PPM,p.h,cols[sl.i%cols.length],35); }
+  // multi-storey ramp: one car up, one down
+  { const t=(timeS*0.08)%1; apCar(g,(390+t*20)*TILE,701.2*TILE,Math.PI/2,cols[1],35); const u=(timeS*0.08+0.5)%1; apCar(g,(410-u*20)*TILE,702.4*TILE,-Math.PI/2,cols[4],35); } }
+function apPedDraw(g,x,y,col,ph){ g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.ellipse(x+1.5,y+1.5,4,3,0,0,7); g.fill(); g.fillStyle=col; g.beginPath(); g.ellipse(x,y,4.2,3,0,0,7); g.fill(); g.fillStyle='#2b1d0e'; g.beginPath(); g.arc(x,y,2.3,0,7); g.fill();
+  const sw=Math.sin(ph)*2; g.fillStyle='#34495e'; g.fillRect(x-3+sw,y+2,1.6,2.4); g.fillRect(x+1.4-sw,y+2,1.6,2.4); }
+function apWalk(P,u){ let L=0; const seg=[]; for(let i=1;i<P.length;i++){ const d=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]); seg.push(d); L+=d; } let d=u*L; for(let i=0;i<seg.length;i++){ if(d<=seg[i]){ const f=d/seg[i]; return [P[i][0]+(P[i+1][0]-P[i][0])*f,P[i][1]+(P[i+1][1]-P[i][1])*f]; } d-=seg[i]; } return P[P.length-1]; }
+function apPeds(A){ const g=ctx, T_=TILE, cols=['#c0392b','#2980b9','#27ae60','#f1c40f','#8e44ad','#ecf0f1','#e67e22'];
+  // drivers from the animated car-park slots walk to the doors, then (late in the stay) walk back
+  for(const sl of A.slots||[]){ const p=apSlotState(sl,timeS); if(!p||p.ph!=='park') continue; const sx=sl.x/4+0.5, sy=sl.y/4-0.6, door=[402+(sl.i%3)*15,688.8], P=[[sx,sy],[416.5,sy],[416.5,690.5],door];
+    if(p.tp<30){ const q=apWalk(P,p.tp/30); apPedDraw(g,q[0]*T_,q[1]*T_,cols[sl.i%cols.length],timeS*9+sl.i); }
+    else if(p.tp>50&&p.tp<78){ const q=apWalk(P.slice().reverse(),(p.tp-50)/28); apPedDraw(g,q[0]*T_,q[1]*T_,cols[(sl.i+3)%cols.length],timeS*9+sl.i); } }
+  // multi-storey stair core -> crossing -> doors, and drop-off kerb -> doors
+  const paths=[[[388.5,697],[388.5,690.2],[372,690.2],[372,688.8]],[[389,705],[389,690.6],[402,690.6],[402,688.8]],[[398,690.4],[432,690.4],[432,688.8]],[[426,690.2],[417,690.2],[417,688.8]]];
+  for(let i=0;i<14;i++){ const P=paths[i%paths.length], u=((timeS*0.04+i*0.137)%1), q=apWalk(i%2?P:P.slice().reverse(),u); apPedDraw(g,q[0]*T_,q[1]*T_,cols[i%cols.length],timeS*9+i); } }
 function apTerminal(A,vx0,vy0,vx1,vy1,night){ const T_=TILE, g=ctx, t=A.term, x0=t.x0*T_, x1=t.x1*T_, y0=t.y0*T_, y1=t.y1*T_, W=x1-x0, H=y1-y0, cx=(x0+x1)/2;
   if(x1<vx0-200||x0>vx1+200||y1<vy0-200||y0>vy1+200) return;
   const rs0=669.6*T_, rs1=676.4*T_;   // glass skylight strip over the tracks (y 673)
