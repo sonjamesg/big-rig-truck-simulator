@@ -37,34 +37,70 @@ function apBuild(A){
   const tb=A.term; for(const o of world.objects){ if(!/^(tree|bush|scrub|rock|hedge|cactus)$/.test(o.kind)) continue; const x=o.x/T_, y=o.y/T_;
     if(x>A.x0&&x<A.x1&&y>A.y0&&y<A.y1+2) o._dead=1; if(x>tb.x0-12&&x<tb.x1+2&&y>tb.y0-2&&y<tb.y1+32) o._dead=1; }
   // aircraft paths (tiles)
-  const S0=[A.civ.lane];
-  A.pIn=A.stands.map(st=>{ const sy=A.civ.y1-1.5-30*st.sc/32; st.sy=sy; return apSm(A,[[-150,0],[100,0],[124,10],[130,30],[140,34],[60,34],[0,34],[405,573,0],[405,A.civ.lane,0],[st.x+4,A.civ.lane,0],[st.x,A.civ.lane+5,0],[st.x,sy,0]]); });
-  A.pOut=A.stands.map(st=>apSm(A,[[st.x,A.civ.lane,0],[st.x-4,A.civ.lane,0],[409,A.civ.lane,0],[405,A.civ.lane-6,0],[405,573,0],[0,34],[-140,34],[-194,28],[-200,6],[-196,0],[-190,0]]));
-  for(const f of A.fighters){ const h=f.h, out=[[h.p[0],h.p[1],0],[h.q[0],h.q[1],0]], inn=[]; 
-    if(h.v<0){ out.push([-194,-24],[-200,-6],[-196,0],[-190,0]); inn.push([100,0],[150,0],[176,-10],[194,-24],[140,-30],[h.u+8,-30]); }
-    else if(h.u<0){ out.push([-194,28],[-200,6],[-196,0],[-190,0]); inn.push([100,0],[124,10],[140,34],[0,34],[-140,34],[h.u+8,34]); }
-    else { out.push([140,34],[0,34],[-140,34],[-194,28],[-200,6],[-196,0],[-190,0]); inn.push([100,0],[124,10],[h.u-8,34]); }
-    inn.push([h.q[0],h.q[1],0],[h.p[0],h.p[1],0]); f.pOut=apSm(A,out); f.pIn=apSm(A,[[-150,0]].concat(inn)); }
+  // ---- taxi routes built from the painted centrelines: straight legs + loop slices, corners filleted (the same paths are painted) ----
+  const W=(u,v)=>apT(A,u,v), Ln=A.loop.length;
+  const near=(p)=>{ let b=0,bd=1e9; for(let i=0;i<Ln;i++){ const d=(A.loop[i][0]-p[0])**2+(A.loop[i][1]-p[1])**2; if(d<bd){bd=d;b=i;} } return b; };
+  const slice=(a,b,dir)=>{ const i0=near(a), i1=near(b), out=[]; for(let i=i0;;i=(i+dir+Ln)%Ln){ out.push(A.loop[i].slice()); if(i===i1||out.length>Ln) break; } return out; };
+  const dirTo=(a,b)=>{ const i0=near(a), i1=near(b); return ((i1-i0+Ln)%Ln)<Ln/2?1:-1; };
+  const lp=(a,b)=>slice(a,b,dirTo(a,b));
+  A.taxiPaint=[];
+  const route=(legs,r,paint)=>{ const P=[]; for(const g of legs) for(const p of g){ const q=P[P.length-1]; if(!q||Math.hypot(q[0]-p[0],q[1]-p[1])>0.3) P.push(p); } const R0=apFillet(P,r), R=[R0[0]]; for(let i=1;i<R0.length;i++){ const a=R0[i-1], b=R0[i], d=Math.hypot(b[0]-a[0],b[1]-a[1]), m=Math.ceil(d/1.5); for(let k=1;k<=m;k++) R.push([a[0]+(b[0]-a[0])*k/m,a[1]+(b[1]-a[1])*k/m]); } if(paint) A.taxiPaint.push(R); return R; };
+  const lane=A.civ.lane, cl0=W(0,34);
+  A.pIn=A.stands.map(st=>{ const sy=A.civ.y1-1.5-30*st.sc/32; st.sy=sy;
+    return apTimed(route([[W(-172,0),W(120,0)],[W(120,34)],lp(W(120,34),cl0),[[405,573],[405,lane],[st.x,lane],[st.x,sy]]],5,true),{v0:12,stop:1}); });
+  A.pOut=A.stands.map(st=>apTimed(route([[[st.x,lane]],[[405,lane],[405,573]],lp(cl0,W(-120,34)),[W(-120,10)]],5,true),{stop:1}));
+  A.lineup=apTimed(route([[W(-120,10),W(-120,0),W(-100,0)]],5,true),{stop:1});
+  A.lineupN=apTimed(route([[W(-120,-10),W(-120,0),W(-100,0)]],5,true),{stop:1});
+  for(const f of A.fighters){ const h=f.h; f.fly=(f.i===0||f.i===3); if(!f.fly) continue;
+    const q=[h.q[0],h.q[1]], p=[h.p[0],h.p[1]], N=h.v<0;
+    f.pOut=apTimed(route([[p,q],lp(q,W(-120,N?-30:34)),[W(-120,N?-10:10)]],4,true),{stop:1});
+    f.pIn=apTimed(route([[W(-172,0),W(0,0),W(0,N?-30:34)],lp(W(0,N?-30:34),q),[q]],4,true),{v0:12,stop:1});
+    f.rev=apPath([q,p]); f.P=900+((f.i*7919)%600); }
 }
 // ---------- timelines ----------
-function apRunway(A,u0,u1,t,dur,acc){ const u=acc?u0+(u1-u0)*Math.min(1,(t/dur)**2):u0+(u1-u0)*(1-(1-Math.min(1,t/dur))**2); const p=apT(A,u,0); return [p[0],p[1],A.rwA]; }
-function apCivil(A,st,t){ const C=300, tt=((t+st.ph)%C+C)%C, pin=A.pIn[st.k], pout=A.pOut[st.k];
-  if(tt<14){ const u=-150-(14-tt)*22, p=apT(A,u,0); return {x:p[0],y:p[1],h:A.rwA,alt:(14-tt)/14*2.4,ph:'app'}; }
-  let o=tt-14, rl=apAt(pin,0); const vR=7; // landing roll is the first ~250 tiles of the taxi-in path, decelerating
-  const rollLen=250; if(o<20){ const d=rollLen*(1-(1-o/20)**2); const p=apAt(pin,d); return {x:p[0],y:p[1],h:p[2],alt:0,ph:'roll'}; } o-=20;
-  const tIn=(pin.len-rollLen)/vR; if(o<tIn){ const p=apAt(pin,rollLen+o*vR); return {x:p[0],y:p[1],h:p[2],alt:0,ph:'taxi'}; } o-=tIn;
-  if(o<120) return {x:st.x,y:st.sy,h:Math.PI/2,alt:0,ph:'park',tp:o}; o-=120;
-  if(o<12){ const u=o/12; return {x:st.x,y:st.sy+(A.civ.lane-st.sy)*u*u*(3-2*u),h:Math.PI/2,alt:0,ph:'push'}; } o-=12;
-  const tOut=4+pout.len/vR; if(o<tOut){ const p=apAt(pout,Math.max(0,o-4)*vR); return {x:p[0],y:p[1],h:o<4?Math.PI/2:p[2],alt:0,ph:'taxo'}; } o-=tOut;
-  const u=-190+0.5*3.2*o*o; if(u>420) return null; const p=apT(A,u,0), alt=Math.max(0,(u-60)/110); if(alt>2.6) return null; return {x:p[0],y:p[1],h:A.rwA,alt,ph:'tko'}; }
-function apFighter(A,f,t){ const C=240, tt=((t+f.ph)%C+C)%C, h=f.h, v=9;
-  if(tt<70) return {x:h.p[0],y:h.p[1],h:h.a,alt:0,ph:'has'};
-  let o=tt-70; const tO=f.pOut.len/v; if(o<tO){ const p=apAt(f.pOut,o*v); return {x:p[0],y:p[1],h:p[2],alt:0,ph:'taxo'}; } o-=tO;
-  if(o<14){ const u=-190+0.5*4.5*o*o*3; const p=apT(A,Math.min(u,400),0); return {x:p[0],y:p[1],h:A.rwA,alt:Math.max(0,(u-(-40))/90),ph:'tko'}; } o-=14;
-  if(o<60) return null; o-=60;   // sortie
-  if(o<10){ const u=-150-(10-o)*30, p=apT(A,u,0); return {x:p[0],y:p[1],h:A.rwA,alt:(10-o)/10*2.2,ph:'app'}; } o-=10;
-  const rollLen=250; if(o<14){ const p=apAt(f.pIn,rollLen*(1-(1-o/14)**2)); return {x:p[0],y:p[1],h:p[2],alt:0,ph:'roll'}; } o-=14;
-  const p=apAt(f.pIn,Math.min(f.pIn.len,rollLen+o*v)); const done=rollLen+o*v>=f.pIn.len; return {x:p[0],y:p[1],h:done?h.a:p[2],alt:0,ph:done?'has':'taxi'}; }
+function apFillet(P,r){ const out=[P[0]]; for(let i=1;i<P.length-1;i++){ const a=P[i-1],b=P[i],c=P[i+1], l1=Math.hypot(b[0]-a[0],b[1]-a[1]), l2=Math.hypot(c[0]-b[0],c[1]-b[1]);
+    const u1=[(b[0]-a[0])/l1,(b[1]-a[1])/l1], u2=[(c[0]-b[0])/l2,(c[1]-b[1])/l2], th=Math.acos(Math.max(-1,Math.min(1,u1[0]*u2[0]+u1[1]*u2[1])));
+    if(th<0.12||l1<1.5||l2<1.5){ out.push(b); continue; } const d=Math.min(r*Math.tan(th/2),l1*0.48,l2*0.48), p1=[b[0]-u1[0]*d,b[1]-u1[1]*d], p2=[b[0]+u2[0]*d,b[1]+u2[1]*d], n=Math.max(4,Math.ceil(th*8));
+    for(let k=0;k<=n;k++){ const t=k/n, m=1-t; out.push([m*m*p1[0]+2*m*t*b[0]+t*t*p2[0], m*m*p1[1]+2*m*t*b[1]+t*t*p2[1]]); } }
+  out.push(P[P.length-1]); return out; }
+// time table: taxi 2.3 tiles/s (~33 km/h) on straights, ~1 tile/s through turns, gentle accel/brake
+function apTimed(pts,o){ const P=apPath(pts), n=pts.length, vm=new Array(n).fill(2.3); o=o||{};
+  for(let i=1;i<n-1;i++){ const a=Math.atan2(pts[i][1]-pts[i-1][1],pts[i][0]-pts[i-1][0]), b=Math.atan2(pts[i+1][1]-pts[i][1],pts[i+1][0]-pts[i][0]); let d=Math.abs(b-a); if(d>Math.PI) d=2*Math.PI-d;
+    const k=d/Math.max(0.2,(P.L[i+1]-P.L[i-1])/2); if(k>0.02) vm[i]=Math.max(0.9,Math.min(vm[i],0.32/Math.sqrt(k))); }
+  if(o.v0){ for(let i=0;i<n&&P.L[i]<250;i++) vm[i]=Math.max(vm[i],o.v0); }
+  const v=vm.slice(); v[0]=o.v0||0.3; const ac=0.35, dc=o.v0?0.9:0.35;
+  for(let i=1;i<n;i++) v[i]=Math.min(vm[i],Math.sqrt(v[i-1]**2+2*ac*(P.L[i]-P.L[i-1])));
+  if(o.stop) v[n-1]=0.25; for(let i=n-2;i>=0;i--) v[i]=Math.min(v[i],Math.sqrt(v[i+1]**2+2*(o.v0&&P.L[i]<300?dc:0.35)*(P.L[i+1]-P.L[i])));
+  const T=[0]; for(let i=1;i<n;i++) T.push(T[i-1]+2*(P.L[i]-P.L[i-1])/Math.max(0.05,v[i]+v[i-1])); P.T=T; P.dur=T[n-1]; let ir=0; while(ir<n-1&&P.L[ir]<290) ir++; P.tRoll=o.v0?T[ir]:0; return P; }
+function apAtT(P,t){ t=Math.max(0,Math.min(P.dur,t)); let lo=1,hi=P.T.length-1; while(lo<hi){ const m=(lo+hi)>>1; if(P.T[m]<t) lo=m+1; else hi=m; } const i=lo, a=P.pts[i-1], b=P.pts[i], u=(t-P.T[i-1])/Math.max(1e-6,P.T[i]-P.T[i-1]); return [a[0]+(b[0]-a[0])*u,a[1]+(b[1]-a[1])*u,Math.atan2(b[1]-a[1],b[0]-a[0])]; }
+const AP_G=(x,y,h,ph,ex)=>Object.assign({x,y,h,alt:0,ph},ex||{});
+// approach: 3° glide down the centreline, flare from ~15 m to touchdown at u=-172
+function apApp(A,o,dur,s){ const tdU=-172, v=s||14, u=tdU-(dur-o)*v, p=apT(A,u,0), d=tdU-u, fl=24, alt=d>fl?0.12+(d-fl)*0.0105:0.12*(d/fl)**2; return {x:p[0],y:p[1],h:A.rwA,alt,ph:'app',gear:1,ldg:1,nose:d<fl?1:0}; }
+function apTko(A,o,acc,rotU){ const u=-100+0.5*acc*o*o, p=apT(A,Math.min(u,700),0), alt=u>rotU?Math.min(4,(u-rotU)*0.012+((u-rotU)/220)**2):0; return alt>3.6?null:{x:p[0],y:p[1],h:A.rwA,alt,ph:'tko',gear:alt<0.6?1:0,ldg:1}; }
+function apCivil(A,st,t){ const pin=A.pIn[st.k], pout=A.pOut[st.k], C=640, tt=((t+st.ph*2.3)%C+C)%C; let o=tt;
+  if(o<24) return apApp(A,o,24); o-=24;
+  if(o<pin.dur){ const p=apAtT(pin,o), lead=o>pin.dur*0.25&&o<pin.dur-6; return AP_G(p[0],p[1],p[2],o<pin.tRoll?'roll':'taxi',{fm:lead?apAtT(pin,Math.min(pin.dur,o+9)):null,marsh:o>pin.dur-30,st}); } o-=pin.dur;
+  if(o<120) return AP_G(st.x,st.sy,Math.PI/2,'park',{tp:o}); o-=120;
+  if(o<14){ const u=o/14, e=u*u*(3-2*u), hh=Math.PI/2+(st.x<405?-1:1)*0*e; return AP_G(st.x,st.sy+(A.civ.lane-st.sy)*e,hh,'push'); } o-=14;
+  if(o<4){ const h1=apAtT(pout,0.5)[2]; let dh=h1-Math.PI/2; dh=Math.atan2(Math.sin(dh),Math.cos(dh)); return AP_G(st.x,A.civ.lane,Math.PI/2+dh*(o/4),'start'); }  o-=4;
+  if(o<pout.dur){ const p=apAtT(pout,o); return AP_G(p[0],p[1],p[2],'taxo'); } o-=pout.dur;
+  if(o<20){ const p=apAtT(pout,pout.dur); return AP_G(p[0],p[1],p[2],'hold'); } o-=20;
+  if(o<A.lineup.dur){ const p=apAtT(A.lineup,o); return AP_G(p[0],p[1],p[2],'line'); } o-=A.lineup.dur;
+  if(o<5){ const p=apT(A,-100,0); return AP_G(p[0],p[1],A.rwA,'line'); } o-=5;
+  return apTko(A,o,1.15,60); }
+function apFighter(A,f,t){ const h=f.h, park=AP_G(h.p[0],h.p[1],h.a,'has'); if(!f.fly) return park;
+  const P=f.P, tt=((t+f.i*311)%P+P)%P; let o=tt-(P-420); if(o<0) return park;
+  if(o<8) return Object.assign(park,{ph:'start'}); o-=8;
+  if(o<f.pOut.dur){ const p=apAtT(f.pOut,o); return AP_G(p[0],p[1],p[2],'taxo'); } o-=f.pOut.dur;
+  const lu=h.v<0?A.lineupN:A.lineup; if(o<12){ const p=apAtT(f.pOut,f.pOut.dur); return AP_G(p[0],p[1],p[2],'hold'); } o-=12;
+  if(o<lu.dur){ const p=apAtT(lu,o); return AP_G(p[0],p[1],p[2],'line'); } o-=lu.dur;
+  if(o<3){ const p=apT(A,-100,0); return AP_G(p[0],p[1],A.rwA,'line',{ab:1}); } o-=3;
+  if(o<20){ const r=apTko(A,o,2.6,-20); if(r) r.ab=1; return r; } o-=20;
+  if(o<80) return null; o-=80;
+  if(o<16) return apApp(A,o,16,16); o-=16;
+  if(o<f.pIn.dur){ const p=apAtT(f.pIn,o); return AP_G(p[0],p[1],p[2],'taxi'); } o-=f.pIn.dur;
+  if(o<10){ const p=apAt(f.rev,f.rev.len*(o/10)); return AP_G(p[0],p[1],h.a,'push'); }
+  return park; }
 // ---------- drawing helpers ----------
 function apJet(g,s,col,tail){ g.fillStyle='#f3f5f7'; g.save(); g.rotate(Math.PI/2); planeShape(s); g.restore();
   g.fillStyle=tail; g.fillRect(-27*s,-1.8*s,8*s,3.6*s); g.fillStyle=col; g.fillRect(-18*s,-0.7*s,40*s,1.4*s);
@@ -73,18 +109,26 @@ function apFtr(g,s,shadow){ g.beginPath(); const P=[[30,0],[14,-3],[-10,-18],[-1
   if(!shadow){ g.fillStyle='#2c3e50'; g.beginPath(); g.ellipse(14*s,0,5*s,1.6*s,0,0,7); g.fill(); g.fillStyle='#6c7a86'; g.fillRect(-26*s,-1*s,10*s,2*s); } }
 function apNav(X,Y,h,w,beacon){ if(typeof dnLight!=='function') return; const c=Math.cos(h), sn=Math.sin(h); dnLight(X-sn*w,Y+c*w,28,'rgba(40,255,90,0.9)',0.9); dnLight(X+sn*w,Y-c*w,28,'rgba(255,40,40,0.9)',0.9); if(beacon&&(timeS*1.1)%1<0.12) dnLight(X,Y,70,'rgba(255,255,255,0.9)',1); }
 function apDrawCivil(st,p){ const g=ctx, T_=TILE, X=p.x*T_, Y=p.y*T_, s=st.sc, a=p.alt||0, sc=s*(1+a*0.35);
-  g.save(); g.translate(X+a*70,Y+a*70); g.rotate(p.h); g.fillStyle='rgba(10,15,25,'+(0.32-a*0.1)+')'; g.save(); g.rotate(Math.PI/2); planeShape(s); g.restore(); g.restore();
-  g.save(); g.translate(X,Y); g.rotate(p.h); apJet(g,sc,st.col,st.tail); g.restore(); apNav(X,Y,p.h,26*sc,true);
-  if(p.ph!=='park'&&typeof dnLight==='function') dnLight(X+Math.cos(p.h)*34*sc,Y+Math.sin(p.h)*34*sc,90,'rgba(255,245,210,0.55)',0.8); }
+  g.save(); g.translate(X+a*70,Y+a*70); g.rotate(p.h); g.fillStyle='rgba(10,15,25,'+Math.max(0.08,0.32-a*0.08)+')'; g.save(); g.rotate(Math.PI/2); planeShape(s*(1-Math.min(0.3,a*0.08))); g.restore(); g.restore();
+  g.save(); g.translate(X,Y); g.rotate(p.h); if(a<0.5) apGear(g,sc,[[22,0,1.6],[-4,-5,3],[-4,5,3]]); apJet(g,sc,st.col,st.tail); g.restore(); apNav(X,Y,p.h,26*sc,true);
+  if(p.ph!=='park'&&typeof dnLight==='function') dnLight(X+Math.cos(p.h)*34*sc,Y+Math.sin(p.h)*34*sc,p.ldg?200:90,'rgba(255,245,210,0.6)',0.8); apLights(X,Y,p,26*sc);
+  if(p.fm) apVeh(ctx,p.fm[0]*T_,p.fm[1]*T_,p.fm[2],'follow'); if(p.marsh) apMarsh(st.x*T_,(st.sy+40*st.sc/32)*T_); }
+function apGear(g,s,pts){ g.fillStyle='#1b1f24'; for(const [x,y,w] of pts){ g.fillRect((x-1.6)*s,(y-w/2)*s,3.2*s,w*s); } }
+function apLights(X,Y,p,w){ if(typeof dnLight!=='function'||p.ph==='has'||p.ph==='park') return; const c=Math.cos(p.h), sn=Math.sin(p.h), t=timeS*1.3%1;
+  if(t<0.06||(t>0.12&&t<0.18)){ dnLight(X-sn*w,Y+c*w,60,'rgba(255,255,255,0.95)',1); dnLight(X+sn*w,Y-c*w,60,'rgba(255,255,255,0.95)',1); } }
+function apMarsh(x,y){ const g=ctx, k=Math.sin(timeS*4)*0.6; g.fillStyle='#f39c12'; g.beginPath(); g.arc(x,y,5,0,7); g.fill(); g.fillStyle='#2c3e50'; g.beginPath(); g.arc(x,y,2.6,0,7); g.fill();
+  g.strokeStyle='#ff5a1f'; g.lineWidth=2.4; for(const sg of [-1,1]){ g.beginPath(); g.moveTo(x+sg*4,y); g.lineTo(x+sg*(4+9*Math.cos(k)),y-9*Math.sin(Math.abs(k)+0.5)); g.stroke(); }
+  if(typeof dnLight==='function'){ dnLight(x-8,y-6,24,'rgba(255,110,40,0.9)',0.8); dnLight(x+8,y-6,24,'rgba(255,110,40,0.9)',0.8); } }
 function apDrawFighter(f,p){ const g=ctx, T_=TILE, X=p.x*T_, Y=p.y*T_, a=p.alt||0, s=1.55*(1+a*0.3);
   g.save(); g.translate(X+a*60,Y+a*60); g.rotate(p.h); g.fillStyle='rgba(10,15,25,'+(0.32-a*0.1)+')'; apFtr(g,1.55,true); g.restore();
-  g.save(); g.translate(X,Y); g.rotate(p.h); g.fillStyle=f.col; apFtr(g,s,false); if(p.ph==='tko'||p.ph==='taxo'&&false){ g.fillStyle='rgba(255,150,40,0.85)'; g.beginPath(); g.ellipse(-30*s,0,6*s,2*s,0,0,7); g.fill(); } g.restore(); apNav(X,Y,p.h,18*s,p.ph!=='has'); }
+  g.save(); g.translate(X,Y); g.rotate(p.h); if(a<0.5) apGear(g,s,[[16,0,1.2],[-8,-4,2],[-8,4,2]]); g.fillStyle=f.col; apFtr(g,s,false); if(p.ab||p.ph==='tko'){ g.fillStyle='rgba(255,150,40,0.85)'; g.beginPath(); g.ellipse(-30*s,0,6*s,2*s,0,0,7); g.fill(); } g.restore(); apNav(X,Y,p.h,18*s,p.ph!=='has'); apLights(X,Y,p,18*s); }
 function apVeh(g,x,y,h,kind){ g.save(); g.translate(x,y); g.rotate(h); const R=(c,a,b,w,l)=>{ g.fillStyle=c; g.beginPath(); g.roundRect(a,b,w,l,3); g.fill(); };
   if(kind==='tug'){ R('#f1c40f',-14,-9,28,18); R('#2c3e50',4,-7,8,14); }
   else if(kind==='cart'){ R('#7f8c8d',-12,-9,24,18); R('#d35400',-9,-6,8,6); R('#2980b9',1,-6,8,6); }
   else if(kind==='fuel'){ R('#ecf0f1',-34,-11,52,22); R('#c0392b',-34,-11,52,4); R('#2c3e50',20,-10,14,20); }
   else if(kind==='cater'){ R('#bdc3c7',-30,-11,22,22); R('#fdfefe',-8,-12,34,24); R('#2471a3',-8,-12,34,4); }
   else if(kind==='push'){ R('#f39c12',-20,-12,40,24); R('#2c3e50',-6,-8,12,16); }
+  else if(kind==='follow'){ R('#f1c40f',-18,-9,36,18); R('#2c3e50',-2,-7,9,14); g.fillStyle='#111'; for(let i=-16;i<16;i+=6) g.fillRect(i,-9,3,3); if((timeS*3)%1<0.5){ g.fillStyle='#ff9f1a'; g.fillRect(-6,-3,4,6); } }
   else if(kind==='mil'){ R('#556b2f',-22,-10,44,20); R('#3d4f22',6,-8,12,16); }
   g.restore(); }
 function apService(st,p,X,Y){ const T_=TILE, tp=p.tp, k=Math.min(1,tp/8)*(1-Math.max(0,Math.min(1,(tp-104)/10))); if(k<=0.01) return; const s=st.sc, off=(1-k)*14*T_, g=ctx;
@@ -135,6 +179,10 @@ function apDrawLow(vx0,vy0,vx1,vy1){ const A=apA(); if(!A) return; const T_=TILE
   g.restore();
   // taxiway centrelines (yellow) + blue edge dots at night
   const yel=(pts)=>apStroke(g,pts,0.22*T_,'#e8b923',T_); yel(A.loop.concat([A.loop[0]])); for(const [a,b] of A.links) yel([a,b]); yel([A.civLink[0],[405,573],[405,A.civ.lane]]); for(const h of A.has) yel([h.p,h.q]);
+  { const sA=Math.sin(A.rwA), cA=Math.cos(A.rwA), vv=p=>-(p[0]-A.rwC[0])*sA+(p[1]-A.rwC[1])*cA; for(const R of A.taxiPaint||[]){ let run=[]; for(const p of R){ if(Math.abs(vv(p))>0.45) run.push(p); else { if(run.length>1) yel(run); run=[]; } } if(run.length>1) yel(run); }
+    // runway-holding positions: 2 solid + 2 dashed bars across each link at v=±10 (dashes face the runway)
+    g.fillStyle='#e8b923'; for(const u of [-120,0,120]) for(const sv of [-1,1]){ for(let k=0;k<4;k++){ const vb=sv*(10.6-k*0.42); for(let w=-2.4;w<2.4;w+=k<2?4.8:0.9){ const a=apT(A,u+w,vb), b=apT(A,u+Math.min(2.4,w+(k<2?4.8:0.55)),vb);
+      g.save(); g.translate(a[0]*T_,a[1]*T_); g.rotate(A.rwA); g.fillRect(0,-0.08*T_,Math.hypot(b[0]-a[0],b[1]-a[1])*T_,0.16*T_); g.restore(); } } } }
   yel([[A.civ.x0+3,A.civ.lane],[A.civ.x1-3,A.civ.lane]]); for(const st of A.stands){ yel([[st.x,A.civ.lane],[st.x,A.civ.y1-2]]); const ny=st.sy+30*st.sc/32; g.fillStyle='#e8b923'; g.fillRect((st.x-2.2)*T_,(ny+0.2)*T_,4.4*T_,0.45*T_); g.fillStyle='#f0f0f0'; g.fillRect((st.x-1.4)*T_,(ny-1.6)*T_,2.8*T_,0.3*T_); g.font='bold 22px sans-serif'; g.fillStyle='#e8b923'; g.fillText('STOP',(st.x+2.6)*T_,(ny+0.8)*T_); }
   // holding points
   g.fillStyle='#e8b923'; for(const [a,b] of A.links) for(const p of [a,b]){ const q=[p[0]+(apT(A,0,0)[0]-p[0])*0.0,p[1]]; }
@@ -279,3 +327,17 @@ setTimeout(()=>{
     A.posts.forEach(([x,y],i)=>{ if(i%2===0) add(x*T_,y*T_,170,'fl'); }); for(const q of A.gates) add(q.x*T_,q.y*T_,240,'fl');
     for(const st of A.stands) add(st.x*T_,(A.civ.y1-12)*T_,320,'fl'); for(let k=0;k<3;k++) add((A.mil.x0+16+k*32)*T_,(A.mil.y0+10)*T_,300,'fl'); }; }
 },0);
+// ---------- solid aircraft: fuselage + wing + tailplane rectangles (tiles), rebuilt once per game tick ----------
+function apPlaneSolids(){ const A=apA(); if(!A) return null; if(A._solT===timeS) return A._sol; const L=[];
+  const add=(p,s,k)=>{ if(!p||p.alt>0.05) return; L.push({x:p.x,y:p.y,c:Math.cos(p.h),s:Math.sin(p.h),k,sc:s/TILE}); };
+  for(const st of A.stands) add(apCivil(A,st,timeS),st.sc,0);
+  for(const f of A.fighters) add(apFighter(A,f,timeS),1.55,1);
+  for(let k=0;k<3;k++) add({x:A.mil.x0+16+k*32,y:A.mil.y0+14,h:Math.PI/2,alt:0},1.55,1);
+  A._solT=timeS; A._sol=L; return L; }
+// shapes in plane-local units (x along nose, y across): civil = planeShape rotated, fighter = apFtr
+const AP_BOX=[[[-27,30,-4,4],[-8,4,-26,26],[-29,-20,-11,11]],[[-24,30,-3,3],[-14,6,-17,17],[-27,-22,-9,9]]];
+function apSolidM(mx,my){ const A=apA(); if(!A) return false; const x=mx/M_T, y=my/M_T; if(x<A.x0||x>A.x1||y<A.y0||y>A.y1) return false;
+  const L=apPlaneSolids(); if(!L) return false;
+  for(const q of L){ const dx=x-q.x, dy=y-q.y; if(dx*dx+dy*dy>100) continue; const a=(dx*q.c+dy*q.s)/q.sc, b=(-dx*q.s+dy*q.c)/q.sc;
+    for(const r of AP_BOX[q.k]) if(a>r[0]&&a<r[1]&&b>r[2]&&b<r[3]) return true; }
+  return false; }

@@ -11,7 +11,7 @@ const truck={
 };
 const fwd=a=>[Math.sin(a),-Math.cos(a)], rgt=a=>[Math.cos(a),Math.sin(a)];
 function kingpin(s){ const f=fwd(s.h); return [s.x+f[0]*0.3, s.y+f[1]*0.3]; }
-function solidAtM(mx,my){ return isSolidTile(Math.floor(mx*PPM/TILE),Math.floor(my*PPM/TILE)); }
+function solidAtM(mx,my){ return isSolidTile(Math.floor(mx*PPM/TILE),Math.floor(my*PPM/TILE))||(typeof apSolidM==="function"&&apSolidM(mx,my)); }
 function bodyHits(cx,cy,a,yf,yr,w){ // local y forward-negative range [yf,yr], width w; returns true on hit
   const f=fwd(a), r=rgt(a); const n=Math.ceil((yr-yf)/1.2);
   for(let i=0;i<=n;i++){ const ly=yf+(yr-yf)*i/n; for(const lx of [-w/2,0,w/2]){ if(lx===0 && i>0 && i<n) continue;
