@@ -403,13 +403,16 @@ function updatePortLogistics(P,dt,t){ const ships=portShips(P,t); portShipHold(P
   if(P.lorT<=0&&typeof PTRUCK==='undefined'){ P.lorT=7; const sx=P.lspawn[0]*TILE-cam.x, sy=P.lspawn[1]*TILE-cam.y, seen=Math.abs(sx)<VW/2/cam.z+120&&Math.abs(sy)<VH/2/cam.z+120; const busy=typeof traffic!=='undefined'&&traffic.vs.some(o=>Math.hypot(o.x/M_T-P.lspawn[0],o.y/M_T-P.lspawn[1])<12); if(seen||busy) P.lorT=2; else if(P.lors.length<4&&!P.lors.some(l=>l.p<-P.lpre+12)){ const pend=P.lors.filter(l=>l.box&&!l.dropped).length;
       if(P.ex+P.exRes+pend<P.ecap-2&&(Math.random()<0.55||P.stock-P.impClaim<=0)) P.lors.push({p:-P.lpre,box:YARD_COLS[(Math.random()*8)|0],kind:'exp',w:0,still:0,col:['#d63b2f','#2e86c1','#f4f6f7','#27ae60','#f39c12'][(Math.random()*5)|0]});
       else if(P.stock-P.impClaim>0){ P.impClaim++; P.lors.push({p:-P.lpre,box:null,kind:'imp',claim:1,w:0,still:0,col:['#d63b2f','#2e86c1','#f4f6f7','#27ae60','#f39c12'][(Math.random()*5)|0]}); } } }
+  if(!P.agates){ const d=P.laneDir, E0=P.loops.E.lv0<P.loops.I.lv0; P.agates=[{i:0,v:Math.min(...P.lor)+3,chk:3.5,a:0},...(P.fenceV!=null?[{i:1,v:P.fenceV+1.2,chk:2.5,a:0,impOnly:1}]:[])].map(g=>Object.assign(g,{p:(g.v-P.lor[0])*d,name:g.i===0?(E0?'EXPORT':'IMPORT'):(E0?'IMPORT':'EXPORT')})); }
   const LS=P.lors.slice().sort((a,b)=>b.p-a.p);
   for(let i=0;i<LS.length;i++){ const l=LS[i], ahead=i?LS[i-1].p:1e9; let tgt=P.laneLen+P.lpost; if(l.truck&&!l.box&&!l.claim&&P.stock-P.impClaim>0){ l.claim=1; P.impClaim++; }   // hauliers wait in the loading slot until the ship's boxes reach the stack
     if(l.kind==='exp'&&l.box&&!l.dropped) tgt=pE; else if((l.claim||l.truck)&&!l.box&&!l.loaded) tgt=pI;
+    l.gt=l.gt||{}; for(const g of P.agates){ const sp=g.p-2.6; if(!l.gt[g.i]&&l.p<sp+0.06&&tgt>sp){ if(g.impOnly&&!(l.claim||l.truck)&&!(l.kind==='imp')){ if(l.p>sp-0.5) l.gt[g.i]=1; else { tgt=sp; } } else tgt=sp; if(Math.abs(sp-l.p)<0.06){ l.gw=(l.gw||0)+dt; if(l.gw>=(g.impOnly&&!(l.claim||l.truck)?0.4:g.chk)){ l.gt[g.i]=1; l.gw=0; } } break; } }   /* v43 gate check-in: stop at the barrier, then it lifts */
     const lp0=lorPose(P,l.p+P.lpre), dist=tgt-l.p, pa=Math.min(portPlayerAhead(P,lp0[0],lp0[1],lp0[2],8),portTrafficAhead(P,lp0[0]+Math.cos(lp0[2])*1.5,lp0[1]+Math.sin(lp0[2])*1.5,lp0[2],7)+1.5); l.yield=pa<8; const gs=dgStop(P,l); const mv=Math.max(0,Math.min(dt*Math.min(3.2,0.3+Math.max(0,dist,0)*0.8,0.3+gs*0.8),Math.max(0,dist),gs,ahead-l.p-5.6,l.yield?Math.max(0,(pa-3.4)*dt):1e9)); l.p+=mv; l.mv=mv/dt; { const q=lorPose(P,l.p+P.lpre); l.x=q[0]+(l.ox||0); l.y=q[1]+(l.oy||0); l.h=q[2]; artic(l,l.x,l.y,q[2],2.75); } l.at=Math.abs(dist)<0.05;
     if(mv>0.001||l.at) l.still=0; else l.still+=dt;
     if(l.at&&!l.rq){ if(tgt===pE){ l.rq=1; P.rtg[1].q.push({veh:l,kind:'lDrop',u:P.lorU}); } else if(tgt===pI&&l.claim){ l.rq=1; P.rtg[0].q.push({veh:l,kind:'lLoad',u:P.lorU}); } }
     if(l.at&&tgt===pI&&!l.box){ l.w+=dt; if(l.w>70&&!l.truck&&P.rtg[0].cur?.veh!==l){ P.rtg[0].q=P.rtg[0].q.filter(j=>j.veh!==l); l.claim=0; P.impClaim--; l.rq=0; } } }
+  for(const g of P.agates){ const op=P.lors.some(l=>l.gt&&l.gt[g.i]&&l.p>g.p-3&&l.p<g.p+5); g.a+=((op?1:0)-g.a)*Math.min(1,dt*2.5); g.q=P.lors.filter(l=>!(l.gt&&l.gt[g.i])&&l.p<g.p&&l.p>g.p-24).length; }
   for(let i=P.lors.length-1;i>=0;i--) if(!P.lors[i].truck&&P.lors[i].p>=P.laneLen+P.lpost-0.5){ const l=P.lors[i]; P.lors.splice(i,1); if(l.box) P.sent++; }
   // ---- yard gantries (one lift at a time, FIFO)
   for(const g of P.rtg){ if(!g.cur&&g.q.length){ for(let qi=0;qi<g.q.length;qi++){ const j=g.q[qi];
@@ -573,7 +576,11 @@ function dockLightList(){ if(dockLightList.L) return dockLightList.L; const L=[]
 setTimeout(()=>{ if(typeof siteLights!=='function') return; const sl=siteLights; siteLights=function(add){ sl.apply(this,arguments); try{ for(const l of dockLightList()) add(l[0],l[1],l[2],l[3]); }catch(e){} }; },0);
 
 // v42 fence between the IMPORT and EXPORT areas (yard side of the lorry lane), area signs, a gate booth + barrier for each area on the lorry lane
-function drawPortFence(P){ if(P.fenceV==null) return; const T_=TILE, v=P.fenceV*T_, u0=(P.lorU+1.0)*T_, u1=-0.4*T_;
+function drawPortQueue(P){ if(!P.agates||!P.lpath) return; const T_=TILE; ctx.save(); ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  for(const g of P.agates) for(let k=0;k<3;k++){ const p=g.p-2.6-k*6.2; if(p+P.lpre<0) continue; const q=lorPose(P,p+P.lpre); ctx.save(); ctx.translate(q[0]*T_,q[1]*T_); ctx.rotate(q[2]); ctx.strokeStyle='rgba(255,255,255,0.75)'; ctx.lineWidth=1.5; ctx.setLineDash([6,4]); ctx.strokeRect(-4.6*T_,-0.75*T_,6.0*T_,1.5*T_); ctx.setLineDash([]);
+    ctx.rotate(-Math.PI/2*Math.sign(Math.cos(q[2])||1)); ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.fillText((g.name[0])+(k+1),0,-0.0*T_); ctx.restore(); }
+  ctx.restore(); }
+function drawPortFence(P){ drawPortQueue(P); if(P.fenceV==null) return; const T_=TILE, v=P.fenceV*T_, u0=(P.lorU+1.0)*T_, u1=-0.4*T_;
   ctx.strokeStyle='rgba(30,30,30,0.35)'; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(u0+4,v+4); ctx.lineTo(u1+4,v+4); ctx.stroke();
   ctx.strokeStyle='#9ea4a8'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(u0,v); ctx.lineTo(u1,v); ctx.stroke(); ctx.fillStyle='#5d6266'; for(let u=u0;u<=u1;u+=12) ctx.fillRect(u-3,v-3,6,6);
   ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1; for(let u=u0;u<u1;u+=6){ ctx.beginPath(); ctx.moveTo(u,v-1.5); ctx.lineTo(u+6,v+1.5); ctx.stroke(); }
@@ -581,6 +588,7 @@ function drawPortFence(P){ if(P.fenceV==null) return; const T_=TILE, v=P.fenceV*
   const I=P.loops.I, E=P.loops.E; lab('IMPORT AREA',(I.lv0+I.lv1)/2,'rgba(120,200,255,0.75)'); lab('EXPORT AREA',(E.lv0+E.lv1)/2,'rgba(255,190,90,0.75)');
   for(const [vv,t,col] of [[Math.min(...P.lor)+3,(P.loops.E.lv0<P.loops.I.lv0)?'EXPORT GATE':'IMPORT GATE','#c9733a'],[P.fenceV+1.2,(P.loops.E.lv0<P.loops.I.lv0)?'IMPORT GATE':'EXPORT GATE','#3f8fbf']]){
     const y=vv*T_, x=P.lorU*T_; ctx.fillStyle='#2b2f33'; ctx.fillRect(x-1.6*T_,y-6,0.5*T_,12); ctx.fillStyle=col; ctx.fillRect(x-1.6*T_,y-6,0.5*T_,3);
-    for(let k=0;k<5;k++){ ctx.fillStyle=k%2?'#fff':'#d33'; ctx.fillRect(x-1.1*T_+k*0.44*T_,y-1.5,0.44*T_,3); }
+    const g=(P.agates||[]).find(g=>Math.abs(g.v-vv)<0.01), ang=(g?g.a:0)*Math.PI*0.45; ctx.save(); ctx.translate(x-1.1*T_,y); ctx.rotate(-ang*P.laneDir); for(let k=0;k<5;k++){ ctx.fillStyle=k%2?'#fff':'#d33'; ctx.fillRect(k*0.44*T_,-1.5,0.44*T_,3); } ctx.restore();
+    ctx.fillStyle=g&&g.a>0.5?'#2ecc71':'#e74c3c'; ctx.beginPath(); ctx.arc(x-1.35*T_,y-4,3,0,7); ctx.fill();
     ctx.save(); ctx.translate(x-2.1*T_,y); ctx.rotate(-Math.PI/2); ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='bold 13px sans-serif'; ctx.textAlign='center'; ctx.fillText(t,0,0); ctx.restore(); } }
 function portFenceSolid(mx,my){ if(typeof portList!=='function') return false; const x=mx/M_T, y=my/M_T; for(const P of portList()){ if(P.fenceV==null||!P.O) continue; const q=portLocal(P,x,y); if(Math.abs(q[1]-P.fenceV)<0.22&&q[0]>P.lorU+1&&q[0]<-0.4) return true; } return false; }
