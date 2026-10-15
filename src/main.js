@@ -210,7 +210,7 @@ function drawOverhead(o){
 }
 // ---------- HUD
 function drawHUD(){
-  const s=truck, kmh=Math.abs(s.v)*3.6;
+  const s=truck, kmh=Math.abs(s.v)*2.23694;
   drawMinimap(); drawClockHUD(); drawWeatherHUD(); drawCoupleHUD(); drawFuelHUD(); drawIndHUD(); if(typeof drawBeamHUD==='function') drawBeamHUD(); drawCareerHUD(); drawNavHUD();
   // gauge panel
   const gx=14, gy=VH-150, gw=186, gh=136;
@@ -229,7 +229,7 @@ function drawHUD(){
   ctx.fillStyle='#fff'; ctx.font='bold 13px system-ui,sans-serif'; ctx.fillText(String(Math.round(s.rpm)),ccx,ccy+42);
   // speed + gear
   ctx.textAlign='right'; ctx.fillStyle='#fff'; ctx.font='bold 34px system-ui,sans-serif'; ctx.fillText(String(Math.round(kmh)),gx+gw-12,gy+44);
-  ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='11px system-ui,sans-serif'; ctx.fillText('km/h',gx+gw-12,gy+58);
+  ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='11px system-ui,sans-serif'; ctx.fillText('mph',gx+gw-12,gy+58);
   const gear= s.mode==='R'?'R': (Math.abs(s.v)<0.2&&s.throttle<0.05?'N':String(s.gear));
   ctx.fillStyle= s.mode==='R'?'#ff8c42':'#7fdcff'; ctx.font='bold 34px system-ui,sans-serif'; ctx.fillText(gear,gx+gw-12,gy+104);
   ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.font='11px system-ui,sans-serif'; ctx.fillText('GEAR',gx+gw-12,gy+118);

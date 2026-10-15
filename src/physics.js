@@ -1,7 +1,7 @@
 'use strict';
 // ===================== LORRY PHYSICS =====================
 const GEARS=[4.2,3.1,2.3,1.75,1.35,1.08,0.88,0.72], FINAL=4.0, WHEEL_R=0.5, REV_RATIO=4.5;
-const MASS=22000, IDLE=650, REDLINE=2300, VMAX=25.0;   // 90 km/h governor
+const MASS=22000, IDLE=650, REDLINE=2300, VMAX=25.0;   // 56 mph governor (UK HGV)
 function torqueAt(rpm){ if(rpm<600) return 1300; if(rpm<1100) return 1300+(rpm-600)*2.2; if(rpm<1500) return 2400; if(rpm<2100) return 2400-(rpm-1500)*1.3; return Math.max(0,1620-(rpm-2100)*8); }
 const truck={
   x:0,y:0,h:0,           // rear axle position (metres), heading (rad, 0 = north, clockwise)

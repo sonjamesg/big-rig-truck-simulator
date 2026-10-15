@@ -13,7 +13,7 @@ function flyPick(sx,sy){ const wx=((sx-VW/2)/cam.z+cam.x)/PPM, wy=((sy-VH/2)/cam
 function flyInfo(t){ if(t.ptruck){ const T=t.ptruck, v=T.v; const st={road:'on road',gate:'in port gate lane',depot:'at depot gantry',lost:'re-routing',new:'starting'}[T.st]||T.st;
     const dest=T.tgt==='port'?((T.P&&T.P.depot?T.P.depot.name:'Port')+' gate'):(T.dest&&T.dest.name)||(v&&v.goal&&v.goal.name)||'\u2014';
     return ['PORT LORRY'+(T.home?' (own fleet)':''), st+' \u2022 '+(T.box?'loaded':'empty'), '\u2192 '+dest]; }
-  const v=t; return [(v.role||'civilian').toUpperCase()+' \u2022 '+(v.kind||'car'), (Math.abs(v.v||0)<0.5?'stopped':Math.round(Math.abs(v.v)*3.6)+' km/h'), '\u2192 '+((v.goal&&v.goal.name)||'cruising')]; }
+  const v=t; return [(v.role||'civilian').toUpperCase()+' \u2022 '+(v.kind||'car'), (Math.abs(v.v||0)<0.5?'stopped':Math.round(Math.abs(v.v)*2.23694)+' mph'), '\u2192 '+((v.goal&&v.goal.name)||'cruising')]; }
 function flyCamTick(dt){ if(!FLY.on) return; if(!flyAllowed()){ flySet(false); return; }
   let px=0,py=0; const K=FLY.keys; if(K.has('ArrowLeft')||K.has('KeyA')) px--; if(K.has('ArrowRight')||K.has('KeyD')) px++; if(K.has('ArrowUp')||K.has('KeyW')) py--; if(K.has('ArrowDown')||K.has('KeyS')) py++;
   if(K.has('Equal')||K.has('NumpadAdd')) FLY.z*=Math.exp(dt*1.5); if(K.has('Minus')||K.has('NumpadSubtract')) FLY.z*=Math.exp(-dt*1.5);

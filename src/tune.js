@@ -13,9 +13,9 @@ const CZ_PARTS=[
   // engine: hp stages, turbo, ECU remap
   {id:'eng1',slot:'eng',n:'Stage 1 tune',lv:1,p:800,req:1,fx:{pw:1.06},d:'Freer intake + injector tweak'},
   {id:'eng2',slot:'eng',n:'Turbo upgrade',lv:2,p:2500,req:3,fx:{pw:1.13,acc:1.05},d:'Bigger hybrid turbo, more low-end shove'},
-  {id:'eng3',slot:'eng',n:'ECU remap',lv:3,p:4500,req:5,fx:{pw:1.20,vm:1.4,econ:0.97},d:'Remapped fuelling, limiter raised to 95 km/h'},
+  {id:'eng3',slot:'eng',n:'ECU remap',lv:3,p:4500,req:5,fx:{pw:1.20,vm:1.4,econ:0.97},d:'Remapped fuelling, limiter raised to 59 mph'},
   {id:'eng4',slot:'eng',n:'Stage 4 twin-turbo',lv:4,p:8500,req:8,fx:{pw:1.30,vm:2.2,acc:1.08,econ:1.04},d:'Sequential twin turbos + intercooler'},
-  {id:'eng5',slot:'eng',n:'Stage 5 race block',lv:5,p:15000,req:12,fx:{pw:1.42,vm:3.0,acc:1.12,econ:1.10,dur:1.05},d:'Forged internals, 100 km/h, thirsty'},
+  {id:'eng5',slot:'eng',n:'Stage 5 race block',lv:5,p:15000,req:12,fx:{pw:1.42,vm:3.0,acc:1.12,econ:1.10,dur:1.05},d:'Forged internals, 63 mph, thirsty'},
   // brakes + engine brake
   {id:'brk1',slot:'brk',n:'Sport pads',lv:1,p:600,req:1,fx:{br:1.10},d:'Higher-friction pads',cl:'#c0392b'},
   {id:'brk2',slot:'brk',n:'Drilled discs',lv:2,p:1800,req:2,fx:{br:1.22},d:'Cross-drilled vented discs',cl:'#e67e22'},
@@ -54,8 +54,8 @@ function czLook(mid,fit){ const L={}; for(const k in fit){ const p=czPart(fit[k]
 function czFx(fit){ const F={pw:1,vm:0,acc:1,br:1,ebr:1,grip:1,hand:1,jk:0,econ:1,tank:0,dur:1,shift:1,beam:1,snd:0};
   for(const k in fit){ const p=czPart(fit[k]); if(!p||!p.fx) continue; for(const q in p.fx){ if(q==='vm'||q==='tank'||q==='jk'||q==='snd') F[q]+=p.fx[q]; else F[q]*=p.fx[q]; } } return F; }
 // ---- stats (display 0..1 bars + text)
-function czStats(m,fit){ const F=czFx(fit), hp=Math.round(m.hp*F.pw), v=(m.vmax+F.vm)*3.6, acc=m.power*F.pw*F.acc*(1+(1-F.shift)*0.15), L=36*m.econ*F.econ;
-  return [['Power',hp+' hp',hp/1100],['Top speed',Math.round(v)+' km/h',(v-70)/45],['Acceleration',(acc*10).toFixed(1),acc/2.6],['Braking',Math.round(F.br*100)+'%',(F.br-0.6)/1.1],
+function czStats(m,fit){ const F=czFx(fit), hp=Math.round(m.hp*F.pw), v=(m.vmax+F.vm)*2.23694, acc=m.power*F.pw*F.acc*(1+(1-F.shift)*0.15), L=36*m.econ*F.econ;
+  return [['Power',hp+' hp',hp/1100],['Top speed',Math.round(v)+' mph',(v-44)/28],['Acceleration',(acc*10).toFixed(1),acc/2.6],['Braking',Math.round(F.br*100)+'%',(F.br-0.6)/1.1],
     ['Handling',Math.round(F.grip*F.hand*100)+'%',(F.grip*F.hand+F.jk-0.6)/1.1],['Economy',L.toFixed(0)+' L/100',(60-L)/40],['Durability',Math.round(100/F.dur)+'%',(1/F.dur-0.5)/0.9]]; }
 // ---- apply to the live truck (called by applyModel)
 function czApply(){ const m=modelById(career.cur), F=czFx(czFitted(m.id)); truck.power=m.power*F.pw; truck.vmax=m.vmax+F.vm; truck.accM=F.acc; truck.brk=F.br; truck.ebr=F.ebr; truck.grip=F.grip; truck.hand=F.hand; truck.jkM=F.jk;
@@ -265,7 +265,7 @@ function czTabParts(t){ const out=[]; for(const sl of CZ_TABS.find(x=>x.id===t).
 function czOwned(mid,p){ return p.stock||!!czSetup(mid).own[p.id]; }
 function czIsFit(mid,p){ const f=czSetup(mid).fit[p.slot]; return p.stock?!f:f===p.id; }
 function czFxText(p){ if(!p.fx) return p.look?'cosmetic':''; const t=[], f=p.fx, pc=(v,n)=>t.push((v>1?'+':'')+Math.round((v-1)*100)+'% '+n);
-  if(f.pw) pc(f.pw,'power'); if(f.vm) t.push('+'+Math.round(f.vm*3.6)+' km/h'); if(f.br) pc(f.br,'brakes'); if(f.ebr) pc(f.ebr,'engine brake'); if(f.grip) pc(f.grip,'grip'); if(f.hand&&!f.grip) pc(f.hand,'handling'); if(f.econ) t.push((f.econ<1?'-':'+')+Math.abs(Math.round((f.econ-1)*100))+'% fuel use'); if(f.tank) t.push('+'+f.tank+' L tank'); if(f.dur) pc(1/f.dur,'durability'); if(f.jk) t.push('anti-jackknife'); if(f.shift) pc(1/f.shift,'shift speed'); if(f.beam) pc(f.beam,'beam reach'); if(f.snd) t.push('deeper sound'); return t.slice(0,2).join(' \u2022 '); }
+  if(f.pw) pc(f.pw,'power'); if(f.vm) t.push('+'+Math.round(f.vm*2.23694)+' mph'); if(f.br) pc(f.br,'brakes'); if(f.ebr) pc(f.ebr,'engine brake'); if(f.grip) pc(f.grip,'grip'); if(f.hand&&!f.grip) pc(f.hand,'handling'); if(f.econ) t.push((f.econ<1?'-':'+')+Math.abs(Math.round((f.econ-1)*100))+'% fuel use'); if(f.tank) t.push('+'+f.tank+' L tank'); if(f.dur) pc(1/f.dur,'durability'); if(f.jk) t.push('anti-jackknife'); if(f.shift) pc(1/f.shift,'shift speed'); if(f.beam) pc(f.beam,'beam reach'); if(f.snd) t.push('deeper sound'); return t.slice(0,2).join(' \u2022 '); }
 function czRender(){ const b=uiRoot.querySelector('.mback'); if(!b||career.uiOpen!=='tune') return; const pf=typeof pad!=='undefined'&&pad.focus, fk=pf?(pf.dataset.p?'[data-p="'+pf.dataset.p+'"]':pf.dataset.t?'.cztabs [data-t="'+pf.dataset.t+'"]':pf.id?'#'+pf.id:null):null; czRender0(b); if(fk){ const el=b.querySelector(fk); if(el){ pad.focus=el; el.classList.add('padfocus'); } } }
 function czRender0(b){ const m=modelById(career.cur), lvl=levelOf(career.xp);
   b.querySelector('#czBank').textContent=money(truck.money);

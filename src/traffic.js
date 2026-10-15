@@ -276,6 +276,9 @@ function planRB(v,rb,sg,d,r,forceArm){
 let tRand=mulberry(4242);
 function viewRectM(){ const z=cam.z; return [ (cam.x-VW/2/z)/PPM, (cam.y-VH/2/z)/PPM, (cam.x+VW/2/z)/PPM, (cam.y+VH/2/z)/PPM ]; }
 function onScreen(x,y,m){ const v=viewRectM(); return x>v[0]-m&&x<v[2]+m&&y>v[1]-m&&y<v[3]+m; }
+function segDeadEnd(sg){ if(sg._dE!==undefined) return sg._dE; const r=(sg.js||[]).map(j=>jRange(sg,j));
+  const e0=r.some(q=>q[0]<=sg.b0+1)||sg.cv0!=null||sg.link0!=null||sg.rb0!=null, e1=r.some(q=>q[1]>=sg.b1)||sg.cv1!=null||sg.link1!=null||sg.rb1!=null;
+  return sg._dE=!(e0&&e1)&&sg.b1-sg.b0>40&&(sg.type==='dual'||sg.type==='hwy'); }
 function spawnVehicle(x,y,force,opt){
   const r=tRand;
   const tx=Math.floor(x/M_T), ty=Math.floor(y/M_T); if(!inb(tx,ty)) return null;
@@ -283,7 +286,7 @@ function spawnVehicle(x,y,force,opt){
   if(opt&&opt.seg!=null) sid=opt.seg; if(sid<0) return null; const sg=world.segs[sid];
   const along=opt&&opt.along!=null?opt.along:(sg.dir==='h'?tx:ty)+0.5;
   for(const J of sg.js){ const [a,b]=jRange(sg,J); if(along>a-3&&along<b+3) return null; }
-  if(along<sg.b0+2||along>sg.b1-1) return null;
+  if(along<sg.b0+2||along>sg.b1-1) return null; if(segDeadEnd(sg)) return null;   // v26: never spawn onto a road that leads nowhere
   const dir=opt&&opt.dir?opt.dir:(r()<0.5?1:-1), lane=opt?0:(r()*nLanes(sg))|0;
   const p=lanePt(sg,dir,lane,along);
   const kind=opt&&opt.kind?opt.kind:pickW(MIX[sg.type]||MIX.city,r()), t=VTYPES[kind];
@@ -399,7 +402,7 @@ function updateTraffic(dt){
     if(onScreen(x,y,25)) continue; if(spawnVehicle(x,y)) made++; }
   for(let k=traffic.vs.length-1;k>=0;k--){ const v=traffic.vs[k]; const d=Math.hypot(v.x-P.x,v.y-P.y);
     if(d<70) v.pinT=timeS+60;
-    if(d>300 && v.pinT<timeS && !onScreen(v.x,v.y,30)){ releaseJ(v); traffic.vs.splice(k,1); traffic.despawned++; } }
+    if(((d>300&&v.pinT<timeS)||(v.stopT>40&&d>60)) && !onScreen(v.x,v.y,30)){ releaseJ(v); traffic.vs.splice(k,1); traffic.despawned++; } }
   // sub-stepped simulation
   const n=Math.ceil(dt/0.034), h=dt/n;
   for(let st=0;st<n;st++) for(const v of traffic.vs) stepVeh(v,h,pbs);

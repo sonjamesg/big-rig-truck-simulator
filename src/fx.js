@@ -1,6 +1,6 @@
 'use strict';
 // ===================== v14 FX: exhaust puffs, wheel-lock skid marks/smoke, crash explosions =====================
-const FX_CRASH_V=19;   // m/s (~68 km/h) impact speed that destroys the rig
+const FX_CRASH_V=19;   // m/s (~43 mph) impact speed that destroys the rig
 const FX={p:[],marks:[],lastThr:0,puffT:0,skT:0,boom:null};
 function fxEmit(x,y,vx,vy,r,life,col,grow,fire){ if(FX.p.length>500) FX.p.shift(); FX.p.push({x,y,vx,vy,r,life,t:0,col,grow,fire}); }
 function updateFX(dt){ const s=truck, f=fwd(s.h), r=rgt(s.h); const st=(modelById(career.cur).style)||{};

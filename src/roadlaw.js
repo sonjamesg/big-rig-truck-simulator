@@ -11,9 +11,9 @@ const OFF={list:[],subs:[],services:[],total:0,
     if(r.amount>0){ truck.money-=r.amount; this.total+=r.amount; } for(const f of this.subs){ try{ f(r); }catch(e){} }
     if(typeof BigRig!=='undefined'&&BigRig.emit) BigRig.emit('offence',r); return r; } };
 
-// ---- speed limits (UK mph). Game speeds are scaled so a 70 limit sits right at a stock truck's governor (≈90 km/h on the dial).
-const SPL={SCALE:0.8, cur:30, seg:null, tol:1.1};
-function slKmh(mph){ return mph*1.609*SPL.SCALE; }
+// ---- speed limits (UK mph, true mph: 1 m/s = 2.237 mph). Cameras trigger above limit*tol+2 mph.
+const MPH=2.23694, SPL={SCALE:1, cur:30, seg:null, tol:1.1};
+function slMph(mph){ return mph*SPL.SCALE; }
 function slOfSeg(sg){ if(!sg) return null; if(sg.limit) return sg.limit; const t=sg.type, w=sg.w||2, L=(sg.b1-sg.b0)||0; let m=30;
   if(t==='hwy') m=70; else if(t==='dual') m=70;
   else if(t==='rural') m=w>=6?50:60; else if(t==='lane') m=60; else if(t==='dirt') m=40;
@@ -45,20 +45,20 @@ let CAMP=null;
 function updateRoadLaw(dt){ if(!world.ready||!started) return; camBuild(); CAM.flash=Math.max(0,CAM.flash-dt*3);
   for(const v of traffic.vs) if(!v.role) v.role='civilian';
   const sg=slSegAt(truck.x,truck.y); if(sg){ SPL.seg=sg; SPL.cur=slOfSeg(sg); }
-  const tx=truck.x/M_T, ty=truck.y/M_T, kmh=Math.abs(truck.v)*3.6;
+  const tx=truck.x/M_T, ty=truck.y/M_T, mph=Math.abs(truck.v)*MPH;
   if(CAMP&&!(typeof BREAKDOWN!=='undefined'&&BREAKDOWN.active)){ for(const c of CAM.list){ const sg2=c.sg, lo=sg2.a-1.2, hi=sg2.a+sg2.w+1.2;
       const crossed=c.h?((CAMP[0]-c.al)*(tx-c.al)<=0&&CAMP[0]!==tx&&ty>lo&&ty<hi):((CAMP[1]-c.al)*(ty-c.al)<=0&&CAMP[1]!==ty&&tx>lo&&tx<hi);
-      if(!crossed||timeS-c.last<CAM.cd) continue; const lim=slOfSeg(sg2); if(kmh<=slKmh(lim)*SPL.tol+2) continue; c.last=timeS; CAM.flash=1; camSound();
-      const mph=Math.round(kmh/1.609/SPL.SCALE); OFF.add({type:'speeding',amount:100,reason:mph+' in a '+lim,cam:c,limit:lim,kmh:Math.round(kmh)});
-      toast('\u{1F4F8} Speed camera \u2022 '+mph+' in a '+lim+' \u2022 \u2212\u00a3100 fine'); } }
+      if(!crossed||timeS-c.last<CAM.cd) continue; const lim=slOfSeg(sg2); if(mph<=slMph(lim)*SPL.tol+2) continue; c.last=timeS; CAM.flash=1; camSound();
+      const mphR=Math.round(mph); OFF.add({type:'speeding',amount:100,reason:mphR+' mph in a '+lim,cam:c,limit:lim,mph:mphR});
+      toast('\u{1F4F8} Speed camera \u2022 '+mphR+' mph'+' in a '+lim+' \u2022 \u2212\u00a3100 fine'); } }
   CAMP=[tx,ty]; }
 
 // ---- drawing
 function slRoundel(x,y,r,mph){ ctx.save(); ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.fill(); ctx.strokeStyle='#d0021b'; ctx.lineWidth=r*0.2; ctx.beginPath(); ctx.arc(x,y,r*0.88,0,7); ctx.stroke();
   ctx.fillStyle='#111'; ctx.font='900 '+Math.round(r*(mph>=100?0.75:0.95))+'px Arial,system-ui'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(String(mph),x,y+r*0.06); ctx.restore(); }
-function drawRoadLawHUD(){ if(!started) return; const gx=14, gy=VH-150, gw=186, r=VW<520?20:24, x=gx+gw+12+r, y=gy+136-r-4, over=Math.abs(truck.v)*3.6>slKmh(SPL.cur)*SPL.tol+2;
+function drawRoadLawHUD(){ if(!started) return; const gx=14, gy=VH-150, gw=186, r=VW<520?20:24, x=gx+gw+12+r, y=gy+136-r-4, over=Math.abs(truck.v)*MPH>slMph(SPL.cur)*SPL.tol+2;
   ctx.save(); ctx.fillStyle='rgba(10,14,22,0.6)'; ctx.beginPath(); ctx.arc(x,y,r+5,0,7); ctx.fill(); if(over&&(timeS*3)%1<0.5){ ctx.strokeStyle='#ff3b30'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(x,y,r+5,0,7); ctx.stroke(); } ctx.restore();
-  slRoundel(x,y,r,SPL.cur); ctx.save(); ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.font='bold 9px system-ui'; ctx.textAlign='center'; ctx.fillText('\u2248'+Math.round(slKmh(SPL.cur))+' km/h',x,y+r+14); ctx.restore();
+  slRoundel(x,y,r,SPL.cur); ctx.save(); ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.font='bold 9px system-ui'; ctx.textAlign='center'; ctx.fillText('mph',x,y+r+14); ctx.restore();
   if(CAM.flash>0){ ctx.save(); ctx.fillStyle='rgba(255,255,255,'+(0.85*CAM.flash*CAM.flash)+')'; ctx.fillRect(0,0,VW,VH); ctx.restore(); } }
 function drawCameras(vx0,vy0,vx1,vy1){ const S=TILE, K=typeof DN!=='undefined'?DN.dark:0; for(const c of CAM.list){ const x=c.px*S, y=c.py*S; if(x<vx0-80||x>vx1+80||y<vy0-80||y>vy1+80) continue;
     ctx.save(); // calibration marks across the carriageway

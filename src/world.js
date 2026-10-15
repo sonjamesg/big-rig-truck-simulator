@@ -268,8 +268,8 @@ function* genWorldSteps(){
   // v17 Kingsbridge: elevated-style dual loop round a compact downtown, roundabout interchanges at its corners, five radials, district grids of differing pitch, channel bridges
   mway([[1530,1530,'rb'],[1705,1530,'rb'],[1705,1680,'rb'],[1530,1680,'rb']],true,0,'Kingsbridge Loop','dual');
   mway([[1360,1380,'rb'],[1530,1380],[1530,1530,'rb']],false,40,'K1 Northway','dual');
-  mway([[1705,1530,'rb'],[1940,1530]],false,0,'K2 Eastway','dual');
-  mway([[1705,1680,'rb'],[1850,1680],[1850,1940]],false,40,'K3 Portway','dual');
+  mway([[1705,1530,'rb'],[1945,1530]],false,0,'K2 Eastway','dual');
+  mway([[1705,1680,'rb'],[1850,1680],[1850,1945]],false,40,'K3 Portway','dual');
   mway([[1530,1680,'rb'],[1400,1680]],false,0,'K4 Westway','dual');
   road('v',1400,1683,1787,RW,'city'); road('h',1589,1400,1526,2,'rural');   // Airport Way + Dam Road (K5) feed in (v25 audit: Airport Way stub now ends flush with the T, was a 3-tile dead end)
   for(const k of [1,3]){ road('h',KB.ys[k],1533,KB.xs[0]-1,RW,'city'); road('h',KB.ys[k],KB.X1+1,1701,RW,'city'); }
