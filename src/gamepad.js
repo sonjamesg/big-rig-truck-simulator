@@ -48,9 +48,10 @@ function padUpdate(dt){
   if(!started){ if(hit(0)&&!isTyping(document.activeElement)) startGame(); return; }   // lobby: no game actions, A = play solo
   if(!started) return;
   if(hit(12)&&MP.on) mpToggleList();
-  if(hit(0)){ if(document.getElementById('czGo')&&typeof czOpen==='function') czOpen(); else toggleCouple(); } if(hit(2)) toggleRefuel(); if(hit(3)) tryUnload();
+  if(hit(0)){ const cc=!truck.trl&&typeof coupleCandidate==='function'?coupleCandidate():null;   // v31: a lined-up trailer always wins; repair/tune prompts never uncouple
+    if(cc&&cc.ok) toggleCouple(); else if(document.getElementById('rpGo')&&typeof rpDo==='function') rpDo(); else if(document.getElementById('czGo')&&typeof czOpen==='function') czOpen(); else toggleCouple(); } if(hit(2)) toggleRefuel(); if(hit(3)) tryUnload();
   if(hit(13)&&typeof hbToggle==='function') hbToggle(); if(hit(14)) indToggle(1); if(hit(15)) indToggle(2); if((hit(4)&&now[5])||(hit(5)&&now[4])){ hazToggle(); input.horn=false; }
-  if(hit(8)) openMap(); if(hit(9)) openBoard(); if(hit(5)&&!now[4]&&NAV.route){ clearRoute(); flash('Route cancelled'); }
+  if(hit(8)) openMap(); if(hit(9)) openBoard(); if(hit(5)) pad.rbT=timeS; if(now[5]&&!now[4]&&pad.rbT!=null&&timeS-pad.rbT>0.8){ pad.rbT=null; if(NAV.route){ clearRoute(); flash('Route cancelled'); } } if(!now[5]&&prev[5]&&pad.rbT!=null&&!now[4]&&!prev[4]&&timeS-pad.rbT<=0.8){ if(typeof hbToggle==='function') hbToggle(); } if(!now[5]) pad.rbT=null;   // v31: RB tap = full beam (same as BEAM), hold = cancel route
 }
 // ---- spatial focus navigation for the DOM panels
 function padFocusables(){ const root=document.querySelector('#bdPanel')||document.querySelector('#ui .mback, #ui .celebrate'); if(!root) return [];

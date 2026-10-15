@@ -27,7 +27,7 @@ function ambForce(j){ let st=null, bd=1e9; const cx=Math.floor(j.sx/M_T), cy=Mat
   if(!goal) return false; const P=[]; let c=goal; while(c){ P.push([(c[0]+0.5)*M_T,(c[1]+0.5)*M_T]); c=prev.get(c[0]+c[1]*1e5); }
   for(let i=0;i<P.length-1;i++){ const dx=P[i+1][0]-P[i][0], dy=P[i+1][1]-P[i][1], d=Math.hypot(dx,dy)||1; P[i][0]+=-dy/d*1.6; P[i][1]+=dx/d*1.6; }   // keep left-ish
   const L=P[P.length-1]; L[0]+=(j.sx-L[0])*0.5; L[1]+=(j.sy-L[1])*0.5; const f=P.shift(), n=P[0]||[j.sx,j.sy];
-  if(j.v) ambDrop(j.v); j.v=null; j.k={x:f[0],y:f[1],h:Math.atan2(n[0]-f[0],-(n[1]-f[1])),path:P,t:0}; j.st='drive'; j.t=0; if(!j.siren) j.siren=emSiren(); AMBU.forced=(AMBU.forced||0)+1; return true; }
+  if(j.v) ambDrop(j.v); j.v=null; j.k={x:f[0],y:f[1],h:Math.atan2(n[0]-f[0],-(n[1]-f[1])),path:P,t:0}; j.st='drive'; j.t=0; if(!j.siren) j.siren=emSiren('ambulance'); AMBU.forced=(AMBU.forced||0)+1; return true; }
 function ambRear(j){ const b=fwd(j.k.h), L=emArt('ambulance').L||5; return [j.k.x-b[0]*(L/2+1.3),j.k.y-b[1]*(L/2+1.3)]; }
 function ambMove(o,tx,ty,sp,dt){ const dx=tx-o.x, dy=ty-o.y, d=Math.hypot(dx,dy); if(d<0.15) return true; const s=Math.min(d,sp*dt); o.x+=dx/d*s; o.y+=dy/d*s; if(d>0.3) o.a=Math.atan2(dy,dx); return false; }
 function ambCrewOnS(j,walk,dt){ const S=j.S, c=Math.cos(S.a), s=Math.sin(S.a); for(const m of j.crew){ const sg=m.k?-1:1; m.x=S.x+c*1.35*sg; m.y=S.y+s*1.35*sg; m.dir=[c*-sg,s*-sg]; m.kneel=walk?0:1; if(walk) m.ph+=dt*9; } }
@@ -35,7 +35,7 @@ function ambUpdate(dt){ if(!world.ready||(typeof uiBlocking==='function'&&uiBloc
   for(const j of AMBU.jobs){ j.t+=dt; j.tt+=dt; const v=j.v;
     if(j.siren&&(j.v||j.k)) j.siren.set(emSirenVol((j.v||j.k).x,(j.v||j.k).y));
     if((j.st==='spawn'||j.st==='go')&&j.tt>25){ if(ambForce(j)) continue; }
-    if(j.st==='spawn'){ if(j.t<0.6) continue; const nv=ambTrySpawn(j,j.tt>3); if(nv){ j.v=nv; j.st='go'; j.t=0; j.best=1e9; if(!j.siren) j.siren=emSiren(); AMBU.spawns=(AMBU.spawns||0)+1; } else { j.t=0; if(j.tt>6) ambForce(j); } continue; }
+    if(j.st==='spawn'){ if(j.t<0.6) continue; const nv=ambTrySpawn(j,j.tt>3); if(nv){ j.v=nv; j.st='go'; j.t=0; j.best=1e9; if(!j.siren) j.siren=emSiren('ambulance'); AMBU.spawns=(AMBU.spawns||0)+1; } else { j.t=0; if(j.tt>6) ambForce(j); } continue; }
     if(j.st==='go'){ if(!traffic.vs.includes(v)){ j.v=null; j.st='spawn'; j.t=0; continue; }
       const d=Math.hypot(v.x-j.sx,v.y-j.sy); if(d<j.best-1){ j.best=d; j.prog=j.t; }
       if(d<24||(d<55&&d>j.best+4)||(d<80&&j.t-(j.prog||0)>6)){ ambDrop(v); j.v=null; const r=rgt(v.h), f=fwd(v.h); j.k={x:v.x,y:v.y,h:v.h,path:[[v.x+r[0]*1.3+f[0]*4,v.y+r[1]*1.3+f[1]*4]]}; j.st='pull'; j.t=0; }

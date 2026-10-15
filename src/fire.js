@@ -21,7 +21,7 @@ function firePickBuilding(){ const P=truck, c=[]; for(const o of world.objects){
 function fireEngNear(x,y){ let st=null,bd=1e18; for(const s of fireStations()){ const d=(s.x-x)**2+(s.y-y)**2; if(d<bd){ bd=d; st=s; } } return [st,Math.sqrt(bd)]; }
 function fireDispatch(f){ const [st,d]=fireEngNear(f.x,f.y); const e={f,st,stt:'out',t:0,v:null,k:null,siren:null,far:!st||d>900,bay:null};
   if(st){ const free=st.bays.filter(b=>b.kind==='appliance'&&!FIRE.out.has(b)); e.bay=free[0]||null; }
-  if(!e.far&&e.bay){ FIRE.out.add(e.bay); const hs=st.parts.house, dy=(hs.y)*M_T+1.5; e.k={x:e.bay.x,y:dy,h:0,path:[[e.bay.x,e.bay.y],[e.bay.x,st.entrance.y+1.5]],t:0}; e.door=1; e.siren=emSiren(); }
+  if(!e.far&&e.bay){ FIRE.out.add(e.bay); const hs=st.parts.house, dy=(hs.y)*M_T+1.5; e.k={x:e.bay.x,y:dy,h:0,path:[[e.bay.x,e.bay.y],[e.bay.x,st.entrance.y+1.5]],t:0}; e.door=1; e.siren=emSiren('fire'); }
   else e.stt='spawn'; FIRE.eng.push(e); return e; }
 function fireTraffic(e,x,y){ const v=emToTraffic(x,y,'fire'); if(!v) return null; v.role='fire'; v.art={body:fireArt().body}; v.fireE=e; v.pinT=timeS+1e6; return v; }
 function fireSpawnFar(e){ const R=typeof ambViewR==='function'?ambViewR():120, f=e.f; for(let t=0;t<40;t++){ const a=Math.random()*6.283, d=R*(e.tt>3?0.8:1.5)+30+Math.random()*R*0.4, x=f.x+Math.cos(a)*d, y=f.y+Math.sin(a)*d, tx=Math.floor(x/M_T), ty=Math.floor(y/M_T); if(!inb(tx,ty)) continue;
@@ -33,7 +33,7 @@ function fireUpdate(dt){ if(!world.ready||typeof started!=='undefined'&&!started
   for(const f of FIRE.list){ f.t+=dt; if(f.st==='burn') f.int=Math.min(1.25,f.int+dt*0.004); }
   for(const e of FIRE.eng){ e.t+=dt; e.tt=(e.tt||0)+dt; const f=e.f; if(e.siren) e.siren.set(emSirenVol((e.v||e.k||f).x,(e.v||e.k||f).y));
     if(e.stt==='out'){ if(e.door<2) e.door=Math.min(2,e.door+dt*0.6); if(e.door<1.6) continue; if(emFollow(e.k,dt,4)){ const v=fireTraffic(e,e.k.x,e.k.y-2); if(v&&aiGoal(v,{entrance:{x:f.x,y:f.y},name:'fire'})){ e.v=v; e.k=null; e.stt='go'; e.t=0; e.best=1e9; } else if(v){ fireDrop(v); } } continue; }
-    if(e.stt==='spawn'){ if(e.t<0.5) continue; e.t=0; const v=fireSpawnFar(e); if(v){ e.v=v; e.stt='go'; e.best=1e9; e.siren=emSiren(); } continue; }
+    if(e.stt==='spawn'){ if(e.t<0.5) continue; e.t=0; const v=fireSpawnFar(e); if(v){ e.v=v; e.stt='go'; e.best=1e9; e.siren=emSiren('fire'); } continue; }
     if(e.stt==='go'){ const v=e.v; if(!traffic.vs.includes(v)){ e.stt=e.far?'spawn':'spawn'; e.far=true; continue; } const d=Math.hypot(v.x-f.x,v.y-f.y); if(d<e.best-1){ e.best=d; e.prog=e.t; }
       if(d<f.r+22||(d<f.r+60&&e.t-(e.prog||0)>6)){ fireDrop(v); e.k={x:v.x,y:v.y,h:v.h,path:[]}; e.v=null; e.stt='spray'; e.t=0; } else if(e.t-(e.prog||0)>16&&!onScreen(v.x,v.y,10)){ fireDrop(v); e.v=null; e.stt='spawn'; e.t=0; e.tt=99; e.far=true; FIRE.respawn=(FIRE.respawn||0)+1; } continue; }
     if(e.stt==='spray'){ f.st='fight'; f.int-=dt/18; if(e.siren&&e.t>4){ e.siren.stop(); e.siren=null; } if(f.int<=0){ f.int=0; f.st='out'; e.stt='back'; e.t=0; FIRE.doneN++; } continue; }

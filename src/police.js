@@ -46,11 +46,25 @@ function emDrawBar(v,on,type){ if(type==='police'&&v.polT) type=v.polT; const a=
     ctx.fillStyle='rgba(120,170,255,0.95)'; ctx.beginPath(); ctx.arc(x*PPM,y*PPM,4.5,0,7); ctx.fill(); ctx.fillStyle='rgba(80,140,255,0.25)'; ctx.beginPath(); ctx.arc(x*PPM,y*PPM,16,0,7); ctx.fill();
     if(typeof dnLight==='function') dnLight(x*PPM,y*PPM,90,'rgba(60,120,255,1)',0.9); } }
 function emBlit(v,type){ if(type==='police'&&v.polT) type=v.polT; const a=emArt(type); blitV(a.body.sh,v.x,v.y,v.h,a.L,a.W,4,4); blitV(a.body.c,v.x,v.y,v.h,a.L,a.W,0,0); }
-function emSiren(){ try{ const c=audio.ctx; if(!c||!audio.master) return null; const o=c.createOscillator(), l=c.createOscillator(), lg=c.createGain(), g=c.createGain(), f=c.createBiquadFilter();
-    o.type='sawtooth'; o.frequency.value=810; l.type='square'; l.frequency.value=0.85; lg.gain.value=120; l.connect(lg); lg.connect(o.frequency); f.type='lowpass'; f.frequency.value=2200; o.connect(f); f.connect(g); g.gain.value=0; let pn=null; try{ pn=c.createStereoPanner(); g.connect(pn); pn.connect(audio.master); }catch(e){ g.connect(audio.master); } o.start(); l.start();
-    return {g,stop(){ try{ g.gain.setTargetAtTime(0,c.currentTime,0.05); setTimeout(()=>{ try{ o.stop(); l.stop(); g.disconnect(); }catch(e){} },400); }catch(e){} }, set(v){ try{ const o=typeof v==='object'?v:{v,p:0}; g.gain.setTargetAtTime(o.v,c.currentTime,0.08); if(pn) pn.pan.setTargetAtTime(o.p,c.currentTime,0.08); }catch(e){} }}; }catch(e){ return null; } }
+// v31 sirens: all synthesised live with WebAudio (no sample files, no licences needed, ~0 bytes of build size). Kinds:
+//  'police'  UK two-tone hi-lo, fast (responding)      'yelp'  rapid sawtooth yelp, rate rises with chase time
+//  'ambulance' UK two-tone, slower and lower            'fire'  deep slow air-horn-style wail (sawtooth + sub octave)
+//  s.whoop() = short police 'whoop'/phaser burst used when they want you to pull over
+const SIRK={police:{c:850,dep:-120,lt:'square',lr:1.25,ot:'sawtooth',lp:2400},yelp:{c:1000,dep:420,lt:'sawtooth',lr:3.2,ot:'sawtooth',lp:2600},
+  ambulance:{c:560,dep:-90,lt:'square',lr:0.6,ot:'triangle',lp:1700},fire:{c:520,dep:260,lt:'sine',lr:0.22,ot:'sawtooth',lp:1100,sub:1}};
+function emSiren(kind){ try{ const c=audio.ctx; if(!c||!audio.master) return null; const K=SIRK[kind]||SIRK.police; const o=c.createOscillator(), l=c.createOscillator(), lg=c.createGain(), g=c.createGain(), f=c.createBiquadFilter(); let o2=null;
+    o.type=K.ot; o.frequency.value=K.c; l.type=K.lt; l.frequency.value=K.lr; lg.gain.value=K.dep; l.connect(lg); lg.connect(o.frequency); f.type='lowpass'; f.frequency.value=K.lp; o.connect(f);
+    if(K.sub){ o2=c.createOscillator(); o2.type='square'; const g2=c.createGain(); g2.gain.value=0.35; o2.frequency.value=K.c/2; const lg2=c.createGain(); lg2.gain.value=K.dep/2; l.connect(lg2); lg2.connect(o2.frequency); o2.connect(g2); g2.connect(f); }
+    f.connect(g); g.gain.value=0; let pn=null; try{ pn=c.createStereoPanner(); g.connect(pn); pn.connect(audio.master); }catch(e){ g.connect(audio.master); } o.start(); l.start(); if(o2) o2.start();
+    let last=0;
+    return {g,kind,stop(){ try{ g.gain.setTargetAtTime(0,c.currentTime,0.05); setTimeout(()=>{ try{ o.stop(); l.stop(); if(o2) o2.stop(); g.disconnect(); }catch(e){} },400); }catch(e){} },
+      set(v){ try{ const q=typeof v==='object'?v:{v,p:0}; last=q.v; g.gain.setTargetAtTime(q.v,c.currentTime,0.08); if(pn) pn.pan.setTargetAtTime(q.p,c.currentTime,0.08); }catch(e){} },
+      mode(k){ const N=SIRK[k]; if(!N||this.kind===k) return; this.kind=k; const t=c.currentTime; l.type=N.lt; l.frequency.setTargetAtTime(N.lr,t,0.05); lg.gain.setTargetAtTime(N.dep,t,0.05); o.frequency.setTargetAtTime(N.c,t,0.05); },
+      rate(r){ try{ l.frequency.setTargetAtTime(r,c.currentTime,0.3); }catch(e){} },
+      whoop(){ try{ if(last<0.002) return; const t=c.currentTime, w=c.createOscillator(), wg=c.createGain(); w.type='sawtooth'; w.frequency.setValueAtTime(300,t); w.frequency.exponentialRampToValueAtTime(1500,t+0.35); w.frequency.exponentialRampToValueAtTime(500,t+0.6);
+        wg.gain.setValueAtTime(0,t); wg.gain.linearRampToValueAtTime(last*1.6,t+0.04); wg.gain.linearRampToValueAtTime(0,t+0.62); w.connect(wg); wg.connect(pn||audio.master); w.start(t); w.stop(t+0.65); }catch(e){} } }; }catch(e){ return null; } }
 // v31: quieter, falls off to silence about one screen from the player, stereo pan by side
-function emSirenVol(x,y){ const vr=viewRectM(), R=Math.max(40,Math.max(vr[2]-vr[0],vr[3]-vr[1])/2), d=Math.hypot(x-truck.x,y-truck.y), f=Math.max(0,1-d/(R*1.1)); return {v:0.055*f*f,p:Math.max(-1,Math.min(1,(x-truck.x)/R))*0.8}; }
+function emSirenVol(x,y){ const vr=viewRectM(), R=Math.max(40,Math.max(vr[2]-vr[0],vr[3]-vr[1])/2), d=Math.hypot(x-truck.x,y-truck.y), f=Math.max(0,1-d/(R*1.3)); return {v:0.05*f*f*(3-2*f),p:Math.max(-1,Math.min(1,(x-truck.x)/R))*0.8}; }
 // road point just outside a services site's driveway
 function emRoadPt(s){ return {x:s.entrance.x,y:s.entrance.y-M_T*0.8}; }
 // move a kinematic vehicle along a polyline (metres); returns true when done
@@ -71,7 +85,7 @@ function polSpawn(){ const P=truck, R=polViewR(), f=fwd(P.h), mv=Math.abs(P.v)>3
     if(world.roadH[i]<0&&world.roadV[i]<0||onScreen(x,y,12)) continue; if(POL.cars.length>=6) return null; const v=spawnVehicle(x,y,true,{kind:'estate'}); if(v&&onScreen(v.x,v.y,10)){ const k=traffic.vs.indexOf(v); if(k>=0) traffic.vs.splice(k,1); continue; } if(v){ let st=null,bd=1e18; for(const s of polStations()){ const q=(s.x-x)**2+(s.y-y)**2; if(q<bd){ bd=q; st=s; } } POL.spawns=(POL.spawns||0)+1; return polMake(v,st); } }
   return null; }
 function polUpdatePatrols(dt){ POL.cars=POL.cars.filter(v=>traffic.vs.includes(v)||v===(POL.chase&&POL.chase.v));
-  const R=polViewR(); for(const v of POL.cars.slice()){ if(v===(POL.chase&&POL.chase.v)) continue; if(Math.hypot(v.x-truck.x,v.y-truck.y)>R*2.6+60&&!onScreen(v.x,v.y,20)){ const i=traffic.vs.indexOf(v); if(i>=0){ releaseJ(v); traffic.vs.splice(i,1); } POL.cars.splice(POL.cars.indexOf(v),1); } }
+  const R=polViewR(); for(const v of POL.cars.slice()){ if(v===(POL.chase&&POL.chase.v)) continue; if((v.pol&&v.pol.leave&&!onScreen(v.x,v.y,15))||Math.hypot(v.x-truck.x,v.y-truck.y)>R*2.6+60&&!onScreen(v.x,v.y,20)){ const i=traffic.vs.indexOf(v); if(i>=0){ releaseJ(v); traffic.vs.splice(i,1); } POL.cars.splice(POL.cars.indexOf(v),1); } }
   POL.spawnT-=dt*(Math.abs(truck.v)>2?1:0.3); if(POL.spawnT<=0){ POL.spawnT=Math.random()<0.25?6+Math.random()*10:15+Math.random()*Math.random()*70; POL.want=1+((Math.random()*3)|0); const n=POL.cars.filter(v=>Math.hypot(v.x-truck.x,v.y-truck.y)<R*2.6+60).length; if(n<POL.want) polSpawn(); }
   for(const v of POL.cars){ const p=v.pol; if(!p||v===(POL.chase&&POL.chase.v)) continue;
     if(!p.home&&timeS>p.end&&p.st&&typeof aiGoal==='function'){ p.home=true; const e=emRoadPt(p.st); aiGoal(v,{entrance:e,name:p.st.name}); v.pinT=0; }
@@ -85,7 +99,7 @@ function polOffence(type,v,reason){ const c=POL.chase; if(c&&c.offs.some(o=>o.ty
   const amt=(typeof OFF!=='undefined'&&OFF.FINES&&OFF.FINES[type])||POL_FINES[type]; ch.offs.push({type,amount:amt,reason}); if(type==='pedestrian') ch.arrest=true; POL.log.push({type,t:timeS});
   if(typeof toast==='function') toast('\u{1F6A8} Police: '+reason); }
 function polStartChase(v){ if(!v) return; const i=traffic.vs.indexOf(v); if(i>=0){ releaseJ(v); traffic.vs.splice(i,1); }
-  POL.chase={v,offs:[],arrest:false,t:0,siren:emSiren(),sp:Math.abs(v.v||8)}; POL.stopT=0; POL.lostT=0; }
+  POL.chase={v,offs:[],arrest:false,t:0,siren:emSiren('police'),sp:Math.abs(v.v||8)}; POL.stopT=0; POL.lostT=0; }
 function polEndChase(back){ const c=POL.chase; if(!c) return; if(c.siren) c.siren.stop(); POL.chase=null; POL.stopT=0;
   if(back){ const nv=emToTraffic(c.v.x,c.v.y,'police'); if(nv){ nv.polT=c.v.polT; polMake(nv,c.v.pol&&c.v.pol.st); nv.pol.end=timeS+60+Math.random()*300; } } }
 function polDetect(dt){ if(POL.chase&&POL.chase.paying) return; const P=truck, mph=Math.abs(P.v)*(typeof MPH!=='undefined'?MPH:2.237), lim=(typeof SPL!=='undefined'&&SPL.cur)||30;
@@ -103,11 +117,11 @@ function wantSearchGoal(v){ const a=Math.random()*6.283, d=30+Math.random()*120;
 function wantUpdate(dt){ if(!WANT.lvl) return;
   if(POL.chase){ WANT.chased=true; WANT.t=60; return; }
   if(WANT.chased){ wantClear(); return; }               // chase over (fined/arrested or lost): wanted level ends
-  const w=polCanSee()[0]; if(w){ polOffence('pedestrian',w,'hit a pedestrian'); return; }
-  WANT.t-=dt; if(WANT.t<=0){ wantClear(); return; }
+  const hid=hideAt(truck.x,truck.y)&&Math.abs(truck.v)<0.5; WANT.hid=hid; const w=!hid&&polCanSee()[0]; if(w){ polOffence('pedestrian',w,'hit a pedestrian'); return; }
+  WANT.t-=dt*(hid?6:1); if(WANT.t<=0){ wantClear(); return; }
   WANT.sp-=dt; const n=POL.cars.filter(v=>v.pol&&v.pol.search).length; if(WANT.sp<=0){ WANT.sp=5+Math.random()*7; if(n<4){ const v=polSpawn(); if(v){ v.pol.search=true; v.pinT=timeS+1e6; wantSearchGoal(v); } } }
   for(const v of POL.cars) if(v.pol&&v.pol.search&&timeS>v.pol.sg&&traffic.vs.includes(v)) wantSearchGoal(v); }
-function wantClear(){ WANT.lvl=0; WANT.chased=false; for(const v of POL.cars) if(v.pol&&v.pol.search){ v.pol.search=false; v.pinT=0; v.pol.end=timeS; v.pol.home=false; } }
+function wantClear(){ WANT.lvl=0; WANT.chased=false; WANT.t=0; for(const v of POL.cars) if(v.pol&&v.pol.search){ v.pol.search=false; v.pinT=0; v.pol.end=timeS; v.pol.home=false; v.pol.leave=true; } }
 function drawWantedHUD(){ if(!WANT.lvl) return; const x=VW-34, y=VH*0.13+70, fl=POL.chase||WANT.t>10||(timeS*4)%1<0.6;
   ctx.save(); ctx.translate(x,y); ctx.beginPath(); for(let i=0;i<10;i++){ const r=i%2?7:17, a=i*Math.PI/5-Math.PI/2; ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r); } ctx.closePath();
   ctx.fillStyle=fl?'#ffd21e':'rgba(255,210,30,0.35)'; ctx.strokeStyle='#000'; ctx.lineWidth=3; ctx.stroke(); ctx.fill();
@@ -115,13 +129,32 @@ function drawWantedHUD(){ if(!WANT.lvl) return; const x=VW-34, y=VH*0.13+70, fl=
 function polMapDots(px,py){ const ph=(timeS*4)%1<0.5, L=POL.cars.filter(v=>v.pol&&(v.pol.search||WANT.lvl)&&traffic.vs.includes(v)).map(v=>v); if(POL.chase) L.push(POL.chase.v);
   for(const v of L){ const X=px(v.x),Y=py(v.y); const R=(typeof bigmap!=='undefined'&&bigmap.open)?8:5; ctx.fillStyle=ph?'rgba(255,32,48,0.35)':'rgba(42,91,255,0.35)'; ctx.beginPath(); ctx.arc(X,Y,R*2,0,7); ctx.fill(); ctx.fillStyle=ph?'#ff2030':'#2a5bff'; ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(X,Y,R,0,7); ctx.fill(); ctx.stroke(); } }
 // ---------- chase
+// v31 chase: re-paths over the road network to the player's current position every ~0.5 s and follows the same roads (junction boxes may be cut);
+// steers around traffic; can be lost (stuck behind traffic, crash/spin, or out of sight for a while) -> 1-star 60 s search
+function polChasePath(c,tx,ty){ const v=c.v, s=navSnap(v.x/M_T,v.y/M_T,6), e=navSnap(tx/M_T,ty/M_T,8); c.path=null; if(!s||!e) return; const p=navAStar(s[0],s[1],e[0],e[1]); if(!p||p.length<2) return;
+  c.path=p.map(i=>[(i%MW+0.5)*M_T,(Math.floor(i/MW)+0.5)*M_T]); c.pk=0; }
+function polChaseAim(c){ const v=c.v, P=c.path; if(!P) return null; let k=c.pk||0, bd=1e18; for(let q=k;q<Math.min(P.length,k+12);q++){ const d=(P[q][0]-v.x)**2+(P[q][1]-v.y)**2; if(d<bd){ bd=d; k=q; } } c.pk=k;
+  const q=P[Math.min(P.length-1,k+3)], r=P[Math.min(P.length-1,k+4)]; if(!q) return null; const dx=r[0]-q[0], dy=r[1]-q[1], l=Math.hypot(dx,dy)||1; return [q[0]-dy/l*1.4,q[1]+dx/l*1.4]; }   // keep-left lane-ish
 function polUpdateChase(dt){ const c=POL.chase; if(!c) return; const v=c.v, P=truck; c.t+=dt;
-  const back=P.trl?20:9, f=fwd(P.trl?P.th:P.h), tx=(P.trl?P.trl.x:P.x)-f[0]*back, ty=(P.trl?P.trl.y:P.y)-f[1]*back, dx=tx-v.x, dy=ty-v.y, d=Math.hypot(dx,dy), dP=Math.hypot(P.x-v.x,P.y-v.y);
-  const want=d>25?Math.max(Math.abs(P.v)+7,16):d>6?Math.abs(P.v)+d*0.25:Math.abs(P.v)*0.6; c.sp+=Math.max(-9*dt,Math.min(5*dt,Math.min(48,want)-c.sp)); if(dP<7) c.sp=Math.min(c.sp,1);
-  if(d>1.5){ const th=Math.atan2(dx,-dy); v.h+=Math.max(-2.6*dt,Math.min(2.6*dt,wrapA(th-v.h))); } const fv=fwd(v.h); v.x+=fv[0]*c.sp*dt; v.y+=fv[1]*c.sp*dt; v.v=c.sp;
-  if(c.siren) c.siren.set(emSirenVol(v.x,v.y));
-  if(dP>500||!onView(v.x,v.y)&&dP>200){ POL.lostT+=dt; if(POL.lostT>25){ toast('\u{1F694} You lost the police'); polEndChase(true); return; } } else POL.lostT=0;
+  const back=P.trl?20:9, f=fwd(P.trl?P.th:P.h), tx=(P.trl?P.trl.x:P.x)-f[0]*back, ty=(P.trl?P.trl.y:P.y)-f[1]*back, dP=Math.hypot(P.x-v.x,P.y-v.y);
+  if(c.spin>0){ c.spin-=dt; v.h+=dt*5*c.spinD; c.sp*=Math.max(0,1-dt*3); const fv=fwd(v.h); v.x+=fv[0]*c.sp*dt; v.y+=fv[1]*c.sp*dt; v.v=c.sp; if(c.siren) c.siren.set(emSirenVol(v.x,v.y)); if(c.spin<=0&&dP>45){ polLose('crashed'); } return; }
+  c.rp=(c.rp||0)-dt; let aim=null; const direct=Math.hypot(tx-v.x,ty-v.y)<28;
+  if(!direct){ if(c.rp<=0){ c.rp=0.5; polChasePath(c,tx,ty); } aim=polChaseAim(c); }
+  if(!aim) aim=[tx,ty]; let dx=aim[0]-v.x, dy=aim[1]-v.y; const d=Math.hypot(tx-v.x,ty-v.y);
+  // steer around traffic directly ahead
+  const fv0=fwd(v.h); let blk=null, bdist=1e9; for(const o of traffic.vs){ if(o===v) continue; const ox=o.x-v.x, oy=o.y-v.y, al=ox*fv0[0]+oy*fv0[1]; if(al<0||al>16) continue; const lat=ox*fv0[1]-oy*fv0[0]; if(Math.abs(lat)<2.4&&al<bdist){ bdist=al; blk={o,lat,al}; } }
+  if(blk){ const r=rgt(v.h), sd=blk.lat>0?-1:1; dx+=r[0]*sd*3.5*(16-blk.al)/4; dy+=r[1]*sd*3.5*(16-blk.al)/4; if(blk.al<3.2){ if(c.sp>13){ c.spin=1.6; c.spinD=Math.random()<0.5?-1:1; POL.crashes=(POL.crashes||0)+1; return; } c.sp=Math.min(c.sp,Math.abs(blk.o.v||0)); } }
+  const want=d>25?Math.max(Math.abs(P.v)+6,15):d>6?Math.abs(P.v)+d*0.25:Math.abs(P.v)*0.6, turn=Math.abs(wrapA(Math.atan2(dx,-dy)-v.h)), cap=turn>0.6?9:turn>0.3?16:40;
+  c.sp+=Math.max(-10*dt,Math.min(5*dt,Math.min(cap,want)-c.sp)); if(dP<7) c.sp=Math.min(c.sp,1);
+  if(Math.hypot(dx,dy)>1.2){ const th=Math.atan2(dx,-dy); v.h+=Math.max(-2.8*dt,Math.min(2.8*dt,wrapA(th-v.h))); } const fv=fwd(v.h); v.x+=fv[0]*c.sp*dt; v.y+=fv[1]*c.sp*dt; v.v=c.sp;
+  if(c.siren){ c.siren.set(emSirenVol(v.x,v.y)); if(c.t>4){ c.siren.mode('yelp'); c.siren.rate(Math.min(7,3.2+(c.t-4)*0.08)); } if(dP<30&&timeS-(c.wh||0)>3.5){ c.wh=timeS; c.siren.whoop(); } }
+  // losing them
+  if(c.sp<2&&dP>40&&Math.abs(P.v)>2){ c.stuckT=(c.stuckT||0)+dt; if(c.stuckT>6){ polLose('stuck'); return; } } else c.stuckT=0;
+  if(!onView(v.x,v.y)&&dP>polViewR()*1.2){ POL.lostT+=dt; if(POL.lostT>10){ polLose('sight'); return; } } else POL.lostT=0;
   if(Math.abs(P.v)<0.3&&dP<32&&!c.paying){ POL.stopT+=dt; if(POL.stopT>5) polFinePopup(); } else if(!c.paying) POL.stopT=0; }
+function polLose(why){ const c=POL.chase; if(!c) return; POL.lostWhy=why; POL.lost=(POL.lost||0)+1; toast('\u{1F694} You lost the police \u2014 lie low'); polEndChase(true);
+  const nv=POL.cars[POL.cars.length-1]; if(nv&&nv.pol){ nv.pol.search=true; nv.pinT=timeS+1e6; wantSearchGoal(nv); }
+  WANT.lvl=1; WANT.t=60; WANT.chased=false; WANT.sp=3; }
 function polFinePopup(){ const c=POL.chase; if(!c||c.paying) return; c.paying=true; P_input_clear(); const tot0=c.offs.reduce((a,o)=>a+o.amount,0), tot=Math.min(tot0,Math.max(0,Math.floor(truck.money||0)));
   const rows=c.offs.map(o=>`<div style="display:flex;justify-content:space-between;gap:18px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.12)"><span>${esc(o.reason)}${o.type==='pedestrian'?' <b style="color:#ff6b6b">\u2022 ARREST</b>':''}</span><b>${money(o.amount)}</b></div>`).join('');
   const b=openModal('police',`<h2 style="margin:0 0 6px">\u{1F694} Police \u2014 Fixed Penalty</h2><p style="opacity:.8;margin:0 0 10px">You were pulled over. Offences:</p>${rows}
@@ -156,13 +189,13 @@ function emYield(v,acc,dt){ if(v.role==='police'||v.role==='ambulance'||v.role==
   let y=false; for(const E of EMY.src){ const f=fwd(E.h), dx=v.x-E.x, dy=v.y-E.y, al=dx*f[0]+dy*f[1], lat=Math.abs(dx*f[1]-dy*f[0]), par=Math.abs(Math.cos((v.h||0)-(E.h||0))); if(par>0.7&&al>-4&&al<110&&lat<14){ y=true; break; } }
   if(y&&(emInJ(v)||v.ring!=null||v.jHeld)) y=false;   // never stop inside a junction box (no deadlocks): clear it first
   if(y){ v.emY=timeS; EMY.n++; emShift(v,-1.4,dt); return Math.min(acc,-Math.max(1.5,v.v*1.2)); }
-  if(v.emO) emShift(v,0,dt); return acc; }
+  if(beamYield(v,dt)) return acc; if(v.emO) emShift(v,0,dt); return acc; }
 // lateral shift relative to heading (+ = right / centre line, - = left / kerb), eased; tracked separately from crash offsets
 function emShift(v,to,dt){ const cur=v.emO||0, nw=cur+(to-cur)*Math.min(1,dt*1.6), d=nw-cur, r=rgt(v.h||0); v.offX+=r[0]*d; v.offY+=r[1]*d; v.emO=Math.abs(nw)<0.02&&to===0?0:nw; if(v.emO===0){ v.offX-=r[0]*nw; v.offY-=r[1]*nw; } }
 setTimeout(()=>{ const ub=updateBreakdown; updateBreakdown=function(dt){ EMY.src=emSources(); return ub.apply(this,arguments); }; },0);
 // ---------- per-frame + drawing
 function updatePolice(dt){ if(!world.ready||typeof started!=='undefined'&&!started||(typeof uiBlocking==='function'&&uiBlocking())) return; polUpdatePatrols(dt); polUpdateChase(dt); polDetect(dt); wantUpdate(dt); }
-function drawPolice(vx0,vy0,vx1,vy1){ polDrawParked(vx0,vy0,vx1,vy1); for(const v of POL.cars) if(v.pol&&traffic.vs.includes(v)) emDrawBar(v,false,'police');
+function drawPolice(vx0,vy0,vx1,vy1){ try{ drawHideSpots(vx0,vy0,vx1,vy1); }catch(e){} polDrawParked(vx0,vy0,vx1,vy1); for(const v of POL.cars) if(v.pol&&traffic.vs.includes(v)) emDrawBar(v,false,'police');
   if(POL.parkIn) for(const k of POL.parkIn) emBlit(k,'police'); const c=POL.chase; if(c){ emBlit(c.v,'police'); emDrawBar(c.v,true,'police'); } }
 function drawPoliceHUD(){ const c=POL.chase; if(!c||c.paying) return; const w=Math.min(VW-30,360), x=VW/2-w/2, y=VH*0.13, ph=(timeS*3)%1<0.5;
   ctx.save(); ctx.fillStyle=ph?'rgba(200,20,30,0.88)':'rgba(25,60,200,0.88)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(x,y,w,52,12):ctx.rect(x,y,w,52); ctx.fill();
@@ -172,6 +205,36 @@ setTimeout(()=>{
   const ub=updateBreakdown; updateBreakdown=function(dt){ ub.apply(this,arguments); try{ updatePolice(dt); }catch(e){ console.warn('[police]',e); } };
   const dt0=drawTraffic; drawTraffic=function(vx0,vy0,vx1,vy1){ const r=dt0.apply(this,arguments); try{ drawPolice(vx0,vy0,vx1,vy1); if(typeof drawAmbulance==='function') drawAmbulance(vx0,vy0,vx1,vy1); }catch(e){ console.warn('[police draw]',e); } return r; };
   const dh=drawHUD; drawHUD=function(){ dh.apply(this,arguments); if(!(typeof bigmap!=='undefined'&&bigmap.open)) { drawPoliceHUD(); drawWantedHUD(); } };
-  if(typeof svcMapIcons==='function'){ const sm=svcMapIcons; svcMapIcons=function(icon,px,py){ sm.apply(this,arguments); try{ polMapDots(px,py); }catch(e){} }; }
+  if(typeof svcMapIcons==='function'){ const sm=svcMapIcons; svcMapIcons=function(icon,px,py){ sm.apply(this,arguments); try{ hideMapDots(px,py); polMapDots(px,py); }catch(e){} }; }
   if(typeof BigRig!=='undefined'){ BigRig.police=()=>({cars:POL.cars.length,chase:!!POL.chase,offences:POL.chase?POL.chase.offs.map(o=>o.type):[]}); }
 },0);
+
+// ---------- v31 hide spots: blue dashed bays in car parks / alleys / under bridges; parked inside one while wanted -> cooldown ~6x faster, unseen
+const HIDE={list:null};
+function hideBad(x,y){ const S=typeof SVC!=='undefined'&&SVC.byType?Object.values(SVC.byType).flat():[]; for(const s of S){ const r=s.rect; if(r&&x>r.x0-12&&x<r.x1+12&&y>r.y0-12&&y<r.y1+12) return true; }
+  for(const g of world.garages||[]) if(Math.hypot(g.x-x,g.y-y)<45) return true; for(const f of world.fuel||[]) if(Math.hypot(f.x-x,f.y-y)<40) return true; for(const d of world.depots||[]) if(d.entrance&&Math.hypot(d.entrance.x-x,d.entrance.y-y)<30) return true; return false; }
+function hideBuild(){ const L=[], C=70; const ok=(x,y)=>{ if(!inb(x,y)) return false; const t=get(x,y); return t===T.LOT||t===T.CONC||t===T.PLAZA; };
+  const nearRd=(x,y)=>{ for(let d=-2;d<=5;d++) for(const [a,b] of [[x+d,y-1],[x+d,y+2],[x-1,y],[x+4,y+1]]) if(inb(a,b)&&isRoadT(idx(a,b))) return true; return false; };
+  for(let cy=0;cy<MH;cy+=C) for(let cx=0;cx<MW;cx+=C){ let f=null; for(let y=cy+4;y<cy+C-4&&!f;y+=2) for(let x=cx+4;x<cx+C-6&&!f;x+=2){ let g=true; for(let b=0;b<2&&g;b++) for(let a=0;a<4&&g;a++) if(!ok(x+a,y+b)) g=false; if(g&&nearRd(x,y)) f=[x,y]; }
+    if(f&&hideBad(f[0]*M_T,f[1]*M_T)) f=null;
+    if(f) L.push({x:f[0]*M_T,y:f[1]*M_T,w:4*M_T,h:2*M_T,kind:get(f[0],f[1])===T.LOT?'car park':'alley'}); }
+  // under bridges: road tiles beneath an overpass
+  if(world.bridges) for(const b of world.bridges.slice(0,40)){ if(b.under) L.push({x:b.under.x,y:b.under.y,w:4*M_T,h:2*M_T,kind:'bridge'}); }
+  HIDE.list=L; return L; }
+function hideAt(x,y){ const L=HIDE.list||hideBuild(); for(const h of L) if(x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h) return h; return null; }
+function drawHideSpots(vx0,vy0,vx1,vy1){ const L=HIDE.list||hideBuild(); ctx.save(); ctx.setLineDash([6,4]); ctx.lineWidth=2;
+  for(const h of L){ const X=h.x*PPM, Y=h.y*PPM, W=h.w*PPM, H=h.h*PPM; if(X>vx1||X+W<vx0||Y>vy1||Y+H<vy0) continue; ctx.fillStyle=WANT.lvl?'rgba(40,110,255,0.22)':'rgba(40,110,255,0.10)'; ctx.fillRect(X,Y,W,H); ctx.strokeStyle='rgba(70,140,255,0.9)'; ctx.strokeRect(X+1,Y+1,W-2,H-2);
+    ctx.setLineDash([]); ctx.fillStyle='rgba(90,160,255,0.95)'; ctx.font='bold '+Math.round(PPM*1.1)+'px sans-serif'; ctx.textAlign='center'; ctx.fillText('HIDE',X+W/2,Y+H/2+PPM*0.4); ctx.setLineDash([6,4]); } ctx.restore(); }
+function hideMapDots(px,py){ if(!WANT.lvl) return; const L=HIDE.list||hideBuild(); ctx.save(); for(const h of L){ const X=px(h.x+h.w/2), Y=py(h.y+h.h/2); if(X<-10||Y<-10||X>VW+10||Y>VH+10) continue; ctx.fillStyle='rgba(60,130,255,0.9)'; ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.fillRect(X-3,Y-2,6,4); ctx.strokeRect(X-3,Y-2,6,4); } ctx.restore(); }
+
+// v31: full beam behind a car in the outer (fast) lane of a multi-lane road -> it indicates left and moves over one lane when clear (UK keep-left)
+function bySeg(v){ const tx=Math.floor(v.x/M_T), ty=Math.floor(v.y/M_T); if(!inb(tx,ty)) return null; const i=idx(tx,ty), h=world.roadH[i], vv=world.roadV[i]; const H=Math.abs(Math.sin(v.h||0))>0.8;
+  const id=H?h:vv; if(id==null||id<0) return null; const sg=world.segs[id]; if(!sg||nLanes(sg)<2||(sg.dir==='h')!==H) return null; const lt=(H?v.y:v.x)/M_T; return {sg,cen:Math.abs(lt-(sg.a+sg.w/2))<1.05}; }
+function beamYield(v,dt){ const P=truck;
+  if(v.byT){ v.byT+=dt; const f=fwd(v.h), al=(P.x-v.x)*f[0]+(P.y-v.y)*f[1]; v.sigBY=v.emO>-3.6?-1:0; emShift(v,-4,dt); if((al>30&&v.byT>3)||v.byT>20||!bySeg(v)){ v.byT=0; v.sigBY=0; BYD.done++; return false; } return true; }
+  if(!(typeof HB!=='undefined'&&HB.on)||Math.abs(P.v)<8||Math.abs(v.v||0)<6||v.emO) return false; const f=fwd(v.h), dx=P.x-v.x, dy=P.y-v.y, al=dx*f[0]+dy*f[1], lat=dx*f[1]-dy*f[0];
+  if(al>-5||al<-40||Math.abs(lat)>2.5||Math.cos((P.h||0)-(v.h||0))<0.9) return false; const s=bySeg(v); if(!s||!s.cen) return false;
+  const r=rgt(v.h); for(const o of traffic.vs){ if(o===v) continue; const ox=o.x-v.x, oy=o.y-v.y, oa=ox*f[0]+oy*f[1], ol=ox*r[0]+oy*r[1]; if(Math.abs(oa)<14&&ol<-2.2&&ol>-6.5) return false; }   // left lane must be clear
+  v.byT=0.01; BYD.n++; return true; }
+const BYD={n:0,done:0};
+setTimeout(()=>{ const dt0=drawTraffic; drawTraffic=function(){ for(const v of traffic.vs) if(v.sigBY) v.sig=v.sigBY; return dt0.apply(this,arguments); }; },0);
