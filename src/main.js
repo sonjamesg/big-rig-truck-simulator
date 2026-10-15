@@ -82,7 +82,7 @@ function frame(ts){
   if(window.__camHold){ cam.x=__camHold[0]; cam.y=__camHold[1]; }   // test/debug: hold the camera on a spot
   const zt=cam.zLock||(1.05-0.33*Math.min(1,sp/24)); cam.z+=(zt-cam.z)*(1-Math.exp(-dt*1.2));
   cam.shake*=Math.exp(-dt*8);
-  if(typeof flyCamTick==='function') flyCamTick(dt);
+  if(typeof flyCamTick==='function') flyCamTick(dt); if(typeof ovlFlush==='function') ovlFlush(bigmap.open?12:3);
   draw();
   requestAnimationFrame(frame);
 }
@@ -274,7 +274,7 @@ const bigmap={open:false,z:2.4,cx:0,cy:0,drag:null};
 // roundabouts, curves, bridges, buildings); zoomed out, the per-tile ground image (1 px = 1 tile, same coordinates).
 const MAPC={cache:new Map(),order:[],px:128,max:700,budget:7,built:0};
 function mapChunk(cx,cy,allow){ const k=cx+','+cy; let c=MAPC.cache.get(k); if(c) return c; const gc=getChunk(cx,cy,false);
-  if(!gc&&!allow) return null; const src=gc||renderChunk(cx,cy); c=mkCanvas(MAPC.px,MAPC.px); const g=c.getContext('2d'); g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high'; g.drawImage(src,0,0,MAPC.px,MAPC.px);
+  if(!gc&&!allow) return null; const src=gc||renderChunk(cx,cy); c=mkCanvas(MAPC.px,MAPC.px); const g=c.getContext('2d'); g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high'; g.drawImage(src,0,0,MAPC.px,MAPC.px); if(typeof ovlPaint==='function'){ const N=CHUNK/TILE; ovlPaint(g,0,0,cx*N,cy*N,N,N,MAPC.px/N); }
   MAPC.cache.set(k,c); MAPC.order.push(k); MAPC.built++; if(MAPC.order.length>MAPC.max) MAPC.cache.delete(MAPC.order.shift()); return c; }
 function drawMapDetail(X0,Y0,z,x0,y0,x1,y1){   // X0/Y0: screen pos of tile 0,0; z px per tile; clip rect in screen px
   const N=CHUNK/TILE, s=N*z; const cx0=Math.max(0,Math.floor((x0-X0)/s)), cy0=Math.max(0,Math.floor((y0-Y0)/s)), cx1=Math.min(MW/N-1,Math.floor((x1-X0)/s)), cy1=Math.min(MH/N-1,Math.floor((y1-Y0)/s));

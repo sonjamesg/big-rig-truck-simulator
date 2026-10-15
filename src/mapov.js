@@ -8,7 +8,7 @@ function ovSheet(i,j){ const s=OV.sheets[j*OV.sw+i]; if(!s.c){ s.c=mkCanvas(OV.s
 function ovBuild(cx,cy){ const k=cy*OV.nc+cx; if(OV.done[k]) return false; OV.done[k]=1; OV.n++;
   const N=CHUNK/TILE, src=chunkCache.get(cx+','+cy)||chunkLo.get(cx+','+cy)||renderChunk(cx,cy); const tx=cx*N, ty=cy*N, si=Math.floor(tx/OV.sheetT), sj=Math.floor(ty/OV.sheetT);
   const s=ovSheet(si,sj), g=s.c.getContext('2d'); g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high'; const d=N*OV.px;
-  g.drawImage(src,(tx-si*OV.sheetT)*OV.px,(ty-sj*OV.sheetT)*OV.px,d,d); return true; }
+  g.drawImage(src,(tx-si*OV.sheetT)*OV.px,(ty-sj*OV.sheetT)*OV.px,d,d); ovlPaint(g,(tx-si*OV.sheetT)*OV.px,(ty-sj*OV.sheetT)*OV.px,tx,ty,N,N,OV.px); return true; }
 // build a few chunks per frame, spiralling out from the focus (map centre when open, truck otherwise)
 function ovTick(ms){ if(!MINIMAP||typeof chunkCache==='undefined') return; ovInit(); if(OV.n>=OV.total) return;
   const N=CHUNK/TILE, fxT=bigmap.open?bigmap.cx:truck.x*PPM/TILE, fyT=bigmap.open?bigmap.cy:truck.y*PPM/TILE;
@@ -25,3 +25,20 @@ function ovDraw(X0,Y0,z,x0,y0,x1,y1){ if(!OV.done){ ctx.drawImage(MINIMAP,X0,Y0,
   for(const s of OV.sheets){ const sx=X0+s.i*T*z, sy=Y0+s.j*T*z, w=T*z; if(sx>x1||sy>y1||sx+w<x0||sy+w<y0) continue;
     if(s.c) ctx.drawImage(s.c,Math.floor(sx),Math.floor(sy),Math.ceil(w)+1,Math.ceil(w)+1); else ctx.drawImage(MINIMAP,s.i*T,s.j*T,T,T,Math.floor(sx),Math.floor(sy),Math.ceil(w)+1,Math.ceil(w)+1); }
   ctx.imageSmoothingEnabled=true; }
+// ground layers that the game draws live on top of the chunks (airport airfield/landside) are painted into the map too.
+// They draw on the main ctx, so each block is rendered into the corner of the main canvas, copied out, and the corner restored
+// within the same task (never composited -> nothing visible).
+const OVL={tmp:null};
+function ovlBoxes(){ const L=[]; const A=typeof apA==='function'?apA():null; if(A) L.push([A.x0-50,A.y0-30,A.x1+50,A.term.y1+40]); return L; }
+function ovlHits(tx0,ty0,tx1,ty1){ return ovlBoxes().some(b=>tx1>b[0]&&tx0<b[2]&&ty1>b[1]&&ty0<b[3]); }
+// queued and run at the start of the next frame, when the main ctx carries no clip from the map/minimap
+function ovlPaint(g,dx,dy,tx0,ty0,wT,hT,ppt){ if(!ovlHits(tx0,ty0,tx0+wT,ty0+hT)) return; (OVL.q||(OVL.q=[])).push([g,dx,dy,tx0,ty0,wT,hT,ppt]); }
+function ovlFlush(ms){ if(!OVL.q||!OVL.q.length) return; const t0=performance.now(); while(OVL.q.length&&performance.now()-t0<ms){ const j=OVL.q.shift(); ovlNow(...j); } }
+function ovlNow(g,dx,dy,tx0,ty0,wT,hT,ppt){ const B=256, k=ppt/TILE; if(!OVL.tmp) OVL.tmp=mkCanvas(B,B); const tg=OVL.tmp.getContext('2d');
+  const W=Math.ceil(wT*ppt), H=Math.ceil(hT*ppt);
+  for(let by=0;by<H;by+=B) for(let bx=0;bx<W;bx+=B){ const bw=Math.min(B,W-bx), bh=Math.min(B,H-by), wx0=tx0*TILE+bx/k, wy0=ty0*TILE+by/k;
+    tg.globalCompositeOperation='copy'; tg.drawImage(cv,0,0,bw,bh,0,0,bw,bh); tg.globalCompositeOperation='source-over';
+    ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,bw,bh); ctx.beginPath(); ctx.rect(0,0,bw,bh); ctx.clip(); ctx.setTransform(k,0,0,k,-wx0*k,-wy0*k);
+    try{ apDrawLow(wx0,wy0,wx0+bw/k,wy0+bh/k); }catch(e){ OVL.err=String(e&&e.stack||e); } ctx.restore();
+    g.drawImage(cv,0,0,bw,bh,dx+bx,dy+by,bw,bh);
+    ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalCompositeOperation='copy'; ctx.drawImage(OVL.tmp,0,0,bw,bh,0,0,bw,bh); ctx.restore(); } }

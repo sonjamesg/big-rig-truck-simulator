@@ -44,7 +44,7 @@ function updatePortTrucks(dt){ if(!world.ready||typeof traffic==='undefined') re
   for(const P of portList()){ if(!P.ready||!P.lpath) continue; const mine=PTRUCK.list.filter(T=>T.P===P&&!T.home);
     if(mine.length<PTRUCK.per&&PTRUCK.t>(P.ptNext||0)){ P.ptNext=PTRUCK.t+8;   // seed: start out of sight at a depot or on the port approach, alternating loaded/empty
       const exp=ptWantExp(P), T={P,st:'new',box:exp?YARD_COLS[(Math.random()*8)|0]:null,t:0,id:PTRUCK.list.length}; const dp=ptDest(T), g=dp&&ptDepotGeo(dp);
-      if(g&&!ptVisible(g.S[0],g.S[1],200)&&ptToRoad(T,g.sg,1,g.along+6,ptGateGoal(P))){ T.tgt='port'; PTRUCK.list.push(T); } } }
+      if(g&&ptLaneOK(P)&&!ptVisible(g.S[0],g.S[1],200)&&ptToRoad(T,g.sg,1,g.along+6,ptGateGoal(P))){ T.tgt='port'; PTRUCK.list.push(T); } } }
   for(let k=PTRUCK.list.length-1;k>=0;k--){ const T=PTRUCK.list[k], P=T.P; T.t+=dt;
     if(T.st==='road'){ const v=T.v;
       if(!traffic.vs.includes(v)){ T.st='lost'; T.v=null; continue; }
@@ -79,7 +79,7 @@ function updatePortTrucks(dt){ if(!world.ready||typeof traffic==='undefined') re
           if(left<0.05){ T.ph='drop'; T.w=0; T.rev=0; } } }
       else if(T.ph==='drop'){ T.w+=dt; { const bh=Math.atan2(D.u[1],D.u[0]), e=(x,t)=>{ let d=t-x; d=Math.atan2(Math.sin(d),Math.cos(d)); return x+d*Math.min(1,dt*3); }; T.th=e(T.th,bh); T.h=e(T.h,bh); T.x=D.K[0]; T.y=D.K[1]; T.ax=D.K[0]-D.u[0]*10.5; T.ay=D.K[1]-D.u[1]*10.5; T.straight=Math.abs(Math.atan2(Math.sin(T.th-bh),Math.cos(T.th-bh)))<0.03; }  /* final square-up in the bay */ if(T.pick){ if(T.w>2.5&&!T.box&&T.straight) T.box=YARD_COLS[(Math.random()*8)|0]; if(T.w>4.5&&T.box){ T.ph='out'; T.s=0; T.bay=null; ptSetArt(T); } } else { if(T.w>2.5&&T.box&&T.straight&&!T.expLoad){ T.box=null; if(T.home&&typeof ownDelivered==='function') ownDelivered(T); T.P.delivered=(T.P.delivered||0)+1; if(!T.home&&ptWantExp(T.P)) T.expLoad=1; } if(T.expLoad&&!T.box&&T.w>4){ T.box=YARD_COLS[(Math.random()*8)|0]; ptSetArt(T); T.P.expOut=(T.P.expOut||0)+1; } if(T.w>(T.expLoad?6:4.5)&&(!T.box||T.expLoad)){ T.ph='out'; T.s=0; T.bay=null; T.expLoad=0; } } }   // box goes into the building, never seen again
       else { const pa=ptAhead(T,6), mv=Math.max(0,Math.min(dt*Math.min(6,1+T.s*0.4),pa<6?Math.max(0,(pa-3)*dt):1e9)), end=D.outP.len;
-        if(T.s+mv>=end-0.05){ T.s=end-0.05; const g=ptDepotGeo(T.dest); if(T.home&&typeof ownMission==='function'){ if(T.pick&&T.box){ T.pick=0; T.dest=T.home; T.tgt='depot'; } else ownMission(T); } else { T.tgt='port'; T.dest=null; } if(ptToRoad(T,g.sg,D.exit.dir,D.exit.along,T.tgt==='port'?ptGateGoal(T.P):T.dest)){ if(T.tgt==='port') T.dest=null; continue; } } else T.s+=mv;
+        if(T.s+mv>=end-0.05){ T.s=end-0.05; const g=ptDepotGeo(T.dest); if(T.wl){ if(!ptLaneOK(T.P)) continue; T.wl=0; } else { if(T.home&&typeof ownMission==='function'){ if(T.pick&&T.box){ T.pick=0; T.dest=T.home; T.tgt='depot'; } else ownMission(T); } else { T.tgt='port'; T.dest=null; } if(T.tgt==='port'&&!ptLaneOK(T.P)){ T.wl=1; continue; } } if(ptToRoad(T,g.sg,D.exit.dir,D.exit.along,T.tgt==='port'?ptGateGoal(T.P):T.dest)){ if(T.tgt==='port') T.dest=null; continue; } } else T.s+=mv;
         const q=ptPose(D.outP,T.s); T.x=q[0]; T.y=q[1]; T.h=q[2]; artic(T,q[0],q[1],q[2],10.5); }
       continue; }
     if(T.st==='lost'){ T.lt=(T.lt||0)+dt; if(T.lt>6){ T.lt=0; const dp=ptDest(T)||T.dest, g=dp&&ptDepotGeo(dp); if(g&&!ptVisible(g.S[0],g.S[1],200)&&ptToRoad(T,g.sg,1,g.along+6,ptGateGoal(P))){ T.tgt='port'; T.dest=null; } } } } }
@@ -114,3 +114,6 @@ function portMapTrucks(BX,BY,z){ if(typeof ownMap==='function'&&z>0) ownMap(BX,B
     ctx.fillStyle='#d63b2f'; ctx.fillRect(l*0.18,-w/2,l*0.3,w); if(q.box){ ctx.fillStyle=q.box; ctx.fillRect(-l*0.62,-w/2,l*0.78,w); ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.strokeRect(-l*0.62,-w/2,l*0.78,w); } else { ctx.strokeStyle='#e8e8e8'; ctx.lineWidth=1.5; ctx.setLineDash([2,2]); ctx.strokeRect(-l*0.62,-w/2,l*0.78,w); ctx.setLineDash([]); }
     ctx.restore(); if(z>=2.2&&!q.mini){ ctx.font='bold 11px system-ui'; ctx.textAlign='left'; ctx.lineWidth=3; ctx.strokeStyle='rgba(0,0,0,0.8)'; const t=q.box?'Container (loaded)':'Empty trailer'; ctx.strokeText(t,x+l*0.6+4,y-6); ctx.fillStyle=q.box?'#ffe08a':'#cfd8e3'; ctx.fillText(t,x+l*0.6+4,y-6); } }
   ctx.restore(); }
+
+// road port trucks only head for the gate when the holding lane has space for them (counts trucks already on the way)
+function ptLaneOK(P){ const onWay=PTRUCK.list.filter(o=>o.P===P&&o.tgt==='port'&&o.v&&!o.wl).length; return dgHoldN(P)+P.lors.filter(l=>l.p<-0.5).length+onWay<4; }
