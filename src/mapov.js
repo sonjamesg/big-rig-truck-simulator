@@ -39,6 +39,6 @@ function ovlNow(g,dx,dy,tx0,ty0,wT,hT,ppt){ const B=256, k=ppt/TILE; if(!OVL.tmp
   for(let by=0;by<H;by+=B) for(let bx=0;bx<W;bx+=B){ const bw=Math.min(B,W-bx), bh=Math.min(B,H-by), wx0=tx0*TILE+bx/k, wy0=ty0*TILE+by/k;
     tg.globalCompositeOperation='copy'; tg.drawImage(cv,0,0,bw,bh,0,0,bw,bh); tg.globalCompositeOperation='source-over';
     ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,bw,bh); ctx.beginPath(); ctx.rect(0,0,bw,bh); ctx.clip(); ctx.setTransform(k,0,0,k,-wx0*k,-wy0*k);
-    try{ apDrawLow(wx0,wy0,wx0+bw/k,wy0+bh/k); }catch(e){ OVL.err=String(e&&e.stack||e); } ctx.restore();
+    APX.noAc=1; try{ apDrawLow(wx0,wy0,wx0+bw/k,wy0+bh/k); }catch(e){ OVL.err=String(e&&e.stack||e); } APX.noAc=0; ctx.restore();
     g.drawImage(cv,0,0,bw,bh,dx+bx,dy+by,bw,bh);
     ctx.save(); ctx.setTransform(1,0,0,1,0,0); ctx.globalCompositeOperation='copy'; ctx.drawImage(OVL.tmp,0,0,bw,bh,0,0,bw,bh); ctx.restore(); } }

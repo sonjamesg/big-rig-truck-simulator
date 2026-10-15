@@ -213,9 +213,9 @@ function apDrawLow(vx0,vy0,vx1,vy1){ const A=apA(); if(!A) return; const T_=TILE
   apDrawFighter({col:'#7d8a95'},{x:A.hang[1].x0+14,y:A.hang[1].y0+3,h:-Math.PI/2,alt:0,ph:'has'});
   apFieldLights(A,vx0,vy0,vx1,vy1);
   // aircraft on the ground
-  for(const st of A.stands){ const p=apCivil(A,st,apLT(st)); if(p&&p.alt<=0.05&&vis(p.x,p.y,900)){ apDrawCivil(st,p); if(p.ph==='park') apService(st,p,p.x*T_,p.y*T_); if(p.ph==='push') apVeh(g,p.x*T_,(p.y+33*st.sc/32)*T_,Math.PI/2,'push'); }
+  if(!APX.noAc) for(const st of A.stands){ const p=apCivil(A,st,apLT(st)); if(p&&p.alt<=0.05&&vis(p.x,p.y,900)){ apDrawCivil(st,p); if(p.ph==='park') apService(st,p,p.x*T_,p.y*T_); if(p.ph==='push') apVeh(g,p.x*T_,(p.y+33*st.sc/32)*T_,Math.PI/2,'push'); }
     apBridge(A,st,p); }
-  for(const f of A.fighters){ const p=apFighter(A,f,apLT(f)); if(p&&p.alt<=0.05&&vis(p.x,p.y,600)) apDrawFighter(f,p); }
+  if(!APX.noAc) for(const f of A.fighters){ const p=apFighter(A,f,apLT(f)); if(p&&p.alt<=0.05&&vis(p.x,p.y,600)) apDrawFighter(f,p); }
   apTerminal(A,vx0,vy0,vx1,vy1,night); }
 function apBridge(A,st,p){ const g=ctx, T_=TILE, ty=A.civ.y1*T_, X=st.x*T_, ny=(st.sy+24*st.sc/32)*T_, ext=p&&p.ph==='park'&&p.tp>3&&p.tp<116, y1=ext?ny:ty-3*T_, dx=X-6*st.sc;
   g.fillStyle='#4f5b66'; g.beginPath(); g.roundRect(dx-12,y1,24,ty-y1,6); g.fill(); g.fillStyle='#aab7c4'; g.fillRect(dx-9,y1+2,18,ty-y1-4); g.fillStyle='#34495e'; g.beginPath(); g.roundRect(dx-16,y1-6,32,10,4); g.fill(); }
