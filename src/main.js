@@ -250,6 +250,7 @@ function drawMinimap(){
   drawPOIs(m=>x+(m/4-(cxT-span/2))*sc, m=>y+(m/4-(cyT-sh/2))*sc, false);
   mpDrawMap(m=>x+(m/4-(cxT-span/2))*sc, m=>y+(m/4-(cyT-sh/2))*sc, false);
   for(const t of world.trailers){ if(t.coupled) continue; const mx=x+(t.x/4-(cxT-span/2))*sc, my=y+(t.y/4-(cyT-sh/2))*sc; if(mx<x||my<y||mx>x+w||my>y+h) continue; ctx.fillStyle=t.target?'#ffd600':'#4fd1ff'; ctx.fillRect(mx-2,my-3,4,6); }
+  if(typeof missionFlag==='function'){ ctx.save(); ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip(); missionFlag(m=>x+(m/4-(cxT-span/2))*sc, m=>y+(m/4-(cyT-sh/2))*sc, false); ctx.restore(); }
   if(typeof railMapTrains==='function') railMapTrains(m=>x+(m-(cxT-span/2))*sc, m=>y+(m-(cyT-sh/2))*sc, sc, true);
   if(typeof portMapTrucks==='function') portMapTrucks(m=>x+(m-(cxT-span/2))*sc, m=>y+(m-(cyT-sh/2))*sc, sc*0.6);
   for(const v of traffic.vs){ const mx=x+(v.x/4-(cxT-span/2))*sc, my=y+(v.y/4-(cyT-sh/2))*sc; if(mx<x||my<y||mx>x+w||my>y+h) continue; ctx.fillStyle=v.heavy?'#ff9f1a':'#ffffff'; ctx.fillRect(mx-1.5,my-1.5,3,3); }
@@ -296,7 +297,7 @@ function drawBigMap(){
   for(const t of world.trailers){ if(t.coupled) continue; if(z<0.8&&!t.target) continue; ctx.fillStyle=t.target?'#ffd600':'#4fd1ff'; ctx.fillRect(BX(t.x/4)-2,BY(t.y/4)-2,4,4); }
   const IR=mapIconR(z); MAPLBL.length=0; railBigMap(BX,BY,z,IR); portBigMap(BX,BY,z);
   navLine(m=>BX(m/4),m=>BY(m/4),4,'#ff3df0');
-  drawPOIs(m=>BX(m/4),m=>BY(m/4),z>0.6,IR);
+  drawPOIs(m=>BX(m/4),m=>BY(m/4),z>0.6,IR); if(typeof missionFlag==='function') missionFlag(m=>BX(m/4),m=>BY(m/4),true);
   mpDrawMap(m=>BX(m/4),m=>BY(m/4),true);
   if(typeof ownMapLabels==='function') ownMapLabels(BX,BY,z,IR);
   if(typeof czMapMarks==='function') czMapMarks(BX,BY,z,IR);

@@ -180,3 +180,28 @@ function foNavStep(i,j,d,k,FF){ if(k>1) return -1; const along=t=>{ const h=worl
   if(!FF[i]){ if(cv(i)) return 1; return along(j)?0:-1; }                  // entering: from the curve onto the deck, or straight along the lower road
   if(navUp[i]){ return FF[j]?1:(cv(j)?0:-1); }                             // on the deck: stay on it until it lands back on the curve
   if(cv(j)) return -1; return along(j)&&along(i)?0:-1; }                  // under it: straight along the lower road only
+
+// v31: persistent mission sat nav - while a mission step is active the route to its target is restored (about every second) whenever it goes missing
+function missionTarget(){ const a=typeof career!=='undefined'&&career.active; if(!a||!a.job) return null;
+  if(a.phase==='pickup'){ const b=a.pickBay, t=a.trailer; return t?{x:t.x,y:t.y,name:a.job.from.name+(b&&b.id!=null?' \u2022 bay '+b.id:''),ref:a.job.from}:a.job.from; }
+  if(a.phase==='recouple'&&a.trailer) return {x:a.trailer.x,y:a.trailer.y,name:'Your cargo'};
+  if(a.phase==='deliver') return jobBayTarget(a); return null; }
+function missionFlag(X,Y,big){ const t=missionTarget(); if(!t) return; const tx=t.x!=null?t.x:t.entrance&&t.entrance.x, ty=t.y!=null?t.y:t.entrance&&t.entrance.y; if(tx==null) return;
+  const x=X(tx), y=Y(ty), pu=0.5+0.5*Math.sin(performance.now()/260), s=big?1.3:0.9; ctx.save();
+  ctx.strokeStyle='rgba(255,214,0,'+(0.35+0.4*pu)+')'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,(6+6*pu)*s,0,7); ctx.stroke();
+  ctx.strokeStyle='#222'; ctx.lineWidth=1.6; ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y-16*s); ctx.stroke(); ctx.fillStyle='#ffd600'; ctx.beginPath(); ctx.moveTo(x,y-16*s); ctx.lineTo(x+10*s,y-12.5*s); ctx.lineTo(x,y-9*s); ctx.fill();
+  const nm=String(t.name||'Mission').replace(/^.*\u2022\s*/,big?String(t.name).split(' \u2022')[0]+' \u2022 ':''); ctx.font='bold '+(big?12:9)+'px sans-serif'; const w=ctx.measureText(nm).width+6;
+  ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(x+11*s,y-20*s,w,big?15:11); ctx.fillStyle='#ffd600'; ctx.fillText(nm,x+11*s+3,y-20*s+(big?12:9)); ctx.restore(); }
+setTimeout(()=>{ const un=updateNav; let acc=0; updateNav=function(dt){ un.apply(this,arguments); acc+=dt; if(acc<1) return; acc=0;
+  try{ const t=missionTarget(); if(!t) return; if(NAV.route&&!(NAV.route.arrived&&NAV.route.target.name!==t.name)) return; const fl=flash; flash=()=>{}; try{ setRoute(t); NAV.restored=(NAV.restored||0)+1; } finally{ flash=fl; } }catch(e){} }; },0);
+// v31: an uncoupled trailer abandoned on a road / junction is cleared after ~60 s off screen with the player (and every MP player) over a screen away;
+// coming back resets the timer. Bay/yard trailers stay. A mission trailer goes back to its pickup bay and the job stays valid (sat nav restores).
+function trlOnRoad(t){ const tx=Math.floor(t.x/M_T), ty=Math.floor(t.y/M_T); if(!inb(tx,ty)) return false; const i=idx(tx,ty); return isRoadT(i)||!!(world.jMask&&world.jMask[i]); }
+function trlNearPlayer(t,R){ if(Math.hypot(t.x-truck.x,t.y-truck.y)<R) return true; if(typeof MP!=='undefined'&&MP.on) for(const k in MP.players){ const p=MP.players[k], q=p&&p.buf&&p.buf[p.buf.length-1]; const x=p&&(p.x!=null?p.x:q&&q[0]), y=p&&(p.y!=null?p.y:q&&q[1]); if(x!=null&&Math.hypot(t.x-x,t.y-y)<R) return true; } return false; }
+function trlSweep(dt){ const vr=viewRectM(), R=Math.max(vr[2]-vr[0],vr[3]-vr[1])*1.0; const a=typeof career!=='undefined'&&career.active;
+  for(let i=world.trailers.length-1;i>=0;i--){ const t=world.trailers[i]; if(t.coupled||t.bay||t.inBay||!trlOnRoad(t)){ t.awayT=0; continue; }
+    if(onScreen(t.x,t.y,10)||trlNearPlayer(t,R)){ t.awayT=0; continue; } t.awayT=(t.awayT||0)+dt; if(t.awayT<60) continue; t.awayT=0;
+    if(a&&a.trailer===t){ const b=a.pickBay; if(b){ t.x=b.kx; t.y=b.ky; t.th=b.th; if(t.h!=null) t.h=b.th; t.bay=b; b.trailer=t; b.target=true; t.target=true; if(a.phase==='deliver'||a.phase==='recouple') a.phase='pickup'; if(typeof clearRoute==='function') clearRoute(); TRLSW.back++; } continue; }
+    world.trailers.splice(i,1); TRLSW.gone++; } }
+const TRLSW={gone:0,back:0};
+setTimeout(()=>{ const un=updateNav; let acc=0; updateNav=function(dt){ un.apply(this,arguments); acc+=dt; if(acc<1) return; const d=acc; acc=0; try{ trlSweep(d); }catch(e){ console.warn('[trlSweep]',e); } }; },0);
