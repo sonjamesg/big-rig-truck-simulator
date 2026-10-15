@@ -98,7 +98,7 @@ function ptYardCounter(vx0,vy0,vx1,vy1){ for(const P of portList()){ if(!P.ready
     { const sh=(P.cur&&P.cur.ships)||[], nm=o=>['ALBION STAR','NORDIC TIDE','MAERSK KENT','CMA SEINE','EVER GRACE','HAPAG ELBE'][((o.k%6)+6)%6], cnt=o=>o.s?o.s.has.filter(Boolean).length:0;   // v43 extra 3: ship schedule board
       const st=k=>({in:'INBOUND',sideIn:'BERTHING',dockA:'DISCHARGING',shift:'SHIFTING',dockB:'LOADING',sideOut:'SAILING',out:'OUTBOUND',anchor:'AT ANCHOR'})[k]||k;
       const A=sh.find(o=>o.pose.k==='dockA'||o.pose.k==='sideIn'), B=sh.find(o=>o.pose.k==='dockB'||o.pose.k==='shift'), an=sh.filter(o=>o.pose.k==='anchor'), inb=sh.filter(o=>o.pose.k==='in');
-      const L=['SHIP SCHEDULE','A import  '+(A?nm(A).padEnd(12)+st(A.pose.k).padEnd(12)+cnt(A)+'/6':'-- free --'),'B export  '+(B?nm(B).padEnd(12)+st(B.pose.k).padEnd(12)+cnt(B)+'/6':'-- free --'),'anchor    '+(an.length?an.map(nm).join(', ')+' (next)':'none')+(inb.length?'  inbound '+inb.length:'')];
+      const L=[P.windStop?'SHIP SCHEDULE  \u26A0 CRANES STOPPED - HIGH WIND':'SHIP SCHEDULE','A import  '+(A?nm(A).padEnd(12)+st(A.pose.k).padEnd(12)+cnt(A)+'/6':'-- free --'),'B export  '+(B?nm(B).padEnd(12)+st(B.pose.k).padEnd(12)+cnt(B)+'/6':'-- free --'),'anchor    '+(an.length?an.map(nm).join(', ')+' (next)':'none')+(inb.length?'  inbound '+inb.length:'')];
       ctx.font='bold 13px ui-monospace,monospace'; ctx.textAlign='left'; const W2=Math.max(...L.map(t=>ctx.measureText(t).width))+16, y2=y+28; ctx.fillStyle='rgba(10,14,20,0.85)'; ctx.fillRect(x-W2/2,y2,W2,L.length*17+8);
       L.forEach((t,i)=>{ ctx.fillStyle=i?'#e6edf3':'#ffd866'; ctx.fillText(t,x-W2/2+8,y2+16+i*17); }); }
     ctx.restore(); } }

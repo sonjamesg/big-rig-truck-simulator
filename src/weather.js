@@ -1,9 +1,9 @@
 // ---------- weather: random clear / rain / fog cycles (host-synced in MP, saved) ----------
-const WX={st:'clear',rain:0,fog:0,wet:0,timer:240,grip:1,drops:null,wip:0};
-function wxPick(){ const r=Math.random(); WX.st=r<0.58?'clear':r<0.85?'rain':'fog'; WX.timer=(WX.st==='clear'?240:150)+Math.random()*240; }
+const WX={st:'clear',rain:0,fog:0,wet:0,timer:240,grip:1,drops:null,wip:0,wind:0};
+function wxPick(){ const r=Math.random(); WX.st=r<0.56?'clear':r<0.78?'rain':r<0.9?'fog':'storm'; WX.timer=(WX.st==='clear'?240:150)+Math.random()*240; }
 function updateWeather(dt,run){ const host=!(typeof MP!=='undefined'&&MP.on&&!MP.host);
   if(run&&host){ WX.timer-=dt; if(WX.timer<=0) wxPick(); }
-  const tr=WX.st==='rain'?1:0, tf=WX.st==='fog'?1:0; WX.rain+=(tr-WX.rain)*Math.min(1,dt*0.15); WX.fog+=(tf-WX.fog)*Math.min(1,dt*0.12);
+  const tr=WX.st==='rain'||WX.st==='storm'?1:0, tf=WX.st==='fog'?1:0; WX.wind+=((WX.st==='storm'?1:0)-WX.wind)*Math.min(1,dt*0.1); WX.rain+=(tr-WX.rain)*Math.min(1,dt*0.15); WX.fog+=(tf-WX.fog)*Math.min(1,dt*0.12);
   WX.wet=Math.max(WX.rain, WX.wet-dt*0.006); WX.grip=1-0.3*WX.wet; WX.wip+=dt*(WX.rain>0.2?3.2:0); }
 function drawWeather(vx0,vy0,vx1,vy1,z){ const W=WX.wet, Rn=WX.rain, F=WX.fog; if(W<0.02&&F<0.02) return; ctx.save(); ctx.setTransform(1,0,0,1,0,0);
   if(W>0.02){ ctx.globalCompositeOperation='multiply'; ctx.fillStyle='rgba(150,165,190,'+(0.45*W)+')'; ctx.fillRect(0,0,VW,VH); ctx.globalCompositeOperation='source-over';

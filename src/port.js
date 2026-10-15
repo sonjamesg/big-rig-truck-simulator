@@ -176,6 +176,7 @@ function drawPortNight(vx0,vy0,vx1,vy1){ const K=typeof DN!=='undefined'?DN.dark
     if(portVisible(P,vx0,vy0,vx1,vy1)){ const q0=P.qy0||P.berths[0].y0, q1=P.qy1||P.berths[P.berths.length-1].y1; for(let v=q0+6;v<q1;v+=16) dot(-0.6,v,P,null,150,0.55);
       for(const [bv,occ] of [[P.vA,!!(P.cur&&P.cur.shA)],[P.vB,!!(P.cur&&P.cur.shB)]]) for(const e of [-14,14]) dot(-0.4,bv+e,P,null,34,1);
       for(const m of (P.masts||[])){ dot(m.u,m.v,P,null,200,0.13); dot(m.u,m.v,P,null,22,0.75); }
+      for(const c of (P.cranes||[])){ dot(P.legL*0.5,c.y,P,null,170,0.35); dot(P.dockU,c.y,P,null,110,0.4); } for(const g of (P.rtg||[])){ dot((P.legL+P.tl1)/2,g.v,P,null,120,0.3); }   /* v43 extra 9: crane + gantry floodlights */
       if(P.gates) for(const g of P.gates){ dot(g.pu,g.pv,P,null,80,0.7); const w=PL(P,g.lu,g.lv); dgLamp(w[0]*TILE,w[1]*TILE,g.a>0.95,K); } }
     for(const o of (P.cur?P.cur.ships:[])){ const p=o.pose, f=[Math.cos(p.h),Math.sin(p.h)], l=[-f[1],f[0]];
       dot(p.u+f[0]*12,p.v+f[1]*12,P,null,26,1); dot(p.u-f[0]*11.5,p.v-f[1]*11.5,P,null,40,0.35); } }
@@ -363,8 +364,9 @@ function updatePortLogistics(P,dt,t){ const ships=portShips(P,t); portShipHold(P
   P.cur={ships,shA,shB};
   if(shB&&P.ex+P.exRes<SHIP.N){ P.ex=SHIP.N-P.exRes; }
   // ---- quay cranes
+  P.windStop=typeof WX!=='undefined'&&WX.wind>0.6;   /* v43 extra 9: high wind -> quay + yard cranes finish the current lift, then stop */
   for(const c of P.cranes){ const B=c.role==='A'?shA:shB; const tv=c.trac&&c.trac.box&&c.role==='B'?c.tv:null;
-    if(c.ph===0&&c.job==null){ c.trac=c.trac&&c.trac.task&&c.trac.task.crane===c?c.trac:null;
+    if(c.ph===0&&c.job==null&&!P.windStop){ c.trac=c.trac&&c.trac.task&&c.trac.task.crane===c?c.trac:null;
       if(B&&c.role==='A'&&B.rem>20&&P.stock+P.resImp<P.cap){ const j=c.idx.find(j=>B.s.has[j]&&craneFree(P,c,P.vA+P.hs*boxAx(j))); if(j!=null){ c.job=j; } }
       if(B&&c.role==='B'&&B.rem>26){ const j=c.idx.find(j=>!B.s.has[j]&&!P.cranes.some(o=>o!==c&&o.job===j&&o.role==='B')&&craneFree(P,c,P.vB+P.hs*boxAx(j))); if(j!=null&&(c.trac||P.ex>0)) c.job=j; }
       if(c.job==null&&c.trac){ const t=c.trac; if(c.role==='A'){ if(!t.box) t.task=null; } else if(t.task&&t.task.need) t.task.cancel=1; else t.task=t.box?{k:'retExp'}:null; c.trac=null; } }
@@ -423,7 +425,7 @@ function updatePortLogistics(P,dt,t){ const ships=portShips(P,t); portShipHold(P
   for(const g of P.agates){ const op=P.lors.some(l=>l.gt&&l.gt[g.i]&&l.p>g.p-3&&l.p<g.p+5); g.a+=((op?1:0)-g.a)*Math.min(1,dt*2.5); g.q=P.lors.filter(l=>!(l.gt&&l.gt[g.i])&&l.p<g.p&&l.p>g.p-24).length; }
   for(let i=P.lors.length-1;i>=0;i--) if(!P.lors[i].truck&&P.lors[i].p>=P.laneLen+P.lpost-0.5){ const l=P.lors[i]; P.lors.splice(i,1); if(l.box) P.sent++; }
   // ---- yard gantries (one lift at a time, FIFO)
-  for(const g of P.rtg){ if(!g.cur&&g.q.length){ for(let qi=0;qi<g.q.length;qi++){ const j=g.q[qi];
+  for(const g of P.rtg){ if(!g.cur&&g.q.length&&!P.windStop){ for(let qi=0;qi<g.q.length;qi++){ const j=g.q[qi];
       const ok=j.kind==='tDrop'?P.stock<P.cap:j.kind==='tPick'?true:j.kind==='tRet'?true:j.kind==='lDrop'?P.ex+P.exRes+(P.mty||0)<P.ecap:j.kind==='lLoad'?P.stock>0:true; if(ok){ g.cur=j; g.q.splice(qi,1); g.t=0; break; } } }
     const tv=g.blk?P.expC:P.impC; g.v+= Math.sign(tv-g.v)*Math.min(Math.abs(tv-g.v),dt);
     if(!g.cur){ g.su+= (P.blkU[0]-g.su)*Math.min(1,dt*2); g.car=null; continue; }
