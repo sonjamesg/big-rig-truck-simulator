@@ -398,7 +398,7 @@ function* genWorldSteps(){
   // ---------------- junctions & lorry-friendly kerb radii ----------------
   const reserved=new Uint8Array(MW*MH); world.reserved=reserved; world.jMask=new Uint8Array(MW*MH); world.cornerAt=new Int32Array(MW*MH).fill(-1);
   { // v36: Albion Airport landside access: forecourt -> west along 716 -> down to the town grid (seg at x346 from y780), laid before junctions so AI + sat nav use it
-    road('v',410,689,715,4,'city'); road('h',716,346,413,4,'city');
+    road('v',410,689,715,4,'town'); road('h',716,346,413,4,'town');
     const tg=world.segs.find(q=>q.dir==='v'&&q.a===346&&q.b0===780); if(tg){ for(let y=720;y<780;y++) for(let k=0;k<tg.w;k++){ const x=tg.a+k; set(x,y,water[idx(x,y)]?T.BRIDGE:T.ROAD); world.roadV[idx(x,y)]=tg.id; } tg.b0=720; } }
   // v33: re-centre arms that hit a roundabout off-centre: pull the road back and S-bend in on the centre line
   for(const rb of world.rbs) for(const sg of world.segs.slice()){ if(sg.dead) continue;
@@ -441,6 +441,7 @@ function* genWorldSteps(){
     for(let y=jy;y<jy+jh;y++) for(let x=jx;x<jx+jw;x++) if(inb(x,y)) world.jMask[idx(x,y)]=1;
     world.junctions.push(J); hs.js.push(J); vs.js.push(J);
   } }
+  for(const J of world.junctions) if(J.y===716&&(J.x===410||J.x===346)) J.lights=false;   // v36: airport access L-bends are plain corners (no signals / box)
   for(const rb of world.rbs){ for(const sg of S){
     const ends= sg.dir==='h' ? [[sg.b0,sg.a+sg.w/2,-1],[sg.b1+1,sg.a+sg.w/2,1]] : [[sg.a+sg.w/2,sg.b0,-1],[sg.a+sg.w/2,sg.b1+1,1]];
     for(const [ex,ey,side] of ends){ const d=Math.hypot(ex-rb.cx,ey-rb.cy); if(d<rb.rout+2.5){ rb.arms.push({seg:sg.id,side,ang:Math.atan2(ey-rb.cy,ex-rb.cx)}); sg['rb'+(side<0?0:1)]=rb.id; } } } }

@@ -174,6 +174,9 @@ function apLandside(A,night){ const g=ctx, T_=TILE;
   // drop-off loop round the end of the access road (x 410-414), kerbside lane along the terminal front
   g.fillStyle='#55585d'; g.beginPath(); g.roundRect(392*T_,689*T_,40*T_,13*T_,6.5*T_); g.fill(); g.fillStyle='#8fb26a'; g.beginPath(); g.roundRect(398*T_,693.5*T_,28*T_,4*T_,2*T_); g.fill();
   g.fillStyle='#55585d'; g.beginPath(); g.roundRect(352*T_,688.4*T_,92*T_,2.6*T_,1.3*T_); g.fill(); g.fillStyle='#f0f0f0'; for(let x=354;x<442;x+=3) g.fillRect(x*T_,689.6*T_,1.6*T_,0.18*T_);
+  // rounded outer kerb on the access road's east bend (410..414,716..720): pave-colour corner piece outside a 4-tile arc + kerb line
+  { const cx=410*T_, cy=720*T_, r=4*T_; g.fillStyle='#bdbcb6'; g.beginPath(); g.moveTo(cx+r,cy-r); g.lineTo(cx+r,cy); g.arc(cx,cy,r,0,-Math.PI/2,true); g.closePath(); g.fill();
+    g.strokeStyle='#d7d4cb'; g.lineWidth=5; g.beginPath(); g.arc(cx,cy,r-2,0,-Math.PI/2,true); g.stroke(); }
   // multi-storey
   g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.roundRect(354*T_+14,692*T_+14,34*T_,22*T_,T_*1.5); g.fill(); g.fillStyle='#8d939a'; g.beginPath(); g.roundRect(354*T_,692*T_,34*T_,22*T_,T_*1.5); g.fill();
   const rnd=mulberry(77); for(let r=0;r<5;r++){ g.fillStyle='#9aa1a8'; g.fillRect(356*T_,(693.5+r*4)*T_,30*T_,2.6*T_); for(let x=356.3;x<385.5;x+=1.2){ if(rnd()<0.65){ g.fillStyle=['#c0392b','#2980b9','#ecf0f1','#2c3e50','#7f8c8d','#f1c40f'][(rnd()*6)|0]; g.fillRect(x*T_,(693.7+r*4)*T_,0.8*T_,2.2*T_); } } }
