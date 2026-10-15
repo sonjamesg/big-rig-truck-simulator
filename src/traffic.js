@@ -248,18 +248,21 @@ function laneChange(v,sg,d,l0,l1,pos,lineA){
 function rbQueued(v){ const f=v.s+v.L/2; for(const m of v.mk){ if(m.kind==='rb'&&m.d-f<90&&v.s<(m.join||m.d)+5) return true; if(m.kind==='ring'&&v.s>m.d0-2&&v.s<m.d1) return true; } return false; }
 function planRB(v,rb,sg,d,r,forceArm){
   // v24: tangential flared entry -> clockwise ring -> tangential exit; give way at the ring edge to traffic already circulating
-  const R=rbRingR(rb)*M_T, C=[rb.cx*M_T,rb.cy*M_T];
+  const C=[rb.cx*M_T,rb.cy*M_T];
   const myArm=rb.arms.find(a=>a.seg===sg.id&&a.side===d);
   let arms=rb.arms.filter(a=>a!==myArm); if(!arms.length) arms=rb.arms;
   const arm=forceArm||arms[(r()*arms.length)|0], Q=world.segs[arm.seg], qd=arm.side<0?1:-1, qpos=arm.side<0?Q.b0:Q.b1+1;
   const lane=Math.min(nLanes(Q)-1,(r()*nLanes(Q))|0);
+  // v31: pick the circulating lane from how far round the exit is
+  let Rt=rbRingR(rb); { const n=v.px.length, a0=myArm?rbEntry(rb,myArm,v.plan.lane).phi:Math.atan2(v.py[n-1]-C[1],v.px[n-1]-C[0])+0.4, a1=rbExit(rb,arm,lane).phi; let dl=mod2pi(a1-a0); if(dl<0.4) dl+=6.283185307; Rt=rbLaneR(rb,dl); }
+  const R=Rt*M_T;
   const dIn=pathEnd(v); let dGw=dIn, aIn, aOut;
-  if(myArm){ const en=rbEntry(rb,myArm,v.plan.lane); aIn=en.phi; let hit=false;
+  if(myArm){ const en=rbEntry(rb,myArm,v.plan.lane,Rt); aIn=en.phi; let hit=false;
     for(const p of en.pts){ pathPush(v,p[0]*M_T,p[1]*M_T); if(!hit&&Math.hypot(p[0]-rb.cx,p[1]-rb.cy)<rb.rout+0.35){ hit=true; dGw=pathEnd(v); } } }
   else { const n=v.px.length; aIn=Math.atan2(v.py[n-1]-C[1],v.px[n-1]-C[0])+0.4; pathLine(v,C[0]+Math.cos(aIn)*R,C[1]+Math.sin(aIn)*R); dGw=pathEnd(v); }
-  const ex=rbExit(rb,arm,lane); aOut=ex.phi;
+  const ex=rbExit(rb,arm,lane,Rt); aOut=ex.phi;
   let del=mod2pi(aOut-aIn); if(del<0.4) del+=6.283185307;
-  const mrb={kind:'rb',d:dGw,rb,ang:aIn+0.18,key:sg.id+':'+d}; v.mk.push(mrb);
+  const mrb={kind:'rb',d:dGw,rb,ang:aIn+0.18,key:sg.id+':'+d,ln:v.plan.lane}; v.mk.push(mrb);
   { const P=ex.pts, n=P.length; if(n>1){ const a=P[n-2], b=P[n-1], l=Math.hypot(b[0]-a[0],b[1]-a[1])||1; mrb.ex=[b[0]*M_T,b[1]*M_T,(b[0]-a[0])/l,(b[1]-a[1])/l]; } }
   const d0=pathEnd(v), k=Math.ceil(del*R/2); mrb.join=d0+6;
   for(let i=1;i<=k;i++){ const a=aIn+del*i/k; pathPush(v,C[0]+Math.cos(a)*R,C[1]+Math.sin(a)*R); }
@@ -439,7 +442,7 @@ function stepVeh(v,dt,pbs){
         if(!stop&&gap<14){ let busy=false; for(const o of traffic.vs){ if(o===v||o.ring!==m.rb) continue; const a=Math.atan2(o.y-m.rb.cy*M_T,o.x-m.rb.cx*M_T); const df=mod2pi(m.ang-a); if(df<1.5&&df>0.05){ busy=true; break; } }
           if(!busy){ const t=truck, dr=Math.hypot(t.x-m.rb.cx*M_T,t.y-m.rb.cy*M_T); if(dr<(m.rb.rout+1)*M_T&&Math.abs(t.v)>0.8){ const a=Math.atan2(t.y-m.rb.cy*M_T,t.x-m.rb.cx*M_T), df=mod2pi(m.ang-a); if(df<1.6&&df>0.05) busy=true; } }
           if(busy&&(v.stopT>12||(typeof rbSigState==='function'&&RBSIG.on&&rbSigState(m.rb,m.key)==='g'))){ busy=false; for(const o of traffic.vs){ if(o===v||o.ring!==m.rb) continue; const a=Math.atan2(o.y-m.rb.cy*M_T,o.x-m.rb.cx*M_T), df=mod2pi(m.ang-a); if(df<0.5&&df>-0.15&&o.v>0.5){ busy=true; break; } } }   // long wait: only a car right at the merge still blocks
-          if(!busy) for(const o of traffic.vs){ const e=o.rbIn; if(o!==v&&e&&e.m.rb===m.rb&&e.m.key===m.key&&o.mk.indexOf(e.m)>=0&&o.s-o.L/2<e.m.join){ busy=true; break; } }   // one car per entry at a time: side-by-side lanes never squeeze onto the ring together
+          if(!busy) for(const o of traffic.vs){ const e=o.rbIn; if(o!==v&&e&&e.m.rb===m.rb&&e.m.key===m.key&&(e.m.ln===m.ln||e.m.ln==null)&&o.mk.indexOf(e.m)>=0&&o.s-o.L/2<e.m.join){ busy=true; break; } }   // one car per entry at a time: side-by-side lanes never squeeze onto the ring together
           if(!busy&&m.ex&&rbExitBlocked(v,m.ex)) busy=true;   // v25: don't enter the ring while our exit is queued back to the ring (no gridlock)
           if(!busy){ if(gap<2.5){ m.go=true; if(!m.join) m.join=m.d+20; v.rbIn={m}; } } else stop=true; } }
       if(!stop&&m.turn&&gap<8&&!m.go&&turnSweepBlocked(v,m)) stop=true;   // v25: hold the turn while a stopped car sits in our swept path

@@ -33,6 +33,11 @@ function navAStar(sx,sy,gx,gy){
   NAV.lastIt=it; if(navStamp[Gl]!==gen) return null; const rp=[]; for(let i=Gl;i!==-1;i=navFrom[i]) rp.push(i); rp.reverse(); const path=[rp[0]]; for(let k=1;k<rp.length;k++){ const a=rp[k-1], b=rp[k], d=b-a, st=Math.abs(d)<MW?Math.sign(d):Math.sign(d)*MW; if(Math.abs(d)!==1&&Math.abs(d)!==MW) for(let j=a+st;j!==b;j+=st) path.push(j); path.push(b); } return path; }
 function navBuild(path,target){
   const P=path.map(i=>[((i%MW)+0.5)*M_T,(((i/MW)|0)+0.5)*M_T]), n=P.length, cum=new Float32Array(n), eta=new Float32Array(n);
+  // v31: through a roundabout the route follows the AI's clockwise lane (outer for 1st exit, middle ahead, inner beyond)
+  for(let k=0;k<n;k++){ if(world.roadH[path[k]]!==-2) continue; let k1=k; while(k1+1<n&&world.roadH[path[k1+1]]===-2) k1++; const rb=rbAtTile(path[k]%MW,(path[k]/MW)|0);
+    if(rb&&k>0&&k1<n-1){ const C=[rb.cx*M_T,rb.cy*M_T], A=P[k-1], B=P[k1+1], a0=Math.atan2(A[1]-C[1],A[0]-C[0]), a1=Math.atan2(B[1]-C[1],B[0]-C[0]); let dl=a1-a0; while(dl<0.3) dl+=Math.PI*2; while(dl>Math.PI*2+0.3) dl-=Math.PI*2;
+      const Rm=rbLaneR(rb,dl)*M_T, m=k1-k+1; for(let q=0;q<m;q++){ const t=(q+1)/(m+1), sp=Math.sin(Math.PI*t), rr=Rm*sp+(rb.rout*M_T)*(1-sp), a=a0+dl*t; P[k+q]=[C[0]+Math.cos(a)*rr,C[1]+Math.sin(a)*rr]; } }
+    k=k1; }
   for(let k=1;k<n;k++){ cum[k]=cum[k-1]+Math.hypot(P[k][0]-P[k-1][0],P[k][1]-P[k-1][1]); }
   for(let k=n-2;k>=0;k--) eta[k]=eta[k+1]+(cum[k+1]-cum[k])/((navTileInfo(path[k])||[0,0,11])[2]);
   // turn instructions: heading change over a +/-4 tile window, local maxima only
