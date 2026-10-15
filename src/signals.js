@@ -28,7 +28,12 @@ function buildSig(J){ const keys=Object.keys(J.appr||{}), mvs=[], by=new Map();
   const get=(k,mv)=>by.get(k+'|'+mv);
   const dedR=k=>{ const ap=J.appr[k]; return ap&&ap.lanes&&ap.lanes.length>=2&&ap.lanes.some(l=>l==='R'); };
   const stages=[]; const ax0=hash2(J.x,J.y)<0.5?'v':'h';
-  for(const ax of [ax0,ax0==='v'?'h':'v']){ const ks=keys.filter(k=>axisOf(k)===ax); if(!ks.length) continue;
+  // v29 UK split phasing at 4-arm junctions: each approach runs alone in turn (protected right arrow), so opposing right-turners never meet in the box
+  const four=['h','v'].every(a=>keys.filter(k=>axisOf(k)===a).length>=2);
+  if(four){ const cx=(J.x+J.w/2)*M_T, cy=(J.y+J.h/2)*M_T, ang=k=>{ const [sid,d]=k.split(':'), sg=world.segs[+sid], o=jOptions(J,sg,+d), p=lanePt(sg,+d,0,o.stop); return Math.atan2(p[0]-cx,-(p[1]-cy)); };
+    const ord=keys.slice().sort((a,b)=>((ang(a)+7)%6.2832)-((ang(b)+7)%6.2832)); const off=(hash2(J.x+3,J.y)*ord.length)|0;
+    for(let i=0;i<ord.length;i++){ const k=ord[(i+off)%ord.length]; const st={kind:'split',ax:axisOf(k),mv:[]}; for(const mv of ['L','S','R']){ const m=get(k,mv); if(m) st.mv.push({m,filter:false}); } if(st.mv.length) stages.push(st); } }
+  else for(const ax of [ax0,ax0==='v'?'h':'v']){ const ks=keys.filter(k=>axisOf(k)===ax); if(!ks.length) continue;
     const main={kind:'main',ax,mv:[]}; for(const k of ks) for(const mv of ['L','S','R']){ const m=get(k,mv); if(!m) continue; const opp=ks.indexOf(sigOpp(k))>=0&&(get(sigOpp(k),'S')||get(sigOpp(k),'L')); main.mv.push({m,filter:mv==='R'&&!!opp}); }
     stages.push(main);
     const rs=ks.map(k=>get(k,'R')).filter(Boolean);
@@ -38,7 +43,7 @@ function buildSig(J){ const keys=Object.keys(J.appr||{}), mvs=[], by=new Map();
   // left filter arrows alongside any non-conflicting stage
   for(const s of stages){ for(const m of mvs){ if(m.mv!=='L'||s.mv.some(x=>x.m===m)) continue; if(s.mv.every(x=>!sigConflict(J,x.m,m))) s.mv.push({m,filter:false,extra:true}); } }
   // timings: cycle ~60-90 s
-  for(const s of stages) s.g= s.kind==='main'?(stages.length>2?22:27):7;
+  for(const s of stages) s.g= s.kind==='split'?13:s.kind==='main'?(stages.length>2?22:27):7;
   let t=0; const of=new Map(); stages.forEach((s,i)=>{ s.t0=t; t+=s.g+SIG_AMBER+SIG_ALLRED+SIG_RA2; s.idx=new Map(s.mv.map(x=>[x.m.id,x])); for(const x of s.mv){ if(!of.has(x.m.id)) of.set(x.m.id,new Set()); of.get(x.m.id).add(i); } });
   return {stages,T:t,of,mvs}; }
 function sigOf(J){ return J.sig||(J.sig=buildSig(J)); }
@@ -49,7 +54,7 @@ function sigState(J,key,mv){ const [S,cur,u]=sigCur(J), id=key+'|'+mv, set=S.of.
   return 'r'; }
 // true while a green right turn must give way to oncoming traffic (filtering under a full green)
 function sigFilter(J,key,mv){ if(mv!=='R') return false; const [S,cur,u]=sigCur(J); const x=S.stages[cur].idx.get(key+'|'+mv); return !!(x&&x.filter); }   // the arrow only takes over once its own stage starts (after the full intergreen)
-function sigArrow(J,key,mv){ const [S,cur,u]=sigCur(J); const st=S.stages[cur]; let x=st.idx.get(key+'|'+mv); return !!(x&&(st.kind!=='main'||x.extra)&&!x.filter&&sigState(J,key,mv)==='g'); }
+function sigArrow(J,key,mv){ const [S,cur,u]=sigCur(J); const st=S.stages[cur]; let x=st.idx.get(key+'|'+mv); if(st.kind==='split'&&!(x&&x.extra)) return mv==='R'&&!!x&&sigState(J,key,mv)==='g'; return !!(x&&(st.kind!=='main'||x.extra)&&!x.filter&&sigState(J,key,mv)==='g'); }
 // legacy (corner pole lights): any movement on that axis
 function lightState(J,ns){ const S=sigOf(J); let best='r'; for(const m of S.mvs){ if((m.ax==='v')!==ns) continue; const s=sigState(J,m.key,m.mv); if(s==='g') return 'g'; if(s==='a') best='a'; else if(s==='ra'&&best==='r') best='ra'; } return best; }
 // is there oncoming traffic a filtering right-turner must give way to?
