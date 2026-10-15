@@ -147,15 +147,16 @@ function drawRB(g,o){ const rb=o.rb, X=rb.cx*TILE, Y=rb.cy*TILE, Ro=rb.rout*TILE
     const e2=W(gm,gm.uE+0.6,f.e-f.sd*off), e1=W(gm,f.uf,f.e-f.sd*off); g.moveTo(e1[0],e1[1]); g.lineTo(e2[0],e2[1]); g.stroke(); }
   // inner edge line round the central island + lane divider on the circulatory carriageway
   g.beginPath(); g.arc(X,Y,(rb.rin+off)*S,0,Math.PI*2); g.stroke();
-  g.lineWidth=2; g.setLineDash([16,16]); g.beginPath(); g.arc(X,Y,(rb.rin+rb.rout)/2*S,0,Math.PI*2); g.stroke(); g.setLineDash([]);
+  if(typeof rbLaneLines==='function') rbLaneLines(g,rb,G2,X,Y,S); else { g.lineWidth=2; g.setLineDash([16,16]); g.beginPath(); g.arc(X,Y,(rb.rin+rb.rout)/2*S,0,Math.PI*2); g.stroke(); g.setLineDash([]); }
   // central island: kerb, verge, trees
   g.fillStyle='#8a877f'; g.beginPath(); g.arc(X,Y,rb.rin*S,0,7); g.fill(); g.fillStyle=g.createPattern(TEX.island[0],'repeat'); g.beginPath(); g.arc(X,Y,rb.rin*S-5,0,7); g.fill();
+  if(typeof rbIsland==='function') rbIsland(g,rb,X,Y,S,o.seed);
   const r=mulberry(o.seed); for(let k=0;k<6;k++){ const a=r()*6.28, d=r()*rb.rin*S*0.6; drawObject(g,{kind:'tree',x:X+Math.cos(a)*d,y:Y+Math.sin(a)*d,r:9+r()*6,seed:(r()*1e9)|0}); }
   for(let k=0;k<rb.arms.length;k++){ const arm=rb.arms[k], gm=G2[k], sp=rbSplitter(rb,arm);
     // give-way: double dashed line across the entry mouth along the ring edge (entry side, v>c), triangle just behind it
     const f=gm.fil.find(q=>q.sd>0), aT=ang(rbW(gm,rb,f.tr[0],f.tr[1])); const vb=sp?sp.baseV[0]:gm.c, aS=ang(rbW(gm,rb,Math.sqrt(Math.max(0,rb.rout*rb.rout-vb*vb)),vb));
     let a0=aS, a1=aT; if(((a1-a0+Math.PI*3)%(Math.PI*2))-Math.PI<0){ const t=a0; a0=a1; a1=t; } let da=a1-a0; while(da<0) da+=Math.PI*2;
-    g.strokeStyle='#ececec'; g.lineWidth=4; g.setLineDash([12,9]); for(const rr of [rb.rout+0.12,rb.rout+0.42]){ g.beginPath(); g.arc(X,Y,rr*S,a0+0.02,a0+da-0.02); g.stroke(); } g.setLineDash([]);
+    g.strokeStyle='#ececec'; if(typeof RBSIG!=='undefined'&&RBSIG.on){ g.lineWidth=6; g.beginPath(); g.arc(X,Y,(rb.rout+0.3)*S,a0+0.02,a0+da-0.02); g.stroke(); } else { g.lineWidth=4; g.setLineDash([12,9]); for(const rr of [rb.rout+0.12,rb.rout+0.42]){ g.beginPath(); g.arc(X,Y,rr*S,a0+0.02,a0+da-0.02); g.stroke(); } g.setLineDash([]); }   // v31: signalised entries get a solid stop line
     const tri=W(gm,rb.rout+2.4,(vb+gm.c+gm.hw+1.2)/2); g.save(); g.translate(tri[0],tri[1]); g.rotate(Math.atan2(gm.o[1],gm.o[0])+Math.PI/2); g.lineWidth=3; g.beginPath(); g.moveTo(-11,-26); g.lineTo(11,-26); g.lineTo(0,26); g.closePath(); g.stroke(); g.restore();
     if(!sp) continue;
     // painted hatched nose ahead of the raised island

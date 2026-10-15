@@ -435,9 +435,10 @@ function stepVeh(v,dt,pbs){
         if(!stop&&gap<6&&jBusy(v,m.J)) stop=true;                 // give way to anything still crossing the junction
         if(!stop&&gap<3){ m.go=true; m.goT=timeS; if(traffic.goLog) traffic.goLog.push({J:m.J.id,key:m.key,mv:m.move,t:timeS,st:ls,veh:v.id}); } }
       else if(m.kind==='gw'){ if(gap<12&&m.dEnd!==undefined&&boxBlocked(v,m)) stop=true; else if(gap<18){ if(!giveWayBusy(v,m.J)||v.stopT>10) { if(gap<2.5) m.go=true; } else stop=true; } }
-      else { if(gap<14){ let busy=false; for(const o of traffic.vs){ if(o===v||o.ring!==m.rb) continue; const a=Math.atan2(o.y-m.rb.cy*M_T,o.x-m.rb.cx*M_T); const df=mod2pi(m.ang-a); if(df<1.5&&df>0.05){ busy=true; break; } }
+      else { if(typeof rbSigState==='function'){ const ls=rbSigState(m.rb,m.key); if(ls==='r'||ls==='ra'||(ls==='a'&&gap>v.v*v.v/7+1)){ if(!(v.emResp&&gap<6)) stop=true; } }   // v31 signalised entries
+        if(!stop&&gap<14){ let busy=false; for(const o of traffic.vs){ if(o===v||o.ring!==m.rb) continue; const a=Math.atan2(o.y-m.rb.cy*M_T,o.x-m.rb.cx*M_T); const df=mod2pi(m.ang-a); if(df<1.5&&df>0.05){ busy=true; break; } }
           if(!busy){ const t=truck, dr=Math.hypot(t.x-m.rb.cx*M_T,t.y-m.rb.cy*M_T); if(dr<(m.rb.rout+1)*M_T&&Math.abs(t.v)>0.8){ const a=Math.atan2(t.y-m.rb.cy*M_T,t.x-m.rb.cx*M_T), df=mod2pi(m.ang-a); if(df<1.6&&df>0.05) busy=true; } }
-          if(busy&&v.stopT>12){ busy=false; for(const o of traffic.vs){ if(o===v||o.ring!==m.rb) continue; const a=Math.atan2(o.y-m.rb.cy*M_T,o.x-m.rb.cx*M_T), df=mod2pi(m.ang-a); if(df<0.5&&df>-0.15&&o.v>0.5){ busy=true; break; } } }   // long wait: only a car right at the merge still blocks
+          if(busy&&(v.stopT>12||(typeof rbSigState==='function'&&RBSIG.on&&rbSigState(m.rb,m.key)==='g'))){ busy=false; for(const o of traffic.vs){ if(o===v||o.ring!==m.rb) continue; const a=Math.atan2(o.y-m.rb.cy*M_T,o.x-m.rb.cx*M_T), df=mod2pi(m.ang-a); if(df<0.5&&df>-0.15&&o.v>0.5){ busy=true; break; } } }   // long wait: only a car right at the merge still blocks
           if(!busy) for(const o of traffic.vs){ const e=o.rbIn; if(o!==v&&e&&e.m.rb===m.rb&&e.m.key===m.key&&o.mk.indexOf(e.m)>=0&&o.s-o.L/2<e.m.join){ busy=true; break; } }   // one car per entry at a time: side-by-side lanes never squeeze onto the ring together
           if(!busy&&m.ex&&rbExitBlocked(v,m.ex)) busy=true;   // v25: don't enter the ring while our exit is queued back to the ring (no gridlock)
           if(!busy){ if(gap<2.5){ m.go=true; if(!m.join) m.join=m.d+20; v.rbIn={m}; } } else stop=true; } }
@@ -497,7 +498,7 @@ function stepVeh(v,dt,pbs){
   placeVeh(v); trimPath(v);
 }
 function rbExitBlocked(v,e){ for(const o of traffic.vs){ if(o===v||o.v>1.2) continue; const dx=o.x-e[0], dy=o.y-e[1]; if(Math.abs(dx)>16||Math.abs(dy)>16) continue;
-    const u=dx*e[2]+dy*e[3], w=-dx*e[3]+dy*e[2]; if(u>-2&&u<v.L+4&&Math.abs(w)<4.5) return true; } return false; }
+    const u=dx*e[2]+dy*e[3], w=-dx*e[3]+dy*e[2]; if(u>-2&&u<v.L+4&&Math.abs(w)<4.5){ const f=fwd(o.h||0); if(f[0]*e[2]+f[1]*e[3]>0.5) return true; } } return false; }   // v31: only cars heading OUT along the exit (not the entry queue beside it)
 function oppTurnIn(v,J){ if(v.stopT>15) return false; const x0=J.x*M_T-2, y0=J.y*M_T-2, x1=(J.x+J.w)*M_T+2, y1=(J.y+J.h)*M_T+2;
   for(const o of traffic.vs){ if(o===v) continue; const inb=o.x>x0&&o.x<x1&&o.y>y0&&o.y<y1;
     if(o.filterJ===J&&o.id<v.id&&inb&&o.v<3) return true;   // tie-break: two opposing right-turners arriving together - lower id goes first

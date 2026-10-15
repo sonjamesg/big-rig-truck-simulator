@@ -140,6 +140,10 @@ function polUpdateChase(dt){ const c=POL.chase; if(!c) return; const v=c.v, P=tr
   if(c.spin>0){ c.spin-=dt; v.h+=dt*5*c.spinD; c.sp*=Math.max(0,1-dt*3); const fv=fwd(v.h); v.x+=fv[0]*c.sp*dt; v.y+=fv[1]*c.sp*dt; v.v=c.sp; if(c.siren) c.siren.set(emSirenVol(v.x,v.y)); if(c.spin<=0&&dP>45){ polLose('crashed'); } return; }
   c.rp=(c.rp||0)-dt; let aim=null; const direct=Math.hypot(tx-v.x,ty-v.y)<28;
   if(!direct){ if(c.rp<=0){ c.rp=0.5; polChasePath(c,tx,ty); } aim=polChaseAim(c); }
+  // v31: close in, follow the player's own tyre track (breadcrumbs) so the car stays on the road instead of cutting across verges
+  c.trT=(c.trT||0)-dt; if(c.trT<=0){ c.trT=0.25; (c.trail=c.trail||[]).push([P.x,P.y]); if(c.trail.length>80) c.trail.shift(); }
+  if(direct&&c.trail&&c.trail.length>2){ let k=-1, bd=1e18; for(let q=0;q<c.trail.length;q++){ const d2=(c.trail[q][0]-v.x)**2+(c.trail[q][1]-v.y)**2; if(d2<bd){ bd=d2; k=q; } }
+    for(let q=k;q<c.trail.length;q++){ const t=c.trail[q]; if(Math.hypot(t[0]-v.x,t[1]-v.y)>6){ aim=t; break; } } }
   if(!aim) aim=[tx,ty]; let dx=aim[0]-v.x, dy=aim[1]-v.y; const d=Math.hypot(tx-v.x,ty-v.y);
   // steer around traffic directly ahead
   const fv0=fwd(v.h); let blk=null, bdist=1e9; for(const o of traffic.vs){ if(o===v) continue; const ox=o.x-v.x, oy=o.y-v.y, al=ox*fv0[0]+oy*fv0[1]; if(al<0||al>16) continue; const lat=ox*fv0[1]-oy*fv0[0]; if(Math.abs(lat)<2.4&&al<bdist){ bdist=al; blk={o,lat,al}; } }
