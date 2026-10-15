@@ -41,7 +41,7 @@ function fireDrop(v){ const i=traffic.vs.indexOf(v); if(i>=0){ releaseJ(v); traf
 function fireUpdate(dt){ if(!world.ready||typeof started!=='undefined'&&!started||(typeof uiBlocking==='function'&&uiBlocking())) return;
   FIRE.t-=dt*(Math.abs(truck.v)>2?1:0.5); if(FIRE.t<=0){ FIRE.t=150+Math.random()*300; if(FIRE.list.length<1){ const b=firePickBuilding(); if(b) fireStart(b); } }
   for(const f of FIRE.list){ f.t+=dt; if(f.st==='burn') f.int=Math.min(1.25,f.int+dt*0.004); }
-  for(const e of FIRE.eng){ e.t+=dt; e.tt=(e.tt||0)+dt; const f=e.f; if(e.siren) e.siren.set(emSirenVol((e.v||e.k||f).x,(e.v||e.k||f).y));
+  for(const e of FIRE.eng){ e.t+=dt; e.tt=(e.tt||0)+dt; const f=e.f; if(e.siren) e.siren.set(emSirenVol((e.v||e.k||f).x,(e.v||e.k||f).y,e)); emSirMode(e.siren,'fire',e);
     if(e.stt==='out'){ if(e.door<2) e.door=Math.min(2,e.door+dt*0.6); if(e.door<1.6) continue; if(emFollow(e.k,dt,4)){ const v=fireTraffic(e,e.k.x,e.k.y-2); if(v&&aiGoal(v,{entrance:{x:f.x,y:f.y},name:'fire'})){ e.v=v; e.k=null; e.stt='go'; e.t=0; e.best=1e9; } else if(v){ fireDrop(v); } } continue; }
     if(e.stt==='spawn'){ if(e.t<0.5) continue; e.t=0; const v=fireSpawnFar(e); if(v){ e.v=v; e.stt='go'; e.best=1e9; e.siren=emSiren('fire'); } continue; }
     if(e.stt==='go'){ const v=e.v; if(!traffic.vs.includes(v)){ e.stt=e.far?'spawn':'spawn'; e.far=true; continue; } const d=Math.hypot(v.x-f.x,v.y-f.y); if(d<e.best-1){ e.best=d; e.prog=e.t; }

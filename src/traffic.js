@@ -353,7 +353,7 @@ function trafficHitTruck(s){
       v.offX+=m[0]*(m[2]+0.05); v.offY+=m[1]*(m[2]+0.05); v.x+=m[0]*(m[2]+0.05); v.y+=m[1]*(m[2]+0.05); if(v.trl){ v.trl.x+=m[0]*(m[2]+0.05); v.trl.y+=m[1]*(m[2]+0.05); }
       if(!v.parked){ if(v.shakeT<=0&&(!v.hitEnd||timeS-v.hitEnd>1.2)){ v.honkT=0; v.shakeT=1.6; v.v=0; v.hits=(v.hits||0)+1; } v.hitEnd=timeS; }
       v.h+=(Math.random()-0.5)*0.04*Math.min(1,Math.abs(s.v)/5);
-      if(!v.hitCool||timeS-v.hitCool>0.6){ v.hitCool=timeS; const imp=Math.abs(s.v); s.v*=0.85; if(imp>1.5){ s.bump=Math.min(1,imp/16); } }
+      if(!v.hitCool||timeS-v.hitCool>0.6){ v.hitCool=timeS; const imp=Math.abs(s.v); if(typeof wantHit==='function') try{ wantHit(v,imp); }catch(e){} s.v*=0.85; if(imp>1.5){ s.bump=Math.min(1,imp/16); } }
       return; } } };
   for(const v of traffic.vs){ if(Math.abs(v.x-s.x)>40||Math.abs(v.y-s.y)>40) continue; if(foApart(v.layer,v.x,v.y,s.foLay,s.x,s.y)) continue; test(v,boxesOf(v)); if(solid) return true; }
   const k=Math.floor(s.x/64)+','+Math.floor(s.y/64);
