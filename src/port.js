@@ -308,7 +308,7 @@ function portCfg(P){
     const cum=[0]; for(let i=1;i<pts.length;i++) cum.push(cum[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1])); P.lpath={pts,cum,len:cum[cum.length-1]};
     let bi=0,bd=1e9; pts.forEach((p,i)=>{ const d=Math.hypot(p[0]-P.lorU,p[1]-C.lor[0]); if(d<bd){ bd=d; bi=i; } }); P.lpre=cum[bi]; P.lpost=P.lpath.len-P.lpre-P.laneLen; P.lspawn=PL(P,...pts[0]); }
   // straddle carrier + quay workers (ambient life)
-  P.strad={v:C.impV[0],dir:1,box:null,w:0}; P.wk=[];   // dg: no pedestrians inside the docks
+  P.strads=P.blocks.map((k,i)=>({v:k[1]+3,dir:1,box:null,w:0,lo:k[1]+2,hi:k[1]+k[3]-2,u:P.blkU[0]+0.6})); P.strad=P.strads[0];   /* v43 extra 2: one straddle carrier per area, kept inside its own block */ P.wk=[];   // dg: no pedestrians inside the docks
   // bridge tiles over the channel (ships draw beneath them)
   P.brg=[]; const ch=C.chan; for(let y=ch[1];y<ch[3];y++){ let x0=-1; for(let x=ch[0];x<=ch[2];x++){ const b=x<ch[2]&&get(x,y)===T.BRIDGE; if(b&&x0<0) x0=x; if(!b&&x0>=0){ P.brg.push(portRectL(P,x0,y,x-x0,1)); x0=-1; } } }
   portBridgeWorld(P); P.brgBox=null; if(P.brg.length){ let a=[1e9,1e9,-1e9,-1e9]; for(const r of P.brg){ a[0]=Math.min(a[0],r[0]); a[1]=Math.min(a[1],r[1]); a[2]=Math.max(a[2],r[0]+r[2]); a[3]=Math.max(a[3],r[1]+r[3]); } P.brgBox=a; } }
@@ -432,10 +432,10 @@ function updatePortLogistics(P,dt,t){ const ships=portShips(P,t); portShipHold(P
       g.cur=null; g.car=null; g.hz=1; } } }
 
 // ---------- docks life: a straddle carrier shuttling boxes between the stacks, hi-vis workers on the quay; both give way to the player
-function updatePortLife(P,dt){ const S=P.strad; if(S){ const lo=Math.min(P.impV[0],P.expV[0])+2, hi=Math.max(P.impV[1],P.expV[1])-2; const h=S.dir>0?Math.PI/2:-Math.PI/2, pa=portPlayerAhead(P,P.blkU[0]+0.6,S.v,h,5); S.yield=pa<5;
+function updatePortLife(P,dt){ for(const S of (P.strads||[])){ const lo=S.lo, hi=S.hi; const h=S.dir>0?Math.PI/2:-Math.PI/2, pa=portPlayerAhead(P,S.u,S.v,h,5); S.yield=pa<5;
     if(S.w>0){ S.w-=dt; if(S.w<=0) S.box=S.box?null:YARD_COLS[(Math.random()*8)|0]; } else if(!S.yield){ S.v+=S.dir*dt*1.4; if(S.v>hi||S.v<lo){ S.v=Math.max(lo,Math.min(hi,S.v)); S.dir*=-1; S.w=4; } } }
   for(const w of P.wk){ const near=Math.hypot(PL(P,w.u,w.v)[0]*M_T-truck.x,PL(P,w.u,w.v)[1]*M_T-truck.y)<9; w.still=near?1:0; if(!near) w.ph+=dt*w.sp; } }
-function drawPortLife(P){ const T_=TILE, S=P.strad; if(S){ ctx.save(); ctx.translate((P.blkU[0]+0.6)*T_,S.v*T_);
+function drawPortLife(P){ const T_=TILE; for(const S of (P.strads||[])){ ctx.save(); ctx.translate(S.u*T_,S.v*T_);
     ctx.fillStyle='rgba(0,0,0,0.25)'; ctx.fillRect(-1.6*T_+5,-1.1*T_+5,3.2*T_,2.2*T_); if(S.box) drawBox(0,0,0.62*T_*1.1,3*T_-2,S.box);
     ctx.fillStyle='#c0392b'; for(const sd of [-1,1]){ ctx.fillRect(sd*1.45*T_-0.15*T_,-1.1*T_,0.3*T_,2.2*T_); } ctx.fillRect(-1.45*T_,-1.1*T_,2.9*T_,0.3*T_); ctx.fillRect(-1.45*T_,0.8*T_,2.9*T_,0.3*T_);
     ctx.fillStyle='#f1f2f6'; ctx.fillRect(1.1*T_,-0.6*T_,0.5*T_,0.6*T_); ctx.fillStyle='#f39c12'; ctx.beginPath(); ctx.arc(0,-1.0*T_,3,0,7); ctx.fill(); ctx.restore();
