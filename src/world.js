@@ -397,7 +397,9 @@ function* genWorldSteps(){
   yield 'Building junctions';
   // ---------------- junctions & lorry-friendly kerb radii ----------------
   const reserved=new Uint8Array(MW*MH); world.reserved=reserved; world.jMask=new Uint8Array(MW*MH); world.cornerAt=new Int32Array(MW*MH).fill(-1);
-  road('v',410,689,767,4,'city');   // v35: Albion Airport landside access (terminal forecourt -> road south)
+  { // v36: Albion Airport landside access: forecourt -> west along 716 -> down to the town grid (seg at x346 from y780), laid before junctions so AI + sat nav use it
+    road('v',410,689,715,4,'city'); road('h',716,346,413,4,'city');
+    const tg=world.segs.find(q=>q.dir==='v'&&q.a===346&&q.b0===780); if(tg){ for(let y=720;y<780;y++) for(let k=0;k<tg.w;k++){ const x=tg.a+k; set(x,y,water[idx(x,y)]?T.BRIDGE:T.ROAD); world.roadV[idx(x,y)]=tg.id; } tg.b0=720; } }
   // v33: re-centre arms that hit a roundabout off-centre: pull the road back and S-bend in on the centre line
   for(const rb of world.rbs) for(const sg of world.segs.slice()){ if(sg.dead) continue;
     for(const end of [0,1]){ const E=segEnd(sg,end), d=Math.hypot(E[0]-rb.cx,E[1]-rb.cy); if(d>=rb.rout+2.5) continue;

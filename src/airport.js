@@ -108,16 +108,25 @@ function apDrawLow(vx0,vy0,vx1,vy1){ const A=apA(); if(!A) return; const T_=TILE
   apStroke(g,A.loop.concat([A.loop[0]]),4*T_,PAVE,T_); for(const [a,b] of A.links) apStroke(g,[a,b],3.6*T_,PAVE,T_);
   apStroke(g,[A.civLink[0],[405,566],[405,A.civ.lane]],3.6*T_,PAVE,T_); apStroke(g,[A.milLink[0],[A.milLink[0][0],A.mil.y0+2]],3.6*T_,PAVE,T_);
   apStroke(g,[apT(A,-120,0),apT(A,-20,0)],0,PAVE,T_);
-  // fillets at every join: soft discs
-  g.fillStyle=PAVE; const fil=(p,r)=>{ g.beginPath(); g.arc(p[0]*T_,p[1]*T_,r*T_,0,7); g.fill(); };
-  for(const [a,b] of A.links){ fil(a,3.4); fil(b,3.4); } fil(A.civLink[0],3.4); fil(A.milLink[0],3.4); for(const h of A.has) fil(h.q,3); fil(apT(A,-200,0),3.6); fil(apT(A,200,0),3.6);
+  // true kerb fillets at every join: square-minus-quarter-circle pieces in both inside corners
+  g.fillStyle=PAVE; const n=v=>{ const l=Math.hypot(v[0],v[1])||1; return [v[0]/l,v[1]/l]; };
+  const fil=(J,t,bd,wm,wb,r)=>{ t=n(t); bd=n(bd); for(const sg of [1,-1]){ const C=[J[0]+bd[0]*wm+sg*t[0]*wb, J[1]+bd[1]*wm+sg*t[1]*wb], u1=[sg*t[0],sg*t[1]], O=[C[0]+(u1[0]+bd[0])*r,C[1]+(u1[1]+bd[1])*r], P1=[C[0]+u1[0]*r,C[1]+u1[1]*r], P2=[C[0]+bd[0]*r,C[1]+bd[1]*r];
+      const a1=Math.atan2(P1[1]-O[1],P1[0]-O[0]), a2=Math.atan2(P2[1]-O[1],P2[0]-O[0]); let da=a2-a1; while(da>Math.PI) da-=2*Math.PI; while(da<-Math.PI) da+=2*Math.PI;
+      g.beginPath(); g.moveTo(C[0]*T_,C[1]*T_); g.lineTo(P1[0]*T_,P1[1]*T_); g.arc(O[0]*T_,O[1]*T_,r*T_,a1,a1+da,da<0); g.closePath(); g.fill(); } };
+  const loopT=p=>{ let bi=0,bd=1e18; for(let i=0;i<A.loop.length;i++){ const q=A.loop[i], d=(q[0]-p[0])**2+(q[1]-p[1])**2; if(d<bd){ bd=d; bi=i; } } const L=A.loop.length, q0=A.loop[(bi+L-2)%L], q1=A.loop[(bi+2)%L]; return [q1[0]-q0[0],q1[1]-q0[1]]; };
+  const rd=[Math.cos(A.rwA),Math.sin(A.rwA)], rn=[-rd[1],rd[0]];
+  for(const [a,b] of A.links){ const dir=[b[0]-a[0],b[1]-a[1]]; fil(a,loopT(a),dir,2,1.8,3.5); fil(b,loopT(b),[-dir[0],-dir[1]],2,1.8,3.5);
+    const m=[(a[0]+b[0])/2,(a[1]+b[1])/2], c=[m[0],m[1]]; const uC=((m[0]-A.rwC[0])*rd[0]+(m[1]-A.rwC[1])*rd[1]); const J=apT(A,uC,0); fil(J,rd,rn,A.rwW/2,1.8,4); fil(J,rd,[-rn[0],-rn[1]],A.rwW/2,1.8,4); }
+  for(const h of A.has) fil(h.q,loopT(h.q),[h.p[0]-h.q[0],h.p[1]-h.q[1]],2,1.6,3);
+  fil(A.civLink[0],loopT(A.civLink[0]),[0,1],2,1.8,3.5); fil([405,A.civ.y0],[1,0],[0,-1],0,1.8,3.5);
+  fil(A.milLink[0],loopT(A.milLink[0]),[0,1],2,1.8,3.5); fil([A.milLink[0][0],A.mil.y0],[1,0],[0,-1],0,1.8,3.5);
   // runway (rounded ends) + markings
   g.save(); const c0=apT(A,0,0); g.translate(c0[0]*T_,c0[1]*T_); g.rotate(A.rwA); const L=A.rwL*T_/2, Wd=A.rwW*T_/2;
   g.fillStyle='#3a3d42'; apRR(g,-L-T_,-Wd,L+T_,Wd,Wd*0.6); g.fill(); g.fillStyle='#f0f0f0';
   for(const sg of [1,-1]){ const e=-sg*L; for(let k=0;k<8;k++){ const v=-Wd+T_*0.6+k*(Wd*2-T_*1.2)/8; g.fillRect(sg>0?e+T_:e-T_*9,v,T_*8,T_*0.45); }
     for(let k=0;k<3;k++){ const u=e+sg*(T_*30+k*T_*12); g.fillRect(sg>0?u:u-T_*6,-Wd+T_*1.2,T_*6,T_*0.7); g.fillRect(sg>0?u:u-T_*6,Wd-T_*1.9,T_*6,T_*0.7); }
     const u=e+sg*T_*64; g.fillRect(sg>0?u:u-T_*11,-Wd+T_*1,T_*11,T_*1.4); g.fillRect(sg>0?u:u-T_*11,Wd-T_*2.4,T_*11,T_*1.4);
-    g.save(); g.translate(e+sg*T_*16,0); g.rotate(sg>0?Math.PI/2:-Math.PI/2); g.font='bold '+(4*T_)+'px sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(sg>0?'08':'26',0,0); g.restore(); }
+    g.save(); g.translate(e+sg*T_*16,0); g.rotate(sg>0?Math.PI/2:-Math.PI/2); g.scale(1,1); g.font='bold '+(4*T_)+'px sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(sg>0?'08':'26',0,0); g.restore(); }
   for(let u=-L+T_*90;u<L-T_*90;u+=T_*8) g.fillRect(u,-T_*0.2,T_*4.5,T_*0.4);
   g.fillStyle='rgba(240,240,240,0.9)'; g.fillRect(-L,-Wd+T_*0.25,2*L,T_*0.25); g.fillRect(-L,Wd-T_*0.5,2*L,T_*0.25);
   // approach light bars beyond both ends
@@ -126,7 +135,7 @@ function apDrawLow(vx0,vy0,vx1,vy1){ const A=apA(); if(!A) return; const T_=TILE
   g.restore();
   // taxiway centrelines (yellow) + blue edge dots at night
   const yel=(pts)=>apStroke(g,pts,0.22*T_,'#e8b923',T_); yel(A.loop.concat([A.loop[0]])); for(const [a,b] of A.links) yel([a,b]); yel([A.civLink[0],[405,566],[405,A.civ.lane]]); for(const h of A.has) yel([h.p,h.q]);
-  yel([[A.civ.x0+3,A.civ.lane],[A.civ.x1-3,A.civ.lane]]); for(const st of A.stands) yel([[st.x,A.civ.lane],[st.x,A.civ.y1-2]]);
+  yel([[A.civ.x0+3,A.civ.lane],[A.civ.x1-3,A.civ.lane]]); for(const st of A.stands){ yel([[st.x,A.civ.lane],[st.x,A.civ.y1-2]]); const ny=st.sy+30*st.sc/32; g.fillStyle='#e8b923'; g.fillRect((st.x-2.2)*T_,(ny+0.2)*T_,4.4*T_,0.45*T_); g.fillStyle='#f0f0f0'; g.fillRect((st.x-1.4)*T_,(ny-1.6)*T_,2.8*T_,0.3*T_); g.font='bold 22px sans-serif'; g.fillStyle='#e8b923'; g.fillText('STOP',(st.x+2.6)*T_,(ny+0.8)*T_); }
   // holding points
   g.fillStyle='#e8b923'; for(const [a,b] of A.links) for(const p of [a,b]){ const q=[p[0]+(apT(A,0,0)[0]-p[0])*0.0,p[1]]; }
   if(night>0.05&&typeof dnLight==='function'){ for(let i=0;i<A.loop.length;i+=10){ const p=A.loop[i]; if(vis(p[0],p[1],300)) dnLight(p[0]*T_,p[1]*T_,16,'rgba(70,140,255,0.9)',0.8); }
