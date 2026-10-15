@@ -397,6 +397,7 @@ function* genWorldSteps(){
   yield 'Building junctions';
   // ---------------- junctions & lorry-friendly kerb radii ----------------
   const reserved=new Uint8Array(MW*MH); world.reserved=reserved; world.jMask=new Uint8Array(MW*MH); world.cornerAt=new Int32Array(MW*MH).fill(-1);
+  road('v',410,689,767,4,'city');   // v35: Albion Airport landside access (terminal forecourt -> road south)
   // v33: re-centre arms that hit a roundabout off-centre: pull the road back and S-bend in on the centre line
   for(const rb of world.rbs) for(const sg of world.segs.slice()){ if(sg.dead) continue;
     for(const end of [0,1]){ const E=segEnd(sg,end), d=Math.hypot(E[0]-rb.cx,E[1]-rb.cy); if(d>=rb.rout+2.5) continue;
@@ -577,12 +578,13 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
   // airports: concrete apron, runways, terminal, hangars
   function airport(name,x0,y0,x1,y1,rws,term){ for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++){ const t=G[idx(x,y)]; if(t!==T.ROAD&&t!==T.WATER&&t!==T.BRIDGE&&t!==T.WALK) set(x,y,T.CONC); }
     const ap={name,rw:[]}; for(const [rx,ry,rw] of rws){ objs.push({kind:'runway',x:rx*TILE,y:ry*TILE,w:rw*TILE,h:12*TILE}); ap.rw.push({x:rx*TILE,y:(ry+6)*TILE,len:rw*TILE}); for(let k=0;k<rw;k+=10) world.beacons.push({x:(rx+k)*TILE,y:(ry-0.5)*TILE,col:'#ffd23f',ph:k*0.05,run:1}); }
-    const [tx,ty,tw]=term; building(tx,ty,tw,10,'warehouse',30,{logo:name.toUpperCase()}); for(let k=0;k<3;k++) building(tx+tw+4+k*24,ty,20,12,'warehouse',24);
+    if(!term){ world.airports.push(ap); return; } const [tx,ty,tw]=term; building(tx,ty,tw,10,'warehouse',30,{logo:name.toUpperCase()}); for(let k=0;k<3;k++) building(tx+tw+4+k*24,ty,20,12,'warehouse',24);
     world.flags.push({x:tx*TILE-20,y:ty*TILE,col:'#2471a3'}); world.airports.push(ap); }
-  airport('Albion Airport',160,470,640,660,[[190,488,400]],[220,520,60]);
+  airport('Albion Airport',160,470,640,660,[],null);
   // v34 Albion: landside terminal block straddling the main line (station inside), concourse forecourt south of it
   for(let y=505;y<694;y++) for(let x=190;x<600;x++){ if(y>=640&&(x<345||x>=525)) continue;{ const t=G[idx(x,y)]; if(t!==T.ROAD&&t!==T.WATER&&t!==T.BRIDGE&&t!==T.WALK) set(x,y,(y>=648&&y<=678)?T.GRAVEL:T.CONC); } }
-  world.airports[world.airports.length-1].albion={x0:160,y0:470,x1:640,y1:640,term:{x0:360,x1:510,y0:640,y1:688},rwY:494,rwX0:190,rwX1:590,twY:512};
+  for(let y=688;y<719;y++) for(let x=350;x<446;x++){ const t=G[idx(x,y)]; if(t!==T.ROAD&&t!==T.WATER&&t!==T.BRIDGE&&!water[idx(x,y)]) set(x,y,T.CONC); }
+  world.airports[world.airports.length-1].albion={x0:160,y0:470,x1:640,y1:640,term:{x0:360,x1:510,y0:640,y1:688},rwC:[400,522],rwA:-9*Math.PI/180,rwL:400,rwW:10.4};
   airport('Sandvale Intl',1070,160,1445,340,[[1090,180,330],[1090,300,330]],[1110,215,80]);
   airport('Kingsbridge Field',1195,1792,1385,1905,[[1205,1860,175]],[1210,1812,40]);
   if(world.quarry){ const {x,y}=world.quarry; for(let j=y-10;j<y+12;j++) for(let i=x;i<x+26;i++){ const t=get(i,j); if(t!==T.ROAD&&t!==T.WATER&&t!==T.BRIDGE) set(i,j,T.GRAVEL); }
