@@ -17,7 +17,7 @@ function assignLanes(letters,nl){
   L[0]=has('L')?'L':(has('S')?'S':'R'); L[nl-1]=has('R')?'R':(has('S')?'S':'L');
   for(let i=1;i<nl-1;i++) L[i]=has('S')?'S':(has('R')?'R':'L'); return L;
 }
-function rbLanes(nl){ return nl===1?['LSR']:nl===2?['LS','SR']:['L','S','R'].concat(new Array(Math.max(0,nl-3)).fill('R')).slice(0,nl); }
+function rbLanes(nl){ return nl===1?['LSR']:nl===2?['LS','R']:['LS'].concat(new Array(nl-2).fill('S'),['R']).slice(0,nl); }   // left: 1st exit + ahead, right: right turns
 function apprBox(o){ const sg=o.sg, A=Math.min(o.lineA,o.lineA-o.d*o.Lapp)-0.5, B=Math.max(o.lineA,o.lineA-o.d*o.Lapp)+0.5;
   if(sg.dir==='h'){ o.x=A*TILE; o.y=sg.a*TILE; o.w=(B-A)*TILE; o.h=sg.w*TILE; } else { o.x=sg.a*TILE; o.y=A*TILE; o.w=sg.w*TILE; o.h=(B-A)*TILE; } }
 function prevEdge(sg,d,before,skipJ){ let prev=d>0?sg.b0:sg.b1+1;

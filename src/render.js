@@ -235,7 +235,7 @@ function renderChunk(cx,cy){
     const tx=cx*N+i, ty=cy*N+j, px=i*TILE, py=j*TILE; if(!inb(tx,ty)){ g.drawImage(TEX.water[0],px,py); continue; }
     const t=G[idx(tx,ty)], v=(hash2(tx,ty)*4)|0;
     switch(t){
-      case T.ROAD: case T.BRIDGE: { const rh=world.roadH[idx(tx,ty)]; if(rh===-2) g.drawImage(t===T.BRIDGE?TEX.water[v]:TEX.grass[v],px,py); else if(rh===-3){ const u=world.under[idx(tx,ty)]; g.drawImage((u===T.WATER||t===T.BRIDGE)?TEX.water[v]:u===T.SAND?TEX.sand[v]:u===T.ROCK?TEX.rock[v]:u===T.FIELD?TEX.field[v]:TEX.grass[v],px,py); } else drawRoadTile(g,tx,ty,px,py); break; }
+      case T.ROAD: case T.BRIDGE: { const rh=world.roadH[idx(tx,ty)]; if(rh===-2){ const ru=rbUnder(tx,ty); g.drawImage(t===T.BRIDGE?TEX.water[v]:ru===T.SAND?TEX.sand[v]:ru===T.ROCK?TEX.rock[v]:TEX.grass[v],px,py); } else if(rh===-3){ const u=world.under[idx(tx,ty)]; g.drawImage((u===T.WATER||t===T.BRIDGE)?TEX.water[v]:u===T.SAND?TEX.sand[v]:u===T.ROCK?TEX.rock[v]:u===T.FIELD?TEX.field[v]:TEX.grass[v],px,py); } else drawRoadTile(g,tx,ty,px,py); break; }
       case T.ROCK: g.drawImage(TEX.rock[v],px,py); break;
       case T.WALK: g.drawImage(TEX.walk[v],px,py); break;
       case T.WATER: g.drawImage(TEX.water[v],px,py); break;
@@ -376,7 +376,8 @@ function makeMinimap(){
 
 // ===================== v13 natural grass & trees =====================
 const GRASSY=new Set([T.GRASS,T.PGRASS,T.TREE,T.HEDGE,T.ISLAND]);
-function isGrassy(tx,ty){ if(!inb(tx,ty)) return false; const t=G[idx(tx,ty)]; if(GRASSY.has(t)) return true; if(t===T.ROAD){ const rh=world.roadH[idx(tx,ty)]; return rh===-2||(rh===-3&&world.under[idx(tx,ty)]===T.GRASS); } return false; }
+function rbUnder(tx,ty){ const rb=rbAtTile(tx,ty); if(!rb) return T.GRASS; if(Math.hypot(tx+0.5-rb.cx,ty+0.5-rb.cy)<rb.rin+1.5) return T.GRASS; return rbGround(rb,tx,ty); }
+function isGrassy(tx,ty){ if(!inb(tx,ty)) return false; const t=G[idx(tx,ty)]; if(GRASSY.has(t)) return true; if(t===T.ROAD){ const rh=world.roadH[idx(tx,ty)]; return (rh===-2&&GRASSY.has(rbUnder(tx,ty)))||(rh===-3&&world.under[idx(tx,ty)]===T.GRASS); } return false; }
 let GD_TMP=null, GD_TINT=null;
 function desertNear(tx,ty){ let k=0; for(const h of world.hills) if(h.desert){ const d=Math.hypot(tx-h.x,ty-h.y)/h.r; if(d<2.6) k=Math.max(k,(2.6-d)/1.6); } return Math.min(1,k); }
 function grassDetail(g,cx,cy){
