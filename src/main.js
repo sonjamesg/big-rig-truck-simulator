@@ -255,7 +255,7 @@ function drawMinimap(){
   ctx.save(); ctx.fillStyle='rgba(10,14,22,0.8)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(x-4,y-4,w+8,h+8,10):ctx.rect(x-4,y-4,w+8,h+8); ctx.fill();
   ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip();
   const cxT=s.x*PPM/TILE, cyT=s.y*PPM/TILE, sc=w/span, sh=h/sc;
-  ctx.imageSmoothingEnabled=false; ctx.drawImage(MINIMAP,cxT-span/2,cyT-sh/2,span,sh,x,y,w,h);
+  ovDraw(x-(cxT-span/2)*sc,y-(cyT-sh/2)*sc,sc,x,y,x+w,y+h); ovTick(bigmap.open?0:2.5);
   ctx.imageSmoothingEnabled=true; drawMapDetail(x-(cxT-span/2)*sc,y-(cyT-sh/2)*sc,sc,x,y,x+w,y+h); nightMapLayer(x-(cxT-span/2)*sc,y-(cyT-sh/2)*sc,sc,x,y,x+w,y+h,true);
   navLine(m=>x+(m/4-(cxT-span/2))*sc, m=>y+(m/4-(cyT-sh/2))*sc, 3, '#ff3df0');
   drawPOIs(m=>x+(m/4-(cxT-span/2))*sc, m=>y+(m/4-(cyT-sh/2))*sc, false);
@@ -302,7 +302,7 @@ function drawBigMap(){
       const wx=bigmap.cx+(a[0]-VW/2)/z0, wy=bigmap.cy+(a[1]-VH/2-10)/z0; bigmap.z=z1; bigmap.cx=wx-(a[0]-VW/2)/z1; bigmap.cy=wy-(a[1]-VH/2-10)/z1; } mapClamp(); }
   ctx.fillStyle='rgba(6,9,15,0.92)'; ctx.fillRect(0,0,VW,VH);
   const z=bigmap.z; ctx.save(); ctx.beginPath(); ctx.rect(20,40,VW-40,VH-60); ctx.clip();
-  ctx.fillStyle='#6e8aac'; ctx.fillRect(20,40,VW-40,VH-60); { const K=nmK(); if(K>0.01){ ctx.globalAlpha=K; ctx.fillStyle='#08102a'; ctx.fillRect(20,40,VW-40,VH-60); ctx.globalAlpha=1; } } ctx.imageSmoothingEnabled=z<1; ctx.drawImage(MINIMAP,VW/2-bigmap.cx*z,VH/2+10-bigmap.cy*z,MW*z,MH*z);
+  ctx.fillStyle='#6e8aac'; ctx.fillRect(20,40,VW-40,VH-60); { const K=nmK(); if(K>0.01){ ctx.globalAlpha=K; ctx.fillStyle='#08102a'; ctx.fillRect(20,40,VW-40,VH-60); ctx.globalAlpha=1; } } ovTick(9); ovDraw(VW/2-bigmap.cx*z,VH/2+10-bigmap.cy*z,z,20,40,VW-20,VH-20);
   bigmap.miss=z>=2.2?drawMapDetail(VW/2-bigmap.cx*z,VH/2+10-bigmap.cy*z,z,20,40,VW-20,VH-20):0;
   nightMapLayer(VW/2-bigmap.cx*z,VH/2+10-bigmap.cy*z,z,20,40,VW-20,VH-20,z>=2.2);
   const BX=t=>VW/2+(t-bigmap.cx)*z, BY=t=>VH/2+10+(t-bigmap.cy)*z;
