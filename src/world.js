@@ -397,6 +397,22 @@ function* genWorldSteps(){
   yield 'Building junctions';
   // ---------------- junctions & lorry-friendly kerb radii ----------------
   const reserved=new Uint8Array(MW*MH); world.reserved=reserved; world.jMask=new Uint8Array(MW*MH); world.cornerAt=new Int32Array(MW*MH).fill(-1);
+  // v33: re-centre arms that hit a roundabout off-centre: pull the road back and S-bend in on the centre line
+  for(const rb of world.rbs) for(const sg of world.segs.slice()){ if(sg.dead) continue;
+    for(const end of [0,1]){ const E=segEnd(sg,end), d=Math.hypot(E[0]-rb.cx,E[1]-rb.cy); if(d>=rb.rout+2.5) continue;
+      const v=sg.dir==='v', off=(v?E[0]-rb.cx:E[1]-rb.cy); if(Math.abs(off)<=2||sg.b1-sg.b0<40) continue;
+      const cen=v?rb.cx:rb.cy, ox=v?E[0]:E[1]; let cross=null;
+      for(const q of world.segs){ if(q.dir===sg.dir||q.dead) continue; const lo=cen-sg.w, hi=cen+sg.w; if(q.b0>lo||q.b1+1<hi) continue;
+        const dd=end?sg.b1+1-(q.a+q.w):q.a-sg.b0; if(dd>=6&&dd<=30&&(!cross||dd<cross.dd)) cross={q,dd}; }
+      let L=24, st=4; const o=end?1:-1; if(cross){ L=cross.dd; st=L; }   // o: direction from the road into the ring along the axis
+      const nb0=end?sg.b1-L+1:sg.b0, nb1=end?sg.b1:sg.b0+L-1;
+      for(let i=nb0;i<=nb1;i++) for(let k=0;k<sg.w;k++){ const x=v?sg.a+k:i, y=v?i:sg.a+k; if(!inb(x,y)) continue; const j=idx(x,y); if((v?world.roadV[j]:world.roadH[j])!==sg.id) continue;
+        if(v) world.roadV[j]=-1; else world.roadH[j]=-1; if(world.roadH[j]===-1&&world.roadV[j]===-1) set(x,y,water[j]?T.WATER:isDesert(x,y)?T.SAND:T.GRASS); }
+      if(end) sg.b1-=L; else sg.b0+=L;
+      const ca=Math.round((v?rb.cx:rb.cy)-sg.w/2), sb0=end?sg.b1+L-st+1:sg.b0-L, rc=Math.ceil(v?rb.cy:rb.cx), s0=end?sb0:Math.max(sb0,rc+rb.rout-2), s1=end?Math.min(sb0+st-1,rc-rb.rout+1):sb0+st-1, stub=road(sg.dir,ca,s0,s1,sg.w,sg.type);
+      if(!cross){ const A=segEnd(stub,end?0:1), B=segEnd(sg,end), dA=segOut(stub,end?0:1), dB=segOut(sg,end), k=(L-st)*0.45;
+      (()=>curve(sg.type,sg.w,bez(A,[A[0]+dA[0]*k,A[1]+dA[1]*k],[B[0]+dB[0]*k,B[1]+dB[1]*k],B,0.5),{seg:stub.id,end:end?0:1},{seg:sg.id,end},'rbfix'))(); }
+      (world.rbfix=world.rbfix||[]).push([rb.id,sg.id,stub.id,off]); } }
   const S=world.segs;
   for(const hs of S){ if(hs.dir!=='h') continue; for(const vs of S){ if(vs.dir!=='v') continue;
     if(vs.a+vs.w-1<hs.b0-1||vs.a>hs.b1+1||hs.a+hs.w-1<vs.b0-1||hs.a>vs.b1+1) continue;
