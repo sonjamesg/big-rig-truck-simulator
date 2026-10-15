@@ -580,3 +580,4 @@ function drawPortFence(P){ if(P.fenceV==null) return; const T_=TILE, v=P.fenceV*
     const y=vv*T_, x=P.lorU*T_; ctx.fillStyle='#2b2f33'; ctx.fillRect(x-1.6*T_,y-6,0.5*T_,12); ctx.fillStyle=col; ctx.fillRect(x-1.6*T_,y-6,0.5*T_,3);
     for(let k=0;k<5;k++){ ctx.fillStyle=k%2?'#fff':'#d33'; ctx.fillRect(x-1.1*T_+k*0.44*T_,y-1.5,0.44*T_,3); }
     ctx.save(); ctx.translate(x-2.1*T_,y); ctx.rotate(-Math.PI/2); ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.font='bold 13px sans-serif'; ctx.textAlign='center'; ctx.fillText(t,0,0); ctx.restore(); } }
+function portFenceSolid(mx,my){ if(typeof portList!=='function') return false; const x=mx/M_T, y=my/M_T; for(const P of portList()){ if(P.fenceV==null||!P.O) continue; const q=portLocal(P,x,y); if(Math.abs(q[1]-P.fenceV)<0.22&&q[0]>P.lorU+1&&q[0]<-0.4) return true; } return false; }
