@@ -401,7 +401,8 @@ function updatePortLogistics(P,dt,t){ const ships=portShips(P,t); portShipHold(P
     else if(!tr.box){ // v41: no job -> park in the waiting bay at the end of the quay lane instead of circling; only roll on to let a working tractor past
       const W=(L.lLen-3)%L.lLen; let need=tr._need; /* v42: clear the way for working tractors (propagated along chains of parked ones) */ tgt=need?null:(loopFwd(L,tr.s,W)<L.lLen-0.5?W:tr.s); tr.waiting=!need; }
     tr.stop=tgt; const dist=tgt==null?1e9:loopFwd(L,tr.s,tgt); let gap=1e9; for(const o of TR) if(o!==tr&&o.L===L){ const g=loopFwd(L,tr.s,o.s); if(g>0.01&&g<gap) gap=g; }
-    const tq=loopPos(L,tr.s), pa=portPlayerAhead(P,tq[0],tq[1],tq[2],6); tr.yield=pa<6; const vmax=tgt==null?1.6:Math.min(6,0.3+dist*1.0), mv=Math.max(0,Math.min(vmax*dt,dist<0.04?0:dist,gap-4.6,tr.yield?Math.max(0,(pa-2.6)*dt):1e9)); tr.atStop=dist<0.05;
+    let cg=1e9; for(const c of P.cranes){ if(c.trac===tr||!(c.ph===1||c.ph===3)) continue; for(const [lu,pos] of [[L.tl1,c.y-L.lv0],[L.tl2,L.lLv+L.lTn+(L.lv1-c.y)]]){ if(Math.abs(c.u-lu)>1.2||c.y<L.lv0||c.y>L.lv1) continue; const d=loopFwd(L,tr.s,pos); if(d>0.01&&d<9) cg=Math.min(cg,d-2.6); } } tr.gw=cg<1e8;   /* v43 extra 7: give way under a crane that is lifting over this lane */
+    const tq=loopPos(L,tr.s), pa=portPlayerAhead(P,tq[0],tq[1],tq[2],6); tr.yield=pa<6; const vmax=tgt==null?1.6:Math.min(6,0.3+dist*1.0), mv=Math.max(0,Math.min(vmax*dt,dist<0.04?0:dist,gap-4.6,Math.max(0,cg),tr.yield?Math.max(0,(pa-2.6)*dt):1e9)); tr.atStop=dist<0.05;
     tr.s=(tr.s+mv)%L.lLen; tr.mv=mv/dt; { const a=loopPos(L,tr.s+0.6), b=loopPos(L,tr.s-0.2), h=loopPos(L,tr.s); tr.h=Math.atan2(a[1]-b[1],a[0]-b[0]); tr.th=tr.h; } if(mv>0.001||!tr.task||tr.atStop) tr.still=0; else tr.still+=dt;
     // stack hand-offs at the transfer row by the yard gantries
     if(tr.atStop&&(k==='toImp'||k==='retExp'||(k==='exp'&&tr.task.need))&&!tr.rq){ tr.rq=1; P.rtg[k==='toImp'?0:1].q.push({veh:tr,kind:k==='toImp'?'tDrop':k==='retExp'?'tRet':'tPick',u:P.tl1}); } }
@@ -587,7 +588,8 @@ function drawPortQueue(P){ if(!P.agates||!P.lpath) return; const T_=TILE; ctx.sa
   for(const g of P.agates) for(let k=0;k<3;k++){ const p=g.p-2.6-k*6.2; if(p<-3.5) continue; const q=lorPose(P,p+P.lpre); ctx.save(); ctx.translate(q[0]*T_,q[1]*T_); ctx.rotate(q[2]); ctx.strokeStyle='rgba(255,255,255,0.75)'; ctx.lineWidth=1.5; ctx.setLineDash([6,4]); ctx.strokeRect(-4.6*T_,-0.75*T_,6.0*T_,1.5*T_); ctx.setLineDash([]);
     ctx.rotate(-Math.PI/2*Math.sign(Math.cos(q[2])||1)); ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.fillText((g.name[0])+(k+1),0,-0.0*T_); ctx.restore(); }
   ctx.restore(); }
-function drawPortFence(P){ drawPortQueue(P); if(P.fenceV==null) return; const T_=TILE, v=P.fenceV*T_, u0=(P.lorU+1.0)*T_, u1=-0.4*T_;
+function drawPortFence(P){ drawPortQueue(P); { const T_=TILE; for(const c of (P.cranes||[])){ const on=c.ph===1||c.ph===3; for(const LL of new Set([P.loops.I,P.loops.E])){ if(c.y<LL.lv0||c.y>LL.lv1) continue; for(const lu of [LL.tl1,LL.tl2]){ ctx.fillStyle=on?'rgba(255,80,60,0.9)':'rgba(255,255,255,0.55)'; for(const dv of [-2.6,2.6]) for(let k=-0.6;k<0.6;k+=0.3) ctx.fillRect((lu+k)*T_,(c.y+dv)*T_-1.5,0.18*T_,3); } } } }
+  if(P.fenceV==null) return; const T_=TILE, v=P.fenceV*T_, u0=(P.lorU+1.0)*T_, u1=-0.4*T_;
   ctx.strokeStyle='rgba(30,30,30,0.35)'; ctx.lineWidth=5; ctx.beginPath(); ctx.moveTo(u0+4,v+4); ctx.lineTo(u1+4,v+4); ctx.stroke();
   ctx.strokeStyle='#9ea4a8'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(u0,v); ctx.lineTo(u1,v); ctx.stroke(); ctx.fillStyle='#5d6266'; for(let u=u0;u<=u1;u+=12) ctx.fillRect(u-3,v-3,6,6);
   ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1; for(let u=u0;u<u1;u+=6){ ctx.beginPath(); ctx.moveTo(u,v-1.5); ctx.lineTo(u+6,v+1.5); ctx.stroke(); }
