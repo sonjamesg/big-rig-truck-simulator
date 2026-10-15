@@ -211,10 +211,11 @@ function apDrawLow(vx0,vy0,vx1,vy1){ const A=apA(); if(!A) return; const T_=TILE
   // parked/static military: fighters on the apron + one in hangar C2's doorway, a fuel bowser, tugs
   for(let k=0;k<3;k++){ const x=(A.mil.x0+16+k*32)*T_, y=(A.mil.y0+14)*T_; apDrawFighter({col:'#8e9aa4'},{x:x/T_,y:y/T_,h:Math.PI/2,alt:0,ph:'has'}); apVeh(g,x+70,y+40,0,'mil'); }
   apDrawFighter({col:'#7d8a95'},{x:A.hang[1].x0+14,y:A.hang[1].y0+3,h:-Math.PI/2,alt:0,ph:'has'});
+  apFieldLights(A,vx0,vy0,vx1,vy1);
   // aircraft on the ground
-  for(const st of A.stands){ const p=apCivil(A,st,timeS); if(p&&p.alt<=0.05&&vis(p.x,p.y,900)){ apDrawCivil(st,p); if(p.ph==='park') apService(st,p,p.x*T_,p.y*T_); if(p.ph==='push') apVeh(g,p.x*T_,(p.y+33*st.sc/32)*T_,Math.PI/2,'push'); }
+  for(const st of A.stands){ const p=apCivil(A,st,apLT(st)); if(p&&p.alt<=0.05&&vis(p.x,p.y,900)){ apDrawCivil(st,p); if(p.ph==='park') apService(st,p,p.x*T_,p.y*T_); if(p.ph==='push') apVeh(g,p.x*T_,(p.y+33*st.sc/32)*T_,Math.PI/2,'push'); }
     apBridge(A,st,p); }
-  for(const f of A.fighters){ const p=apFighter(A,f,timeS); if(p&&p.alt<=0.05&&vis(p.x,p.y,600)) apDrawFighter(f,p); }
+  for(const f of A.fighters){ const p=apFighter(A,f,apLT(f)); if(p&&p.alt<=0.05&&vis(p.x,p.y,600)) apDrawFighter(f,p); }
   apTerminal(A,vx0,vy0,vx1,vy1,night); }
 function apBridge(A,st,p){ const g=ctx, T_=TILE, ty=A.civ.y1*T_, X=st.x*T_, ny=(st.sy+24*st.sc/32)*T_, ext=p&&p.ph==='park'&&p.tp>3&&p.tp<116, y1=ext?ny:ty-3*T_, dx=X-6*st.sc;
   g.fillStyle='#4f5b66'; g.beginPath(); g.roundRect(dx-12,y1,24,ty-y1,6); g.fill(); g.fillStyle='#aab7c4'; g.fillRect(dx-9,y1+2,18,ty-y1-4); g.fillStyle='#34495e'; g.beginPath(); g.roundRect(dx-16,y1-6,32,10,4); g.fill(); }
@@ -233,6 +234,7 @@ function apLandside(A,night){ const g=ctx, T_=TILE, rnd=mulberry(77);
     g.fillStyle='#b9bec4'; g.fillRect(x0,y0,w,t); g.fillRect(x0,y0+h-t,w,t); g.fillRect(x0,y0,t,h); g.fillRect(x0+w-t,y0,t,8*T_); g.fillRect(x0+w-t,y0+12*T_,t,h-12*T_);
     g.fillStyle='#d5d9dd'; g.fillRect(x0,y0,w,0.3*T_); g.fillRect(x0,y0,0.3*T_,h);
     for(const [cx,cy] of [[m.x1-3,m.y0+2.2],[m.x0+2.2,m.y1-3]]){ g.fillStyle='#6c7a89'; g.fillRect((cx-1.4)*T_,(cy-1.4)*T_,2.8*T_,2.8*T_); g.fillStyle='#2e86c1'; g.fillRect((cx-0.9)*T_,(cy-0.9)*T_,1.8*T_,1.8*T_); g.fillStyle='#fff'; g.font='bold '+(0.9*T_)+'px sans-serif'; g.textAlign='center'; g.fillText('⇅',cx*T_,(cy+0.35)*T_); g.textAlign='left'; }
+    g.fillStyle='rgba(255,255,255,0.85)'; for(let x=m.x1-6;x>m.x0+3;x-=7){ const X=x*T_, Y=702*T_; g.beginPath(); g.moveTo(X-1.4*T_,Y); g.lineTo(X,Y-0.6*T_); g.lineTo(X,Y-0.25*T_); g.lineTo(X+1.4*T_,Y-0.25*T_); g.lineTo(X+1.4*T_,Y+0.25*T_); g.lineTo(X,Y+0.25*T_); g.lineTo(X,Y+0.6*T_); g.closePath(); g.fill(); }
     g.fillStyle='#f4d03f'; g.font='bold 70px sans-serif'; g.fillText('P',(m.x0+1)*T_,(m.y0-0.5)*T_); g.fillStyle='#2c3e50'; g.font='bold 30px sans-serif'; g.fillText('MULTI-STOREY • ENTRANCE →',(m.x0+4)*T_,(m.y0-0.6)*T_); }
   // surface car park bay paint (cars come from initParked on the lot objects)
   for(const L of (A.lots||[])){ g.fillStyle='#f4d03f'; g.font='bold 50px sans-serif'; g.fillText('P',(L.x0+0.6)*T_,(L.y0+1.9)*T_); }
@@ -301,7 +303,7 @@ function apStationHigh(A,night){ const T_=TILE, g=ctx, t=A.term, rs0=669.6*T_, r
   for(const x of [416,440,458]) for(const y of [rs0+0.15*T_,rs1-1.15*T_]){ const X=x*T_; g.fillStyle='#1f4e9c'; g.fillRect(X-3.2*T_,y,6.4*T_,T_); g.fillStyle='#fff'; g.fillText('ALBION AIRPORT \u2708',X,y+0.78*T_); }
   g.textAlign='left'; }
 
-function apDrawHigh(){ const A=apA(); if(!A) return; { const t=A.term; if(Math.abs(t.x0*TILE-cam.x)<2600/cam.z) apStationHigh(A,typeof DN!=='undefined'?DN.dark:0); } for(const st of A.stands){ const p=apCivil(A,st,timeS); if(p&&p.alt>0.05) apDrawCivil(st,p); } for(const f of A.fighters){ const p=apFighter(A,f,timeS); if(p&&p.alt>0.05) apDrawFighter(f,p); } }
+function apDrawHigh(){ const A=apA(); if(!A) return; { const t=A.term; if(Math.abs(t.x0*TILE-cam.x)<2600/cam.z) apStationHigh(A,typeof DN!=='undefined'?DN.dark:0); } for(const st of A.stands){ const p=apCivil(A,st,apLT(st)); if(p&&p.alt>0.05) apDrawCivil(st,p); } for(const f of A.fighters){ const p=apFighter(A,f,apLT(f)); if(p&&p.alt>0.05) apDrawFighter(f,p); } }
 setTimeout(()=>{
   if(typeof drawPortTrucksLow==='function'){ const d=drawPortTrucksLow; drawPortTrucksLow=function(a,b,c,e){ const r=d.apply(this,arguments); try{ apDrawLow(a,b,c,e); }catch(err){ if(!APX.err){ APX.err=String(err&&err.stack||err); console.error(err); } } return r; }; }
   if(typeof drawPlanes==='function'){ const d=drawPlanes; drawPlanes=function(v){ const r=d.apply(this,arguments); try{ apDrawHigh(); }catch(err){ APX.err2=String(err); } return r; }; }
@@ -312,8 +314,8 @@ setTimeout(()=>{
 // ---------- solid aircraft: fuselage + wing + tailplane rectangles (tiles), rebuilt once per game tick ----------
 function apPlaneSolids(){ const A=apA(); if(!A) return null; if(A._solT===timeS) return A._sol; const L=[];
   const add=(p,s,k)=>{ if(!p||p.alt>0.05) return; L.push({x:p.x,y:p.y,c:Math.cos(p.h),s:Math.sin(p.h),k,sc:s/TILE}); };
-  for(const st of A.stands) add(apCivil(A,st,timeS),st.sc,0);
-  for(const f of A.fighters) add(apFighter(A,f,timeS),1.55,1);
+  for(const st of A.stands) add(apCivil(A,st,apLT(st)),st.sc,0);
+  for(const f of A.fighters) add(apFighter(A,f,apLT(f)),1.55,1);
   for(let k=0;k<3;k++) add({x:A.mil.x0+16+k*32,y:A.mil.y0+14,h:Math.PI/2,alt:0},1.55,1);
   A._solT=timeS; A._sol=L; return L; }
 // shapes in plane-local units (x along nose, y across): civil = planeShape rotated, fighter = apFtr
@@ -334,3 +336,46 @@ setTimeout(()=>{ if(typeof updateTraffic!=='function') return; const ut=updateTr
     const r=ut.apply(this,arguments); for(const [v,x,y,h] of held){ v.x=x; v.y=y; v.h=h; v.v=0; } APDROP.peds=APDROP.peds.filter(p=>timeS-p.t<12); return r; }; },0);
 function apDropPeds(){ const g=ctx, T_=TILE; for(const p of APDROP.peds){ const e=timeS-p.t; if(e<1.5) continue; const k=Math.min(1,(e-1.5)/6), x=(p.x+0.6+k*2.4)*T_, y=688.45*T_; if(k>=1) continue;
     g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.arc(x+2,y+2,4,0,7); g.fill(); g.fillStyle=p.c; g.beginPath(); g.arc(x,y,4.2,0,7); g.fill(); g.fillStyle='#3b2a20'; g.beginPath(); g.arc(x,y,2.2,0,7); g.fill(); g.fillStyle='#555'; g.fillRect(x+4,y-1,4,3); } }
+// ---------- v42: ATC. Every aircraft runs on its own clock (lt) that only advances when it is cleared:
+// one aircraft on the runway at a time (arrivals hold out on the approach, departures hold at the bars), the two-way apron link and the
+// south-west taxiway merge are single-occupancy blocks, and taxiing aircraft keep 14 tiles behind whatever is ahead.
+function apLT(o){ if(o.lt==null) o.lt=timeS; return o.lt; }
+const AP_RWY_PH={app:1,roll:1,line:1,tko:1};
+function apRwV(A,p){ return -(p.x-A.rwC[0])*Math.sin(A.rwA)+(p.y-A.rwC[1])*Math.cos(A.rwA); }
+function apRwU(A,p){ return (p.x-A.rwC[0])*Math.cos(A.rwA)+(p.y-A.rwC[1])*Math.sin(A.rwA); }
+function apZone(A,p){ if(!p||p.alt>0.05) return 0; if(p.x>368&&p.x<442&&p.y>572&&p.y<600) return 1; const u=apRwU(A,p), v=apRwV(A,p); if(u>-136&&u<-104&&v>7&&v<42) return 2; if(u>-16&&u<16&&v>22&&v<44) return 3; if(u>-16&&u<16&&v<-22&&v>-44) return 4; return 0; }
+function apATC(dt){ const A=apA(); if(!A||!A.lineup) return; const L=[];
+  for(const st of A.stands) L.push({o:st,f:t=>apCivil(A,st,t)}); for(const f of A.fighters) if(f.fly) L.push({o:f,f:t=>apFighter(A,f,t)});
+  for(const q of L){ q.cur=q.f(apLT(q.o)); q.nxt=q.f(q.o.lt+dt); }
+  const onRwy=p=>p&&p.alt<1.5&&(AP_RWY_PH[p.ph]||(Math.abs(apRwV(A,p))<7&&Math.abs(apRwU(A,p))<215));
+  // runway token
+  const keep=p=>p&&(p.ph==='app'||p.ph==='roll'||p.ph==='line'||(p.ph==='tko'&&p.alt<1.5)||(p.alt<0.05&&Math.abs(apRwV(A,p))<7&&Math.abs(apRwU(A,p))<215));
+  if(A.rwy&&!L.some(q=>q.o===A.rwy&&keep(q.cur))) A.rwy=null;
+  for(const q of L){ const c=q.cur, n=q.nxt; let hold=false; q.o.why=null;
+    const wantsRwy=n&&(n.ph==='app'&&(!c||c.ph!=='app')||(n.ph==='line'&&(!c||c.ph==='hold')));
+    if(wantsRwy&&A.rwy!==q.o){ if(A.rwy){ hold=true; q.o.why='rwy'; } else A.rwy=q.o; }
+    const moving=n&&n.alt<0.05&&(n.ph==='taxi'||n.ph==='taxo'||n.ph==='push'||n.ph==='start');
+    if(!hold&&moving){ const zn=apZone(A,n), zc=apZone(A,c);
+      if(zn&&zn!==zc&&L.some(o=>o!==q&&apZone(A,o.cur)===zn&&o.cur.ph!=='park'&&o.cur.ph!=='has')){ hold=true; q.o.why='zone'+zn; }
+      if(!hold&&A.rwy!==q.o&&(n.ph==='taxi'||n.ph==='taxo')) for(const o of L){ if(o===q||!o.cur||o.cur.alt>0.05||o.cur.ph==='park'||o.cur.ph==='has') continue; { const ax=o.cur.x-n.x, ay=o.cur.y-n.y, al=Math.hypot(ax,ay)||1; if((ax*Math.cos(n.h)+ay*Math.sin(n.h))/al<0.85) continue; } const dn=Math.hypot(n.x-o.cur.x,n.y-o.cur.y), dc=Math.hypot(c.x-o.cur.x,c.y-o.cur.y); if(dn<14&&dn<dc-1e-4){ hold=true; q.o.why='follow:'+(o.o.k!=null?'c'+o.o.k:'f'+o.o.i); break; } } }
+    if(!hold) q.o.lt+=dt; q.o.held=hold; } }
+// ---------- v42: airfield lighting (night): runway edge/centreline, threshold/end bars, approach lights, PAPI, taxiway centreline/edges, stop bars
+function apFieldLights(A,vx0,vy0,vx1,vy1){ if(typeof DN==='undefined'||DN.dark<0.05||typeof dnLight!=='function') return; const T_=TILE, m=60;
+  const L=(u,v,r,c,a)=>{ const p=apT(A,u,v), x=p[0]*T_, y=p[1]*T_; if(x<vx0-m||x>vx1+m||y<vy0-m||y>vy1+m) return; dnLight(x,y,r,c,a); };
+  const h=A.rwW/2, uE=A.rwL/2, W='rgba(255,250,235,0.95)';
+  for(let u=-uE;u<=uE;u+=15){ L(u,-h,22,W,0.9); L(u,h,22,W,0.9); }
+  for(let u=-uE+6;u<uE;u+=8) L(u,0,12,u>uE-60?(((u/8)|0)%2?'rgba(255,60,50,0.95)':W):W,0.8);
+  for(let v=-h;v<=h+0.01;v+=h/4){ L(-uE,v,16,'rgba(60,255,110,0.95)',1); L(uE,v,16,'rgba(255,50,40,0.95)',1); L(uE+1.2,v,14,'rgba(60,255,110,0.9)',0.8); L(-uE-1.2,v,14,'rgba(255,50,40,0.9)',0.8); }
+  for(let u=-uE-6;u>=-uE-90;u-=6) L(u,0,18,W,0.95); for(let v=-6;v<=6;v+=1.5) L(-uE-45,v,14,W,0.9);
+  { const sg=((timeS*2)%1)*90; L(-uE-90+sg,0,40,'rgba(255,255,255,0.9)',1); }   // sequenced flasher ("rabbit")
+  for(let k=0;k<4;k++) L(-172+6,-h-3-k*1.2,14,k<2?W:'rgba(255,50,40,0.95)',1);   // PAPI: 2 white + 2 red = on slope
+  const G_='rgba(60,255,120,0.9)', B_='rgba(70,120,255,0.95)';
+  const pts=(P,step,fn)=>{ let acc=0; for(let i=1;i<P.length;i++){ const a=P[i-1], b=P[i], d=Math.hypot(b[0]-a[0],b[1]-a[1]); acc+=d; if(acc>=step){ acc=0; fn(b,a); } } };
+  const W2=(p,r,c,a)=>{ const x=p[0]*T_, y=p[1]*T_; if(x<vx0-m||x>vx1+m||y<vy0-m||y>vy1+m) return; dnLight(x,y,r,c,a); };
+  const sA=Math.sin(A.rwA), cA=Math.cos(A.rwA), onR=p=>Math.abs(-(p[0]-A.rwC[0])*sA+(p[1]-A.rwC[1])*cA)<h+1;
+  pts(A.loop,5,(p)=>W2(p,10,G_,0.85)); pts(A.loop,9,(p,a)=>{ const dx=p[0]-a[0], dy=p[1]-a[1], l=Math.hypot(dx,dy)||1, nx=-dy/l*2.4, ny=dx/l*2.4; W2([p[0]+nx,p[1]+ny],10,B_,0.9); W2([p[0]-nx,p[1]-ny],10,B_,0.9); });
+  for(const R of A.taxiPaint||[]) pts(R,5,(p)=>{ if(!onR(p)) W2(p,10,G_,0.85); });
+  for(const u of [-120,0,120]) for(const sv of [-1,1]){ const busy=!!A.rwy; for(let w=-2;w<=2;w+=1) L(u+w,sv*10.9,10,busy?'rgba(255,40,30,1)':'rgba(255,40,30,0.35)',busy?1:0.5); }
+  for(const st of A.stands) W2([st.x,A.civ.lane+6],260,'rgba(255,240,200,0.5)',0.5);
+  for(let k=0;k<3;k++) W2([A.mil.x0+16+k*32,A.mil.y0+8],260,'rgba(255,240,200,0.45)',0.5); }
+setTimeout(()=>{ if(typeof updateTraffic!=='function') return; const ut=updateTraffic; updateTraffic=function(dt){ const r=ut.apply(this,arguments); try{ apATC(dt); }catch(e){ APX.err3=String(e&&e.stack||e); } return r; }; },0);

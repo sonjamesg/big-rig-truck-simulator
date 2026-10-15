@@ -600,7 +600,7 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
     const fl=(x0,y0,w,h,t)=>{ for(let y=y0;y<y0+h;y++) for(let x=x0;x<x0+w;x++){ const g=G[idx(x,y)]; if(g!==T.ROAD&&g!==T.BRIDGE) set(x,y,t); } };
     // v42: multi-storey = real open deck: solid wall ring, drivable LOT deck inside, ramp mouth on the east side onto the 700 road
     fl(354,692,34,22,T.BLDG); fl(355,693,32,20,T.LOT); fl(386,700,4,4,T.ROAD);
-    objs.push({kind:'lot',x:356*TILE,y:694*TILE,w:29*TILE,h:18*TILE,seed:3911,ap:'ms'});
+    objs.push({kind:'lot',x:356*TILE,y:694*TILE,w:29*TILE,h:6*TILE,seed:3911,ap:'ms'}); objs.push({kind:'lot',x:356*TILE,y:704.5*TILE,w:29*TILE,h:7.5*TILE,seed:3914,ap:'ms2'});   // v42b: clear drive aisle y 700..704 straight in from the east ramp
     // v42: surface parks moved east, clear of the 708 road; they front onto it from the north
     fl(436,696,25,11,T.LOT); fl(463,696,26,11,T.LOT);
     objs.push({kind:'lot',x:436*TILE,y:696*TILE,w:25*TILE,h:11*TILE,seed:3912,ap:'surf'});
