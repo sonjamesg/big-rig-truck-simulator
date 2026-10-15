@@ -48,7 +48,9 @@ function svcGen(K){ const {findSpot,access,clearObjs,region,objs}=K; const t0=pe
     const want={hospital:1,fire:big?2:1,police:big?2:1}, Q=['Central','North','South','East','West'];
     for(const type of ['hospital','fire','police']){ let n=0; const off=type==='fire'?1:type==='police'?3:0; for(let t=0;t<5&&n<want[type];t++){ const last=t===4, [tx,ty]=last?tg[0]:tg[(t+off)%tg.length];
         const nm=type==='hospital'?town+(big?' General Hospital':' Community Hospital'):town+(want[type]>1?' '+Q[n+1]:'')+(type==='fire'?' Fire Station':' Police Station');
-        if(place(type,tx,ty,nm,town,last?sep*0.5:sep,last?Math.max(MR+60,240):Math.min(MR,90),[x0,y0,x1,y1])) n++; } } }
+        if(place(type,tx,ty,nm,town,last?sep*0.5:sep,last?Math.max(MR+60,240):Math.min(MR,type==='hospital'&&t<3?55:90),[x0,y0,x1,y1])) n++; }
+      // v29: every town gets a hospital - fall back to the outskirts (road frontage) if the centre is full
+      if(type==='hospital'&&n<1) for(const [a,b] of [[1.3,0],[-1.3,0],[0,1.3],[0,-1.3],[1.1,1.1],[-1.1,1.1],[1.1,-1.1],[-1.1,-1.1]]){ const nm=town+(big?' General Hospital':' Community Hospital'); if(place(type,Math.round(cx+a*Math.max(hw,30)),Math.round(cy+b*Math.max(hh,30)),nm,town,0,260,[x0,y0,x1,y1])){ n++; break; } } } }
   // rural cover: a fire station (and police post) for open country more than ~300 tiles from any existing one
   for(let gy=180;gy<MH-150;gy+=340) for(let gx=180;gx<MW-150;gx+=340){ for(const type of ['fire','police']){ if(SVC.byType[type].some(s=>Math.hypot(s.tx-gx,s.ty-gy)<300)) continue;
       const g=get(gx,gy); if(g===T.WATER||Object.values(world.cities).some(c=>c&&gx>c.xs[0]-90&&gx<c.X1+90&&gy>c.ys[0]-90&&gy<c.Y1+90)) continue; const rg=region(gx,gy); let nt=null,nd=1e9; for(const k in CN){ const c=world.cities[k]; if(!c) continue; const d=Math.hypot((c.xs[0]+c.X1)/2-gx,(c.ys[0]+c.Y1)/2-gy); if(d<nd){ nd=d; nt=CN[k]; } }
@@ -68,7 +70,8 @@ function svcLights(add){ for(const s of SVC.list){ const X=t=>t*TILE, P=s.parts;
     if(s.type==='fire'){ const h=P.house; for(let k=0;k<3;k++) add(X(h.x+h.w*(k+0.5)/3),X(h.y)-10,70,'fl'); add(X(P.tower.x+2),X(P.tower.y+2.5),10,'cl',{col:'rgba(255,40,30,1)',bl:2}); }
     if(s.type==='hospital'){ const c=P.canopy; add(X(c.x+c.w/2),X(c.y+c.h/2),110,'fl'); add(X(c.x+c.w-1),X(c.y+c.h)+4,14,'cl',{col:'rgba(255,50,50,1)'}); const hp=s.helipad; for(let k=0;k<8;k++){ const a=k/8*6.283; add((hp.x+Math.cos(a)*hp.r)*PPM,(hp.y+Math.sin(a)*hp.r)*PPM,5,'cl',{col:'rgba(90,255,120,1)'}); } } } }
 // ---------- art (static chunk cache, top-down procedural)
-function svcRoller(g,x,y,w,h){ g.fillStyle='#c9ccd0'; g.fillRect(x,y,w,h); g.fillStyle='rgba(0,0,0,0.18)'; for(let k=y+3;k<y+h;k+=5) g.fillRect(x+2,k,w-4,1.5); g.strokeStyle='#666b72'; g.lineWidth=2; g.strokeRect(x+1,y+1,w-2,h-2); g.lineWidth=1; }
+function svcRoller(g,x,y,w,h){ h=Math.max(h,22); g.fillStyle='#3a3d42'; g.fillRect(x-3,y-3,w+6,h+5); const gr=g.createLinearGradient(0,y,0,y+h); gr.addColorStop(0,'#e4e7ea'); gr.addColorStop(1,'#aeb3b9'); g.fillStyle=gr; g.fillRect(x,y,w,h);   // v29: clearer roller doors: dark frame, bold slats, hazard sill
+  g.fillStyle='rgba(0,0,0,0.35)'; for(let k=y+3;k<y+h-4;k+=4) g.fillRect(x+1,k,w-2,1.6); g.fillStyle='#c0392b'; g.fillRect(x,y,w,3); for(let k=0;k<w;k+=8){ g.fillStyle=(k/8)%2?'#111':'#f5c518'; g.fillRect(x+k,y+h-4,Math.min(8,w-k),4); } g.strokeStyle='#22252a'; g.lineWidth=2; g.strokeRect(x,y,w,h); g.lineWidth=1; }
 function svcBays(g,p,label){ const X=t=>t*TILE; g.fillStyle='#3d4148'; g.fillRect(X(p.x),X(p.y),X(p.w),X(p.h)); g.strokeStyle='rgba(245,245,240,0.85)'; g.lineWidth=2.5;
   const n=Math.floor((p.h-1.4)/SVC_BAY); for(const side of [0,1]){ const x0=side?X(p.x+p.w-1.5):X(p.x)+3, x1=side?X(p.x+p.w)-3:X(p.x+1.5); for(let k=0;k<=n;k++){ const yy=X(p.y+1+k*SVC_BAY); g.beginPath(); g.moveTo(x0,yy); g.lineTo(x1,yy); g.stroke(); } }
   g.lineWidth=1; if(label){ g.save(); g.translate(X(p.x+p.w/2),X(p.y+p.h/2)); g.rotate(-Math.PI/2); g.fillStyle='rgba(245,245,235,0.8)'; g.font='bold 16px Arial'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(label,0,0); g.restore(); } }
@@ -83,7 +86,7 @@ OBJX.svc=(g,o)=>{ const s=o.s, P=s.parts, X=t=>t*TILE; g.save();
     g.fillStyle='rgba(245,245,235,0.9)'; g.font='bold 18px Arial'; g.textAlign='center'; g.fillText('KEEP CLEAR \u2022 FIRE ENGINES',hx+hw/2,o.y+X(1)+22);
     drawShadowRect(g,hx,hy,hw,hh,18); const gr=g.createLinearGradient(hx,hy,hx,hy+hh); gr.addColorStop(0,'#c0392b'); gr.addColorStop(0.5,'#9e2b20'); gr.addColorStop(1,'#c0392b'); g.fillStyle=gr; g.fillRect(hx,hy,hw,hh);
     g.fillStyle='rgba(0,0,0,0.18)'; for(let k=hx+12;k<hx+hw;k+=16) g.fillRect(k,hy,2,hh); g.fillStyle='#7a1f17'; g.fillRect(hx,hy+hh/2-3,hw,6);
-    const dw=(hw-16)/3; for(let k=0;k<3;k++) svcRoller(g,hx+4+k*(dw+4),hy-2,dw,16);
+    const dw=(hw-16)/3; for(let k=0;k<3;k++) svcRoller(g,hx+4+k*(dw+4),hy-2,dw,22);
     svcSign(g,hx+hw*0.15,hy+hh*0.62,hw*0.7,30,'#f4f4f0','#b0201a','FIRE STATION'); g.fillStyle='#fff'; g.font='bold 14px Arial'; g.textAlign='center'; g.fillText(s.town.toUpperCase(),hx+hw/2,hy+hh*0.3);
     const t=P.tower, tx=X(t.x), ty=X(t.y), tw=X(t.w), th=X(t.h); drawShadowRect(g,tx,ty,tw,th,52); g.fillStyle='#9ea3a8'; g.fillRect(tx,ty,tw,th); g.fillStyle='#c0392b'; g.fillRect(tx+6,ty+6,tw-12,th-12);
     g.fillStyle='#6d7177'; g.fillRect(tx+tw/2-10,ty+8,20,th-16); g.strokeStyle='#e8e8e8'; g.lineWidth=2; g.beginPath(); g.moveTo(tx+tw/2-7,ty+8); g.lineTo(tx+tw/2-7,ty+th-8); g.moveTo(tx+tw/2+7,ty+8); g.lineTo(tx+tw/2+7,ty+th-8); for(let k=ty+14;k<ty+th-8;k+=9){ g.moveTo(tx+tw/2-7,k); g.lineTo(tx+tw/2+7,k); } g.stroke(); g.lineWidth=1;

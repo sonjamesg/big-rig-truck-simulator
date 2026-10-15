@@ -182,7 +182,7 @@ function drawHomes(vx0,vy0,vx1,vy1){ if(!HOMES.list.length) return; const u=TILE
   for(const a of HOMES.agents){ const x=a.x0*u, y=a.y0*u; if(x>vx1+40||x+12*u<vx0-40||y-a.gap*u>vy1+40||y+9*u<vy0-40) continue; ctx.fillStyle='#9c9d99'; ctx.fillRect((a.x0+3)*u,(a.y0-a.gap)*u,6*u,a.gap*u); ctx.drawImage(hAgentArt(a),x,y);
     if(dark>0.05&&typeof dnLight==='function'){ dnLight((a.x0+6)*u,(a.y0+5)*u,170,'rgba(255,230,160,1)',0.8); for(const k of [1.5,10.5]) dnLight((a.x0+k)*u,(a.y0+4.4)*u,60,'rgba(255,90,80,1)',0.5); } } }
 // ---------- map icons + POIs
-function homeMapIcons(icon,px,py){ for(const a of HOMES.agents) icon(px(a.entrance.x),py(a.entrance.y),'#0f5132','E'); for(const h of HOMES.list) if(homeOwned(h)) icon(px(h.entrance.x),py(h.entrance.y),'#1e8449','\u2302'); }
+function homeMapIcons(icon,px,py){ for(const a of HOMES.agents) icon(px(a.entrance.x),py(a.entrance.y),'#0f5132','E'); for(const h of HOMES.list) if(homeOwned(h)) icon(px(h.entrance.x),py(h.entrance.y),'#1e8449','\u{1F3E0}'); }
 function homePOIs(test){ for(const a of HOMES.agents) test(a.ft,a.entrance.x,a.entrance.y,'Estate agent'); for(const h of HOMES.list) if(homeOwned(h)) test(h.ft,h.entrance.x,h.entrance.y,'Your home'); }
 // ---------- UI
 const HOME_CSS=`.hmm{width:min(980px,96%)!important;max-width:none!important;height:min(640px,92%);max-height:92%;padding:0!important;display:flex;flex-direction:column;overflow:hidden;background:linear-gradient(180deg,#14202c,#0d1620)!important;border:1px solid rgba(212,175,55,.35)!important}
