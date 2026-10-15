@@ -40,8 +40,8 @@ function stepTruck(s,inp,dt){ if(typeof FX!=='undefined'&&FX.boom){ s.v=0; s.thr
   if(s.mode==='D'&&brk>Math.min(0.99,(typeof WX!=='undefined'&&WX.wet>0.5?0.8:0.92)+((s.grip||1)-1)*0.4)&&Math.abs(s.v)>15) s.lockT=(s.lockT||0)+dt; else s.lockT=0;
   s.skid=(s.skid?brk>0.6:s.lockT>0.15)&&Math.abs(s.v)>3;
   // ----- surface
-  const surf=surfaceAt(s); s.offroad=(surf===T.GRASS||surf===T.PGRASS||surf===T.SAND||surf===T.GRAVEL);
-  { const f=fwd(s.h), qx=(s.x-f[0]*2)*PPM/TILE, qy=(s.y-f[1]*2)*PPM/TILE, rb=rbAtTile(Math.floor(qx),Math.floor(qy)); if(rb) s.offroad=rbSurf(rb,qx,qy)!==1; }   // roundabout: exact flared outline
+  const surf=surfaceAt(s); s.offroad=(surf===T.GRASS||surf===T.PGRASS||surf===T.SAND); s.pave=(surf===T.GRAVEL||surf===T.WALK||surf===T.PLAZA);   // v38: footpaths/gravel paths are paved-ish, barely slower than road
+  { const f=fwd(s.h), qx=(s.x-f[0]*2)*PPM/TILE, qy=(s.y-f[1]*2)*PPM/TILE, rb=rbAtTile(Math.floor(qx),Math.floor(qy)); if(rb){ const rs=rbSurf(rb,qx,qy); s.offroad=rs!==1&&!s.pave; } }   // roundabout: exact flared outline
   // ----- gearbox & engine
   const dir= s.mode==='R'?-1:1, av=Math.abs(s.v);
   const ratio= s.mode==='R'? REV_RATIO : GEARS[s.gear-1];
@@ -59,7 +59,7 @@ function stepTruck(s,inp,dt){ if(typeof FX!=='undefined'&&FX.boom){ s.v=0; s.thr
     F += dir*tq*ratio*FINAL*0.9/WHEEL_R;
     if(s.throttle<0.05 && av>1) F -= Math.sign(s.v)*(250+0.35*s.rpm)*ratio*FINAL/WHEEL_R*0.6*(s.ebr||1);   // engine braking (cz: exhaust/jake brake)
   }
-  const roll=(s.offroad?0.06:0.008)*M*9.81, air=0.5*1.2*6.5*0.7*s.v*s.v;
+  const roll=(s.offroad?0.06:s.pave?0.011:0.008)*M*9.81, air=0.5*1.2*6.5*0.7*s.v*s.v;
   F -= Math.sign(s.v)*(roll+air);
   // brakes
   const bF=(s.skid?(solo?0.42:0.36)*(s.grip||1):s.brake*(solo?0.6:0.5)*(s.brk||1))*M*9.81*(typeof WX!=='undefined'?WX.grip:1);
@@ -67,7 +67,7 @@ function stepTruck(s,inp,dt){ if(typeof FX!=='undefined'&&FX.boom){ s.v=0; s.thr
   if(s.brake>0){ const dv=bF/M*dt; if(Math.abs(nv)<=dv) nv=0; else nv-=Math.sign(nv)*dv; }
   if(Math.abs(nv)<0.05 && s.throttle<0.05) nv=0;
   if(Math.sign(nv)!==Math.sign(s.v) && s.v!==0 && !(s.mode==='R'&&nv<0) && !(s.mode==='D'&&nv>0)) nv=0;
-  if(s.offroad && Math.abs(nv)>8) nv*=0.995;
+  if(s.offroad && Math.abs(nv)>8){ const cap=13.8; nv*=Math.abs(nv)>cap?0.995:0.9993; }   // v38: off-road top speed ~31 mph (was ~25)
   if(s.jkLimit && Math.abs(nv)>1.2) nv*=1-0.6*dt;   // scrub at jackknife limit, never below walking pace
   s.v=nv;
   // ----- steering with inertia and self-centring

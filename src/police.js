@@ -137,7 +137,7 @@ function polChaseAim(c){ const v=c.v, P=c.path; if(!P) return null; let k=c.pk||
   const q=P[Math.min(P.length-1,k+3)], r=P[Math.min(P.length-1,k+4)]; if(!q) return null; const dx=r[0]-q[0], dy=r[1]-q[1], l=Math.hypot(dx,dy)||1; return [q[0]-dy/l*1.4,q[1]+dx/l*1.4]; }   // keep-left lane-ish
 function polUpdateChase(dt){ const c=POL.chase; if(!c) return; const v=c.v, P=truck; c.t+=dt;
   const back=P.trl?20:9, f=fwd(P.trl?P.th:P.h), tx=(P.trl?P.trl.x:P.x)-f[0]*back, ty=(P.trl?P.trl.y:P.y)-f[1]*back, dP=Math.hypot(P.x-v.x,P.y-v.y);
-  if(c.spin>0){ c.spin-=dt; v.h+=dt*5*c.spinD; c.sp*=Math.max(0,1-dt*3); const fv=fwd(v.h); v.x+=fv[0]*c.sp*dt; v.y+=fv[1]*c.sp*dt; v.v=c.sp; if(c.siren) c.siren.set(emSirenVol(v.x,v.y)); if(c.spin<=0&&dP>45){ polLose('crashed'); } return; }
+  if(c.spin>0){ c.spin-=dt; v.h+=dt*5*c.spinD; c.sp*=Math.max(0,1-dt*3); const fv=fwd(v.h); v.x+=fv[0]*c.sp*dt; v.y+=fv[1]*c.sp*dt; v.v=c.sp; polSep(c); if(c.siren) c.siren.set(emSirenVol(v.x,v.y)); if(c.spin<=0&&dP>45){ polLose('crashed'); } return; }
   c.rp=(c.rp||0)-dt; let aim=null; const direct=Math.hypot(tx-v.x,ty-v.y)<28;
   if(!direct){ if(c.rp<=0){ c.rp=0.5; polChasePath(c,tx,ty); } aim=polChaseAim(c); }
   // v31: close in, follow the player's own tyre track (breadcrumbs) so the car stays on the road instead of cutting across verges
@@ -146,11 +146,11 @@ function polUpdateChase(dt){ const c=POL.chase; if(!c) return; const v=c.v, P=tr
     for(let q=k;q<c.trail.length;q++){ const t=c.trail[q]; if(Math.hypot(t[0]-v.x,t[1]-v.y)>6){ aim=t; break; } } }
   if(!aim) aim=[tx,ty]; let dx=aim[0]-v.x, dy=aim[1]-v.y; const d=Math.hypot(tx-v.x,ty-v.y);
   // steer around traffic directly ahead
-  const fv0=fwd(v.h); let blk=null, bdist=1e9; for(const o of traffic.vs){ if(o===v) continue; const ox=o.x-v.x, oy=o.y-v.y, al=ox*fv0[0]+oy*fv0[1]; if(al<0||al>16) continue; const lat=ox*fv0[1]-oy*fv0[0]; if(Math.abs(lat)<2.4&&al<bdist){ bdist=al; blk={o,lat,al}; } }
+  const fv0=fwd(v.h); let blk=null, bdist=1e9; for(const o of traffic.vs){ if(o===v) continue; const ox=o.x-v.x, oy=o.y-v.y, al=ox*fv0[0]+oy*fv0[1]; if(al<0||al>22) continue; const lat=ox*fv0[1]-oy*fv0[0]; if(Math.abs(lat)<2.8&&al<bdist){ bdist=al; blk={o,lat,al}; } }
   if(blk){ const r=rgt(v.h), sd=blk.lat>0?-1:1; dx+=r[0]*sd*3.5*(16-blk.al)/4; dy+=r[1]*sd*3.5*(16-blk.al)/4; if(blk.al<3.2){ if(c.sp>13){ c.spin=1.6; c.spinD=Math.random()<0.5?-1:1; POL.crashes=(POL.crashes||0)+1; return; } c.sp=Math.min(c.sp,Math.abs(blk.o.v||0)); } }
   const want=d>25?Math.max(Math.abs(P.v)+6,15):d>6?Math.abs(P.v)+d*0.25:Math.abs(P.v)*0.6, turn=Math.abs(wrapA(Math.atan2(dx,-dy)-v.h)), cap=turn>0.6?9:turn>0.3?16:40;
   c.sp+=Math.max(-10*dt,Math.min(5*dt,Math.min(cap,want)-c.sp)); if(dP<7) c.sp=Math.min(c.sp,1);
-  if(Math.hypot(dx,dy)>1.2){ const th=Math.atan2(dx,-dy); v.h+=Math.max(-2.8*dt,Math.min(2.8*dt,wrapA(th-v.h))); } const fv=fwd(v.h); v.x+=fv[0]*c.sp*dt; v.y+=fv[1]*c.sp*dt; v.v=c.sp;
+  if(Math.hypot(dx,dy)>1.2){ const th=Math.atan2(dx,-dy); v.h+=Math.max(-2.8*dt,Math.min(2.8*dt,wrapA(th-v.h))); } const fv=fwd(v.h); v.x+=fv[0]*c.sp*dt; v.y+=fv[1]*c.sp*dt; v.v=c.sp; polSep(c);
   if(c.siren){ c.siren.set(emSirenVol(v.x,v.y)); if(c.t>4){ c.siren.mode('yelp'); c.siren.rate(Math.min(7,3.2+(c.t-4)*0.08)); } if(dP<30&&timeS-(c.wh||0)>3.5){ c.wh=timeS; c.siren.whoop(); } }
   // losing them
   if(c.sp<2&&dP>40&&Math.abs(P.v)>2){ c.stuckT=(c.stuckT||0)+dt; if(c.stuckT>6){ polLose('stuck'); return; } } else c.stuckT=0;
@@ -226,10 +226,18 @@ function hideBuild(){ const L=[], C=70; const ok=(x,y)=>{ if(!inb(x,y)) return f
   if(world.bridges) for(const b of world.bridges.slice(0,40)){ if(b.under) L.push({x:b.under.x,y:b.under.y,w:4*M_T,h:2*M_T,kind:'bridge'}); }
   HIDE.list=L; return L; }
 function hideAt(x,y){ const L=HIDE.list||hideBuild(); for(const h of L) if(x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h) return h; return null; }
-function drawHideSpots(vx0,vy0,vx1,vy1){ const L=HIDE.list||hideBuild(); ctx.save(); ctx.setLineDash([6,4]); ctx.lineWidth=2;
-  for(const h of L){ const X=h.x*PPM, Y=h.y*PPM, W=h.w*PPM, H=h.h*PPM; if(X>vx1||X+W<vx0||Y>vy1||Y+H<vy0) continue; ctx.fillStyle=WANT.lvl?'rgba(40,110,255,0.22)':'rgba(40,110,255,0.10)'; ctx.fillRect(X,Y,W,H); ctx.strokeStyle='rgba(70,140,255,0.9)'; ctx.strokeRect(X+1,Y+1,W-2,H-2);
-    ctx.setLineDash([]); ctx.fillStyle='rgba(90,160,255,0.95)'; ctx.font='bold '+Math.round(PPM*1.1)+'px sans-serif'; ctx.textAlign='center'; ctx.fillText('HIDE',X+W/2,Y+H/2+PPM*0.4); ctx.setLineDash([6,4]); } ctx.restore(); }
-function hideMapDots(px,py){ if(!WANT.lvl) return; const L=HIDE.list||hideBuild(); ctx.save(); for(const h of L){ const X=px(h.x+h.w/2), Y=py(h.y+h.h/2); if(X<-10||Y<-10||X>VW+10||Y>VH+10) continue; ctx.fillStyle='rgba(60,130,255,0.9)'; ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.fillRect(X-3,Y-2,6,4); ctx.strokeRect(X-3,Y-2,6,4); } ctx.restore(); }
+function drawHideSpots(vx0,vy0,vx1,vy1){ const L=HIDE.list||hideBuild(); const W1=WANT.lvl||POL.chase, pu=0.75+0.25*Math.sin(timeS*3); ctx.save();
+  for(const h of L){ const X=h.x*PPM, Y=h.y*PPM, W=h.w*PPM, H=h.h*PPM; if(X>vx1||X+W<vx0||Y>vy1||Y+H<vy0) continue;
+    if(W1){ ctx.shadowColor='rgba(60,150,255,0.9)'; ctx.shadowBlur=18*pu; }   // v38: subtle glow while wanted
+    ctx.fillStyle=W1?'rgba(40,120,255,'+(0.30*pu+0.08)+')':'rgba(40,120,255,0.18)'; ctx.fillRect(X,Y,W,H); ctx.shadowBlur=0;
+    ctx.setLineDash([8,5]); ctx.lineWidth=3; ctx.strokeStyle='rgba(110,180,255,1)'; ctx.strokeRect(X+1.5,Y+1.5,W-3,H-3); ctx.setLineDash([]);
+    const fs=Math.round(PPM*1.6); ctx.font='bold '+fs+'px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.lineWidth=4; ctx.strokeStyle='rgba(10,30,70,0.85)'; ctx.strokeText('HIDE',X+W/2,Y+H/2); ctx.fillStyle='#cfe4ff'; ctx.fillText('HIDE',X+W/2,Y+H/2);
+    if(W1&&typeof dnLight==='function') dnLight(X+W/2,Y+H/2,Math.max(W,H)*0.8,'rgba(70,150,255,1)',0.5); }
+  ctx.restore(); }
+function hideMapDots(px,py){ if(!(WANT.lvl||POL.chase)) return; const L=HIDE.list||hideBuild(); ctx.save(); ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='bold 9px sans-serif';
+  for(const h of L){ const X=px(h.x+h.w/2), Y=py(h.y+h.h/2); if(X<-10||Y<-10||X>VW+10||Y>VH+10) continue; ctx.fillStyle='#1e6cff'; ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.roundRect(X-7,Y-7,14,14,3); ctx.fill(); ctx.stroke(); ctx.fillStyle='#fff'; ctx.fillText('H',X,Y+0.5); } ctx.restore(); }
+// v38: hide boxes as sat-nav targets (full map tap/click/controller pick) while wanted
+function hidePOIs(){ if(!(WANT.lvl||POL.chase)) return []; return (HIDE.list||hideBuild()).map((h,i)=>h.poi||(h.poi={name:'Hide box '+(i+1),x:h.x+h.w/2,y:h.y+h.h/2,hide:h})); }
 
 // v31: full beam behind a car in the outer (fast) lane of a multi-lane road -> it indicates left and moves over one lane when clear (UK keep-left)
 function bySeg(v){ const tx=Math.floor(v.x/M_T), ty=Math.floor(v.y/M_T); if(!inb(tx,ty)) return null; const i=idx(tx,ty), h=world.roadH[i], vv=world.roadV[i]; const H=Math.abs(Math.sin(v.h||0))>0.8;
@@ -242,3 +250,17 @@ function beamYield(v,dt){ const P=truck;
   v.byT=0.01; BYD.n++; return true; }
 const BYD={n:0,done:0};
 setTimeout(()=>{ const dt0=drawTraffic; drawTraffic=function(){ for(const v of traffic.vs) if(v.sigBY) v.sig=v.sigBY; return dt0.apply(this,arguments); }; },0);
+
+// v38: police never pass through vehicles: capsule separation against traffic, parked/attached trailers and the player's rig.
+// Blocked -> slow to the blocker's speed / queue; the only way past is a real gap (the steer-around above).
+function polObst(){ const L=[]; for(const o of traffic.vs) L.push([o,o.x,o.y,o.h||0,(o.L||4.6),(o.W||2)]);
+  for(const t of world.trailers||[]) L.push([t,t.x,t.y,t.th||0,13.6,2.6]);
+  L.push([truck,truck.x,truck.y,truck.h,6.2,2.5]); if(truck.trl){ const t=truck.trl; L.push([t,t.x,t.y,truck.th!=null?truck.th:t.th,13.6,2.6]); } return L; }
+function polCaps(x,y,h,len){ const f=fwd(h), a=len/2; return [x-f[0]*a,y-f[1]*a,x+f[0]*a,y+f[1]*a]; }
+function polSegD(a,b){ let best=[1e9]; for(let i=0;i<=4;i++){ const px=a[0]+(a[2]-a[0])*i/4, py=a[1]+(a[3]-a[1])*i/4, ex=b[2]-b[0], ey=b[3]-b[1], l2=ex*ex+ey*ey||1, u=Math.max(0,Math.min(1,((px-b[0])*ex+(py-b[1])*ey)/l2)), qx=b[0]+ex*u, qy=b[1]+ey*u, d=Math.hypot(px-qx,py-qy); if(d<best[0]) best=[d,px-qx,py-qy]; }
+  for(let i=0;i<=4;i++){ const px=b[0]+(b[2]-b[0])*i/4, py=b[1]+(b[3]-b[1])*i/4, ex=a[2]-a[0], ey=a[3]-a[1], l2=ex*ex+ey*ey||1, u=Math.max(0,Math.min(1,((px-a[0])*ex+(py-a[1])*ey)/l2)), qx=a[0]+ex*u, qy=a[1]+ey*u, d=Math.hypot(px-qx,py-qy); if(d<best[0]) best=[d,qx-px,qy-py]; } return best; }
+function polSep(c){ const v=c.v; const me=polCaps(v.x,v.y,v.h,(v.L||4.6)-2); let hit=0;
+  for(const [o,x,y,h,len,w] of polObst()){ if(o===v||Math.abs(x-v.x)>18||Math.abs(y-v.y)>18) continue; const ob=polCaps(x,y,h,Math.max(0.1,len-w)), [d,nx,ny]=polSegD(me,ob), need=(w+(v.W||2))/2+0.15;
+    if(d<need){ const l=Math.hypot(nx,ny)||1, k=need-d; v.x+=nx/l*k; v.y+=ny/l*k; me[0]+=nx/l*k; me[1]+=ny/l*k; me[2]+=nx/l*k; me[3]+=ny/l*k; hit++;
+      const f=fwd(v.h), ov=o===truck?truck.v:(o.v||0), along=(x-v.x)*f[0]+(y-v.y)*f[1]; if(along>0) c.sp=Math.min(c.sp,Math.max(0,Math.abs(ov)*0.9)); } }
+  c.blocked=hit>0; POL.blockN=(POL.blockN||0)+hit; }

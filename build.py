@@ -8,7 +8,8 @@ except Exception: _rev='dev'
 _bk=os.path.join(s,'railbake.json')
 if os.path.exists(_bk): js="window.RAIL_BAKE="+open(_bk).read().strip()+";\n"+js
 js="window.BIGRIG_VERSION='Build "+datetime.date.today().strftime('%d %b %Y')+" \\u00b7 "+_rev+"';\n"+js
-html=open(os.path.join(s,'template.html')).read().replace('/*SCRIPT*/',js)
+_bid=datetime.datetime.utcnow().strftime('%Y%m%d%H%M%S')
+html=open(os.path.join(s,'template.html')).read().replace('/*SCRIPT*/',js).replace('__BUILD_ID__',_bid)
 open(os.path.join(d,'BigRig.html'),'w').write(html)
 open(os.path.join(d,'index.html'),'w').write(html)
 dist=os.path.join(d,'dist','BigRigWeb'); shutil.rmtree(os.path.join(d,'dist'),ignore_errors=True); os.makedirs(dist)
