@@ -566,11 +566,16 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
   yield 'Building the docks';
   { // v14 Albion container terminal: quay apron + 3 berths, neat stack rows between the aisles, gate, loading-bay terminal
     const P=world.port; for(let y=P.y0;y<P.y1;y++) for(let x=P.x0;x<P.edge;x++){ const t=G[idx(x,y)]; if(t===T.GRASS||t===T.SAND||t===T.WALK||t===T.PGRASS||t===T.TREE) set(x,y,T.QUAY); }
-    const cols=['#c0392b','#2e86c1','#e67e22','#27ae60','#8e44ad','#d4ac0d','#7f8c8d','#16a085'], H=P.hole, A=P.aisles;
-    const inHole=(x,y)=>x+6>H.x-1&&x<H.x+H.w+1&&y+2>H.y-2&&y<H.y+H.h+1;
-    for(let i=0;i<A.length-1;i++){ for(let y=A[i]+RW+2;y+2<=A[i+1]-2;y+=3) for(let x=P.x0+4;x+6<=580;x+=8){ if(inHole(x,y)) continue; let ok=true; for(let k=0;k<6;k++) for(let q=0;q<2;q++) if(get(x+k,y+q)!==T.QUAY) ok=false; if(!ok) continue;
-      fill(x,y,6,2,T.CONT); objs.push({kind:'cont',x:x*TILE,y:y*TILE,w:6*TILE,h:2*TILE,c1:cols[(R()*8)|0],c2:cols[(R()*8)|0],c3:cols[(R()*8)|0],seed:(R()*1e9)|0}); } }
-    for(let y=A[4]+RW+2;y+2<=P.y1-2;y+=3) for(let x=P.x0+4;x+6<=580;x+=8){ let ok=true; for(let k=0;k<6;k++) for(let q=0;q<2;q++) if(get(x+k,y+q)!==T.QUAY) ok=false; if(ok){ fill(x,y,6,2,T.CONT); objs.push({kind:'cont',x:x*TILE,y:y*TILE,w:6*TILE,h:2*TILE,c1:cols[(R()*8)|0],c2:cols[(R()*8)|0],c3:cols[(R()*8)|0],seed:(R()*1e9)|0}); } }
+    const H=P.hole, A=P.aisles;   // v40 true-scale terminal: long 6-row blocks (40ft = 3.05 tiles), RTG truck lanes, reefer + empties blocks, lorry park, gate
+    const inHole=(x,y,w,h)=>x+w>H.x-1&&x<H.x+H.w+1&&y+h>H.y-1&&y<H.y+H.h+1, BW=31, XS=[478,512,546], LET='ABCDEFGHJKLMNPQRSTUVWXYZ'; let bi=0;
+    const free=(x,y,w,h)=>{ for(let q=0;q<h;q++) for(let k=0;k<w;k++) if(get(x+k,y+q)!==T.QUAY) return false; return true; };
+    const rows=[]; for(let i=0;i<A.length-1;i++) for(let y=A[i]+RW+1;y+6<=A[i+1];y+=7) rows.push([y,i]); for(let y=A[4]+RW+1;y+6<=P.y1-1;y+=7) rows.push([y,4]);
+    for(const [y,band] of rows) for(const x of XS){ if(band===0&&x===478){ continue; } if(inHole(x,y,BW,6)||!free(x,y,BW,4)) continue;
+      const reefer=band===3&&x===546, empty=band===4, id=LET[bi++%LET.length];
+      fill(x,y,BW,4,T.CONT); objs.push({kind:'yblk',x:x*TILE,y:y*TILE,w:BW*TILE,h:6*TILE,sh:4*TILE,id,reefer,empty,seed:(R()*1e9)|0});
+      if(!empty){ const n=reefer?1:1+(R()<0.5); for(let k=0;k<n;k++) world.overhead.push({kind:'yrtg',x:(x+3+R()*(BW-8))*TILE,y:(y-0.3)*TILE,h:6.1*TILE,seed:(R()*1e9)|0}); } }
+    { const y=A[0]+RW+1, h=A[1]-y-1; fill(478,y,BW,h,T.CONC); objs.push({kind:'lpark',x:478*TILE,y:y*TILE,w:BW*TILE,h:h*TILE}); }
+    world.overhead.push({kind:'pgate',x:476*TILE,y:(A[2]-1.2)*TILE,w:6*TILE,h:(RW+2.4)*TILE});
     for(let y=A[0]-10;y<A[0]-2;y++) for(let x=P.x0+4;x<580;x++) if(get(x,y)===T.QUAY){} 
     building(P.x0+6,P.y0+2,14,A[0]-P.y0-5,'warehouse',24,{logo:'ALBION PORT'});
     objs.push({kind:'paint',x:(P.x0+1)*TILE,y:(A[2]-3)*TILE,text:'PORT GATE',small:true});

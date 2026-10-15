@@ -163,6 +163,15 @@ function drawSTower(o){ const S=o.S, H=SUSP_K*1.08, legs=[S.a-0.9,S.a+S.w+0.9], 
     ctx.fillStyle='#5a1a10'; ctx.fillRect(c[0]-r*0.35,c[1]-r*0.35,r*0.7,r*0.7); ctx.fillStyle='#ff2b1e'; ctx.beginPath(); ctx.arc(c[0],c[1],2.2+Math.sin(timeS*3)*0.8,0,7); ctx.fill(); }
   ctx.restore(); }
 function drawOverhead(o){
+  if(o.kind==='yrtg'){ const T_=TILE, x=o.x, y=o.y, h=o.h, hw=0.95*T_, r=mulberry(o.seed), ty=y+T_*0.6+r()*(h-T_*3.2); ctx.fillStyle='rgba(0,0,0,0.22)'; ctx.fillRect(x-hw+12,y+12,hw*2,h);
+    ctx.fillStyle='#1b1b1b'; for(const yy of [y-4,y+h-8]) for(const xx of [x-hw-3,x+hw-7]) ctx.fillRect(xx,yy,10,12);
+    ctx.fillStyle='#d9d6cc'; ctx.fillRect(x-hw,y,7,h); ctx.fillRect(x+hw-7,y,7,h); ctx.fillStyle='#b9b5a8'; ctx.fillRect(x-hw,y,hw*2,6); ctx.fillRect(x-hw,y+h-6,hw*2,6);
+    ctx.fillStyle='#24407a'; ctx.fillRect(x-hw,y+h*0.5-1,2,2); ctx.fillStyle='#e7c33a'; ctx.fillRect(x-hw+7,ty+4,hw*2-14,10); ctx.fillStyle='#c9c4b5'; ctx.fillRect(x-hw+2,ty,hw*2-4,18); ctx.fillStyle='#2f4f6a'; ctx.fillRect(x+hw-14,y+h-30,9,12);
+    ctx.fillStyle='#f2c230'; ctx.fillRect(x-hw,y,hw*2,2); return; }
+  if(o.kind==='pgate'){ const T_=TILE; ctx.save(); ctx.globalAlpha=0.7; ctx.fillStyle='rgba(0,0,0,0.2)'; ctx.fillRect(o.x+18,o.y+18,o.w,o.h); ctx.fillStyle='#e9ecee'; ctx.fillRect(o.x,o.y,o.w,o.h); ctx.fillStyle='#24407a'; ctx.fillRect(o.x,o.y,o.w,7); ctx.fillRect(o.x,o.y+o.h-7,o.w,7);
+    ctx.globalAlpha=1; const cy=o.y+o.h/2; ctx.fillStyle='#5d6f80'; ctx.fillRect(o.x+o.w*0.35,cy-5,o.w*0.3,10); ctx.fillStyle='#9fb8c4'; ctx.fillRect(o.x+o.w*0.38,cy-3,o.w*0.24,6);
+    for(const yy of [o.y+8,cy+5]){ const L=cy-5-(o.y+8); for(let k=0;k<L;k+=8){ ctx.fillStyle=(k/8)%2?'#fff':'#d33'; ctx.fillRect(o.x+o.w-8,yy+k,4,Math.min(8,L-k)); } }
+    ctx.fillStyle='#24407a'; ctx.font='bold 16px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('GATE',o.x+o.w/2,o.y+16); ctx.fillStyle='#2b2b2b'; ctx.font='bold 13px sans-serif'; ctx.fillText('LANE 1 →',o.x+o.w/2,o.y+o.h*0.25); ctx.fillText('← LANE 2',o.x+o.w/2,o.y+o.h*0.75); ctx.restore(); return; }
   if(o.kind==='susp') return drawSusp(o); if(o.kind==='stower') return drawSTower(o);
   if(o.kind==='mast'){ const l=o.l, f=o.f, Ax=o.A[0]*TILE, Ay=o.A[1]*TILE, E0=[Ax+f[0]*0.55*TILE,Ay+f[1]*0.55*TILE], onArm=(lat)=>{ const u=lat/o.pLat, lon=0.55+(o.pLon-0.55)*u; return [E0[0]+(l[0]*lat-f[0]*lon)*TILE,E0[1]+(l[1]*lat-f[1]*lon)*TILE]; }, P=onArm(o.pLat), tip=onArm(-0.15);
     const sh=10; ctx.lineCap='round';

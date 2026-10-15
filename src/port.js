@@ -56,8 +56,8 @@ function portJob(tr){ if(!tr||!tr.portLoad||career.active) return; const P=tr.po
 // ---------- drawing ----------
 function portFrame(P){ ctx.transform(P.U[0],P.U[1],P.V[0],P.V[1],P.O[0]*TILE,P.O[1]*TILE); }
 function portVisible(P,vx0,vy0,vx1,vy1){ const a=PL(P,-20,P.berths[0].y0-40), b=PL(P,24,P.berths[P.berths.length-1].y1+40); const x0=Math.min(a[0],b[0])*TILE,x1=Math.max(a[0],b[0])*TILE,y0=Math.min(a[1],b[1])*TILE,y1=Math.max(a[1],b[1])*TILE; return !(x1<vx0||x0>vx1||y1<vy0||y0>vy1); }
-function drawBox(x,y,lu,lv,col){ ctx.fillStyle=col; ctx.fillRect(x-lu/2,y-lv/2,lu,lv); ctx.fillStyle='rgba(0,0,0,0.22)'; for(let k=-lv/2+3;k<lv/2-1;k+=4) ctx.fillRect(x-lu/2,y+k,lu,1); ctx.strokeStyle='rgba(0,0,0,0.45)'; ctx.lineWidth=1; ctx.strokeRect(x-lu/2,y-lv/2,lu,lv); }
-const YARD_COLS=['#c0392b','#2e86c1','#e67e22','#27ae60','#8e44ad','#d4ac0d','#7f8c8d','#16a085'];
+function drawBox(x,y,lu,lv,col){ ctx.fillStyle=col; ctx.fillRect(x-lu/2,y-lv/2,lu,lv); ctx.fillStyle='rgba(0,0,0,0.18)'; for(let k=-lv/2+4;k<lv/2-3;k+=3) ctx.fillRect(x-lu/2,y+k,lu,1); ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.fillRect(x-lu/2,y-lv/2,lu,2.5); ctx.fillRect(x-lu/2,y+lv/2-2.5,lu,2.5); ctx.strokeStyle='rgba(0,0,0,0.45)'; ctx.lineWidth=1; ctx.strokeRect(x-lu/2,y-lv/2,lu,lv); }
+const YARD_COLS=['#3f8fbf','#d6ae3c','#24407a','#3d7449','#c9733a','#8c9095','#dcdedc','#7a4f35'];
 function drawShip(P,o){ const T_=TILE, p=o.pose, s=o.s, L=SHIP.L*T_, W=SHIP.W*T_; ctx.save(); ctx.translate(p.u*T_,p.v*T_); ctx.rotate(p.h);
   ctx.fillStyle='rgba(0,0,0,0.13)'; ctx.fillRect(-L/2+8,-W/2+8,L-2.5*TILE,W);
   if(p.k==='in'||p.k==='out'){ ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.beginPath(); ctx.moveTo(-L/2,-W/2+4); ctx.lineTo(-L/2-5*T_,-W*0.9); ctx.lineTo(-L/2-5*T_,W*0.9); ctx.lineTo(-L/2,W/2-4); ctx.fill(); }
