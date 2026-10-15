@@ -5,16 +5,26 @@
 // until the fire goes out -> returns to its station without siren and reverses into its bay (despawns if far off screen and unwatched).
 // Hook for later (vehicle fires etc.): fireStart({x,y,r,kind:'vehicle',o:null}) returns the fire record.
 const FIRE={list:[],t:120+Math.random()*180,eng:[],out:new Set(),started:0,doneN:0};
-function fireArt(){ if(EMV.arts.fire) return EMV.arts.fire; const L=7.4,W=2.45,c=vCanvas(L,W),g=c.getContext('2d'),cx=c.width/2,X=m=>cx+m*VS,Y=m=>0.15*VS+m*VS;
-  g.fillStyle='#121212'; for(const fy of [0.9,L-2.2,L-1.1]) for(const s of [-1,1]) g.fillRect(X(s*W/2-(s>0?0.2:0.04)),Y(fy),0.24*VS,0.75*VS);
-  g.fillStyle=grad(g,X(-W/2),X(W/2),'#c8102e'); rr(g,X(-W/2),Y(0),W*VS,L*VS,0.3*VS); g.fill(); g.strokeStyle='rgba(0,0,0,0.5)'; g.lineWidth=1.5; g.stroke();
-  g.fillStyle='#1b2836'; rr(g,X(-W/2+0.2),Y(0.25),(W-0.4)*VS,0.7*VS,0.15*VS); g.fill(); g.fillStyle='rgba(160,200,230,0.35)'; g.fillRect(X(-W/2+0.3),Y(0.3),(W-0.6)*VS,0.22*VS);
-  g.fillStyle='#e8e8e8'; g.fillRect(X(-W/2+0.1),Y(1.2),(W-0.2)*VS,0.12*VS);                                    // cab/body split
-  g.fillStyle='#9aa0a6'; g.fillRect(X(-0.75),Y(1.6),0.18*VS,(L-2.0)*VS); g.fillRect(X(0.57),Y(1.6),0.18*VS,(L-2.0)*VS); for(let k=1.8;k<L-0.5;k+=0.45) g.fillRect(X(-0.75),Y(k),1.5*VS,0.08*VS);   // ladder
-  g.fillStyle='#f2e600'; for(const s of [-1,1]) g.fillRect(s<0?X(-W/2+0.02):X(W/2-0.16),Y(1.3),0.14*VS,(L-1.5)*VS);  // reflective flank stripes
-  g.fillStyle='#d9d9d9'; g.beginPath(); g.arc(X(0),Y(1.45),0.28*VS,0,7); g.fill(); g.fillStyle='#555'; g.fillRect(X(-0.07),Y(0.9),0.14*VS,0.55*VS);   // roof monitor (water cannon)
-  const by=0.05; g.fillStyle='#222'; g.fillRect(X(-W/2+0.3),Y(by),(W-0.6)*VS,0.22*VS);
-  const a={body:{c,sh:shadowOf(c)},L,W,kind:'van',bar:L/2-by-0.1}; return EMV.arts.fire=a; }
+function fireArt(){ if(EMV.arts.fire) return EMV.arts.fire; const L=7.4,W=2.45,c=vCanvas(L,W),g=c.getContext('2d'),cx=c.width/2,X=m=>cx+m*VS,Y=m=>0.15*VS+m*VS, R=(x,y,w,h,col)=>{ g.fillStyle=col; g.fillRect(X(x),Y(y),w*VS,h*VS); };
+  // v41 cherry-red glossy pumper/ladder (ref: inv/firetruck_ref.jpg): front = Y(0)
+  g.fillStyle='#121212'; for(const fy of [0.75,L-2.3,L-1.2]) for(const s of [-1,1]) g.fillRect(X(s*W/2-(s>0?0.2:0.04)),Y(fy),0.24*VS,0.8*VS);
+  const gl=g.createLinearGradient(X(-W/2),0,X(W/2),0); gl.addColorStop(0,'#4a0610'); gl.addColorStop(0.18,'#8e0f1e'); gl.addColorStop(0.45,'#b3192b'); gl.addColorStop(0.55,'#a01526'); gl.addColorStop(0.85,'#7a0b18'); gl.addColorStop(1,'#3e050d');
+  g.fillStyle=gl; rr(g,X(-W/2+0.05),Y(0.05),(W-0.1)*VS,(L-0.1)*VS,0.35*VS); g.fill(); g.strokeStyle='rgba(20,0,0,0.7)'; g.lineWidth=1.5; g.stroke();
+  R(-W/2+0.25,0,W-0.5,0.12,'#c9ccd1'); R(-W/2+0.3,0.02,0.22,0.1,'#ffcf6a'); R(W/2-0.52,0.02,0.22,0.1,'#ffcf6a');                         // chrome bumper + amber lamps
+  g.fillStyle='rgba(255,255,255,0.22)'; g.beginPath(); g.ellipse(X(0),Y(0.4),0.85*VS,0.25*VS,0,0,7); g.fill();                         // bonnet gloss
+  R(-W/2+0.22,0.62,W-0.44,0.98,'#d9dcdf'); R(-W/2+0.3,0.68,W-0.6,0.86,'#f2f3f4'); R(-0.06,0.68,0.12,0.86,'#b8bcc1');                 // white/silver cab roof
+  R(-W/2+0.4,0.72,W-0.8,0.2,'#2a2a2e'); R(-W/2+0.42,0.74,0.42,0.16,'#e0303a'); R(W/2-0.84,0.74,0.42,0.16,'#e0303a'); R(-0.4,0.74,0.8,0.16,'#f4f4f4');   // light bar (red/white)
+  for(const s of [-1,1]){ g.fillStyle='#d8dbe0'; g.fillRect(s<0?X(-W/2-0.02):X(W/2-0.16),Y(0.5),0.18*VS,0.05*VS); g.fillStyle='#eef0f3'; g.fillRect(s<0?X(-W/2):X(W/2-0.1),Y(0.38),0.1*VS,0.28*VS); }   // chrome mirrors
+  R(-W/2+0.1,1.62,W-0.2,0.06,'#d0b04a');
+  R(-0.62,1.72,1.24,0.95,'#0d0d0f'); R(-0.6,1.74,1.2,0.04,'#3a3a40');                                                                   // black equipment bay
+  g.fillStyle='#c9a22c'; g.beginPath(); g.arc(X(0),Y(2.2),0.3*VS,0,7); g.fill(); g.fillStyle='#22336b'; g.beginPath(); g.moveTo(X(-0.15),Y(2.02)); g.lineTo(X(0.15),Y(2.02)); g.lineTo(X(0.15),Y(2.25)); g.lineTo(X(0),Y(2.4)); g.lineTo(X(-0.15),Y(2.25)); g.closePath(); g.fill(); g.fillStyle='#b3192b'; g.fillRect(X(-0.03),Y(2.05),0.06*VS,0.3*VS); g.fillStyle='#e9c75a'; for(const s of [-1,1]){ g.beginPath(); g.arc(X(s*0.26),Y(2.0),0.06*VS,0,7); g.fill(); }   // gold crest
+  for(const s of [-1,1]){ R(s<0?-W/2+0.18:W/2-0.58,1.75,0.4,0.85,'#6c7076'); for(let k=1.8;k<2.55;k+=0.12) R(s<0?-W/2+0.2:W/2-0.56,k,0.36,0.05,'#2b2d31'); }   // chrome side grilles
+  for(const s of [-1,1]) for(const yy of [2.85]){ g.fillStyle='#5a0710'; g.beginPath(); g.arc(X(s*0.85),Y(yy),0.17*VS,0,7); g.fill(); g.fillStyle='#ff4040'; g.beginPath(); g.arc(X(s*0.85),Y(yy),0.11*VS,0,7); g.fill(); }
+  R(-0.78,3.15,1.56,L-3.45,'rgba(0,0,0,0.35)'); R(-0.74,3.12,0.1,L-3.4,'#c7cbd0'); R(0.64,3.12,0.1,L-3.4,'#c7cbd0'); R(-0.36,3.12,0.06,L-3.4,'#aeb2b8'); R(0.3,3.12,0.06,L-3.4,'#aeb2b8');   // silver ladder bank
+  for(let k=3.22;k<L-0.35;k+=0.2) R(-0.68,k,1.36,0.05,'#9aa0a6'); R(-0.52,3.12,0.04,L-3.4,'#d4b24a'); R(0.48,3.12,0.04,L-3.4,'#d4b24a');
+  for(const s of [-1,1]){ R(s<0?-W/2+0.12:W/2-0.15,1.0,0.03,L-1.3,'#d4b24a'); R(s<0?-W/2+0.2:W/2-0.23,3.0,0.03,L-3.3,'#b8952f'); }       // gold pinstripes
+  R(-W/2+0.25,L-0.14,W-0.5,0.1,'#b9bcc0'); for(const s of [-1,1]) R(s<0?-W/2+0.1:W/2-0.38,L-0.22,0.28,0.16,'#ff2a2a');                // rear step + red tail lights
+  const a={body:{c,sh:shadowOf(c)},L,W,kind:'van',bar:L/2-0.82}; return EMV.arts.fire=a; }
 function fireStations(){ return typeof SVC!=='undefined'?SVC.byType.fire:[]; }
 function fireStart(o){ const f=Object.assign({int:1,t:0,st:'burn',r:12,ph:Math.random()*9,id:++FIRE.started},o); FIRE.list.push(f); fireDispatch(f); return f; }
 function firePickBuilding(){ const P=truck, c=[]; for(const o of world.objects){ if(o.kind!=='bldg'||o._dead||o.w<40||o.h<40) continue; const x=(o.x+o.w/2)/PPM, y=(o.y+o.h/2)/PPM, d=Math.hypot(x-P.x,y-P.y); if(d<50||d>260||FIRE.list.some(f=>f.o===o)) continue; c.push({o,x,y,r:Math.min(22,Math.max(o.w,o.h)/PPM*0.45)}); } return c.length?c[(Math.random()*c.length)|0]:null; }
@@ -50,7 +60,7 @@ function fireDraw(vx0,vy0,vx1,vy1){ fireArt(); const inV=(x,y,m)=>x*PPM>vx0-m&&x
   // parked engines (bays) except those out on a call; doors drawn open while an engine is passing
   for(const s of fireStations()){ if(!inV(s.x,s.y,300)) continue; for(const b of s.bays) if(b.kind==='appliance'&&!FIRE.out.has(b)) emBlitF({x:b.x,y:b.y,h:0}); }
   for(const e of FIRE.eng){ if(e.st&&e.door>0&&e.bay){ const hs=e.st.parts.house, X=e.bay.x*PPM, Y=hs.y*TILE, w=(hs.w*TILE-16)/3, op=Math.min(1,e.door/1.5); ctx.save(); ctx.fillStyle='rgba(15,15,18,'+(0.85*op)+')'; ctx.fillRect(X-w/2,Y-2,w,16*op); ctx.restore(); }
-    const v=e.v||e.k; if(!v||!inV(v.x,v.y,80)) continue; if(e.k) emBlitF(e.k); emDrawBar(v,e.stt==='go'||e.stt==='out'||e.stt==='spray','fire');
+    const v=e.v||e.k; if(!v||!inV(v.x,v.y,80)) continue; const onC=e.stt==='go'||e.stt==='out'||e.stt==='spray'; if(onC){ const fl=0.55+0.45*Math.abs(Math.sin(T*9)); ctx.save(); ctx.globalCompositeOperation='lighter'; const gr=ctx.createRadialGradient(v.x*PPM,v.y*PPM,4,v.x*PPM,v.y*PPM,7*PPM); gr.addColorStop(0,`rgba(255,30,30,${0.35*fl})`); gr.addColorStop(1,'rgba(255,0,0,0)'); ctx.fillStyle=gr; ctx.beginPath(); ctx.arc(v.x*PPM,v.y*PPM,7*PPM,0,7); ctx.fill(); ctx.restore(); } if(e.k) emBlitF(e.k); emDrawBar(v,onC,'fire');
     if(e.stt==='spray'&&e.k){ const f=e.f, a=fwd(e.k.h), sx=(e.k.x+a[0]*(fireArt().L/2-1.45))*PPM, sy=(e.k.y+a[1]*(fireArt().L/2-1.45))*PPM, tx=f.x*PPM, ty=f.y*PPM; ctx.save(); ctx.lineCap='round';
       for(let k=0;k<3;k++){ const w=Math.sin(T*6+k)*6; ctx.strokeStyle='rgba(190,225,255,'+(0.55-k*0.14)+')'; ctx.lineWidth=5-k*1.3; ctx.beginPath(); ctx.moveTo(sx,sy); ctx.quadraticCurveTo((sx+tx)/2+w,(sy+ty)/2-30,tx+w,ty+w*0.5); ctx.stroke(); }
       ctx.fillStyle='rgba(220,240,255,0.5)'; for(let k=0;k<10;k++){ const u=((T*1.7+k*0.1)%1), px=tx+Math.sin(k*7.1+T*3)*14*u, py=ty+Math.cos(k*3.3+T*2)*10*u; ctx.beginPath(); ctx.arc(px,py,2+3*u,0,7); ctx.fill(); } ctx.restore(); } }

@@ -42,6 +42,7 @@ function emArt(type){ if(EMV.arts[type]) return EMV.arts[type]; if(type==='polic
   const a={body:{c,sh:shadowOf(c)},L,W,kind,bar:L/2-by-0.15}; return EMV.arts[type]=a; }
 function emDrawBar(v,on,type){ if(type==='police'&&v.polT) type=v.polT; const a=emArt(type), f=fwd(v.h), r=rgt(v.h), off=a.bar, cx=v.x+f[0]*off, cy=v.y+f[1]*off; if(!on) return;
   const ph=(timeS*4)%1<0.5; for(const s of [-1,1]){ const lit=(s<0)===ph; if(!lit) continue; const x=cx+r[0]*s*a.W*0.25, y=cy+r[1]*s*a.W*0.25, red=a.rb&&s<0;
+    if(type==='fire'){ const c=s<0?'255,45,45':'255,255,255'; ctx.fillStyle=`rgba(${c},0.95)`; ctx.beginPath(); ctx.arc(x*PPM,y*PPM,4.5,0,7); ctx.fill(); ctx.fillStyle=`rgba(${c},0.25)`; ctx.beginPath(); ctx.arc(x*PPM,y*PPM,16,0,7); ctx.fill(); if(typeof dnLight==='function') dnLight(x*PPM,y*PPM,90,s<0?'rgba(255,40,40,1)':'rgba(255,255,255,1)',0.9); continue; }
     if(red){ ctx.fillStyle='rgba(255,60,60,0.95)'; ctx.beginPath(); ctx.arc(x*PPM,y*PPM,4.5,0,7); ctx.fill(); ctx.fillStyle='rgba(255,40,40,0.25)'; ctx.beginPath(); ctx.arc(x*PPM,y*PPM,16,0,7); ctx.fill(); if(typeof dnLight==='function') dnLight(x*PPM,y*PPM,90,'rgba(255,40,40,1)',0.9); continue; }
     ctx.fillStyle='rgba(120,170,255,0.95)'; ctx.beginPath(); ctx.arc(x*PPM,y*PPM,4.5,0,7); ctx.fill(); ctx.fillStyle='rgba(80,140,255,0.25)'; ctx.beginPath(); ctx.arc(x*PPM,y*PPM,16,0,7); ctx.fill();
     if(typeof dnLight==='function') dnLight(x*PPM,y*PPM,90,'rgba(60,120,255,1)',0.9); } }
