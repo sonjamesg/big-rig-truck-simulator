@@ -3,7 +3,7 @@
 // Patrol cars are ordinary traffic vehicles (v.role='police') so they keep UK lane discipline + signals; a chasing car leaves the traffic
 // sim and is driven kinematically behind the player. Local per client (MP fine). Uses SVC (services.js) and OFF (roadlaw.js).
 const POL_FINES={speeding:100,redlight:100,pedestrian:500};
-const POL={cars:[],chase:null,spawnT:20+Math.random()*30,want:2,stopT:0,pend:[],arrest:false,lostT:0,inJ:null,prev:null,seen:new Set(),fade:0,log:[]};
+const POL={cars:[],chase:null,spawnT:6+Math.random()*14,want:2,stopT:0,pend:[],arrest:false,lostT:0,inJ:null,prev:null,seen:new Set(),fade:0,log:[]};
 // ---------- shared emergency-vehicle art / audio / helpers (also used by ambulance.js)
 const EMV={arts:{}};
 function emArt(type){ if(EMV.arts[type]) return EMV.arts[type];
@@ -37,13 +37,16 @@ const onView=(x,y)=>typeof onScreen==='function'&&onScreen(x,y,-2);
 // ---------- patrols
 function polStations(){ return typeof SVC!=='undefined'?SVC.byType.police:[]; }
 function polMake(v,st){ v.role='police'; v.art={body:emArt('police').body}; v.pol={st,end:timeS+90+Math.random()*480,home:false}; POL.cars.push(v); return v; }
-function polSpawn(){ const P=truck, near=polStations().filter(s=>Math.hypot(s.x-P.x,s.y-P.y)<1100);
-  if(near.length&&Math.random()<0.6){ const st=near[(Math.random()*near.length)|0], e=emRoadPt(st); if(onView(e.x,e.y)&&Math.random()<0.5) return null; const v=spawnVehicle(e.x,e.y,true,{kind:'estate'}); if(v) return polMake(v,st); }
-  for(let t=0;t<14;t++){ const a=Math.random()*6.283, d=140+Math.random()*160, x=P.x+Math.cos(a)*d, y=P.y+Math.sin(a)*d; const tx=Math.floor(x/M_T), ty=Math.floor(y/M_T); if(!inb(tx,ty)) continue; const i=idx(tx,ty);
-    if(world.roadH[i]<0&&world.roadV[i]<0||onView(x,y)) continue; const v=spawnVehicle(x,y,true,{kind:'estate'}); if(v){ let st=null,bd=1e18; for(const s of polStations()){ const q=(s.x-x)**2+(s.y-y)**2; if(q<bd){ bd=q; st=s; } } return polMake(v,st); } }
+// GTA2-style: patrols appear on roads just out of view (1-1.5 screens), biased ahead of the truck
+function polViewR(){ const v=viewRectM(); return Math.max(v[2]-v[0],v[3]-v[1])/2; }
+function polSpawn(){ const P=truck, R=polViewR(), f=fwd(P.h), mv=Math.abs(P.v)>3;
+  for(let t=0;t<40;t++){ let a=Math.random()*6.283; if(mv&&Math.random()<0.7) a=Math.atan2(f[1],f[0])+(Math.random()-0.5)*1.8;
+    const d=R*(1+Math.random()*0.5)+15, x=P.x+Math.cos(a)*d, y=P.y+Math.sin(a)*d; const tx=Math.floor(x/M_T), ty=Math.floor(y/M_T); if(!inb(tx,ty)) continue; const i=idx(tx,ty);
+    if(world.roadH[i]<0&&world.roadV[i]<0||onScreen(x,y,12)) continue; const v=spawnVehicle(x,y,true,{kind:'estate'}); if(v){ let st=null,bd=1e18; for(const s of polStations()){ const q=(s.x-x)**2+(s.y-y)**2; if(q<bd){ bd=q; st=s; } } POL.spawns=(POL.spawns||0)+1; return polMake(v,st); } }
   return null; }
 function polUpdatePatrols(dt){ POL.cars=POL.cars.filter(v=>traffic.vs.includes(v)||v===(POL.chase&&POL.chase.v));
-  POL.spawnT-=dt; if(POL.spawnT<=0){ POL.spawnT=25+Math.random()*95; POL.want=1+((Math.random()*3)|0); const n=POL.cars.filter(v=>Math.hypot(v.x-truck.x,v.y-truck.y)<700).length; if(n<POL.want&&(!traffic.target||traffic.target>3)) polSpawn(); }
+  const R=polViewR(); for(const v of POL.cars.slice()){ if(v===(POL.chase&&POL.chase.v)) continue; if(Math.hypot(v.x-truck.x,v.y-truck.y)>R*2.6+60&&!onScreen(v.x,v.y,20)){ const i=traffic.vs.indexOf(v); if(i>=0){ releaseJ(v); traffic.vs.splice(i,1); } POL.cars.splice(POL.cars.indexOf(v),1); } }
+  POL.spawnT-=dt*(Math.abs(truck.v)>2?1:0.3); if(POL.spawnT<=0){ POL.spawnT=12+Math.random()*48; POL.want=1+((Math.random()*3)|0); const n=POL.cars.filter(v=>Math.hypot(v.x-truck.x,v.y-truck.y)<R*2.6+60).length; if(n<POL.want) polSpawn(); }
   for(const v of POL.cars){ const p=v.pol; if(!p||v===(POL.chase&&POL.chase.v)) continue;
     if(!p.home&&timeS>p.end&&p.st&&typeof aiGoal==='function'){ p.home=true; const e=emRoadPt(p.st); aiGoal(v,{entrance:e,name:p.st.name}); v.pinT=0; }
     if(p.home&&p.st){ const e=emRoadPt(p.st); if(Math.hypot(v.x-e.x,v.y-e.y)<14){ const i=traffic.vs.indexOf(v); if(i>=0){ releaseJ(v); traffic.vs.splice(i,1); }
@@ -67,7 +70,24 @@ function polDetect(dt){ if(POL.chase&&POL.chase.paying) return; const P=truck, m
   if(J&&J!==POL.inJ&&POL.prev&&typeof sigState==='function'){ const sg=slSegAt(POL.prev[0],POL.prev[1]); if(sg&&sg.js&&sg.js.includes(J)){ const dd=sg.dir==='h'?Math.sign(P.x-POL.prev[0]):Math.sign(P.y-POL.prev[1]);
       if(dd){ const key=sg.id+':'+dd, red=['S','L','R'].every(m=>sigState(J,key,m)==='r'); if(red&&Math.abs(P.v)>2){ POL.redRuns=(POL.redRuns||0)+1; const w=polCanSee()[0]; if(w) polOffence('redlight',w,'ran a red light'); } } } }
   POL.inJ=J; if(!J) POL.prev=[P.x,P.y]; }
-function polPedHit(p){ const w=polCanSee()[0]; if(w||(POL.chase&&polSees(POL.chase.v))) polOffence('pedestrian',w||POL.chase.v,'hit a pedestrian'); }
+function polPedHit(p){ const w=polCanSee()[0]; if(w||(POL.chase&&polSees(POL.chase.v))) polOffence('pedestrian',w||POL.chase.v,'hit a pedestrian'); else if(!POL.chase){ WANT.lvl=1; WANT.t=60; WANT.sp=1; } }
+// ---------- v29 wanted level: unseen ped hit -> 1 star, 60 s; searchers roam near (not on) the player; spotted -> chase -> fine/arrest
+const WANT={lvl:0,t:0,sp:0,chased:false};
+function wantSearchGoal(v){ const a=Math.random()*6.283, d=30+Math.random()*120; if(typeof aiGoal==='function') aiGoal(v,{entrance:{x:truck.x+Math.cos(a)*d,y:truck.y+Math.sin(a)*d},name:'search'}); v.pol.sg=timeS+12+Math.random()*10; }
+function wantUpdate(dt){ if(!WANT.lvl) return;
+  if(POL.chase){ WANT.chased=true; WANT.t=60; return; }
+  if(WANT.chased){ wantClear(); return; }               // chase over (fined/arrested or lost): wanted level ends
+  const w=polCanSee()[0]; if(w){ polOffence('pedestrian',w,'hit a pedestrian'); return; }
+  WANT.t-=dt; if(WANT.t<=0){ wantClear(); return; }
+  WANT.sp-=dt; const n=POL.cars.filter(v=>v.pol&&v.pol.search).length; if(WANT.sp<=0){ WANT.sp=5+Math.random()*7; if(n<4){ const v=polSpawn(); if(v){ v.pol.search=true; v.pinT=timeS+1e6; wantSearchGoal(v); } } }
+  for(const v of POL.cars) if(v.pol&&v.pol.search&&timeS>v.pol.sg&&traffic.vs.includes(v)) wantSearchGoal(v); }
+function wantClear(){ WANT.lvl=0; WANT.chased=false; for(const v of POL.cars) if(v.pol&&v.pol.search){ v.pol.search=false; v.pinT=0; v.pol.end=timeS; v.pol.home=false; } }
+function drawWantedHUD(){ if(!WANT.lvl) return; const x=VW-34, y=VH*0.13+70, fl=POL.chase||WANT.t>10||(timeS*4)%1<0.6;
+  ctx.save(); ctx.translate(x,y); ctx.beginPath(); for(let i=0;i<10;i++){ const r=i%2?7:17, a=i*Math.PI/5-Math.PI/2; ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r); } ctx.closePath();
+  ctx.fillStyle=fl?'#ffd21e':'rgba(255,210,30,0.35)'; ctx.strokeStyle='#000'; ctx.lineWidth=3; ctx.stroke(); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.strokeStyle='#000'; ctx.lineWidth=3; ctx.font='bold 13px system-ui,sans-serif'; ctx.textAlign='center'; const tx=POL.chase?'CHASE':'WANTED '+Math.ceil(WANT.t)+'s'; ctx.strokeText(tx,0,32); ctx.fillText(tx,0,32); ctx.restore(); }
+function polMapDots(px,py){ const ph=(timeS*4)%1<0.5, L=POL.cars.filter(v=>v.pol&&(v.pol.search||WANT.lvl)&&traffic.vs.includes(v)).map(v=>v); if(POL.chase) L.push(POL.chase.v);
+  for(const v of L){ const X=px(v.x),Y=py(v.y); ctx.fillStyle=ph?'#ff2030':'#2a5bff'; ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(X,Y,4.5,0,7); ctx.fill(); ctx.stroke(); } }
 // ---------- chase
 function polUpdateChase(dt){ const c=POL.chase; if(!c) return; const v=c.v, P=truck; c.t+=dt;
   const back=P.trl?20:9, f=fwd(P.trl?P.th:P.h), tx=(P.trl?P.trl.x:P.x)-f[0]*back, ty=(P.trl?P.trl.y:P.y)-f[1]*back, dx=tx-v.x, dy=ty-v.y, d=Math.hypot(dx,dy), dP=Math.hypot(P.x-v.x,P.y-v.y);
@@ -98,8 +118,21 @@ addEventListener('keydown',e=>{ if(typeof career!=='undefined'&&career.uiOpen===
 // ---------- parked cars in station bays (static decoration, cheap)
 function polDrawParked(vx0,vy0,vx1,vy1){ for(const s of polStations()){ if(s.rect.x1*PPM<vx0||s.rect.x0*PPM>vx1||s.rect.y1*PPM<vy0||s.rect.y0*PPM>vy1) continue;
     s.bays.forEach((b,i)=>{ if((i*7+s.tx)%3) return; emBlit({x:b.x,y:b.y,h:b.h},'police'); }); } }
+
+// ---------- v29 blue-light yield: traffic ahead (both directions) slows, pulls to its kerb and stops; the emergency vehicle takes the centre
+const EMY={src:[],n:0};
+function emSources(){ const out=[]; const c=POL.chase; if(c&&!c.paying) out.push(c.v); if(typeof AMBU!=='undefined') for(const j of AMBU.jobs){ if(j.st==='go'&&j.v) out.push(j.v); else if(j.st==='pull'&&j.k) out.push(j.k); } return out; }
+function emInJ(v){ const tx=v.x/M_T, ty=v.y/M_T; for(const J of world.junctions||[]) if(tx>J.x-1&&tx<J.x+J.w+1&&ty>J.y-1&&ty<J.y+J.h+1) return true; return false; }
+function emYield(v,acc,dt){ if(v.role==='police'||v.role==='ambulance'){ if(v.amb&&v.amb.st==='go'){ v.ghostT=Math.max(v.ghostT||0,0.3); emShift(v,1.3,dt); } return acc; }
+  let y=false; for(const E of EMY.src){ const f=fwd(E.h), dx=v.x-E.x, dy=v.y-E.y, al=dx*f[0]+dy*f[1], lat=Math.abs(dx*f[1]-dy*f[0]); if(al>-4&&al<110&&lat<14){ y=true; break; } }
+  if(y&&emInJ(v)) y=false;   // never stop inside a junction box (no deadlocks): clear it first
+  if(y){ v.emY=timeS; EMY.n++; emShift(v,-1.4,dt); return Math.min(acc,-Math.max(1.5,v.v*1.2)); }
+  if(v.emO) emShift(v,0,dt); return acc; }
+// lateral shift relative to heading (+ = right / centre line, - = left / kerb), eased; tracked separately from crash offsets
+function emShift(v,to,dt){ const cur=v.emO||0, nw=cur+(to-cur)*Math.min(1,dt*1.6), d=nw-cur, r=rgt(v.h||0); v.offX+=r[0]*d; v.offY+=r[1]*d; v.emO=Math.abs(nw)<0.02&&to===0?0:nw; if(v.emO===0){ v.offX-=r[0]*nw; v.offY-=r[1]*nw; } }
+setTimeout(()=>{ const ub=updateBreakdown; updateBreakdown=function(dt){ EMY.src=emSources(); return ub.apply(this,arguments); }; },0);
 // ---------- per-frame + drawing
-function updatePolice(dt){ if(!world.ready||typeof started!=='undefined'&&!started) return; polUpdatePatrols(dt); polUpdateChase(dt); polDetect(dt); }
+function updatePolice(dt){ if(!world.ready||typeof started!=='undefined'&&!started) return; polUpdatePatrols(dt); polUpdateChase(dt); polDetect(dt); wantUpdate(dt); }
 function drawPolice(vx0,vy0,vx1,vy1){ polDrawParked(vx0,vy0,vx1,vy1); for(const v of POL.cars) if(v.pol&&traffic.vs.includes(v)) emDrawBar(v,false,'police');
   if(POL.parkIn) for(const k of POL.parkIn) emBlit(k,'police'); const c=POL.chase; if(c){ emBlit(c.v,'police'); emDrawBar(c.v,true,'police'); } }
 function drawPoliceHUD(){ const c=POL.chase; if(!c||c.paying) return; const w=Math.min(VW-30,360), x=VW/2-w/2, y=VH*0.13, ph=(timeS*3)%1<0.5;
@@ -109,6 +142,7 @@ function drawPoliceHUD(){ const c=POL.chase; if(!c||c.paying) return; const w=Ma
 setTimeout(()=>{
   const ub=updateBreakdown; updateBreakdown=function(dt){ ub.apply(this,arguments); try{ updatePolice(dt); }catch(e){ console.warn('[police]',e); } };
   const dt0=drawTraffic; drawTraffic=function(vx0,vy0,vx1,vy1){ const r=dt0.apply(this,arguments); try{ drawPolice(vx0,vy0,vx1,vy1); if(typeof drawAmbulance==='function') drawAmbulance(vx0,vy0,vx1,vy1); }catch(e){ console.warn('[police draw]',e); } return r; };
-  const dh=drawHUD; drawHUD=function(){ dh.apply(this,arguments); if(!(typeof bigmap!=='undefined'&&bigmap.open)) drawPoliceHUD(); };
+  const dh=drawHUD; drawHUD=function(){ dh.apply(this,arguments); if(!(typeof bigmap!=='undefined'&&bigmap.open)) { drawPoliceHUD(); drawWantedHUD(); } };
+  if(typeof svcMapIcons==='function'){ const sm=svcMapIcons; svcMapIcons=function(icon,px,py){ sm.apply(this,arguments); try{ polMapDots(px,py); }catch(e){} }; }
   if(typeof BigRig!=='undefined'){ BigRig.police=()=>({cars:POL.cars.length,chase:!!POL.chase,offences:POL.chase?POL.chase.offs.map(o=>o.type):[]}); }
 },0);
