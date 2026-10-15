@@ -494,7 +494,12 @@ function* genWorldSteps(){
       objs.push({kind:'paint',x:(x0+7)*TILE,y:(y0+10)*TILE,text:'DEPOT'}); world.start={x:(x0+9)*TILE,y:(y0+15)*TILE,h:Math.PI/2}; continue; }
     if(i===4&&j===2){ fill(x0,y0,w,h,T.CONC); building(x0+11,y0+6,6,5,'shop',18,{sign:'FUEL & SHOP'});
       world.cityFuel={x0,y0,w,h}; for(let k=0;k<3;k++){ set(x0+6+k*2,y0+10,T.PUMP); objs.push({kind:'pump',x:(x0+6+k*2)*TILE,y:(y0+10)*TILE}); }
-      world.overhead.push({kind:'canopy',x:(x0+4.5)*TILE,y:(y0+8.5)*TILE,w:7*TILE,h:4*TILE}); lot(x0+6,y0+14,10,4); continue; }
+      world.overhead.push({kind:'canopy',x:(x0+4.5)*TILE,y:(y0+8.5)*TILE,w:7*TILE,h:4*TILE}); lot(x0+6,y0+14,10,4);
+      // v42: drive-through HGV diesel lane along the north edge, west street in -> east street out, tall pumps + high canopy
+      for(let j=y0+1;j<y0+5;j++){ for(const xx of [x0-1,x0-2,x0+w,x0+w+1]) if(get(xx,j)!==T.ROAD) set(xx,j,T.CONC); }
+      for(let i2=x0+9;i2<x0+20;i2++) set(i2,y0+5,T.PUMP); objs.push({kind:'hgvisland',x:(x0+9)*TILE,y:(y0+5)*TILE,w:11*TILE,h:TILE});
+      world.overhead.push({kind:'canopy',x:(x0+7)*TILE,y:(y0+0.6)*TILE,w:15*TILE,h:5.2*TILE,brand:'HGV DIESEL',hgv:1});
+      world.cityFuel.hgv=[{x0:(x0+6)*M_T,x1:(x0+23)*M_T,y0:(y0+0.8)*M_T,y1:(y0+5)*M_T,id:1}]; objs.push({kind:'hgvbay',x:(x0+6)*TILE,y:(y0+0.8)*TILE,w:17*TILE,h:4.2*TILE,n:1}); continue; }
     if(i===7&&j===7){ stadium(x0,y0,w,h); continue; }
     if(i===0&&j===4){ fill(x0,y0,w,h,T.PLAZA); building(x0+4,y0+4,w-8,h-8,'hospital',45); lot(x0+5,y0+h-4,w-10,3); continue; }
     if(i===3&&j===0){ fill(x0,y0,w,h,T.PLAZA); building(x0+4,y0+3,w-8,h-6,'carpark',26); continue; }

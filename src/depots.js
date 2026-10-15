@@ -119,16 +119,21 @@ function* buildDepotsSteps(objs,R){
   // ---- petrol / truck stops
   world.fuel=[]; world.garages=[];
   const BRANDS=[['ROADSTAR','#c0392b'],['FUELWAY','#1e8449'],['TRUCKSTOP','#2471a3'],['NORTHGAS','#d68910']];
-  function fuelStation(name,x,y,gap,price){ const w=18,h=12; access(x,y,w,gap); clearObjs(x,y,w,h); fill(x,y,w,h,T.CONC); for(let j=y;j<y+h;j++) for(let i=x;i<x+w;i++) world.reserved[idx(i,j)]=1;
+  // v42: compact station with a drive-through HGV diesel lane on its east side (high canopy, tall pumps); lorries enter from the access, drive south
+  // down the lane, refuel, then loop west along the south apron and back north to the access. Cars use the islands under the west canopy.
+  function fuelStation(name,x,y,gap,price){ const w=18,h=12, M=v=>v*M_T; access(x,y,w,gap); clearObjs(x,y,w,h); fill(x,y,w,h,T.CONC); for(let j=y;j<y+h;j++) for(let i=x;i<x+w;i++) world.reserved[idx(i,j)]=1;
     const br=BRANDS[world.fuel.length%BRANDS.length];
-    for(const ix of [x+5,x+11]) for(let j=y+3;j<y+6;j++){ set(ix,j,T.PUMP); objs.push({kind:'pump',x:ix*TILE,y:j*TILE}); }
-    world.overhead.push({kind:'canopy',x:(x+2)*TILE,y:(y+2)*TILE,w:14*TILE,h:5*TILE});
-    fill(x+1,y+h-3,6,3,T.BLDG); objs.push({kind:'bldg',x:(x+1)*TILE,y:(y+h-3)*TILE,w:6*TILE,h:3*TILE,style:'shop',height:14,seed:(R()*1e9)|0,front:'n',sign:'SHOP',awning:br[1]});
-    objs.push({kind:'fsign',x:(x+w-1.5)*TILE,y:(y+1.2)*TILE,r:30,brand:br[0],col:br[1],price});
-    objs.push({kind:'paint',x:(x+8)*TILE,y:(y+h-2)*TILE,text:'DIESEL',small:true});
-    const zones=[[x+1.6,y+1,x+5,y+9.5],[x+6,y+1,x+11,y+9.5],[x+12,y+1,x+16.5,y+9.5]].map(z=>z.map(v=>v*M_T));
-    world.fuel.push({id:'F'+(world.fuel.length+1),name,brand:br[0],price,x:(x+w/2)*M_T,y:(y+h/2)*M_T,zones,region:region(x,y)}); }
-  const cf=world.cityFuel; if(cf) world.fuel.push({id:'F0',name:'Albion City Fuel',brand:'ROADSTAR',price:1.59,x:(cf.x0+9)*M_T,y:(cf.y0+11)*M_T,zones:[[(cf.x0+3)*M_T,(cf.y0+10.9)*M_T,(cf.x0+14)*M_T,(cf.y0+13.5)*M_T]],region:world.regionAt(cf.x0,cf.y0)});
+    for(const ix of [x+3,x+6]) for(let j=y+3;j<y+5;j++){ set(ix,j,T.PUMP); objs.push({kind:'pump',x:ix*TILE,y:j*TILE,car:1}); }
+    world.overhead.push({kind:'canopy',x:(x+1.5)*TILE,y:(y+2)*TILE,w:6.8*TILE,h:4*TILE,col:br[1],brand:br[0]});
+    for(let j=y+3;j<y+8;j++) set(x+15,j,T.PUMP); objs.push({kind:'hgvisland',x:(x+15)*TILE,y:(y+2.6)*TILE,w:TILE,h:5.8*TILE,col:br[1]});
+    world.overhead.push({kind:'canopy',x:(x+9.2)*TILE,y:(y+1.6)*TILE,w:6.8*TILE,h:7.4*TILE,col:br[1],brand:'HGV DIESEL',hgv:1});
+    const bays=[{x0:M(x+9.4),x1:M(x+14.9),y0:M(y+0.5),y1:M(y+11.5),id:1}]; for(const b of bays) objs.push({kind:'hgvbay',x:b.x0*PPM,y:b.y0*PPM,w:(b.x1-b.x0)*PPM,h:(b.y1-b.y0)*PPM,n:b.id});
+    fill(x+1,y+h-3,5,3,T.BLDG); objs.push({kind:'bldg',x:(x+1)*TILE,y:(y+h-3)*TILE,w:5*TILE,h:3*TILE,style:'shop',height:14,seed:(R()*1e9)|0,front:'n',sign:'SHOP',awning:br[1]});
+    objs.push({kind:'fsign',x:(x+16.6)*TILE,y:(y+1.2)*TILE,r:30,brand:br[0],col:br[1],price});
+    objs.push({kind:'paint',x:(x+10.6)*TILE,y:(y+10.4)*TILE,text:'HGV',small:true});
+    const zones=[[x+1.6,y+1,x+4.5,y+8],[x+4.5,y+1,x+8.4,y+8]].map(z=>z.map(v=>v*M_T));
+    world.fuel.push({id:'F'+(world.fuel.length+1),name,brand:br[0],price,x:(x+w/2)*M_T,y:(y+h/2)*M_T,zones,hgv:bays,region:region(x,y)}); }
+  const cf=world.cityFuel; if(cf) world.fuel.push({id:'F0',name:'Albion City Fuel',brand:'ROADSTAR',price:1.59,x:(cf.x0+9)*M_T,y:(cf.y0+11)*M_T,zones:[[(cf.x0+3)*M_T,(cf.y0+10.9)*M_T,(cf.x0+14)*M_T,(cf.y0+13.5)*M_T]],hgv:cf.hgv,region:world.regionAt(cf.x0,cf.y0)});
   const fplan=[['Millford Services',330,900],['Ashby Pumps',300,1170],['Airport Road Fuel',560,470],['Dustwater Fuel',1060,500],['Sandvale Truckstop',1800,520],['Coppermine Fuel',1600,670],['Redhill Services',1060,1250],['Fenwick Pumps',1560,1200],['Kingsbridge Truckstop',1800,1760],['Moor Field Diesel',1300,1790]];
   // v7 forecourt: car canopy in the middle-west, HGV diesel lanes with marked bays + tall pumps on the side, shop, price board, air/water
   function forecourt(name,x,y,gap,price){ const w=26,h=20;
