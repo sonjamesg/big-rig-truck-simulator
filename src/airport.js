@@ -178,9 +178,9 @@ function apLandside(A,night){ const g=ctx, T_=TILE, rnd=mulberry(77);
   g.fillStyle='#f0f0f0'; for(let x=354;x<442;x+=3) g.fillRect(x*T_,689.6*T_,1.6*T_,0.18*T_);
   // zebra crossings into the terminal
   for(const zx of [372,402,432]){ for(let k=0;k<5;k++) g.fillRect((zx+k*0.7)*T_,688.6*T_,0.4*T_,1.4*T_); }
-  // rounded outer kerb on the access road's east bend
-  { const cx=410*T_, cy=720*T_, r=4*T_; g.fillStyle='#bdbcb6'; g.beginPath(); g.moveTo(cx+r,cy-r); g.lineTo(cx+r,cy); g.arc(cx,cy,r,0,-Math.PI/2,true); g.closePath(); g.fill();
-    g.strokeStyle='#d7d4cb'; g.lineWidth=5; g.beginPath(); g.arc(cx,cy,r-2,0,-Math.PI/2,true); g.stroke(); }
+  // v40: tidy outer kerb on the access road's south-east L-bend (410..414,716..720): pave outside a 4-tile arc round the inner corner
+  { const cx=410*T_, cy=716*T_, r=4*T_; g.fillStyle='#c4c2bb'; g.beginPath(); g.moveTo(cx+r,cy+r); g.lineTo(cx+r,cy); g.arc(cx,cy,r,0,Math.PI/2,false); g.closePath(); g.fill();
+    g.strokeStyle='#e2dfd6'; g.lineWidth=0.18*T_; g.beginPath(); g.arc(cx,cy,r-0.1*T_,0,Math.PI/2,false); g.stroke(); }
   // multi-storey car park: solid decks with depth, ramp, P sign, parked cars on each deck
   { const m=A.ms||{x0:354,x1:388,y0:692,y1:714}, x0=m.x0*T_, y0=m.y0*T_, w=(m.x1-m.x0)*T_, h=(m.y1-m.y0)*T_;
     g.fillStyle='rgba(0,0,0,0.28)'; g.beginPath(); g.roundRect(x0+16,y0+16,w,h,T_*1.5); g.fill();

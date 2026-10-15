@@ -519,7 +519,8 @@ function queueLocked(v){ const seen=new Set([v]); let c=v.lead, n=0;
 // ---------------- parked cars ----------------
 function initParked(){
   const r=mulberry(777);
-  const add=(x,y,h,kind)=>{ if(get(Math.floor(x/M_T),Math.floor(y/M_T))===T.ROAD) return; const t=VTYPES[kind]; const v={parked:true,kind,L:t.L,W:t.W,heavy:false,x,y,h,offX:0,offY:0,art:artFor(kind,r),v:0}; traffic.parked.push(v);
+  const HB=(typeof hideBuild==='function')?(HIDE.list||hideBuild()):[];
+  const add=(x,y,h,kind)=>{ if(get(Math.floor(x/M_T),Math.floor(y/M_T))===T.ROAD) return; for(const b of HB) if(x>b.x-2.6&&x<b.x+b.w+2.6&&y>b.y-2.6&&y<b.y+b.h+2.6) return; const t=VTYPES[kind]; const v={parked:true,kind,L:t.L,W:t.W,heavy:false,x,y,h,offX:0,offY:0,art:artFor(kind,r),v:0}; traffic.parked.push(v);
     const k=Math.floor(x/64)+','+Math.floor(y/64); let a=traffic.parkedIdx.get(k); if(!a){ a=[]; traffic.parkedIdx.set(k,a); } a.push(v); };
   for(const o of world.objects){
     if(o.kind==='lot'&&!o._dead){ const x0=o.x/PPM, y0=o.y/PPM, w=o.w/PPM, h=o.h/PPM; const vert=h>w;

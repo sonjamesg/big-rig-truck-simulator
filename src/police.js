@@ -226,7 +226,7 @@ function hideBuild(){ const L=[], C=70; const ok=(x,y)=>{ if(!inb(x,y)) return f
   if(world.bridges) for(const b of world.bridges.slice(0,40)){ if(b.under) L.push({x:b.under.x,y:b.under.y,w:4*M_T,h:2*M_T,kind:'bridge'}); }
   HIDE.list=L; return L; }
 function hideAt(x,y){ const L=HIDE.list||hideBuild(); for(const h of L) if(x>=h.x&&x<=h.x+h.w&&y>=h.y&&y<=h.y+h.h) return h; return null; }
-function drawHideSpots(vx0,vy0,vx1,vy1){ const L=HIDE.list||hideBuild(); const W1=WANT.lvl||POL.chase, pu=0.75+0.25*Math.sin(timeS*3); ctx.save();
+function drawHideSpots(vx0,vy0,vx1,vy1){ if(!(WANT.lvl||POL.chase)) return; const L=HIDE.list||hideBuild(); const W1=true, pu=0.75+0.25*Math.sin(timeS*3); ctx.save();
   for(const h of L){ const X=h.x*PPM, Y=h.y*PPM, W=h.w*PPM, H=h.h*PPM; if(X>vx1||X+W<vx0||Y>vy1||Y+H<vy0) continue;
     if(W1){ ctx.shadowColor='rgba(60,150,255,0.9)'; ctx.shadowBlur=18*pu; }   // v38: subtle glow while wanted
     ctx.fillStyle=W1?'rgba(40,120,255,'+(0.30*pu+0.08)+')':'rgba(40,120,255,0.18)'; ctx.fillRect(X,Y,W,H); ctx.shadowBlur=0;

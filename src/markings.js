@@ -39,7 +39,7 @@ function buildMarkings(objs){
       let minor; if(myT!==otT) minor=myT; else { const a=RANK[sg.type]*10+sg.w, b=RANK[other.type]*10+other.w; minor= a<b || (a===b && sg.dir==='v'); }
       const gw=!J.lights && minor;
       const ap={lanes,lineA,gw,lights:J.lights,Lapp,stop:o.stop,minor}; J.appr[sg.id+':'+d]=ap;
-      const m={kind:'appr',sg,d,lineA,Lapp,lanes,mode:J.lights?'lights':gw?'gw':'major',slow:gw&&sg.type==='rural'&&Lapp>=9}; apprBox(m); objs.push(m); world.marks.push(m);
+      const m={kind:'appr',sg,d,lineA,Lapp,lanes,mode:J.lights?'lights':gw?'gw':'major',slow:gw&&sg.type==='rural'&&Lapp>=9}; if(!J.lights&&J.y===716&&(J.x===410||J.x===346)) m.noArr=true;   // v40: airport access L-bends: plain corners, no turn arrows apprBox(m); objs.push(m); world.marks.push(m);
     }
     if(J.box) objs.push({kind:'boxj',J,x:J.x*TILE,y:J.y*TILE,w:J.w*TILE,h:J.h*TILE});
   }
@@ -83,8 +83,8 @@ function drawApproach(g,o){
   for(let i=0;i<nl;i++){ const cr=laneLat(sg,d,i)+0.5;
     if(o.mode==='gw' && L>=3) at(a1-d*2.0,cr,()=>{ g.strokeStyle='#ececec'; g.lineWidth=3; g.beginPath(); g.moveTo(-10,-22); g.lineTo(10,-22); g.lineTo(0,26); g.closePath(); g.stroke(); });
     const p1= o.mode==='gw'||o.mode==='rb' ? 4.4 : 2.5;
-    if(L>=p1+1 && (nl>1||o.lanes[0].length<3||o.mode==='rb')) at(a1-d*p1,cr,()=>drawLaneArrow(g,o.lanes[i]));
-    if(L>=p1+22 && !o.slow && nl>1) at(a1-d*(p1+5.5),cr,()=>drawLaneArrow(g,o.lanes[i]));
+    if(!o.noArr && L>=p1+1 && (nl>1||o.lanes[0].length<3||o.mode==='rb')) at(a1-d*p1,cr,()=>drawLaneArrow(g,o.lanes[i]));
+    if(!o.noArr && L>=p1+22 && !o.slow && nl>1) at(a1-d*(p1+5.5),cr,()=>drawLaneArrow(g,o.lanes[i]));
   }
   if(o.slow){ at(a1-d*7.5,(rmin+rmax)/2,()=>{ g.fillStyle='#ececec'; g.save(); g.scale(1,2.2); g.font='bold 15px Arial'; g.textAlign='center'; g.textBaseline='middle'; g.fillText('SLOW',0,0); g.restore(); }); }
 }
