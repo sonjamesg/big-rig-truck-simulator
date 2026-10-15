@@ -256,8 +256,8 @@ function* railBuildSteps(objs){
   yield 'Placing stations';
   // stations
   const STT=RAIL.route&&RAIL.route.stations?RAIL_ST.map((r,i)=>[r[0],RAIL.route.stations[i][1],RAIL.route.stations[i][2],r[3]]):RAIL_ST;
-  for(const [name,tx,ty,kind] of STT){ let best=0,bd=1e18; for(let s=0;s<L;s++){ const d=(X[s]-tx*M_T)**2+(Y[s]-ty*M_T)**2; if(d<bd){ bd=d; best=s; } }
-    const len=kind==='hub'?HUB_HALF*2:kind==='city'?200:kind==='town'?160:120; RAIL.stations.push({name,kind,s:best,s0:best,res:!!(RAIL.route&&RAIL.route.resOK&&RAIL.route.resOK[name]),len,dwell:kind==='hub'?40:kind==='city'?30:20+Math.round(rlHash(best)*8)}); }
+  for(const [name,tx,ty,kind] of STT.concat([['Albion Airport',435,663,'city']])){ let best=0,bd=1e18; for(let s=0;s<L;s++){ const d=(X[s]-tx*M_T)**2+(Y[s]-ty*M_T)**2; if(d<bd){ bd=d; best=s; } }
+    const len=kind==='hub'?HUB_HALF*2:kind==='city'?200:kind==='town'?160:120; RAIL.stations.push({fixed:name==='Albion Airport',name,kind,s:best,s0:best,res:!!(RAIL.route&&RAIL.route.resOK&&RAIL.route.resOK[name]),len,dwell:kind==='hub'?40:kind==='city'?30:20+Math.round(rlHash(best)*8)}); }
   // keep every platform on dry land (no water/bridge/road under it) with a road within reach; slide along the track to the nearest such spot
   { const wet=(i,w,rd)=>{ const tx=Math.floor((X[i]+NX[i]*w)/M_T), ty=Math.floor((Y[i]+NY[i]*w)/M_T), g=get(tx,ty); return g===T.WATER||g===T.BRIDGE||rd&&g===T.ROAD; };
     const dry=(c,st)=>{ const h=st.len/2+6; for(let s=c-h;s<=c+h;s+=2){ const i=rlMod(Math.round(s),L); for(let w=-12;w<=12;w+=2) if(wet(i,w,0)) return false; } return true; };
@@ -266,8 +266,8 @@ function* railBuildSteps(objs){
       if(st.res&&Math.abs(rlMod(c-st.s0+L/2,L)-L/2)<=30) return true;   // router-reserved straight, road-adjacent spot
       const tx=Math.floor(X[c]/M_T), ty=Math.floor(Y[c]/M_T), R=Math.ceil((st.kind==='hub'?130:70)/M_T); for(let dy=-R;dy<=R;dy++) for(let dx=-R;dx<=R;dx++){ const g=get(tx+dx,ty+dy); if(g===T.ROAD) return true; } return false; };
     const straight=(c,st)=>{ const h=st.len/2+30, m2=rlMod(Math.round(c),L); for(let q=-h;q<=h;q+=8){ const a=rlMod(Math.round(c+q),L); if(NX[a]*NX[m2]+NY[a]*NY[m2]<0.9992) return false; } return true; };
-    for(const st of RAIL.stations){ if(st.kind!=='hub'&&okAt(st.s,st)&&!straight(st.s,st)){ for(let d=4;d<=600;d+=4){ let hit=-1; for(const c of [st.s+d,st.s-d]){ const cc=rlMod(c,L); if(okAt(cc,st)&&straight(cc,st)){ hit=cc; break; } } if(hit>=0){ RAIL.moved=(RAIL.moved||[]).concat([[st.name+' (straight)',d]]); st.s=hit; break; } } } }
-    for(const st of RAIL.stations){ if(okAt(st.s,st)){ st._ok=1; continue; } const ox=X[st.s], oy=Y[st.s]; let hit=-1, hd=1e18; for(const needS of [1,0]){ if(hit>=0) break; for(let c=0;c<L;c+=4){ const d=(X[c]-ox)**2+(Y[c]-oy)**2; if(d<hd&&d<1500*1500&&okAt(c,st)&&(!needS||st.kind==='hub'||straight(c,st))){ hd=d; hit=c; } } }
+    for(const st of RAIL.stations){ if(st.fixed) continue; if(st.kind!=='hub'&&okAt(st.s,st)&&!straight(st.s,st)){ for(let d=4;d<=600;d+=4){ let hit=-1; for(const c of [st.s+d,st.s-d]){ const cc=rlMod(c,L); if(okAt(cc,st)&&straight(cc,st)){ hit=cc; break; } } if(hit>=0){ RAIL.moved=(RAIL.moved||[]).concat([[st.name+' (straight)',d]]); st.s=hit; break; } } } }
+    for(const st of RAIL.stations){ if(st.fixed||okAt(st.s,st)){ st._ok=1; continue; } const ox=X[st.s], oy=Y[st.s]; let hit=-1, hd=1e18; for(const needS of [1,0]){ if(hit>=0) break; for(let c=0;c<L;c+=4){ const d=(X[c]-ox)**2+(Y[c]-oy)**2; if(d<hd&&d<1500*1500&&okAt(c,st)&&(!needS||st.kind==='hub'||straight(c,st))){ hd=d; hit=c; } } }
       if(hit>=0){ RAIL.moved=(RAIL.moved||[]).concat([[st.name,Math.round(Math.sqrt(hd))]]); st.s=hit; } st._ok=1; } }
   RAIL.stations.sort((a,b)=>a.s-b.s); RAIL.hub=RAIL.stations.find(s=>s.kind==='hub');
   // tracks (lateral offset functions)

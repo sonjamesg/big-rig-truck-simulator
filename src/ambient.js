@@ -66,7 +66,7 @@ function drawPlane(x,y,h,sc,alt,col){ const s=sc;
   if(Math.sin(timeS*6)>0.3){ ctx.fillStyle='#ff3030'; ctx.beginPath(); ctx.arc(-24*s,2*s,2*s,0,7); ctx.fill(); ctx.fillStyle='#30ff60'; ctx.beginPath(); ctx.arc(24*s,2*s,2*s,0,7); ctx.fill(); } ctx.restore(); }
 function planeShape(s){ ctx.beginPath(); ctx.moveTo(0,-30*s); ctx.quadraticCurveTo(4*s,-26*s,4*s,-18*s); ctx.lineTo(4*s,-4*s); ctx.lineTo(26*s,4*s); ctx.lineTo(26*s,8*s); ctx.lineTo(4*s,4*s); ctx.lineTo(3*s,20*s); ctx.lineTo(11*s,26*s); ctx.lineTo(11*s,29*s); ctx.lineTo(0,27*s); ctx.lineTo(-11*s,29*s); ctx.lineTo(-11*s,26*s); ctx.lineTo(-3*s,20*s); ctx.lineTo(-4*s,4*s); ctx.lineTo(-26*s,8*s); ctx.lineTo(-26*s,4*s); ctx.lineTo(-4*s,-4*s); ctx.lineTo(-4*s,-18*s); ctx.quadraticCurveTo(-4*s,-26*s,0,-30*s); ctx.fill(); }
 function drawPlanes(v){ let n=0;
-  for(const ap of world.airports) for(const rw of ap.rw){ n++; const len=rw.len, T0=(timeS+n*23)%70, sc=PPM*1.25/1; let s,alt,dir=Math.PI/2, x0=rw.x, vis=true, col=['#c0392b','#2471a3','#1e8449','#d68910'][n%4];
+  for(const ap of world.airports) for(const rw of ap.rw){ n++; if(ap.albion) continue; const len=rw.len, T0=(timeS+n*23)%70, sc=PPM*1.25/1; let s,alt,dir=Math.PI/2, x0=rw.x, vis=true, col=['#c0392b','#2471a3','#1e8449','#d68910'][n%4];
     if(T0<30){ const t=T0; s= t<4?60*PPM : 60*PPM+0.5*3.2*PPM*(t-4)*(t-4); alt=Math.max(0,(s-len*0.55)/(len*0.5)); if(alt>2.5) vis=false; }
     else if(T0<36) vis=false;
     else { const t=T0-36; const touch=200*PPM; if(t<14){ s=touch-(14-t)*70*PPM; alt=Math.max(0,(touch-s)/(len*0.5)); } else { const u=t-14; s=touch+70*PPM*u-0.5*3.0*PPM*u*u; if(u>23.3) s=touch+70*PPM*23.3-0.5*3*PPM*23.3*23.3; alt=0; if(t>33) vis=false; } }
