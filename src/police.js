@@ -126,7 +126,7 @@ function polDrawParked(vx0,vy0,vx1,vy1){ for(const s of polStations()){ if(s.rec
 const EMY={src:[],n:0};
 function emSources(){ const out=[]; const c=POL.chase; if(c&&!c.paying) out.push(c.v); if(typeof AMBU!=='undefined') for(const j of AMBU.jobs){ if(j.st==='go'&&j.v) out.push(j.v); else if(j.st==='pull'&&j.k) out.push(j.k); } return out; }
 function emInJ(v){ const tx=v.x/M_T, ty=v.y/M_T; for(const J of world.junctions||[]) if(tx>J.x-1&&tx<J.x+J.w+1&&ty>J.y-1&&ty<J.y+J.h+1) return true; return false; }
-function emYield(v,acc,dt){ if(v.role==='police'||v.role==='ambulance'){ v.emResp=!!(v.amb&&v.amb.st==='go'); if(v.emResp){ v.ghostT=Math.max(v.ghostT||0,0.3); emShift(v,1.3,dt); } return acc; }
+function emYield(v,acc,dt){ if(v.role==='police'||v.role==='ambulance'||v.role==='fire'){ v.emResp=!!(v.amb&&v.amb.st==='go')||!!(v.fireE&&v.fireE.stt==='go'); if(v.emResp){ v.ghostT=Math.max(v.ghostT||0,0.3); emShift(v,1.3,dt); } return acc; }
   let y=false; for(const E of EMY.src){ const f=fwd(E.h), dx=v.x-E.x, dy=v.y-E.y, al=dx*f[0]+dy*f[1], lat=Math.abs(dx*f[1]-dy*f[0]), par=Math.abs(Math.cos((v.h||0)-(E.h||0))); if(par>0.7&&al>-4&&al<110&&lat<14){ y=true; break; } }
   if(y&&(emInJ(v)||v.ring!=null||v.jHeld)) y=false;   // never stop inside a junction box (no deadlocks): clear it first
   if(y){ v.emY=timeS; EMY.n++; emShift(v,-1.4,dt); return Math.min(acc,-Math.max(1.5,v.v*1.2)); }
