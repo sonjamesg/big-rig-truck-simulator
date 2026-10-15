@@ -398,7 +398,7 @@ function* genWorldSteps(){
   // ---------------- junctions & lorry-friendly kerb radii ----------------
   const reserved=new Uint8Array(MW*MH); world.reserved=reserved; world.jMask=new Uint8Array(MW*MH); world.cornerAt=new Int32Array(MW*MH).fill(-1);
   { // v36: Albion Airport landside access: forecourt -> west along 716 -> down to the town grid (seg at x346 from y780), laid before junctions so AI + sat nav use it
-    road('v',410,689,715,4,'town'); road('h',716,346,413,4,'town');
+    road('v',410,689,715,4,'town'); road('h',716,346,413,4,'town'); road('h',700,388,410,3,'town'); road('h',708,414,456,3,'town');   // v39: car park access roads (MSCP ramp, surface parks)
     const tg=world.segs.find(q=>q.dir==='v'&&q.a===346&&q.b0===780); if(tg){ for(let y=720;y<780;y++) for(let k=0;k<tg.w;k++){ const x=tg.a+k; set(x,y,water[idx(x,y)]?T.BRIDGE:T.ROAD); world.roadV[idx(x,y)]=tg.id; } tg.b0=720; } }
   // v33: re-centre arms that hit a roundabout off-centre: pull the road back and S-bend in on the centre line
   for(const rb of world.rbs) for(const sg of world.segs.slice()){ if(sg.dead) continue;
@@ -590,6 +590,24 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
   for(let y=640;y<720;y++) for(let x=345;x<525;x++){ const i=idx(x,y); if(water[i]||G[i]===T.WATER){ water[i]=0; set(x,y,(y>=648&&y<=678)?T.GRAVEL:T.CONC); } }   // v37: old pond under the terminal/landside is filled in (layout wins)
   for(let y=688;y<719;y++) for(let x=350;x<446;x++){ const t=G[idx(x,y)]; if(t!==T.ROAD&&t!==T.WATER&&t!==T.BRIDGE&&!water[idx(x,y)]) set(x,y,T.CONC); }
   world.airports[world.airports.length-1].albion={x0:160,y0:470,x1:618,y1:640,term:{x0:360,x1:510,y0:640,y1:688},rwC:[400,534],rwA:-9*Math.PI/180,rwL:400,rwW:10.4};
+  // v39: solid terminal wings (rail corridor stays gravel), landside lots + access roads + footpaths so AI cars park and peds walk in
+  { const A=world.airports[world.airports.length-1].albion, t=A.term;
+    for(let y=t.y0;y<t.y1;y++) for(let x=t.x0;x<t.x1;x++){ if(y>=670&&y<=676) continue; const g=G[idx(x,y)]; if(g!==T.ROAD&&g!==T.BRIDGE&&g!==T.WATER) set(x,y,T.BLDG); }
+    // station glass canopy pillars sit on solid tiles either side of the tracks
+    // multi-storey (solid building, ramp door on its east side at the 700 road) + two surface parks on the 708 road
+    const fl=(x0,y0,w,h,t)=>{ for(let y=y0;y<y0+h;y++) for(let x=x0;x<x0+w;x++){ const g=G[idx(x,y)]; if(g!==T.ROAD&&g!==T.BRIDGE) set(x,y,t); } };
+    fl(354,692,34,22,T.BLDG); fl(386,700,4,4,T.ROAD);   // MSCP solid, east ramp mouth onto the 700 road
+    fl(418,703,27,14,T.LOT); fl(456,703,30,12,T.LOT);
+    objs.push({kind:'lot',x:418*TILE,y:703*TILE,w:27*TILE,h:14*TILE,seed:3912,ap:'surf'});
+    objs.push({kind:'lot',x:456*TILE,y:703*TILE,w:30*TILE,h:12*TILE,seed:3913,ap:'surf2'});
+    objs.push({kind:'bldg',x:354*TILE,y:692*TILE,w:34*TILE,h:22*TILE,style:'carpark',height:28,seed:3911,logo:'P',ap:'ms'});
+    A.lots=[{x0:418,x1:445,y0:703,y1:717},{x0:456,x1:486,y0:703,y1:715}]; A.ms={x0:354,x1:388,y0:692,y1:714};
+    // footpaths: drop-off kerb + links from both parks to the terminal front door
+    for(let x=360;x<500;x++) if(G[idx(x,689)]!==T.ROAD) set(x,689,T.WALK);
+    for(let y=689;y<704;y++){ if(G[idx(388,y)]!==T.ROAD) set(388,y,T.WALK); if(G[idx(416,y)]!==T.ROAD) set(416,y,T.WALK); }
+    for(let x=388;x<430;x++) if(G[idx(x,704)]!==T.ROAD&&G[idx(x,704)]!==T.LOT) set(x,704,T.WALK);
+  }
+
   { const R_=world.reserved; for(let y=466;y<720;y++) for(let x=158;x<644;x++){ if(y>=642&&(x<345||x>=525)) continue; if(G[idx(x,y)]!==T.ROAD&&G[idx(x,y)]!==T.BRIDGE) R_[idx(x,y)]=1; } }   // v37: the Albion airport footprint is off-limits to later depots/shops/services (layout wins)
   airport('Sandvale Intl',1070,160,1445,340,[[1090,180,330],[1090,300,330]],[1110,215,80]);
   airport('Kingsbridge Field',1195,1792,1385,1905,[[1205,1860,175]],[1210,1812,40]);

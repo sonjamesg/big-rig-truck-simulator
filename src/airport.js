@@ -170,29 +170,87 @@ function apDrawLow(vx0,vy0,vx1,vy1){ const A=apA(); if(!A) return; const T_=TILE
   apTerminal(A,vx0,vy0,vx1,vy1,night); }
 function apBridge(A,st,p){ const g=ctx, T_=TILE, ty=A.civ.y1*T_, X=st.x*T_, ny=(st.sy+24*st.sc/32)*T_, ext=p&&p.ph==='park'&&p.tp>3&&p.tp<116, y1=ext?ny:ty-3*T_, dx=X-6*st.sc;
   g.fillStyle='#4f5b66'; g.beginPath(); g.roundRect(dx-12,y1,24,ty-y1,6); g.fill(); g.fillStyle='#aab7c4'; g.fillRect(dx-9,y1+2,18,ty-y1-4); g.fillStyle='#34495e'; g.beginPath(); g.roundRect(dx-16,y1-6,32,10,4); g.fill(); }
-function apLandside(A,night){ const g=ctx, T_=TILE;
-  // drop-off loop round the end of the access road (x 410-414), kerbside lane along the terminal front
-  g.fillStyle='#55585d'; g.beginPath(); g.roundRect(392*T_,689*T_,40*T_,13*T_,6.5*T_); g.fill(); g.fillStyle='#8fb26a'; g.beginPath(); g.roundRect(398*T_,693.5*T_,28*T_,4*T_,2*T_); g.fill();
-  g.fillStyle='#55585d'; g.beginPath(); g.roundRect(352*T_,688.4*T_,92*T_,2.6*T_,1.3*T_); g.fill(); g.fillStyle='#f0f0f0'; for(let x=354;x<442;x+=3) g.fillRect(x*T_,689.6*T_,1.6*T_,0.18*T_);
-  // rounded outer kerb on the access road's east bend (410..414,716..720): pave-colour corner piece outside a 4-tile arc + kerb line
+function apLandside(A,night){ const g=ctx, T_=TILE, rnd=mulberry(77);
+  // drop-off loop + kerbside along the terminal front (real road tiles already laid; this is the painted surface)
+  g.fillStyle='#55585d'; g.beginPath(); g.roundRect(392*T_,689*T_,40*T_,13*T_,6.5*T_); g.fill();
+  g.fillStyle='#8fb26a'; g.beginPath(); g.roundRect(398*T_,693.5*T_,28*T_,4*T_,2*T_); g.fill();
+  g.fillStyle='#55585d'; g.beginPath(); g.roundRect(352*T_,688.4*T_,92*T_,2.6*T_,1.3*T_); g.fill();
+  g.fillStyle='#f0f0f0'; for(let x=354;x<442;x+=3) g.fillRect(x*T_,689.6*T_,1.6*T_,0.18*T_);
+  // zebra crossings into the terminal
+  for(const zx of [372,402,432]){ for(let k=0;k<5;k++) g.fillRect((zx+k*0.7)*T_,688.6*T_,0.4*T_,1.4*T_); }
+  // rounded outer kerb on the access road's east bend
   { const cx=410*T_, cy=720*T_, r=4*T_; g.fillStyle='#bdbcb6'; g.beginPath(); g.moveTo(cx+r,cy-r); g.lineTo(cx+r,cy); g.arc(cx,cy,r,0,-Math.PI/2,true); g.closePath(); g.fill();
     g.strokeStyle='#d7d4cb'; g.lineWidth=5; g.beginPath(); g.arc(cx,cy,r-2,0,-Math.PI/2,true); g.stroke(); }
-  // multi-storey
-  g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.roundRect(354*T_+14,692*T_+14,34*T_,22*T_,T_*1.5); g.fill(); g.fillStyle='#8d939a'; g.beginPath(); g.roundRect(354*T_,692*T_,34*T_,22*T_,T_*1.5); g.fill();
-  const rnd=mulberry(77); for(let r=0;r<5;r++){ g.fillStyle='#9aa1a8'; g.fillRect(356*T_,(693.5+r*4)*T_,30*T_,2.6*T_); for(let x=356.3;x<385.5;x+=1.2){ if(rnd()<0.65){ g.fillStyle=['#c0392b','#2980b9','#ecf0f1','#2c3e50','#7f8c8d','#f1c40f'][(rnd()*6)|0]; g.fillRect(x*T_,(693.7+r*4)*T_,0.8*T_,2.2*T_); } } }
-  g.fillStyle='#f4d03f'; g.font='bold 70px sans-serif'; g.fillText('P',(380)*T_,(691.6)*T_);
-  // surface car park
-  g.fillStyle='#5a5d62'; g.beginPath(); g.roundRect(418*T_,703*T_,27*T_,14*T_,2*T_); g.fill(); for(let r=0;r<3;r++) for(let x=419;x<444;x+=1.3){ g.fillStyle='#d8d8d8'; g.fillRect(x*T_,(704+r*4.4)*T_,0.1*T_,3.4*T_); if(rnd()<0.6){ g.fillStyle=['#c0392b','#2980b9','#ecf0f1','#2c3e50','#f1c40f'][(rnd()*5)|0]; g.fillRect((x+0.25)*T_,(704.3+r*4.4)*T_,0.8*T_,2.8*T_); } }
-  if(night>0.05&&typeof dnLight==='function'){ for(let x=360;x<442;x+=10) dnLight(x*T_,690*T_,90,'rgba(255,225,170,0.7)',0.7); dnLight(431*T_,710*T_,160,'rgba(255,225,170,0.6)',0.6); } }
-function apTerminal(A,vx0,vy0,vx1,vy1,night){ const T_=TILE, g=ctx, t=A.term, x0=t.x0*T_, x1=t.x1*T_, y0=t.y0*T_, y1=t.y1*T_, ry0=649*T_, ry1=677*T_;
-  if(x1<vx0||x0>vx1||y1<vy0||y0>vy1) return; const R=3*T_;
-  g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.roundRect(x0+18,y0+18,x1-x0,y1-y0,R); g.fill();
-  g.fillStyle='#d5dbe1'; g.beginPath(); g.roundRect(x0,y0,x1-x0,ry0-y0,[R,R,0,0]); g.fill(); g.beginPath(); g.roundRect(x0,ry1,x1-x0,y1-ry1,[0,0,R,R]); g.fill();
-  g.fillStyle='#bfc7cf'; for(let x=x0+40;x<x1-60;x+=96){ g.beginPath(); g.roundRect(x,y0+30,60,ry0-y0-60,10); g.fill(); g.beginPath(); g.roundRect(x,ry1+30,60,y1-ry1-60,10); g.fill(); }
-  g.fillStyle='rgba(150,205,235,0.22)'; g.fillRect(x0,ry0,x1-x0,ry1-ry0); g.strokeStyle='rgba(230,240,250,0.55)'; g.lineWidth=2; for(let x=x0+64;x<x1;x+=64){ g.beginPath(); g.moveTo(x,ry0); g.lineTo(x,ry1); g.stroke(); }
-  g.strokeStyle='#7b8794'; g.lineWidth=6; g.beginPath(); g.roundRect(x0,y0,x1-x0,y1-y0,R); g.stroke(); g.beginPath(); g.moveTo(x0,ry0); g.lineTo(x1,ry0); g.moveTo(x0,ry1); g.lineTo(x1,ry1); g.stroke();
-  g.fillStyle='#1f4e9c'; g.font='bold 120px sans-serif'; g.fillText('ALBION AIRPORT',x0+120,y1-110); g.font='bold 56px sans-serif'; g.fillStyle='#2c3e50'; g.fillText('\u2708 Departures  \u2022  \u{1F686} Airport Station',x0+130,y1-40);
-  if(night>0.3&&typeof dnLight==='function') for(let x=x0+80;x<x1;x+=160){ dnLight(x,y0+40,90,'rgba(255,235,180,0.7)',0.7); dnLight(x,(ry0+ry1)/2,110,'rgba(220,240,255,0.7)',0.7); } }
+  // multi-storey car park: solid decks with depth, ramp, P sign, parked cars on each deck
+  { const m=A.ms||{x0:354,x1:388,y0:692,y1:714}, x0=m.x0*T_, y0=m.y0*T_, w=(m.x1-m.x0)*T_, h=(m.y1-m.y0)*T_;
+    g.fillStyle='rgba(0,0,0,0.28)'; g.beginPath(); g.roundRect(x0+16,y0+16,w,h,T_*1.5); g.fill();
+    g.fillStyle='#7a8088'; g.beginPath(); g.roundRect(x0,y0,w,h,T_*1.5); g.fill();
+    for(let fl=0;fl<5;fl++){ const fy=y0+(fl+0.55)*h/5; g.fillStyle='#9aa1a8'; g.fillRect(x0+T_,fy-0.9*T_,w-2*T_,1.8*T_);
+      g.fillStyle='rgba(20,25,30,0.35)'; g.fillRect(x0+T_,fy+0.5*T_,w-2*T_,0.4*T_);
+      for(let x=m.x0+2;x<m.x1-2;x+=1.3){ const sd=((x*17+fl*31)&7); if(sd>2){ g.fillStyle=['#c0392b','#2980b9','#ecf0f1','#2c3e50','#f1c40f','#27ae60'][sd%6]; g.fillRect(x*T_,fy-0.7*T_,0.9*T_,1.4*T_); } } }
+    // ramp mouth (east)
+    g.fillStyle='#55585d'; g.beginPath(); g.moveTo((m.x1-1)*T_,(m.y0+8)*T_); g.lineTo((m.x1+4)*T_,(m.y0+10)*T_); g.lineTo((m.x1+4)*T_,(m.y0+14)*T_); g.lineTo((m.x1-1)*T_,(m.y0+16)*T_); g.closePath(); g.fill();
+    g.fillStyle='#f4d03f'; g.font='bold 90px sans-serif'; g.fillText('P',(m.x0+m.x1)/2*T_-30,(m.y0-0.8)*T_);
+    g.fillStyle='#2c3e50'; g.font='bold 36px sans-serif'; g.fillText('MULTI-STOREY',(m.x0+2)*T_,(m.y1-1.2)*T_); }
+  // surface car park bay paint (cars come from initParked on the lot objects)
+  for(const L of (A.lots||[])){ g.fillStyle='#f4d03f'; g.font='bold 50px sans-serif'; g.fillText('P',(L.x0+0.6)*T_,(L.y0+1.9)*T_); }
+  // animated cars: loop from the access road into a bay then leave (pure function of timeS)
+  apParkFlow(A);
+  // pedestrians between parks, drop-off and the terminal doors
+  apPeds(A);
+  if(night>0.05&&typeof dnLight==='function'){ for(let x=360;x<442;x+=10) dnLight(x*T_,690*T_,90,'rgba(255,225,170,0.7)',0.7); dnLight(431*T_,710*T_,160,'rgba(255,225,170,0.6)',0.6); dnLight(370*T_,702*T_,200,'rgba(255,225,170,0.55)',0.55); } }
+function apCar(g,x,y,h,col,L){ g.save(); g.translate(x,y); g.rotate(h); g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.roundRect(-L*0.45+4,-10,L*0.9,20,4); g.fill();
+  g.fillStyle=col; g.beginPath(); g.roundRect(-L*0.45,-9,L*0.9,18,4); g.fill(); g.fillStyle='#7f8c8d'; g.fillRect(-L*0.15,-7,L*0.35,14); g.restore(); }
+function apParkFlow(A){ const g=ctx, T_=TILE, cols=['#c0392b','#2980b9','#ecf0f1','#2c3e50','#f1c40f','#27ae60','#8e44ad'];
+  // cars circulating the drop-off loop
+  for(let k=0;k<5;k++){ const t=((timeS*0.18+k*0.2)%1), ang=t*Math.PI*2, cx=412*T_, cy=695.5*T_, rx=16*T_, ry=5*T_;
+    apCar(g,cx+Math.cos(ang)*rx,cy+Math.sin(ang)*ry,ang+Math.PI/2,cols[k%cols.length],28); }
+  // cars entering / leaving surface parks along the 708 road
+  for(let k=0;k<4;k++){ const t=((timeS*0.12+k*0.25)%1); const x=(414+t*70)*T_, y=(708.5+(k%2?0.8:-0.8))*T_; apCar(g,x,y,0,cols[(k+2)%cols.length],28); }
+  // cars on the MSCP ramp
+  { const t=(timeS*0.15)%1; apCar(g,(388+t*6)*T_,(702+t*4)*T_,0.5,cols[1],26); } }
+function apPeds(A){ const g=ctx, T_=TILE, cols=['#c0392b','#2980b9','#27ae60','#f1c40f','#8e44ad','#ecf0f1'];
+  // paths: surface park -> drop-off -> terminal doors (y~689)
+  const paths=[[[430,710],[430,700],[402,700],[402,689.5]],[[470,710],[470,700],[432,700],[432,689.5]],[[372,705],[372,689.5]],[[412,696],[412,689.5]]];
+  for(let i=0;i<10;i++){ const P=paths[i%paths.length], ph=((timeS*0.35+i*0.11)%1), len=P.length-1, u=ph*len, i0=Math.floor(u), f=u-i0, a=P[Math.min(i0,len)], b=P[Math.min(i0+1,len)];
+    const x=(a[0]+(b[0]-a[0])*f)*T_, y=(a[1]+(b[1]-a[1])*f)*T_; g.fillStyle=cols[i%cols.length]; g.beginPath(); g.arc(x,y,3.2,0,7); g.fill(); g.fillStyle='#2b1d0e'; g.beginPath(); g.arc(x,y-3.5,2.2,0,7); g.fill(); } }
+function apTerminal(A,vx0,vy0,vx1,vy1,night){ const T_=TILE, g=ctx, t=A.term, x0=t.x0*T_, x1=t.x1*T_, y0=t.y0*T_, y1=t.y1*T_, W=x1-x0, H=y1-y0, cx=(x0+x1)/2;
+  if(x1<vx0-200||x0>vx1+200||y1<vy0-200||y0>vy1+200) return;
+  const rs0=669.6*T_, rs1=676.4*T_;   // glass skylight strip over the tracks (y 673)
+  // drop shadow (light depth: sun from top-left)
+  g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.roundRect(x0+1.2*T_,y0+1.2*T_,W,H,4*T_); g.fill();
+  // shaded side walls (south + east faces visible = depth)
+  g.fillStyle='#8f9aa5'; g.beginPath(); g.roundRect(x0,y0+0.8*T_,W+0.6*T_,H,4*T_); g.fill();
+  // barrel-vault roof: gradient across its short axis, rounded ends
+  const vg=g.createLinearGradient(0,y0,0,y1); vg.addColorStop(0,'#cfe6f7'); vg.addColorStop(0.3,'#8cc1e8'); vg.addColorStop(0.55,'#5b9fd6'); vg.addColorStop(1,'#3d7fb8');
+  g.fillStyle=vg; g.beginPath(); g.roundRect(x0,y0,W,H,4*T_); g.fill();
+  // white structural ribs, bowed (curved glass look)
+  g.strokeStyle='rgba(255,255,255,0.8)'; g.lineWidth=0.18*T_;
+  for(let x=x0+3*T_;x<x1-2*T_;x+=5*T_){ g.beginPath(); g.moveTo(x,y0+0.4*T_); g.quadraticCurveTo(x+1.2*T_,(y0+y1)/2,x,y1-0.4*T_); g.stroke(); }
+  g.lineWidth=0.12*T_; g.strokeStyle='rgba(255,255,255,0.55)';
+  for(let k=1;k<8;k++){ const yy=y0+k*H/8; g.beginPath(); g.moveTo(x0+1.5*T_,yy); g.quadraticCurveTo(cx,yy-(k-4)*0.5*T_,x1-1.5*T_,yy); g.stroke(); }
+  // ridge highlight
+  g.fillStyle='rgba(255,255,255,0.28)'; g.beginPath(); g.roundRect(x0+2*T_,y0+H*0.18,W-4*T_,H*0.08,H*0.04); g.fill();
+  // skylight over the tracks: clear glass so the train shows through
+  g.fillStyle='#6f757c'; g.fillRect(x0+0.5*T_,rs0,W-T_,rs1-rs0); g.fillStyle='#c9ced3'; g.fillRect(x0+0.5*T_,rs0,W-T_,0.9*T_); g.fillRect(x0+0.5*T_,rs1-0.9*T_,W-T_,0.9*T_); g.fillStyle='rgba(205,232,250,0.25)'; g.fillRect(x0+0.5*T_,rs0,W-T_,rs1-rs0);
+  g.strokeStyle='rgba(255,255,255,0.9)'; g.lineWidth=0.15*T_; g.strokeRect(x0+0.5*T_,rs0,W-T_,rs1-rs0); for(let x=x0+2*T_;x<x1-T_;x+=3*T_){ g.beginPath(); g.moveTo(x,rs0); g.lineTo(x,rs1); g.stroke(); }
+  // station dome over the platforms (east third), glass ribs
+  { const dx=x0+W*0.72, dy=(rs0+rs1)/2-2*T_, R=9*T_; g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.arc(dx+0.8*T_,dy+0.8*T_,R,0,7); g.fill();
+    const dg=g.createRadialGradient(dx-R*0.35,dy-R*0.35,R*0.1,dx,dy,R); dg.addColorStop(0,'#eaf6ff'); dg.addColorStop(0.5,'#7fbde9'); dg.addColorStop(1,'#2f6ea8');
+    g.fillStyle=dg; g.beginPath(); g.arc(dx,dy,R,0,7); g.fill(); g.strokeStyle='rgba(255,255,255,0.85)'; g.lineWidth=0.16*T_;
+    for(let k=0;k<12;k++){ const a=k*Math.PI/6; g.beginPath(); g.moveTo(dx,dy); g.lineTo(dx+Math.cos(a)*R,dy+Math.sin(a)*R); g.stroke(); }
+    for(const f of [0.35,0.65]){ g.beginPath(); g.arc(dx,dy,R*f,0,7); g.stroke(); }
+    g.fillStyle='#fff'; g.beginPath(); g.arc(dx,dy,R*0.14,0,7); g.fill();
+    g.fillStyle='#1f4e9c'; g.font='bold '+(1.8*T_)+'px sans-serif'; g.textAlign='center'; g.fillText('AIRPORT STATION',dx,dy+R+2.2*T_); g.textAlign='left'; }
+  // airside pier roots for the jet bridges
+  g.fillStyle='#b8c3cd'; for(const st of A.stands){ g.beginPath(); g.roundRect(st.x*T_-1.5*T_,y0-1.2*T_,3*T_,1.6*T_,0.5*T_); g.fill(); }
+  // landside canopy + DEPARTURES sign over the doors
+  { const px=x0+W*0.22, py=y1-0.6*T_, pw=W*0.36; g.fillStyle='#e9eef2'; g.beginPath(); g.roundRect(px,py,pw,2.2*T_,0.8*T_); g.fill(); g.strokeStyle='#8a949e'; g.lineWidth=0.15*T_; g.stroke();
+    g.fillStyle='#1f4e9c'; g.beginPath(); g.roundRect(px+pw*0.3,py+0.3*T_,pw*0.4,1.6*T_,0.4*T_); g.fill(); g.fillStyle='#fff'; g.font='bold '+(1.1*T_)+'px sans-serif'; g.textAlign='center'; g.fillText('\u2708 DEPARTURES',px+pw*0.5,py+1.5*T_); g.textAlign='left'; }
+  // roof lettering
+  g.fillStyle='rgba(20,50,100,0.85)'; g.font='bold '+(4.2*T_)+'px sans-serif'; g.textAlign='center'; g.fillText('ALBION AIRPORT',x0+W*0.36,y0+H*0.45); g.font='bold '+(1.6*T_)+'px sans-serif'; g.fillText('\u2708 Departures  \u2022  \u{1F686} Airport Station',x0+W*0.36,y0+H*0.45+2.6*T_); g.textAlign='left';
+  if(night>0.2&&typeof dnLight==='function'){ for(let x=x0+6*T_;x<x1;x+=12*T_){ dnLight(x,y0+T_,140,'rgba(180,220,255,0.75)',0.7); dnLight(x,y1,130,'rgba(255,235,180,0.7)',0.7); } dnLight(x0+W*0.72,(rs0+rs1)/2-2*T_,260,'rgba(160,210,255,0.85)',0.85); } }
+
 function apDrawHigh(){ const A=apA(); if(!A) return; for(const st of A.stands){ const p=apCivil(A,st,timeS); if(p&&p.alt>0.05) apDrawCivil(st,p); } for(const f of A.fighters){ const p=apFighter(A,f,timeS); if(p&&p.alt>0.05) apDrawFighter(f,p); } }
 setTimeout(()=>{
   if(typeof drawPortTrucksLow==='function'){ const d=drawPortTrucksLow; drawPortTrucksLow=function(a,b,c,e){ const r=d.apply(this,arguments); try{ apDrawLow(a,b,c,e); }catch(err){ if(!APX.err){ APX.err=String(err&&err.stack||err); console.error(err); } } return r; }; }
