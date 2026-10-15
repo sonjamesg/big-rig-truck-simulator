@@ -193,6 +193,7 @@ if(typeof buildCareerSites==='function') buildCareerSites({findSpot,access,clear
     Object.assign(yd,{brand:BR,office:{x0:x+1,y0:y+1,w:5,h:4},garage:{x0:x+14,y0:y+1,w:5,h:3}}); fill(x+1,y+1,5,4,T.BLDG); fill(x+14,y+1,5,3,T.BLDG); fill(x+7,y+15,6,4,T.BLDG); yd.wh={x0:x+7,y0:y+15,w:6,h:4}; yd.wh2={x0:x+13,y0:y+15,w:6,h:4}; yd.hq={x0:x+1,y0:y+15,w:5,h:4};   // T1 warehouse (bays back onto it); T2 warehouse + T3 HQ become solid on upgrade   // solid site office + truck garage
     yd.gslot={x:(x+16.5)*M_T,y:(y+5.6)*M_T,w:7,L:10}; yd.oslot={x:(x+3.5)*M_T,y:(y+6.6)*M_T,w:7,L:9}; yd.sslot={x:(x+3.5)*M_T,y:(y+12)*M_T,w:7,L:10};
     world.forSale.push(yd); }
+  if(typeof svcGen==='function'){ yield 'Building fire, police & hospitals'; try{ svcGen({findSpot,access,clearObjs,region,objs}); }catch(e){ console.warn('[services] gen failed',e); } }
   if(typeof homesGen==='function'){ yield 'Building homes'; try{ homesGen({findSpot,access,clearObjs,region,objs}); }catch(e){ console.warn('[homes] gen failed',e); } }
   yield 'Parking trailers';
   // fill bays with parked trailers
