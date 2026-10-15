@@ -1,7 +1,7 @@
 import os, zipfile, shutil
 d=os.path.dirname(os.path.abspath(__file__)); s=os.path.join(d,'src')
 js=open(os.path.join(s,'peerjs.min.js')).read()+"\n;\n"+"const ENGINE_WAV_B64='"+open(os.path.join(s,'engine_b64.txt')).read().strip()+"';\n"
-for f in ['keyguard.js','world.js','render.js','bldg2.js','lorry.js','physics.js','audio.js','traffic.js','markings.js','signals.js','depots.js','fuel.js','sites.js','services.js','career.js','ui.js','ambient.js','satnav.js','gamepad.js','mp.js','mobile.js','haptics.js','breakdown.js','indicators.js','beams.js','fx.js','port.js','porttrucks.js','owndepot.js','homes.js','tune.js','tune2.js','tune3.js','tune4.js','park.js','rail.js','daynight.js','nightmap.js','weather.js','main.js','home.js','roadlaw.js','flycam.js','accounts.js','invite.js','server.js','homecard.js']: js+=open(os.path.join(s,f)).read()+"\n"
+for f in ['keyguard.js','world.js','render.js','bldg2.js','lorry.js','physics.js','audio.js','traffic.js','markings.js','signals.js','depots.js','fuel.js','sites.js','services.js','career.js','ui.js','ambient.js','satnav.js','gamepad.js','mp.js','mobile.js','haptics.js','breakdown.js','indicators.js','beams.js','fx.js','port.js','porttrucks.js','owndepot.js','homes.js','tune.js','tune2.js','tune3.js','tune4.js','park.js','rail.js','daynight.js','nightmap.js','weather.js','main.js','home.js','roadlaw.js','police.js','ambulance.js','flycam.js','accounts.js','invite.js','server.js','homecard.js']: js+=open(os.path.join(s,f)).read()+"\n"
 import datetime,subprocess
 try: _rev=subprocess.check_output(['git','rev-parse','--short','HEAD'],cwd=d).decode().strip()
 except Exception: _rev='dev'

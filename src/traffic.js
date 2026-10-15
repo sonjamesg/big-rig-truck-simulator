@@ -541,11 +541,11 @@ function updatePeds(dt){
     ps.push({x:(tx+0.2+tRand()*0.6)*M_T,y:(ty+0.2+tRand()*0.6)*M_T,dx:dd[0],dy:dd[1],sp:1.1+tRand()*0.6,col:PED_COLS[(tRand()*PED_COLS.length)|0],hair:['#2b1d0e','#000','#8a5a2b','#d9c27a','#777'][(tRand()*5)|0],ph:tRand()*6,flee:0,down:0}); }
   const pb=playerBoxes();
   for(let k=ps.length-1;k>=0;k--){ const p=ps[k]; const d=Math.hypot(p.x-P.x,p.y-P.y);
-    if(d>140){ ps.splice(k,1); continue; }
+    if(d>140&&!(p.cas&&d<1500)){ ps.splice(k,1); continue; }   // v28: casualties stay where they fell until treated
     if(p.down>0){ p.down-=dt; continue; }
     let sp=p.sp;
     const close=Math.min(...pb.map(b=>ptBoxDist(p.x,p.y,b)));
-    if(close<0.3 && Math.abs(P.v)>1){ p.down=3; const f=fwd(P.h); p.x+=f[0]*1.5; p.y+=f[1]*1.5; continue; }
+    if(close<0.3 && Math.abs(P.v)>1 && !p.cas){ p.down=1e9; p.cas=true; p.fix=0; p.prog=0; const f=fwd(P.h); p.x+=f[0]*1.5; p.y+=f[1]*1.5; try{ if(typeof ambPedHit==='function') ambPedHit(p); if(typeof polPedHit==='function') polPedHit(p); }catch(e){} continue; }   // v28: knocked down, stays down (no gore) until paramedics arrive
     if(close<7 && Math.abs(P.v)>2){ p.flee=1.5; const ax=p.x-pb[0].x, ay=p.y-pb[0].y; if(Math.abs(ax)>Math.abs(ay)){ p.dx=Math.sign(ax); p.dy=0; } else { p.dx=0; p.dy=Math.sign(ay); } }
     if(p.flee>0){ p.flee-=dt; sp=4.2; }
     const nx=p.x+p.dx*sp*dt, ny=p.y+p.dy*sp*dt; const t=get(Math.floor((nx+p.dx*0.6)/M_T),Math.floor((ny+p.dy*0.6)/M_T));
