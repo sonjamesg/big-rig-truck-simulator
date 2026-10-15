@@ -26,7 +26,7 @@ function dnBuild(){ if(DN.grid) return; const G=new Map(), C=DN.cell; const add=
   for(const k in (world.cities||{})){ const c=world.cities[k]; if(!c||!c.xs) continue; for(let ty=c.ys[0]-30;ty<=c.Y1+30;ty+=6) for(let tx=c.xs[0]-30;tx<=c.X1+30;tx+=6){ if(!inb(tx,ty)) continue; const t=G[idx(tx,ty)]; if(t===T.PLAZA||t===T.LOT) add((tx+0.5)*TILE,(ty+0.5)*TILE,t===T.PLAZA?150:130,'fl',{pz:t===T.PLAZA}); } }
   for(const o of world.objects) if(o.kind==='lot') for(let y=o.y+48;y<o.y+o.h;y+=200) for(let x=o.x+48;x<o.x+o.w;x+=200) add(x,y,140,'fl');
   for(const o of world.overhead) if(o.kind==='canopy') add(o.x+o.w/2,o.y+o.h/2,Math.max(o.w,o.h)*1.1,'fl');
-  if(typeof svcLights==='function') svcLights(add);
+  if(typeof svcLights==='function') svcLights(add); if(typeof siteLights==='function') siteLights(add);
   for(const d of world.depots||[]){ add(d.entrance.x*PPM,d.entrance.y*PPM,160,'fl'); for(const b of d.bays||[]) add(b.kx*PPM,b.ky*PPM,90,'fl'); }
   for(const P of (typeof portList==='function'?portList():[])) if(P.slots) for(let i=0;i<P.slots.length;i+=6){ const q=PL(P,P.slots[i][0],P.slots[i][1]); add(q[0]*TILE,q[1]*TILE,190,'fl'); }
   DN.grid=G; }
