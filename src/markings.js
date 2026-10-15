@@ -39,7 +39,7 @@ function buildMarkings(objs){
       let minor; if(myT!==otT) minor=myT; else { const a=RANK[sg.type]*10+sg.w, b=RANK[other.type]*10+other.w; minor= a<b || (a===b && sg.dir==='v'); }
       const gw=!J.lights && minor;
       const ap={lanes,lineA,gw,lights:J.lights,Lapp,stop:o.stop,minor}; J.appr[sg.id+':'+d]=ap;
-      const m={kind:'appr',sg,d,lineA,Lapp,lanes,mode:J.lights?'lights':gw?'gw':'major',slow:gw&&sg.type==='rural'&&Lapp>=9}; if(!J.lights&&J.y===716&&(J.x===410||J.x===346)) m.noArr=true; if(!J.lights&&J.x>=388&&J.x<=432&&J.y>=688&&J.y<=709) m.noArr=true;   // v40: airport access L-bends: plain corners, no turn arrows apprBox(m); objs.push(m); world.marks.push(m);
+      const m={kind:'appr',sg,d,lineA,Lapp,lanes,mode:J.lights?'lights':gw?'gw':'major',slow:gw&&sg.type==='rural'&&Lapp>=9}; if(!J.lights&&J.y===716&&(J.x===410||J.x===346)) m.noArr=true; if(!J.lights&&(J.x===392||J.x===431)&&J.y===689) m.noArr=true;   // v40: airport access L-bends: plain corners, no turn arrows apprBox(m); objs.push(m); world.marks.push(m);
     }
     if(J.box) objs.push({kind:'boxj',J,x:J.x*TILE,y:J.y*TILE,w:J.w*TILE,h:J.h*TILE});
   }

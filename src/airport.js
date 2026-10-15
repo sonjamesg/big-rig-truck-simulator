@@ -227,21 +227,16 @@ function apLandside(A,night){ const g=ctx, T_=TILE, rnd=mulberry(77);
   // v40: tidy outer kerb on the access road's south-east L-bend (410..414,716..720): pave outside a 4-tile arc round the inner corner
   { const cx=410*T_, cy=716*T_, r=4*T_; g.fillStyle='#c4c2bb'; g.beginPath(); g.moveTo(cx+r,cy+r); g.lineTo(cx+r,cy); g.arc(cx,cy,r,0,Math.PI/2,false); g.closePath(); g.fill();
     g.strokeStyle='#e2dfd6'; g.lineWidth=0.18*T_; g.beginPath(); g.arc(cx,cy,r-0.1*T_,0,Math.PI/2,false); g.stroke(); }
-  // multi-storey car park: solid decks with depth, ramp, P sign, parked cars on each deck
-  { const m=A.ms||{x0:354,x1:388,y0:692,y1:714}, x0=m.x0*T_, y0=m.y0*T_, w=(m.x1-m.x0)*T_, h=(m.y1-m.y0)*T_;
-    g.fillStyle='rgba(0,0,0,0.28)'; g.beginPath(); g.roundRect(x0+16,y0+16,w,h,T_*1.5); g.fill();
-    g.fillStyle='#7a8088'; g.beginPath(); g.roundRect(x0,y0,w,h,T_*1.5); g.fill();
-    for(let fl=0;fl<5;fl++){ const fy=y0+(fl+0.55)*h/5; g.fillStyle='#9aa1a8'; g.fillRect(x0+T_,fy-0.9*T_,w-2*T_,1.8*T_);
-      g.fillStyle='rgba(20,25,30,0.35)'; g.fillRect(x0+T_,fy+0.5*T_,w-2*T_,0.4*T_);
-      for(let x=m.x0+2;x<m.x1-2;x+=1.3){ const sd=((x*17+fl*31)&7); if(sd>2){ g.fillStyle=['#c0392b','#2980b9','#ecf0f1','#2c3e50','#f1c40f','#27ae60'][sd%6]; g.fillRect(x*T_,fy-0.7*T_,0.9*T_,1.4*T_); } } }
-    // ramp mouth (east)
-    g.fillStyle='#55585d'; g.beginPath(); g.moveTo((m.x1-1)*T_,(m.y0+8)*T_); g.lineTo((m.x1+4)*T_,(m.y0+10)*T_); g.lineTo((m.x1+4)*T_,(m.y0+14)*T_); g.lineTo((m.x1-1)*T_,(m.y0+16)*T_); g.closePath(); g.fill();
-    g.fillStyle='#f4d03f'; g.font='bold 90px sans-serif'; g.fillText('P',(m.x0+m.x1)/2*T_-30,(m.y0-0.8)*T_);
-    g.fillStyle='#2c3e50'; g.font='bold 36px sans-serif'; g.fillText('MULTI-STOREY',(m.x0+2)*T_,(m.y1-1.2)*T_); }
+  // v42: multi-storey = open top deck (real parked cars come from initParked on its lot object): parapet wall, stair/lift cores, ramp, signs
+  { const m=A.ms, x0=m.x0*T_, y0=m.y0*T_, w=(m.x1-m.x0)*T_, h=(m.y1-m.y0)*T_, t=0.9*T_;
+    g.fillStyle='rgba(0,0,0,0.22)'; g.fillRect(x0+w,y0+10,12,h); g.fillRect(x0+10,y0+h,w,12);
+    g.fillStyle='#b9bec4'; g.fillRect(x0,y0,w,t); g.fillRect(x0,y0+h-t,w,t); g.fillRect(x0,y0,t,h); g.fillRect(x0+w-t,y0,t,8*T_); g.fillRect(x0+w-t,y0+12*T_,t,h-12*T_);
+    g.fillStyle='#d5d9dd'; g.fillRect(x0,y0,w,0.3*T_); g.fillRect(x0,y0,0.3*T_,h);
+    for(const [cx,cy] of [[m.x1-3,m.y0+2.2],[m.x0+2.2,m.y1-3]]){ g.fillStyle='#6c7a89'; g.fillRect((cx-1.4)*T_,(cy-1.4)*T_,2.8*T_,2.8*T_); g.fillStyle='#2e86c1'; g.fillRect((cx-0.9)*T_,(cy-0.9)*T_,1.8*T_,1.8*T_); g.fillStyle='#fff'; g.font='bold '+(0.9*T_)+'px sans-serif'; g.textAlign='center'; g.fillText('⇅',cx*T_,(cy+0.35)*T_); g.textAlign='left'; }
+    g.fillStyle='#f4d03f'; g.font='bold 70px sans-serif'; g.fillText('P',(m.x0+1)*T_,(m.y0-0.5)*T_); g.fillStyle='#2c3e50'; g.font='bold 30px sans-serif'; g.fillText('MULTI-STOREY • ENTRANCE →',(m.x0+4)*T_,(m.y0-0.6)*T_); }
   // surface car park bay paint (cars come from initParked on the lot objects)
   for(const L of (A.lots||[])){ g.fillStyle='#f4d03f'; g.font='bold 50px sans-serif'; g.fillText('P',(L.x0+0.6)*T_,(L.y0+1.9)*T_); }
   // animated cars: loop from the access road into a bay then leave (pure function of timeS)
-  apParkFlow(A);
   // pedestrians between parks, drop-off and the terminal doors
   apPeds(A); apDropPeds();
   if(night>0.05&&typeof dnLight==='function'){ for(let x=360;x<442;x+=10) dnLight(x*T_,690*T_,90,'rgba(255,225,170,0.7)',0.7); dnLight(431*T_,710*T_,160,'rgba(255,225,170,0.6)',0.6); dnLight(370*T_,702*T_,200,'rgba(255,225,170,0.55)',0.55); } }
@@ -271,13 +266,9 @@ function apPedDraw(g,x,y,col,ph){ g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath();
   const sw=Math.sin(ph)*2; g.fillStyle='#34495e'; g.fillRect(x-3+sw,y+2,1.6,2.4); g.fillRect(x+1.4-sw,y+2,1.6,2.4); }
 function apWalk(P,u){ let L=0; const seg=[]; for(let i=1;i<P.length;i++){ const d=Math.hypot(P[i][0]-P[i-1][0],P[i][1]-P[i-1][1]); seg.push(d); L+=d; } let d=u*L; for(let i=0;i<seg.length;i++){ if(d<=seg[i]){ const f=d/seg[i]; return [P[i][0]+(P[i+1][0]-P[i][0])*f,P[i][1]+(P[i+1][1]-P[i][1])*f]; } d-=seg[i]; } return P[P.length-1]; }
 function apPeds(A){ const g=ctx, T_=TILE, cols=['#c0392b','#2980b9','#27ae60','#f1c40f','#8e44ad','#ecf0f1','#e67e22'];
-  // drivers from the animated car-park slots walk to the doors, then (late in the stay) walk back
-  for(const sl of A.slots||[]){ const p=apSlotState(sl,timeS); if(!p||p.ph!=='park') continue; const sx=sl.x/4+0.5, sy=sl.y/4-0.6, door=[402+(sl.i%3)*15,688.8], P=[[sx,sy],[416.5,sy],[416.5,690.5],door];
-    if(p.tp<30){ const q=apWalk(P,p.tp/30); apPedDraw(g,q[0]*T_,q[1]*T_,cols[sl.i%cols.length],timeS*9+sl.i); }
-    else if(p.tp>50&&p.tp<78){ const q=apWalk(P.slice().reverse(),(p.tp-50)/28); apPedDraw(g,q[0]*T_,q[1]*T_,cols[(sl.i+3)%cols.length],timeS*9+sl.i); } }
-  // multi-storey stair core -> crossing -> doors, and drop-off kerb -> doors
-  const paths=[[[388.5,697],[388.5,690.2],[372,690.2],[372,688.8]],[[389,705],[389,690.6],[402,690.6],[402,688.8]],[[398,690.4],[432,690.4],[432,688.8]],[[426,690.2],[417,690.2],[417,688.8]]];
-  for(let i=0;i<14;i++){ const P=paths[i%paths.length], u=((timeS*0.04+i*0.137)%1), q=apWalk(i%2?P:P.slice().reverse(),u); apPedDraw(g,q[0]*T_,q[1]*T_,cols[i%cols.length],timeS*9+i); } }
+  // v42: footway-only routes: MSCP lift core -> x388 footpath -> terminal-front pavement (row 688) -> doors; surface parks -> their north footpath -> plaza -> east doors.
+  const paths=[[[385,694.2],[388.5,694.2],[388.5,688.5],[402,688.5]],[[388.5,697],[388.5,688.5],[372,688.5]],[[440,695.5],[440,688.5],[452,688.5]],[[470,695.5],[470,688.5],[462,688.5]],[[484,695.5],[484,688.5],[478,688.5]]];
+  for(let i=0;i<12;i++){ const P=paths[i%paths.length], u=((timeS*0.035+i*0.173)%1), q=apWalk(i%2?P:P.slice().reverse(),u); apPedDraw(g,q[0]*T_,q[1]*T_,cols[i%cols.length],timeS*9+i); } }
 function apHall(g,x0,y0,x1,y1,T_,vaultDir){ const W=x1-x0, H=y1-y0, cx=(x0+x1)/2, R=Math.min(3*T_,H/3);
   g.fillStyle='rgba(0,0,0,0.3)'; g.beginPath(); g.roundRect(x0+1.2*T_,y0+1.2*T_,W,H,R); g.fill();
   g.fillStyle='#8f9aa5'; g.beginPath(); g.roundRect(x0,y0+0.8*T_,W+0.6*T_,H,R); g.fill();
@@ -339,7 +330,7 @@ const APDROP={peds:[]};
 setTimeout(()=>{ if(typeof updateTraffic!=='function') return; const ut=updateTraffic; updateTraffic=function(dt){ const A=apA(), held=[];
     if(A&&traffic&&traffic.vs) for(const v of traffic.vs){ if(v.kind==='lorry'||v.ptruck||v.police) continue; const tx=v.x/M_T, ty=v.y/M_T;
       if(v._drop){ const e=timeS-v._drop.t; if(e<9){ held.push([v,v._drop.x,v._drop.y,v.h]); } continue; }
-      if(ty>689&&ty<692&&((v.id*2654435761)>>>0)%3===0) for(const bx of APX_BAYS) if(Math.abs(tx-bx)<0.8){ v._drop={t:timeS,x:v.x,y:v.y}; APDROP.peds.push({x:tx,y:ty,t:timeS,c:['#e67e22','#2980b9','#8e44ad','#16a085'][v.id%4]}); held.push([v,v.x,v.y,v.h]); break; } }
+      if(ty>689&&ty<692&&((v.id*2654435761)>>>0)%3===0) for(const bx of APX_BAYS) if(Math.abs(tx-bx)<0.8){ v._drop={t:timeS,x:v.x,y:v.y}; APDROP.peds.push({x:tx,y:688.4,t:timeS,c:['#e67e22','#2980b9','#8e44ad','#16a085'][v.id%4]}); held.push([v,v.x,v.y,v.h]); break; } }
     const r=ut.apply(this,arguments); for(const [v,x,y,h] of held){ v.x=x; v.y=y; v.h=h; v.v=0; } APDROP.peds=APDROP.peds.filter(p=>timeS-p.t<12); return r; }; },0);
-function apDropPeds(){ const g=ctx, T_=TILE; for(const p of APDROP.peds){ const e=timeS-p.t; if(e<1.5) continue; const k=Math.min(1,(e-1.5)/6), x=p.x*T_+6, y=(p.y-0.6-k*1.8)*T_; if(k>=1) continue;
+function apDropPeds(){ const g=ctx, T_=TILE; for(const p of APDROP.peds){ const e=timeS-p.t; if(e<1.5) continue; const k=Math.min(1,(e-1.5)/6), x=(p.x+0.6+k*2.4)*T_, y=688.45*T_; if(k>=1) continue;
     g.fillStyle='rgba(0,0,0,0.25)'; g.beginPath(); g.arc(x+2,y+2,4,0,7); g.fill(); g.fillStyle=p.c; g.beginPath(); g.arc(x,y,4.2,0,7); g.fill(); g.fillStyle='#3b2a20'; g.beginPath(); g.arc(x,y,2.2,0,7); g.fill(); g.fillStyle='#555'; g.fillRect(x+4,y-1,4,3); } }

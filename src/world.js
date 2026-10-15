@@ -398,7 +398,7 @@ function* genWorldSteps(){
   // ---------------- junctions & lorry-friendly kerb radii ----------------
   const reserved=new Uint8Array(MW*MH); world.reserved=reserved; world.jMask=new Uint8Array(MW*MH); world.cornerAt=new Int32Array(MW*MH).fill(-1);
   { // v36: Albion Airport landside access: forecourt -> west along 716 -> down to the town grid (seg at x346 from y780), laid before junctions so AI + sat nav use it
-    road('v',410,689,715,4,'town'); road('h',716,346,413,4,'town'); road('h',700,388,410,3,'town'); road('h',708,414,456,3,'town'); road('h',689,392,433,3,'town'); road('v',392,689,702,3,'town'); road('v',431,689,709,3,'town');   // v41: arrivals/drop-off frontage loop (real road)
+    road('v',410,689,715,4,'town'); road('h',716,346,413,4,'town'); road('h',700,388,410,3,'town'); road('h',708,414,490,3,'town'); road('h',689,392,433,3,'town'); road('v',392,689,702,3,'town'); road('v',431,689,709,3,'town');   // v41: arrivals/drop-off frontage loop (real road)
     // v39: car park access roads (MSCP ramp, surface parks)
     const tg=world.segs.find(q=>q.dir==='v'&&q.a===346&&q.b0===780); if(tg){ for(let y=720;y<780;y++) for(let k=0;k<tg.w;k++){ const x=tg.a+k; set(x,y,water[idx(x,y)]?T.BRIDGE:T.ROAD); world.roadV[idx(x,y)]=tg.id; } tg.b0=720; } }
   // v33: re-centre arms that hit a roundabout off-centre: pull the road back and S-bend in on the centre line
@@ -443,7 +443,7 @@ function* genWorldSteps(){
     world.junctions.push(J); hs.js.push(J); vs.js.push(J);
   } }
   for(const J of world.junctions) if(J.y===716&&(J.x===410||J.x===346)) J.lights=false;   // v36: airport access L-bends are plain corners (no signals / box)
-  for(const J of world.junctions) if(J.x>=388&&J.x<=432&&J.y>=688&&J.y<=709) J.lights=false;   // v41: landside forecourt junctions are give-way, no signals
+  for(const J of world.junctions) if(J.x>=388&&J.x<=432&&J.y>=688&&J.y<=709&&(J.x===392||J.x===431)&&J.y===689) J.lights=false;   // v42: forecourt corners are plain bends; the T-junctions keep signals
   for(const rb of world.rbs){ for(const sg of S){
     const ends= sg.dir==='h' ? [[sg.b0,sg.a+sg.w/2,-1],[sg.b1+1,sg.a+sg.w/2,1]] : [[sg.a+sg.w/2,sg.b0,-1],[sg.a+sg.w/2,sg.b1+1,1]];
     for(const [ex,ey,side] of ends){ const d=Math.hypot(ex-rb.cx,ey-rb.cy); if(d<rb.rout+2.5){ rb.arms.push({seg:sg.id,side,ang:Math.atan2(ey-rb.cy,ex-rb.cx)}); sg['rb'+(side<0?0:1)]=rb.id; } } } }
@@ -598,16 +598,18 @@ for(const o of objs) if(o.kind==='bldg'&&o.x>=KB.xs[0]*TILE&&o.x<KB.X1*TILE&&o.y
     // station glass canopy pillars sit on solid tiles either side of the tracks
     // multi-storey (solid building, ramp door on its east side at the 700 road) + two surface parks on the 708 road
     const fl=(x0,y0,w,h,t)=>{ for(let y=y0;y<y0+h;y++) for(let x=x0;x<x0+w;x++){ const g=G[idx(x,y)]; if(g!==T.ROAD&&g!==T.BRIDGE) set(x,y,t); } };
-    fl(354,692,34,22,T.BLDG); fl(386,700,4,4,T.ROAD);   // MSCP solid, east ramp mouth onto the 700 road
-    fl(418,703,27,14,T.LOT); fl(456,703,30,12,T.LOT);
-    objs.push({kind:'lot',x:418*TILE,y:703*TILE,w:27*TILE,h:14*TILE,seed:3912,ap:'surf'});
-    objs.push({kind:'lot',x:456*TILE,y:703*TILE,w:30*TILE,h:12*TILE,seed:3913,ap:'surf2'});
-    objs.push({kind:'bldg',x:354*TILE,y:692*TILE,w:34*TILE,h:22*TILE,style:'carpark',height:28,seed:3911,logo:'P',ap:'ms'});
-    A.lots=[{x0:418,x1:445,y0:703,y1:717},{x0:456,x1:486,y0:703,y1:715}]; A.ms={x0:354,x1:388,y0:692,y1:714};
+    // v42: multi-storey = real open deck: solid wall ring, drivable LOT deck inside, ramp mouth on the east side onto the 700 road
+    fl(354,692,34,22,T.BLDG); fl(355,693,32,20,T.LOT); fl(386,700,4,4,T.ROAD);
+    objs.push({kind:'lot',x:356*TILE,y:694*TILE,w:29*TILE,h:18*TILE,seed:3911,ap:'ms'});
+    // v42: surface parks moved east, clear of the 708 road; they front onto it from the north
+    fl(436,696,25,11,T.LOT); fl(463,696,26,11,T.LOT);
+    objs.push({kind:'lot',x:436*TILE,y:696*TILE,w:25*TILE,h:11*TILE,seed:3912,ap:'surf'});
+    objs.push({kind:'lot',x:463*TILE,y:696*TILE,w:26*TILE,h:11*TILE,seed:3913,ap:'surf2'});
+    A.lots=[{x0:436,x1:461,y0:696,y1:707},{x0:463,x1:489,y0:696,y1:707}]; A.ms={x0:354,x1:388,y0:692,y1:714};
     // footpaths: drop-off kerb + links from both parks to the terminal front door
     for(let x=360;x<500;x++) if(G[idx(x,689)]!==T.ROAD) set(x,689,T.WALK);
-    for(let y=689;y<704;y++){ if(G[idx(388,y)]!==T.ROAD) set(388,y,T.WALK); if(G[idx(416,y)]!==T.ROAD) set(416,y,T.WALK); }
-    for(let x=388;x<430;x++) if(G[idx(x,704)]!==T.ROAD&&G[idx(x,704)]!==T.LOT) set(x,704,T.WALK);
+    for(let y=689;y<700;y++){ if(G[idx(388,y)]!==T.ROAD) set(388,y,T.WALK); }
+    for(let x=436;x<489;x++) if(G[idx(x,695)]!==T.ROAD) set(x,695,T.WALK);
   }
 
   { const R_=world.reserved; for(let y=466;y<720;y++) for(let x=158;x<644;x++){ if(y>=642&&(x<345||x>=525)) continue; if(G[idx(x,y)]!==T.ROAD&&G[idx(x,y)]!==T.BRIDGE) R_[idx(x,y)]=1; } }   // v37: the Albion airport footprint is off-limits to later depots/shops/services (layout wins)
