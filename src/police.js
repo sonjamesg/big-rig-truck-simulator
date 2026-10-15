@@ -47,9 +47,10 @@ function emDrawBar(v,on,type){ if(type==='police'&&v.polT) type=v.polT; const a=
     if(typeof dnLight==='function') dnLight(x*PPM,y*PPM,90,'rgba(60,120,255,1)',0.9); } }
 function emBlit(v,type){ if(type==='police'&&v.polT) type=v.polT; const a=emArt(type); blitV(a.body.sh,v.x,v.y,v.h,a.L,a.W,4,4); blitV(a.body.c,v.x,v.y,v.h,a.L,a.W,0,0); }
 function emSiren(){ try{ const c=audio.ctx; if(!c||!audio.master) return null; const o=c.createOscillator(), l=c.createOscillator(), lg=c.createGain(), g=c.createGain(), f=c.createBiquadFilter();
-    o.type='sawtooth'; o.frequency.value=810; l.type='square'; l.frequency.value=0.85; lg.gain.value=120; l.connect(lg); lg.connect(o.frequency); f.type='lowpass'; f.frequency.value=2200; o.connect(f); f.connect(g); g.gain.value=0; g.connect(audio.master); o.start(); l.start();
-    return {g,stop(){ try{ g.gain.setTargetAtTime(0,c.currentTime,0.05); setTimeout(()=>{ try{ o.stop(); l.stop(); g.disconnect(); }catch(e){} },400); }catch(e){} }, set(v){ try{ g.gain.setTargetAtTime(v,c.currentTime,0.08); }catch(e){} }}; }catch(e){ return null; } }
-function emSirenVol(x,y){ const d=Math.hypot(x-truck.x,y-truck.y); return 0.16*Math.max(0,1-d/260); }
+    o.type='sawtooth'; o.frequency.value=810; l.type='square'; l.frequency.value=0.85; lg.gain.value=120; l.connect(lg); lg.connect(o.frequency); f.type='lowpass'; f.frequency.value=2200; o.connect(f); f.connect(g); g.gain.value=0; let pn=null; try{ pn=c.createStereoPanner(); g.connect(pn); pn.connect(audio.master); }catch(e){ g.connect(audio.master); } o.start(); l.start();
+    return {g,stop(){ try{ g.gain.setTargetAtTime(0,c.currentTime,0.05); setTimeout(()=>{ try{ o.stop(); l.stop(); g.disconnect(); }catch(e){} },400); }catch(e){} }, set(v){ try{ const o=typeof v==='object'?v:{v,p:0}; g.gain.setTargetAtTime(o.v,c.currentTime,0.08); if(pn) pn.pan.setTargetAtTime(o.p,c.currentTime,0.08); }catch(e){} }}; }catch(e){ return null; } }
+// v31: quieter, falls off to silence about one screen from the player, stereo pan by side
+function emSirenVol(x,y){ const vr=viewRectM(), R=Math.max(40,Math.max(vr[2]-vr[0],vr[3]-vr[1])/2), d=Math.hypot(x-truck.x,y-truck.y), f=Math.max(0,1-d/(R*1.1)); return {v:0.055*f*f,p:Math.max(-1,Math.min(1,(x-truck.x)/R))*0.8}; }
 // road point just outside a services site's driveway
 function emRoadPt(s){ return {x:s.entrance.x,y:s.entrance.y-M_T*0.8}; }
 // move a kinematic vehicle along a polyline (metres); returns true when done
