@@ -51,7 +51,7 @@ function navBuild(path,target){
   turns.push({k:n-1,kind:'arrive'});
   return {target,path,P,cum,eta,turns,idx:0,len:cum[n-1]};
 }
-function setRoute(target){
+function setRoute(target){ if(!NAV._restoring) NAV.missOff=null;
   let tx,ty,name;
   if(typeof target==='string'){ const d=world.depots.find(o=>o.id===target||o.code===target), f=world.fuel.find(o=>o.id===target), g=world.garages.find(o=>o.id===target); target=d||f||g; if(!target) return null; }
   if(target.entrance){ tx=target.entrance.x/M_T; ty=target.entrance.y/M_T; name=target.name; } else { tx=target.x/M_T; ty=target.y/M_T; name=target.name||target.label||'Map point'; }
@@ -62,6 +62,10 @@ function setRoute(target){
   NAV.route=navBuild(p,tgt); NAV.route.ms=performance.now()-t0; NAV.offT=0; NAV.lastCalc=timeS;
   BigRig.emit('route',{target:tgt,length:NAV.route.len,ms:NAV.route.ms}); return NAV.route; }
 function clearRoute(){ NAV.route=null; }
+// player-facing cancel (✕ chip, map button, X key, RB-hold): custom routes clear at once; a mission route needs a second tap within 4 s and then stays hidden until the mission target changes
+function navIsMission(){ try{ const t=typeof missionTarget==='function'&&missionTarget(); return !!(t&&NAV.route&&NAV.route.target&&NAV.route.target.name===t.name); }catch(e){ return false; } }
+function userCancelRoute(){ if(!NAV.route) return; if(navIsMission()){ if(!(NAV.cfmT!=null&&timeS-NAV.cfmT<4)){ NAV.cfmT=timeS; flash('Mission route \u2022 press \u2715 again to hide it (the job stays active)'); return; }
+    NAV.missOff=NAV.route.target.name; NAV.cfmT=null; clearRoute(); flash('Mission route hidden \u2022 set it again from the map'); return; } clearRoute(); flash('Route cancelled'); }
 function chime(){ const c=audio.ctx; if(!c) return; const t=c.currentTime; [[880,0],[1175,0.16],[1568,0.32]].forEach(([f,dt])=>{ const o=c.createOscillator(), g=c.createGain(); o.type='sine'; o.frequency.value=f; g.gain.setValueAtTime(0.0001,t+dt); g.gain.exponentialRampToValueAtTime(0.25,t+dt+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+dt+0.5); o.connect(g); g.connect(audio.master); o.start(t+dt); o.stop(t+dt+0.55); }); }
 function updateNav(dt){ const R=NAV.route; if(!R) return; const f=fwd(truck.h), cx=truck.x+f[0]*2, cy=truck.y+f[1]*2;
   let best=R.idx, bd=1e9; const a=Math.max(0,R.idx-20), b=Math.min(R.P.length-1,R.idx+120); for(let k=a;k<=b;k++){ const d=Math.hypot(R.P[k][0]-cx,R.P[k][1]-cy); if(d<bd){ bd=d; best=k; } }
@@ -96,6 +100,7 @@ function drawNavHUD(){ const R=NAV.route; if(!R) return; const {x,y,w,h}=NAVP; c
   const dTurn=Math.max(0,R.cum[nt.k]-R.cum[R.idx]), dTot=Math.max(0,R.len-R.cum[R.idx]), eta=R.eta[R.idx];
   ctx.save(); ctx.fillStyle='rgba(10,14,22,0.85)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(x,y,w,h,12):ctx.rect(x,y,w,h); ctx.fill();
   ctx.fillStyle='#1e88e5'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(x+8,y+8,64,64,10):ctx.rect(x+8,y+8,64,64); ctx.fill(); drawTurnIcon(nt.kind,nt.ang,x+40,y+38);
+  { const cx=x+w-19, cy=y+19, m=navIsMission(); ctx.fillStyle=m?'rgba(120,130,145,0.9)':'rgba(214,48,49,0.92)'; ctx.beginPath(); ctx.arc(cx,cy,11,0,7); ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=2.4; ctx.beginPath(); ctx.moveTo(cx-4.5,cy-4.5); ctx.lineTo(cx+4.5,cy+4.5); ctx.moveTo(cx+4.5,cy-4.5); ctx.lineTo(cx-4.5,cy+4.5); ctx.stroke(); }
   ctx.textAlign='left'; ctx.fillStyle='#fff'; ctx.font='bold 26px system-ui,sans-serif'; ctx.fillText(fmtD(dTurn),x+82,y+36);
   ctx.font='12px system-ui,sans-serif'; ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.fillText({L:'Turn left',R:'Turn right',u:'U-turn',rb:'At the roundabout',arrive:'Arrive'}[nt.kind],x+82,y+56);
   ctx.fillStyle='#7fdcff'; ctx.font='bold 12px system-ui,sans-serif'; const m=Math.max(1,Math.round(eta/60)); ctx.fillText(fmtD(dTot)+' \u2022 ETA '+m+' min',x+10,y+88);
@@ -103,7 +108,7 @@ function drawNavHUD(){ const R=NAV.route; if(!R) return; const {x,y,w,h}=NAVP; c
   ctx.fillStyle='rgba(255,255,255,0.12)'; ctx.fillRect(x+w-30,y+8,22,22); ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.font='bold 13px system-ui'; ctx.fillText('\u2715',x+w-19,y+23);
   if(R.off>22){ ctx.fillStyle='#ffb020'; ctx.textAlign='left'; ctx.fillText('Off route',x+82,y+14); }
   ctx.restore(); }
-function navPanelClick(x,y){ if(NAV.route&&x>=NAVP.x+NAVP.w-30&&x<=NAVP.x+NAVP.w-8&&y>=NAVP.y+8&&y<=NAVP.y+30){ clearRoute(); flash('Route cancelled'); return true; } return false; }
+function navPanelClick(x,y){ if(NAV.route&&x>=NAVP.x+NAVP.w-40&&x<=NAVP.x+NAVP.w+4&&y>=NAVP.y-4&&y<=NAVP.y+36){ userCancelRoute(); return true; } return false; }
 // big-map icon hit test
 // icon radius on the big map grows with zoom (canvas px), clamped
 function mapIconR(z){ return Math.max(7,Math.min(18,5+2.2*z)); }
@@ -198,7 +203,7 @@ function missionFlag(X,Y,big){ const t=missionTarget(); if(!t) return; const tx=
   const nm=String(t.name||'Mission').replace(/^.*\u2022\s*/,big?String(t.name).split(' \u2022')[0]+' \u2022 ':''); ctx.font='bold '+(big?12:9)+'px sans-serif'; const w=ctx.measureText(nm).width+6;
   ctx.fillStyle='rgba(0,0,0,0.7)'; ctx.fillRect(x+11*s,y-20*s,w,big?15:11); ctx.fillStyle='#ffd600'; ctx.fillText(nm,x+11*s+3,y-20*s+(big?12:9)); ctx.restore(); }
 setTimeout(()=>{ const un=updateNav; let acc=0; updateNav=function(dt){ un.apply(this,arguments); acc+=dt; if(acc<1) return; acc=0;
-  try{ const t=missionTarget(); if(!t) return; if(NAV.route&&!(NAV.route.arrived&&NAV.route.target.name!==t.name)) return; const fl=flash; flash=()=>{}; try{ setRoute(t); NAV.restored=(NAV.restored||0)+1; } finally{ flash=fl; } }catch(e){} }; },0);
+  try{ const t=missionTarget(); if(!t||NAV.missOff===t.name) return; if(NAV.route&&!(NAV.route.arrived&&NAV.route.target.name!==t.name)) return; const fl=flash; flash=()=>{}; NAV._restoring=1; try{ setRoute(t); NAV.restored=(NAV.restored||0)+1; } finally{ flash=fl; NAV._restoring=0; } }catch(e){} }; },0);
 // v31: an uncoupled trailer abandoned on a road / junction is cleared after ~60 s off screen with the player (and every MP player) over a screen away;
 // coming back resets the timer. Bay/yard trailers stay. A mission trailer goes back to its pickup bay and the job stays valid (sat nav restores).
 function trlOnRoad(t){ const tx=Math.floor(t.x/M_T), ty=Math.floor(t.y/M_T); if(!inb(tx,ty)) return false; const i=idx(tx,ty); return isRoadT(i)||!!(world.jMask&&world.jMask[i]); }

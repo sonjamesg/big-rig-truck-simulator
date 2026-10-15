@@ -351,11 +351,18 @@ function drawFlyovers(vx0,vy0,vx1,vy1,alpha){ if(!world.flyovers||!world.flyover
 function isParkNear(tx,ty){ return get(tx+1,ty)===T.PGRASS||get(tx-1,ty)===T.PGRASS||get(tx,ty+1)===T.PGRASS||get(tx,ty-1)===T.PGRASS; }
 function getChunk(cx,cy,allowRender){
   const k=cx+','+cy; let c=chunkCache.get(k);
-  if(c) return c; if(!allowRender) return null;
-  c=renderChunk(cx,cy); chunkCache.set(k,c); chunkOrder.push(k);
-  if(chunkOrder.length>90){ const old=chunkOrder.shift(); chunkCache.delete(old); }
+  if(c){ chunkCache.delete(k); chunkCache.set(k,c); return c; } if(!allowRender) return null;   // LRU: a hit moves to the back
+  c=renderChunk(cx,cy); chunkCache.set(k,c);
+  while(chunkCache.size>90) chunkCache.delete(chunkCache.keys().next().value);
   return c;
 }
+// zoomed-out LOD: 128px copies of chunks with their own big LRU, so a wide fly-cam view never evicts what is on screen (was: FIFO 90 < visible → flicker)
+const chunkLo=new Map(), CHUNK_LO=128;
+function getChunkLo(cx,cy,allowRender){ const k=cx+','+cy; let c=chunkLo.get(k);
+  if(c){ chunkLo.delete(k); chunkLo.set(k,c); return c; }
+  const f=chunkCache.get(k)||(allowRender?getChunk(cx,cy,true):null); if(!f) return null;
+  c=mkCanvas(CHUNK_LO,CHUNK_LO); const g=c.getContext('2d'); g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high'; g.drawImage(f,0,0,CHUNK_LO,CHUNK_LO);
+  chunkLo.set(k,c); while(chunkLo.size>700) chunkLo.delete(chunkLo.keys().next().value); return c; }
 // ---- minimap
 let MINIMAP=null;
 function makeMinimap(){

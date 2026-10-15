@@ -95,7 +95,8 @@ function draw(){
   let budget=started?2:99;
   const c0x=Math.floor(vx0/CHUNK), c1x=Math.floor(vx1/CHUNK), c0y=Math.floor(vy0/CHUNK), c1y=Math.floor(vy1/CHUNK);
   for(let cy=c0y;cy<=c1y;cy++) for(let cx=c0x;cx<=c1x;cx++){
-    let c=getChunk(cx,cy,false); if(!c && budget>0){ c=getChunk(cx,cy,true); budget--; }
+    let c; if(z<0.34){ c=getChunkLo(cx,cy,false); if(!c&&budget>0){ c=getChunkLo(cx,cy,true); budget--; } }
+    else { c=getChunk(cx,cy,false); if(!c && budget>0){ c=getChunk(cx,cy,true); budget--; } if(!c) c=chunkLo.get(cx+','+cy); }
     if(c) ctx.drawImage(c,cx*CHUNK,cy*CHUNK,CHUNK+0.5,CHUNK+0.5);
   }
   // prefetch one chunk ahead in travel direction
@@ -282,6 +283,8 @@ addEventListener('resize',()=>{ if(bigmap.open) setTimeout(()=>mapFull(true),60)
 function openMap(){ if(!started) return; if(career.uiOpen) return; if(career.active&&career.active.phase==='unloading') return; bigmap.open=true; mapFull(true); bigmap.z=bigmap.zt=bigmap.saved||LOCAL_Z; mapCentreTruck(); }
 function closeMap(){ NAV.sel=null; if(bigmap.open) bigmap.saved=bigmap.zt||bigmap.z; bigmap.open=false; mapFull(false); }
 const MAPBTN=[['+',()=>mapZoomTo(bigmap.zt*1.6)],['−',()=>mapZoomTo(bigmap.zt/1.6)],['◎',mapCentreTruck],['✕',()=>closeMap()]];
+function CR_BTN(){ return [VW/2-90,VH-74,180,46]; }
+function drawCancelRouteBtn(){ if(!NAV.route) return; const [bx,by,bw,bh]=CR_BTN(), mi=navIsMission(); ctx.save(); ctx.fillStyle=mi?'rgba(70,80,95,0.92)':'rgba(200,40,40,0.92)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(bx,by,bw,bh,10):ctx.rect(bx,by,bw,bh); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='bold 15px system-ui,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(mi?'\u2715 HIDE MISSION ROUTE':'\u2715 CANCEL ROUTE',bx+bw/2,by+bh/2+1); ctx.restore(); }
 function mapBtnRect(i){ if(document.body.classList.contains('mapo')){ const i2=i===3?0:i+1; return [VW-96,(i===3?56:84+i2*76),76,68]; } return [VW-62,58+i*48,40,40]; }
 const mBX=t=>VW/2+(t-bigmap.cx)*bigmap.z, mBY=t=>VH/2+10+(t-bigmap.cy)*bigmap.z;
 function routeToMapPoint(x,y){ const tx=bigmap.cx+(x-VW/2)/bigmap.z, ty=bigmap.cy+(y-VH/2-10)/bigmap.z; const r=setRoute({x:tx*M_T,y:ty*M_T,name:'Map point'}); if(r) flash('Route set: '+fmtD(r.len)); }
@@ -325,7 +328,7 @@ function drawBigMap(){
   if(NAV.hover&&!(NAV.sel&&NAV.sel.o===NAV.hover.o)){ const hv=NAV.hover, t=hv.kind+': '+hv.name+'  (click: sat nav / fast travel)'; ctx.font='bold 12px system-ui,sans-serif'; const tw=ctx.measureText(t).width; const tx=Math.min(VW-tw-30,NAV.hx+14), ty=NAV.hy-12; ctx.fillStyle='rgba(10,14,22,0.92)'; ctx.fillRect(tx-6,ty-14,tw+12,22); ctx.strokeStyle='#f5b82e'; ctx.strokeRect(tx-6,ty-14,tw+12,22); ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.fillText(t,tx,ty+1); }
   ctx.fillStyle='#f5b82e'; ctx.font='bold 18px system-ui,sans-serif'; ctx.textAlign='left'; ctx.fillText('WORLD MAP',24,28); ctx.font='11px system-ui,sans-serif'; ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.fillText('1 km ≈ '+Math.round(250*bigmap.z)+' px',150,28);
   // buttons
-  ctx.textAlign='center'; ctx.textBaseline='middle'; MAPBTN.forEach(([t],i)=>{ const [bx,by,bw,bh]=mapBtnRect(i); ctx.fillStyle='rgba(12,18,28,0.85)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(bx,by,bw,bh,8):ctx.rect(bx,by,bw,bh); ctx.fill(); ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.lineWidth=1; ctx.stroke(); ctx.fillStyle='#fff'; ctx.font='bold 22px system-ui,sans-serif'; ctx.fillText(t,bx+bw/2,by+bh/2+1); });
+  drawCancelRouteBtn(); ctx.textAlign='center'; ctx.textBaseline='middle'; MAPBTN.forEach(([t],i)=>{ const [bx,by,bw,bh]=mapBtnRect(i); ctx.fillStyle='rgba(12,18,28,0.85)'; ctx.beginPath(); ctx.roundRect?ctx.roundRect(bx,by,bw,bh,8):ctx.rect(bx,by,bw,bh); ctx.fill(); ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.lineWidth=1; ctx.stroke(); ctx.fillStyle='#fff'; ctx.font='bold 22px system-ui,sans-serif'; ctx.fillText(t,bx+bw/2,by+bh/2+1); });
   // legend
   { if(bigmap.leg===undefined) bigmap.leg=!PORTRAIT_SQ; const items=[['#2e86de','D','Depot'],['#27ae60','F','Fuel'],['#e67e22','G','Garage'],['#d6336c','S','Mall / shop'],['#8e44ad','$','Dealer'],['#d62828','\u{1F692}','Fire station'],['#1d4fbf','\u{1F693}','Police station'],['#0a8f6a','+','Hospital'],['#ffffff','R','Station'],['#ffdd33','\u25B2','Your lorry'],['#4fd1ff','~P','Passenger train'],['#ff9f1a','~F','Freight train'],['#f39c12','Y','Haulage yard'],['#d63b2f','H','Haulage truck']];
     const lx0=28, w=bigmap.leg?232:92, h=bigmap.leg?24+Math.ceil(items.length/2)*17+4:24, ly0=VH-28-h; LEG_BTN=[lx0,ly0,w,h];
@@ -351,7 +354,7 @@ cv.addEventListener('pointerdown',e=>{ const [x,y]=canvasPos(e); downAt=[x,y,per
 cv.addEventListener('pointermove',e=>{ if(bigmap.open&&!bigmap.drag){ const [x,y]=canvasPos(e); NAV.hover=navPOIAt(x,y,mBX,mBY); NAV.hx=x; NAV.hy=y; cv.style.cursor=NAV.hover?'pointer':''; } if(bigmap.open&&bigmap.drag){ const [x,y]=canvasPos(e); bigmap.cx=bigmap.drag[2]-(x-bigmap.drag[0])/bigmap.z; bigmap.cy=bigmap.drag[3]-(y-bigmap.drag[1])/bigmap.z; mapClamp(); } });
 cv.addEventListener('pointerup',e=>{ const [x,y]=canvasPos(e); if(bigmap.btnDown){ const k=bigmap.btnDown; bigmap.btnDown=null; if(popBtnAt(x,y,14)===k) popAct(k); return; } const click=downAt&&Math.hypot(x-downAt[0],y-downAt[1])<6&&performance.now()-downAt[2]<400; bigmap.drag=null;
   if(bigmap.lp){ clearTimeout(bigmap.lp); bigmap.lp=null; }
-  if(click){ if(!bigmap.open&&navPanelClick(x,y)) return; if(bigmap.open){ let hitB=false; MAPBTN.forEach((b,i)=>{ const [bx,by,bw,bh]=mapBtnRect(i); if(x>=bx&&x<=bx+bw&&y>=by&&y<=by+bh) hitB=true; }); const inB=b=>b&&x>=b[0]&&x<=b[0]+b[2]&&y>=b[1]&&y<=b[1]+b[3]; if(NAV.sel&&inB(FT_BTN)){ const d=NAV.sel.o; NAV.sel=null; fastTravel(d); return; } if(NAV.sel&&inB(NAV_BTN)){ const sel=NAV.sel; NAV.sel=null; const r=setRoute(sel.o); if(r) flash('Sat nav to '+sel.name+': '+fmtD(r.len)); return; }
+  if(click){ if(!bigmap.open&&navPanelClick(x,y)) return; if(bigmap.open&&NAV.route&&x>=CR_BTN()[0]&&x<=CR_BTN()[0]+CR_BTN()[2]&&y>=CR_BTN()[1]&&y<=CR_BTN()[1]+CR_BTN()[3]){ userCancelRoute(); return; } if(bigmap.open){ let hitB=false; MAPBTN.forEach((b,i)=>{ const [bx,by,bw,bh]=mapBtnRect(i); if(x>=bx&&x<=bx+bw&&y>=by&&y<=by+bh) hitB=true; }); const inB=b=>b&&x>=b[0]&&x<=b[0]+b[2]&&y>=b[1]&&y<=b[1]+b[3]; if(NAV.sel&&inB(FT_BTN)){ const d=NAV.sel.o; NAV.sel=null; fastTravel(d); return; } if(NAV.sel&&inB(NAV_BTN)){ const sel=NAV.sel; NAV.sel=null; const r=setRoute(sel.o); if(r) flash('Sat nav to '+sel.name+': '+fmtD(r.len)); return; }
       const poi=hitB?null:navPOIAt(x,y,mBX,mBY); const was=NAV.sel; NAV.sel=null; const trn=(hitB||poi||typeof railMapTrainAt!=='function')?null:railMapTrainAt(x,y); if(typeof RAIL!=='undefined') RAIL.mapSel=trn||null; if(poi) NAV.sel=poi; else if(was||trn) hitB=true; MAPBTN.forEach(([t,f],i)=>{ const [bx,by,bw,bh]=mapBtnRect(i); if(x>=bx&&x<=bx+bw&&y>=by&&y<=by+bh) f(); }); } else if(x>=MM.x&&x<=MM.x+MM.w&&y>=MM.y&&y<=MM.y+MM.h) openMap(); } });
 cv.addEventListener('wheel',e=>{ if(!bigmap.open) return; e.preventDefault(); const [mx,my]=canvasPos(e); mapZoomTo((bigmap.zt||bigmap.z)*Math.exp(-e.deltaY*0.0018),mx,my); },{passive:false});
 addEventListener('keydown',e=>{ if(bigmap.open&&NAV.sel&&(e.code==='Enter'||e.code==='Space')){ const d=NAV.sel.o; NAV.sel=null; fastTravel(d); e.preventDefault(); return; }
@@ -360,7 +363,7 @@ addEventListener('keydown',e=>{ if(bigmap.open&&NAV.sel&&(e.code==='Enter'||e.co
 requestAnimationFrame(()=>setTimeout(boot,30));
 
 cv.addEventListener('contextmenu',e=>{ e.preventDefault(); if(!bigmap.open) return; const [x,y]=canvasPos(e); routeToMapPoint(x,y); });
-addEventListener('keydown',e=>{ if(e.code==='KeyX'&&NAV.route){ clearRoute(); flash('Route cancelled'); } });
+addEventListener('keydown',e=>{ if(e.code==='KeyX'&&NAV.route&&!e.repeat) userCancelRoute(); });
 
 // v7 keys: J job board, U unload, Esc closes panels; while a panel is open, game keys are swallowed
 addEventListener('keydown',e=>{ if(!world.ready) return;
