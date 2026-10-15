@@ -3,9 +3,9 @@
 // Data-driven: add a tier or a cargo by adding a row below.
 const TIERS=[
   {tier:1,xp:0,    name:'Rookie Haulier', payMult:1.00,maxKm:7,  color:'#3fb950',perks:['Curtain-siders & box vans','Local retail deliveries']},
-  {tier:2,xp:900,  name:'Regional Driver',payMult:1.30,maxKm:14, color:'#2f81f7',perks:['Fridge & container trailers','Cross-region routes, heavier loads','+30% pay rate']},
-  {tier:3,xp:3000, name:'Specialist',     payMult:1.65,maxKm:24, color:'#a371f7',perks:['Tankers & flatbeds','Fuel, machinery & high-value goods','+65% pay rate']},
-  {tier:4,xp:7000, name:'Elite Haulier',  payMult:2.10,maxKm:99, color:'#f0883e',perks:['Hazardous (ADR) loads','Any distance','+110% pay rate']}];
+  {tier:2,xp:2700, name:'Regional Driver',payMult:1.30,maxKm:14, color:'#2f81f7',perks:['Fridge & container trailers','Cross-region routes, heavier loads','+30% pay rate']},
+  {tier:3,xp:9000, name:'Specialist',     payMult:1.65,maxKm:24, color:'#a371f7',perks:['Tankers & flatbeds','Fuel, machinery & high-value goods','+65% pay rate']},
+  {tier:4,xp:22000,name:'Elite Haulier',  payMult:2.10,maxKm:99, color:'#f0883e',perks:['Hazardous (ADR) loads','Any distance','+110% pay rate']}];
 const CARGOS=[
   {id:'groc', name:'Groceries',            icon:'\u{1F6D2}',trl:'curtain',kg:[9000,15000], mult:1.00,tier:1,col:'#2e7d32'},
   {id:'cloth',name:'Clothing & shoes',     icon:'\u{1F45F}',trl:'box',    kg:[5000,8000],  mult:1.05,tier:1,col:'#6a1b9a'},
@@ -45,7 +45,7 @@ const levelNeed=n=>Math.round(120*Math.pow(n-1,1.55));            // cumulative 
 function levelOf(xp){ let n=1; while(xp>=levelNeed(n+1)) n++; return n; }
 function tierOf(xp){ let t=1; for(const T_ of TIERS) if(xp>=T_.xp) t=T_.tier; return t; }
 const tierInfo=t=>TIERS.find(x=>x.tier===t)||TIERS[TIERS.length-1];
-function addXP(n){ const before=career.tier; career.xp+=n; career.xpFx={t:timeS,n}; career.tier=tierOf(career.xp); BigRig.emit('xp',{xp:career.xp,add:n});
+function addXP(n){ const before=career.tier; career.xp+=n; career.xpFx={t:timeS,n}; career.tier=Math.max(before,tierOf(career.xp)); BigRig.emit('xp',{xp:career.xp,add:n});
   if(career.tier>before){ for(let t=before+1;t<=career.tier;t++){ BigRig.emit('tierUnlocked',{tier:t}); } celebrateTier(career.tier); refreshBoard(true); } }
 // ---------- truck models
 const modelArtCache={};
@@ -91,7 +91,7 @@ function saveGame(){ try{ if(!world.ready) return false; const tr=truck.trl, a=c
 function hasSave(){ try{ return JSON.parse(localStorage.getItem(saveKey())||(world.v2poi?'null':localStorage.getItem(SAVE_KEY_OLD))||'null'); }catch(e){ return null; } }
 function posOK(x,y){ if(!isFinite(x)||!isFinite(y)||x<0||y<0||x>MW*M_T||y>MH*M_T) return false; for(const [dx,dy] of [[0,0],[3,0],[-3,0],[0,3],[0,-3]]) if(solidAtM(x+dx,y+dy)) return false; return true; }
 function loadGame(){ const d=hasSave(); if(!d) return false;
-  truck.money=d.money??truck.money; if(typeof ownLoad==='function') ownLoad(d.own); truck.fuel=d.fuel??truck.fuel; truck.damage=d.damage||0; career.xp=d.xp||0; career.tier=tierOf(career.xp); career.owned=d.owned||['rigger']; if(!career.owned.includes('rigger')) career.owned.unshift('rigger');
+  truck.money=d.money??truck.money; if(typeof ownLoad==='function') ownLoad(d.own); truck.fuel=d.fuel??truck.fuel; truck.damage=d.damage||0; career.xp=d.xp||0; career.tier=Math.max(tierOf(career.xp),Math.min(TIERS.length,d.tier||1));   /* v41: tiers already earned under the old (lower) XP thresholds are kept */ career.owned=d.owned||['rigger']; if(!career.owned.includes('rigger')) career.owned.unshift('rigger');
   if(typeof d.gameT==='number') gameT=d.gameT; if(typeof d.gameDay==='number') gameDay=d.gameDay; if(d.wx){ WX.st=d.wx.st||'clear'; WX.timer=d.wx.t||200; WX.wet=WX.rain=d.wx.st==='rain'?1:0; WX.fog=d.wx.st==='fog'?1:0; } career.colors=d.colors||{}; career.tune=d.tune||{}; career.done=d.done||0; career.earned=d.earned||0; career.boardSeq=Math.max(career.boardSeq,d.boardSeq||1); applyModel(d.cur||'rigger'); if(d.settings) Object.assign(SETTINGS,d.settings); if(typeof HB!=='undefined'){ HB.on=!!d.hb; HB.k=HB.on?1:0; }
   if(d.name&&!localStorage.getItem('bigrig.name')) localStorage.setItem('bigrig.name',d.name);
   if(d.trailer===null&&truck.trl){ const t=truck.trl; t.coupled=false; truck.trl=null; const i=world.trailers.indexOf(t); if(i>=0) world.trailers.splice(i,1); }
@@ -123,7 +123,7 @@ function makeJob(tierWanted,band){ const tier=Math.max(1,Math.min(TIERS.length,t
   for(let tries=0;tries<60;tries++){ let pk=pickupsFor(c); if(band==='local') pk=pk.filter(d=>Math.hypot(d.entrance.x-H.x,d.entrance.y-H.y)<JOB_LOCAL_KM*1000); const from=pk[(R7()*pk.length)|0]; if(!from) return null;
     let dl=dropsFor(c,from); if(band==='local') dl=dl.filter(d=>Math.hypot(d.entrance.x-H.x,d.entrance.y-H.y)<JOB_LOCAL_KM*1000); const to=dl[(R7()*dl.length)|0]; if(!to) continue;
     const km=Math.hypot(to.entrance.x-from.entrance.x,to.entrance.y-from.entrance.y)*1.3/1000;
-    if(band==='local'){ if(km<0.6||km>4.5) continue; } else if(band==='long'){ if(km<7) continue; } else { if(km<1.0||km>T_.maxKm||km>=7||(tier>1&&km<(tier-1)*2.2)) continue; }
+    if(band==='local'){ if(km<0.6||km>4.5) continue; } else if(band==='long'){ if(km<7) continue; } else { if(km<1.0||km>T_.maxKm||(tier===1&&km>=7)||(tier>1&&km<(tier-1)*1.6)) continue; }
     const kg=Math.round((c.kg[0]+R7()*(c.kg[1]-c.kg[0]))/100)*100, TT=TRAILER_TYPES[c.trl];
     const pay=jobPay(km,c,T_,kg,band), xp=Math.round((55+38*km)*c.mult*(0.8+tier*0.35)*(band==='long'?1.2:1));
     return {id:'J'+(career.boardSeq++),cargo:c,tier,from,to,km,kg,weight:kg+TT.tare,trailerType:TT.name,pay,xp,mins:Math.round(km/42*60+3),approx:true,fresh:true,band}; }
@@ -136,11 +136,13 @@ function makeRepeat(){ const H=(career.hist||[]).filter(h=>{ const c=CARGOS.find
   const km=Math.hypot(to.entrance.x-from.entrance.x,to.entrance.y-from.entrance.y)*1.3/1000, kg=Math.round((c.kg[0]+R7()*(c.kg[1]-c.kg[0]))/100)*100, TT=TRAILER_TYPES[c.trl];
   const pay=Math.round(jobPay(km,c,T_,kg,h.b)*(0.92+R7()*0.16)/10)*10, xp=Math.round((55+38*km)*c.mult*(0.8+c.tier*0.35)*(h.b==='long'?1.2:1));
   return {id:'J'+(career.boardSeq++),cargo:c,tier:c.tier,from,to,km,kg,weight:kg+TT.tare,trailerType:TT.name,pay,xp,mins:Math.round(km/42*60+3),approx:true,fresh:true,band:h.b||'med',repeat:(h.n||1)}; }
-function fillBoard(){ const want=10; career.jobs=career.jobs.filter(j=>!j.taken); if(typeof portBoardJobs==='function'&&!career.jobs.some(j=>j.portBoard)){ const ear=jobEarly(); let n=0; for(const j of portBoardJobs()){ if(n>=2||(ear&&(j.km>4.5||Math.hypot(j.from.entrance.x-jobHome().x,j.from.entrance.y-jobHome().y)>JOB_LOCAL_KM*1000))) continue; if(!ear&&j.km>=7){ j.band='long'; j.pay=Math.round(j.pay*1.35/10)*10; } career.jobs.push(j); n++; } } const top=Math.min(TIERS.length,career.tier+1);
+function fillBoard(){ const want=10+3*(career.tier-1); career.jobs=career.jobs.filter(j=>!j.taken); if(typeof portBoardJobs==='function'&&!career.jobs.some(j=>j.portBoard)){ const ear=jobEarly(); let n=0; for(const j of portBoardJobs()){ if(n>=2||(ear&&(j.km>4.5||Math.hypot(j.from.entrance.x-jobHome().x,j.from.entrance.y-jobHome().y)>JOB_LOCAL_KM*1000))) continue; if(!ear&&j.km>=7){ j.band='long'; j.pay=Math.round(j.pay*1.35/10)*10; } career.jobs.push(j); n++; } } const top=Math.min(TIERS.length,career.tier+1);
   const early=jobEarly(), cnt=b=>career.jobs.filter(j=>j.band===b).length; let guard=0;
   if(!early&&(career.hist||[]).length) for(let k=0;k<2&&career.jobs.filter(j=>j.repeat).length<2&&career.jobs.length<want;k++){ const j=makeRepeat(); if(j) career.jobs.push(j); }
   while(career.jobs.length<want&&guard++<40){ const nLocked=career.jobs.filter(j=>j.tier>career.tier).length; let t; if(career.tier<TIERS.length&&nLocked<2&&!early) t=top; else t=1+((R7()*career.tier)|0);
     const band=early?'local':cnt('local')<2?'local':cnt('long')<3?'long':'med'; const j=makeJob(t,band)||(band!=='med'?makeJob(t,'med'):null); if(j) career.jobs.push(j); }
+  // v41: every unlocked tier >=2 always shows several of its own jobs (longer, better paid), plus a couple of next-tier teasers
+  if(!early) for(let t=2;t<=Math.min(TIERS.length,career.tier+1);t++){ const need=t<=career.tier?4:2; let g2=0; while(career.jobs.filter(j=>j.tier===t).length<need&&g2++<30){ const j=makeJob(t,R7()<0.55?'long':'med')||makeJob(t,'med'); if(j) career.jobs.push(j); } }
   if(early&&(career.hist||[]).length) { const j=makeRepeat(); if(j&&Math.hypot(j.from.entrance.x-jobHome().x,j.from.entrance.y-jobHome().y)<JOB_LOCAL_KM*1000){ career.jobs.push(j); } } }
 function refreshBoard(keep){ if(!keep) career.jobs=[]; fillBoard(); if(career.uiOpen==='board') renderBoard(); }
 function jobRoute(j){ if(j.path!==undefined) return j.path; const a=navSnap(j.from.entrance.x/M_T,j.from.entrance.y/M_T,70), b=navSnap(j.to.entrance.x/M_T,j.to.entrance.y/M_T,70);
