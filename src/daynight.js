@@ -820,7 +820,8 @@ function slBuild() {
       ty = Math.floor(py);
     if (!inb(tx, ty)) return false;
     const i = idx(tx, ty);
-    if (BAD.has(G[i]) || (world.reserved && world.reserved[i]) || railT.has(tx + "," + ty))
+    const inMB = world.milbase && mbInside(tx, ty); // v45: base roads get lamps although the base is reserved
+    if (BAD.has(G[i]) || (world.reserved && world.reserved[i] && !inMB) || railT.has(tx + "," + ty))
       return false;
     for (const d of world.depots || [])
       if (tx >= d.x - 1 && tx <= d.x + d.w && ty >= d.y - 1 && ty <= d.y + d.h) return false;
@@ -864,8 +865,8 @@ function slBuild() {
         onB =
           inb(Math.floor(cx), Math.floor(cy)) &&
           G[idx(Math.floor(cx), Math.floor(cy))] === T.BRIDGE;
-      if (z === 2 && !mw && !onB) continue;
-      const sp = onB ? 6 : z === 0 ? 5 : mw && z === 2 ? 10 : 12;
+      if (z === 2 && !mw && !onB && !sg.mil) continue;
+      const sp = sg.mil ? 6 : onB ? 6 : z === 0 ? 5 : mw && z === 2 ? 10 : 12;
       if ((a - sg.b0) % sp !== 0 || inJ(Math.floor(cx), Math.floor(cy))) continue;
       n++;
       if (onB) {

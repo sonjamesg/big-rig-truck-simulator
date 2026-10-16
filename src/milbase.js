@@ -18,7 +18,7 @@ const MB = {
   gx1: 1254, // gap in the south fence for the gate avenue
   av: 1248, // gate avenue (2-way, 4 tiles: x1248..1251) from the spine down to the external road at y353
   barY: 335.5,
-  rt: { bars: [0, 0], mil: 0, spT: 3, err: null, heli: [] },
+  rt: { bars: [0, 0], mil: 0, spT: 3, err: null },
 };
 const MB_HP = [
   [1092, 180],
@@ -56,6 +56,9 @@ function mbDepotOpts() {
       yardAt: [1262, 243],
     },
   };
+}
+function mbInside(tx, ty) {
+  return tx >= MB.x0 - 2 && tx <= MB.x1 + 2 && ty >= MB.y0 - 2 && ty <= 352;
 }
 // ---------------------------------------------------------------- collision (player)
 function mbSolidM(mx, my) {
@@ -630,65 +633,7 @@ function mbTrailerCanvas(kind) {
   MBS[key] = { c };
   return c;
 }
-// ---------------------------------------------------------------- helicopters (pure functions of time)
-// each flies a loop: idle on pad (rotors spool) -> climb -> circuit -> approach -> land
-const MB_HELI = [
-  { pad: 0, T: 160, k: "wildcat", off: 0, cx: 1250, cy: 120, rx: 150, ry: 60 },
-  { pad: 2, T: 180, k: "chinook", off: 70, cx: 1180, cy: 260, rx: 90, ry: 110 },
-  { pad: 4, T: 220, k: "wildcat", off: 130, cx: 1360, cy: 250, rx: 120, ry: 90 },
-];
-function mbHeliAt(H, t) {
-  const [px, py] = MB_HP[H.pad],
-    T_ = TILE,
-    u = (((t + H.off) % H.T) + H.T) % H.T,
-    idle = 30,
-    up = 14,
-    fly = H.T - idle - up * 2;
-  const pad = { x: px * T_, y: py * T_ };
-  const ang0 = -Math.PI / 2;
-  const circ = (f) => {
-    const a = ang0 + f * Math.PI * 2;
-    return { x: (H.cx + Math.cos(a) * H.rx) * T_, y: (H.cy + Math.sin(a) * H.ry) * T_, a };
-  };
-  const ss = (x) => x * x * (3 - 2 * x);
-  if (u < idle)
-    return {
-      x: pad.x,
-      y: pad.y,
-      alt: 0,
-      h: 0,
-      rot: Math.min(1, Math.max(0, (u - idle + 12) / 10)),
-    };
-  if (u < idle + up) {
-    const f = (u - idle) / up,
-      c = circ(0),
-      m = ss(Math.max(0, (f - 0.35) / 0.65));
-    return {
-      x: pad.x + (c.x - pad.x) * m,
-      y: pad.y + (c.y - pad.y) * m,
-      alt: ss(f),
-      h: Math.atan2(c.x - pad.x, -(c.y - pad.y)),
-      rot: 1,
-    };
-  }
-  if (u < idle + up + fly) {
-    const f = (u - idle - up) / fly,
-      c = circ(f),
-      e = 0.002,
-      c2 = circ(f + e);
-    return { x: c.x, y: c.y, alt: 1, h: Math.atan2(c2.x - c.x, -(c2.y - c.y)), rot: 1 };
-  }
-  const f = (u - idle - up - fly) / up,
-    c = circ(1),
-    m = ss(Math.min(1, f / 0.65));
-  return {
-    x: c.x + (pad.x - c.x) * m,
-    y: c.y + (pad.y - c.y) * m,
-    alt: 1 - ss(f),
-    h: Math.atan2(pad.x - c.x, -(pad.y - c.y)),
-    rot: f > 0.95 ? 1 - (f - 0.95) * 4 : 1,
-  };
-}
+// ---------------------------------------------------------------- helicopter art (the helicopters themselves live in heli.js)
 function mbHeliBody(k) {
   const key = "heli:" + k;
   if (MBS[key]) return MBS[key];
@@ -738,9 +683,8 @@ function mbHeliBody(k) {
   };
   return MBS[key];
 }
-function mbDrawHeli(g, H, t) {
-  const s = mbHeliAt(H, t),
-    B = mbHeliBody(H.k),
+function mbDrawHeli(g, s, k, t) {
+  const B = mbHeliBody(k),
     sc = 1 + s.alt * 0.35,
     lift = s.alt * 70;
   const blit = (img, x, y, a, k) => {
@@ -1068,10 +1012,6 @@ function mbDrawLow(vx0, vy0, vx1, vy1) {
   }
   // night: floodlights (consumed by drawNight)
   if (DN.dark > 0.05)
-    for (const [x, y, rr] of B.lights)
-      if (x * T_ > vx0 - 400 && x * T_ < vx1 + 400 && y * T_ > vy0 - 400 && y * T_ < vy1 + 400)
-        dnLight(x * T_, y * T_, rr * T_ * 1.1, "rgba(255,238,200,0.95)", 0.75);
-  if (DN.dark > 0.05)
     for (const s of mbSearch(t)) dnLight(s.x, s.y, 5.5 * T_, "rgba(240,248,255,0.95)", 0.9);
 }
 function mbSearch(t) {
@@ -1107,7 +1047,6 @@ function mbDrawHigh(vx0, vy0, vx1, vy1) {
       g.fillRect(px + s * ((L * i) / 6), py - 1.8, s * (L / 6), 3.6);
     }
   }
-  MB.rt.heli = MB_HELI.map((H) => mbDrawHeli(g, H, timeS));
 }
 function mbDrawNight(vx0, vy0, vx1, vy1) {
   if (!mbVis(vx0, vy0, vx1, vy1) || DN.dark < 0.05) return;
@@ -1145,16 +1084,6 @@ function mbDrawNight(vx0, vy0, vx1, vy1) {
       g.fill();
     }
   });
-  for (const s of MB.rt.heli || [])
-    if (s && s.alt > 0.02) {
-      const gr = g.createRadialGradient(s.x, s.y + s.alt * 70, 0, s.x, s.y + s.alt * 70, 90);
-      gr.addColorStop(0, "rgba(255,255,230," + 0.35 * k + ")");
-      gr.addColorStop(1, "rgba(255,255,230,0)");
-      g.fillStyle = gr;
-      g.beginPath();
-      g.arc(s.x, s.y + s.alt * 70, 90, 0, 7);
-      g.fill();
-    }
   for (const [x, y] of world.milbase.lights) {
     g.fillStyle = "rgba(255,240,200," + 0.8 * k + ")";
     g.beginPath();
@@ -1582,3 +1511,44 @@ OBJX.mb = function (g, o) {
     }
   }
 };
+
+// ---------------------------------------------------------------- night lighting (baked into the night light map, like the docks)
+// floodlight pools on every mast, every building front/back, each depot bay row, helipads, motor pool, range lanes and the parade ground
+function mbSiteLights(add) {
+  const B = world.milbase;
+  if (!B) return;
+  const T_ = TILE;
+  for (const [x, y, rr] of B.lights) add(x * T_, y * T_, rr * T_ * 1.5, "fl");
+  for (const o of world.objects) {
+    if (o.kind !== "mb") continue;
+    if (o.t === "bld") {
+      const r = Math.max(110, Math.min(260, o.w * 0.4));
+      for (let x = o.x + r * 0.6; x < o.x + o.w; x += r * 1.3) {
+        add(x, o.y + o.h + 24, r, "fl");
+        add(x, o.y - 24, r * 0.8, "fl");
+      }
+    } else if (o.t === "hpad") add(o.cx, o.cy, 7 * T_, "fl");
+    else if (o.t === "net" || o.t === "cstack" || o.t === "hard" || o.t === "conc")
+      for (let y = o.y + 4 * T_; y < o.y + o.h; y += 10 * T_)
+        for (let x = o.x + 4 * T_; x < o.x + o.w; x += 10 * T_) add(x, y, 7 * T_, "fl");
+  }
+  for (const rw of (B.depot && B.depot.rows) || [])
+    for (let x = rw.x0; x < rw.x0 + rw.n * rw.bw; x += 6)
+      add(x * T_, (rw.y0 - 1) * T_, 6 * T_, "fl");
+  for (let x = 1186; x < 1326; x += 11)
+    for (const y of [169, 180, 191, 202, 213]) add(x * T_, y * T_, 10 * T_, "fl");
+  for (let x = 1388; x < 1432; x += 11)
+    for (let y = 172; y < 214; y += 11) add(x * T_, y * T_, 8 * T_, "fl");
+}
+setTimeout(() => {
+  if (typeof siteLights !== "function") return;
+  const sl = siteLights;
+  siteLights = function (add) {
+    sl.apply(this, arguments);
+    try {
+      mbSiteLights(add);
+    } catch (e) {
+      console.warn("milbase lights", e);
+    }
+  };
+}, 0);

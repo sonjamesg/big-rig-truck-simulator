@@ -471,6 +471,7 @@ function frame(ts) {
   }
   updatePort(dt);
   mbUpdate(dt);
+  hlUpdate(dt);
   {
     const z = cam.z;
     updateAmbient(dt, [
@@ -564,6 +565,7 @@ function draw() {
   drawNavWorld();
   drawCareerWorld(vx0, vy0, vx1, vy1);
   drawParkedTrailers(vx0, vy0, vx1, vy1);
+  hlDrawPads(vx0, vy0, vx1, vy1);
   drawTraffic(vx0, vy0, vx1, vy1);
   mbDrawLow(vx0, vy0, vx1, vy1);
   drawPortLow(vx0, vy0, vx1, vy1);
@@ -585,9 +587,11 @@ function draw() {
     if (o.x > vx0 - 400 && o.x < vx1 + 400 && o.y > vy0 - 400 && o.y < vy1 + 400) drawOverhead(o);
   drawAmbientHigh(VR);
   mbDrawHigh(vx0, vy0, vx1, vy1);
+  hlDrawHigh(vx0, vy0, vx1, vy1);
   drawWeather(vx0, vy0, vx1, vy1, z);
   drawNight(vx0, vy0, vx1, vy1, z);
   mbDrawNight(vx0, vy0, vx1, vy1);
+  hlDrawNight(vx0, vy0, vx1, vy1);
   drawStreetLamps(vx0, vy0, vx1, vy1);
   drawSigNight();
   drawPortNight(vx0, vy0, vx1, vy1);
@@ -1344,6 +1348,11 @@ function drawMinimap() {
     (m) => y + (m / 4 - (cyT - sh / 2)) * sc,
     false,
   );
+  hlDrawMap(
+    (m) => x + (m / 4 - (cxT - span / 2)) * sc,
+    (m) => y + (m / 4 - (cyT - sh / 2)) * sc,
+    false,
+  );
   for (const t of world.trailers) {
     if (t.coupled) continue;
     const mx = x + (t.x / 4 - (cxT - span / 2)) * sc,
@@ -1663,6 +1672,11 @@ function drawBigMap() {
       true,
     );
   mpDrawMap(
+    (m) => BX(m / 4),
+    (m) => BY(m / 4),
+    true,
+  );
+  hlDrawMap(
     (m) => BX(m / 4),
     (m) => BY(m / 4),
     true,
