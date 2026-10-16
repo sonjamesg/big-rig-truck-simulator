@@ -168,6 +168,7 @@ function flyCamTick(dt) {
   cam.z = FLY.z;
 }
 function flyHUD() {
+  if (typeof bigmap !== "undefined" && bigmap.open) return;
   if (!FLY.on) return;
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -204,7 +205,8 @@ function flyHUD() {
 function flyBtnSync() {
   const b = FLY.btn;
   if (!b) return;
-  b.style.display = flyAllowed() ? "block" : "none";
+  b.style.display =
+    flyAllowed() && !(typeof bigmap !== "undefined" && bigmap.open) ? "block" : "none"; // hidden while the full map is open
   b.style.background = FLY.on ? "#c62828" : "rgba(15,20,30,0.78)";
 }
 // input (capture phase: while flying, movement keys / Tab / Esc belong to the camera)

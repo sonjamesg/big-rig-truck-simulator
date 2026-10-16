@@ -1452,6 +1452,7 @@ addEventListener("resize", () => {
   if (bigmap.open) setTimeout(() => mapFull(true), 60);
 });
 function openMap() {
+  setTimeout(() => typeof flyBtnSync === "function" && flyBtnSync(), 0);
   if (!started) return;
   if (career.uiOpen) return;
   if (career.active && career.active.phase === "unloading") return;
@@ -1461,6 +1462,7 @@ function openMap() {
   mapCentreTruck();
 }
 function closeMap() {
+  setTimeout(() => typeof flyBtnSync === "function" && flyBtnSync(), 0);
   NAV.sel = null;
   if (bigmap.open) bigmap.saved = bigmap.zt || bigmap.z;
   bigmap.open = false;
