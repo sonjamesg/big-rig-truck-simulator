@@ -1249,20 +1249,20 @@ function apLandside(A, night) {
     T_ = TILE,
     rnd = mulberry(77);
   // drop-off loop + kerbside along the terminal front (real road tiles already laid; this is the painted surface)
-  // v41: arrivals frontage is a real road now (389..433 x 689..691); paint drop-off bays + DROP OFF lettering on the kerb lane by the doors, zebras across to the car parks
+  // v41: arrivals frontage is a real road now (392..433 x 692..694, v44: moved south clear of the canopy); paint drop-off bays + DROP OFF lettering on the kerb lane by the doors, zebras across to the car parks
   g.strokeStyle = "#f0f0f0";
   g.lineWidth = 0.14 * T_;
   for (const bx of APX_BAYS) {
-    g.strokeRect((bx - 2.4) * T_, 689.1 * T_, 4.8 * T_, 1.1 * T_);
+    g.strokeRect((bx - 2.4) * T_, 692.1 * T_, 4.8 * T_, 1.1 * T_);
   }
   g.fillStyle = "rgba(255,255,255,0.85)";
   g.font = "bold " + 0.55 * T_ + "px sans-serif";
   g.textAlign = "center";
-  for (const bx of APX_BAYS) g.fillText("DROP OFF", bx * T_, 689.85 * T_);
+  for (const bx of APX_BAYS) g.fillText("DROP OFF", bx * T_, 692.85 * T_);
   g.textAlign = "left";
   g.fillStyle = "#f0f0f0";
   for (const zx of [398, 424]) {
-    for (let k = 0; k < 5; k++) g.fillRect((zx + k * 0.7) * T_, 689.2 * T_, 0.4 * T_, 2.6 * T_);
+    for (let k = 0; k < 5; k++) g.fillRect((zx + k * 0.7) * T_, 692.2 * T_, 0.4 * T_, 2.6 * T_);
   }
   // v40: tidy outer kerb on the access road's south-east L-bend (410..414,716..720): pave outside a 4-tile arc round the inner corner
   {
@@ -1349,7 +1349,7 @@ function apLandside(A, night) {
   apPeds(A);
   apDropPeds();
   if (night > 0.05 && typeof dnLight === "function") {
-    for (let x = 360; x < 442; x += 10) dnLight(x * T_, 690 * T_, 90, "rgba(255,225,170,0.7)", 0.7);
+    for (let x = 360; x < 442; x += 10) dnLight(x * T_, 691 * T_, 90, "rgba(255,225,170,0.7)", 0.7);
     dnLight(431 * T_, 710 * T_, 160, "rgba(255,225,170,0.6)", 0.6);
     dnLight(370 * T_, 702 * T_, 200, "rgba(255,225,170,0.55)", 0.55);
   }
@@ -1792,6 +1792,8 @@ function apSolidM(mx, my) {
   if (!A) return false;
   const x = mx / M_T,
     y = my / M_T;
+  // v44: the whole terminal (both halls + the roofed rail corridor between them) is solid: no driving under / onto the roof
+  if (A.term && x >= A.term.x0 && x < A.term.x1 && y >= A.term.y0 && y < A.term.y1) return true;
   if (x < A.x0 || x > A.x1 || y < A.y0 || y > A.y1) return false;
   const L = apPlaneSolids();
   if (!L) return false;
@@ -1827,13 +1829,13 @@ setTimeout(() => {
           }
           continue;
         }
-        if (ty > 689 && ty < 692 && ((v.id * 2654435761) >>> 0) % 3 === 0)
+        if (ty > 692 && ty < 695 && ((v.id * 2654435761) >>> 0) % 3 === 0)
           for (const bx of APX_BAYS)
             if (Math.abs(tx - bx) < 0.8) {
               v._drop = { t: timeS, x: v.x, y: v.y };
               APDROP.peds.push({
                 x: tx,
-                y: 688.4,
+                y: 691.6,
                 t: timeS,
                 c: ["#e67e22", "#2980b9", "#8e44ad", "#16a085"][v.id % 4],
               });
@@ -1859,8 +1861,8 @@ function apDropPeds() {
     const e = timeS - p.t;
     if (e < 1.5) continue;
     const k = Math.min(1, (e - 1.5) / 6),
-      x = (p.x + 0.6 + k * 2.4) * T_,
-      y = 688.45 * T_;
+      x = (p.x + 0.6) * T_,
+      y = (691.6 - k * 3.1) * T_; // v44: walks north across the drop-off plaza to the doors
     if (k >= 1) continue;
     g.fillStyle = "rgba(0,0,0,0.25)";
     g.beginPath();

@@ -2733,6 +2733,8 @@ function portBoardJobs() {
   for (const P of portList()) {
     const from = P.depot;
     if (!from || !portPickBays(P).length) continue;
+    // v44: no import boxes in the yard -> don't offer pickups that START MISSION would refuse
+    if (P === world.port && from.code === "APT" && P.stock - P.impClaim <= 0) continue;
     const dests = world.depots
       .filter((d) => d !== from && d.bays && d.bays.length && d.code !== "APT")
       .concat((world.malls || []).filter((m) => m.bays && m.bays.length));
@@ -3606,8 +3608,9 @@ setTimeout(() => {
     const P = P0();
     if (P && j && j.cargo && j.cargo.dock && j.from && j.from.code === "APT") {
       if (P.stock - P.impClaim <= 0) {
-        if (typeof flash === "function")
-          flash("No import containers in the Albion yard yet \u2022 the next ship is due soon");
+        career.blockMsg =
+          "No import containers in the Albion yard yet \u2022 the next ship is due soon";
+        if (typeof flash === "function") flash(career.blockMsg);
         return false;
       }
     }

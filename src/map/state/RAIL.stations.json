@@ -1,8 +1,8 @@
 {"$tab":["fixed","name","kind","s","s0","res","len","dwell","_ok"],"ids":[0,0,0,0,0,0,0,0,0,0,0,5221,0,0],"rows":[
   [false,"Ashby","rural",1327,1503,false,120,21,1],
   [false,"Wendwood","rural",3552,3201,false,120,24,1],
+  [false,"Millford","town",4056,4177,false,160,23,1],
   [false,"Albion Central","city",5595,5595,true,200,30,1],
-  [false,"Millford","town",7368,4177,false,160,23,1],
   [true,"Albion Airport","city",7565,7565,false,200,30,1],
   [false,"Sound Coast","coast",10244,10183,false,120,22,1],
   [false,"Dustwater","desert",10724,10754,false,120,27,1],

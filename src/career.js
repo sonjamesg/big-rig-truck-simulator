@@ -1116,7 +1116,10 @@ function jobRoute(j) {
   return p;
 }
 function acceptJob(j) {
-  if (j.tier > career.tier) return false;
+  if (j.tier > career.tier) {
+    career.blockMsg = "Tier " + j.tier + " required for this job";
+    return false;
+  }
   if (career.active) abandonJob(true);
   const dp = j.from,
     BAYS = j.pickBays || dp.bays;

@@ -1778,13 +1778,13 @@ function* genWorldSteps() {
   world.cornerAt = new Int32Array(MW * MH).fill(-1);
   {
     // v36: Albion Airport landside access: forecourt -> west along 716 -> down to the town grid (seg at x346 from y780), laid before junctions so AI + sat nav use it
-    road("v", 410, 689, 715, 4, "town");
+    road("v", 410, 692, 715, 4, "town");
     road("h", 716, 346, 413, 4, "town");
     road("h", 700, 388, 410, 3, "town");
     road("h", 708, 414, 490, 3, "town");
-    road("h", 689, 392, 433, 3, "town");
-    road("v", 392, 689, 702, 3, "town");
-    road("v", 431, 689, 709, 3, "town"); // v41: arrivals/drop-off frontage loop (real road)
+    road("h", 692, 392, 433, 3, "town"); // v44: frontage moved 3 tiles south, clear of the terminal canopy
+    road("v", 392, 692, 702, 3, "town");
+    road("v", 431, 692, 709, 3, "town"); // v41: arrivals/drop-off frontage loop (real road)
     // v39: car park access roads (MSCP ramp, surface parks)
     const tg = world.segs.find((q) => q.dir === "v" && q.a === 346 && q.b0 === 780);
     if (tg) {
@@ -1994,7 +1994,7 @@ function* genWorldSteps() {
       J.y >= 688 &&
       J.y <= 709 &&
       (J.x === 392 || J.x === 431) &&
-      J.y === 689
+      J.y === 692
     )
       J.lights = false; // v42: forecourt corners are plain bends; the T-junctions keep signals
   for (const rb of world.rbs) {
@@ -3079,7 +3079,8 @@ function* genWorldSteps() {
     ];
     A.ms = { x0: 354, x1: 388, y0: 692, y1: 714 };
     // footpaths: drop-off kerb + links from both parks to the terminal front door
-    for (let x = 360; x < 500; x++) if (G[idx(x, 689)] !== T.ROAD) set(x, 689, T.WALK);
+    for (let y = 689; y < 692; y++)
+      for (let x = 360; x < 500; x++) if (G[idx(x, y)] !== T.ROAD) set(x, y, T.WALK); // v44: drop-off plaza between the doors and the frontage road
     for (let y = 689; y < 700; y++) {
       if (G[idx(388, y)] !== T.ROAD) set(388, y, T.WALK);
     }

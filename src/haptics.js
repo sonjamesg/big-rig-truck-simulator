@@ -37,6 +37,7 @@ function haptic(p, force) {
   } catch (e) {}
 }
 const HAP_STRONG = { mHorn: 1, mCouple: 1, mFuel: 1, mUnload: 1 };
+const HAP_DP = { mLeft: 15, mRight: 15 }; // v44: short crisp pulse on the steering arms of the D-pad
 // Old saves: an off switch from before vibV=2 (start screen became scrollable, easy to knock) is ignored until re-chosen.
 // Deck presses are touch by definition: force past the HAP.touch gate (a keydown from a paired pad/keyboard used to zero it), dedupe pointerdown+touchstart.
 function hapPress(id) {
@@ -46,7 +47,7 @@ function hapPress(id) {
   HAP.pt = n;
   HAP.touch = 1;
   HAP.last = n;
-  haptic(HAP_STRONG[id] ? 35 : HAP_PRESS, true);
+  haptic(HAP_STRONG[id] ? 35 : HAP_DP[id] || HAP_PRESS, true);
 }
 // Backup path: if a browser skips/cancels pointerdown on a deck button, buzz on touchstart instead.
 addEventListener(

@@ -8,7 +8,7 @@
  */
 "use strict";
 // ===================== v44 wanted stars (capped at 2 for now): heat score, 2-star police response, roadblocks
-// 1 star = the existing wanted / chase behaviour. Heat builds from offences (more while already wanted); 100 heat while wanted -> 2 stars.
+// 1 star = the existing wanted / chase behaviour. Heat builds from offences (more while already wanted); WANT2_HEAT (180) heat while wanted -> 2 stars.
 const HEAT = {
   pedestrian: 50,
   property: 22,
@@ -19,6 +19,9 @@ const HEAT = {
   flee: 15,
 };
 const RB = { list: [], cool: 0, made: 0, removed: 0 };
+// v44b: 2 stars came far too easily (100 heat). Raised threshold, gentler while-wanted multiplier, faster decay.
+const WANT2_HEAT = 180,
+  WANT2_DROP = 90;
 WANT.heat = 0;
 WANT.star = -9;
 function wantStars() {
@@ -26,10 +29,10 @@ function wantStars() {
 }
 function wantHeat(type, amt) {
   amt = amt ?? HEAT[type] ?? 10;
-  if (wantStars()) amt *= 1.5;
-  WANT.heat = Math.min(200, (WANT.heat || 0) + amt);
+  if (wantStars()) amt *= 1.2;
+  WANT.heat = Math.min(300, (WANT.heat || 0) + amt);
   WANT.ht = timeS;
-  if (WANT.heat >= 100 && wantStars() >= 1 && WANT.lvl < 2) {
+  if (WANT.heat >= WANT2_HEAT && wantStars() >= 1 && WANT.lvl < 2) {
     WANT.lvl = 2;
     WANT.t = Math.max(WANT.t || 0, 90);
     WANT.star = timeS;
@@ -85,7 +88,7 @@ setTimeout(() => {
   polLose = function () {
     const lv = WANT.lvl;
     const r = pl.apply(this, arguments);
-    if (lv >= 2 || WANT.heat >= 100) {
+    if (lv >= 2 || WANT.heat >= WANT2_HEAT) {
       WANT.lvl = 2;
       WANT.t = Math.max(WANT.t, 60);
     }
@@ -94,7 +97,7 @@ setTimeout(() => {
   };
   const wc = wantClear;
   wantClear = function () {
-    if (WANT.lvl >= 2 && WANT.heat >= 50 && !WANT.chased) return;
+    if (WANT.lvl >= 2 && WANT.heat >= WANT2_DROP && !WANT.chased) return;
     WANT.heat = 0;
     return wc.apply(this, arguments);
   };
@@ -130,13 +133,13 @@ setTimeout(() => {
 function want2Update(dt) {
   if (!world.ready) return;
   const seen = polCanSee().length > 0 || (POL.chase && onView(POL.chase.v.x, POL.chase.v.y));
-  // heat decays out of sight (fast in a hide box); 2 stars drops back to 1 below 50 heat
+  // heat decays out of sight (fast in a hide box), slowly even while seen; 2 stars drops back to 1 below WANT2_DROP
   if (!seen && !POL.chase) {
     const hid = WANT.hid;
-    WANT.heat = Math.max(0, (WANT.heat || 0) - dt * (hid ? 14 : 3));
-  }
+    WANT.heat = Math.max(0, (WANT.heat || 0) - dt * (hid ? 24 : 7));
+  } else if (timeS - (WANT.ht || 0) > 8) WANT.heat = Math.max(0, (WANT.heat || 0) - dt * 1.5);
   if (WANT.lvl >= 2) {
-    if (WANT.heat < 50 && !POL.chase) {
+    if (WANT.heat < WANT2_DROP && !POL.chase) {
       WANT.lvl = 1;
       WANT.t = Math.min(WANT.t, 45);
     } else if (!POL.chase) WANT.t = Math.max(WANT.t, 20);

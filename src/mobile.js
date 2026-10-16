@@ -263,6 +263,10 @@ function mobInit() {
     "\u{1F5FA}<small>MAP</small>",
     "fn pill",
     act(() => {
+      // v44: one toggle per tap (a duplicate pointerdown on some Android builds re-closed the map at once)
+      const now = performance.now();
+      if (now - (MOB.mapT || 0) < 450) return;
+      MOB.mapT = now;
       bigmap.open ? closeMap() : openMap();
     }),
   );
@@ -397,16 +401,17 @@ function mobLayout() {
     const dcx = S(78),
       dcy = deckTop + S(98),
       k = S(38);
-    place("mUp", dcx - k / 2, dcy - k * 1.5, k, k);
-    place("mDown", dcx - k / 2, dcy + k / 2, k, k);
-    place("mLeft", dcx - k * 1.5, dcy - k / 2, k, k);
-    place("mRight", dcx + k / 2, dcy - k / 2, k, k);
+    const dg = S(5); // v44: visible gap between the D-pad arms
+    place("mUp", dcx - k / 2, dcy - k * 1.5 - dg, k, k);
+    place("mDown", dcx - k / 2, dcy + k / 2 + dg, k, k);
+    place("mLeft", dcx - k * 1.5 - dg, dcy - k / 2, k, k);
+    place("mRight", dcx + k / 2 + dg, dcy - k / 2, k, k);
     place("mCen", dcx - k / 2, dcy - k / 2, k, k);
     const ab = S(58);
     place("mB", W - S(150), dcy - ab * 0.2, ab, ab);
     place("mA", W - S(78), dcy - ab * 0.85, ab, ab);
     const fy = deckTop + S(178),
-      fw = Math.min(S(66), (W - 24) / 5 - 6),
+      fw = Math.min(S(60), (W - 24) / 5 - 14), // v44: narrower keys -> wider gaps
       gap = (W - 5 * fw) / 6;
     ["mCouple", "mFuel", "mUnload", "mHand", "mHorn"].forEach((id, i) =>
       place(id, gap + i * (fw + gap), fy, fw, fw * 0.78),
@@ -415,10 +420,10 @@ function mobLayout() {
       const g4 = gap,
         w4 = (W - 5 * g4) / 4;
       ["mIndL", "mHaz", "mBeam", "mIndR"].forEach((id, i) =>
-        place(id, g4 + i * (w4 + g4), fy + fw * 1.08, w4, fw * 0.5),
+        place(id, g4 + i * (w4 + g4), fy + fw * 1.2, w4, fw * 0.5),
       );
     }
-    const py = fy + fw * 1.78;
+    const py = fy + fw * 1.98;
     const pw = S(84),
       ph2 = S(26);
     place("mMap", W / 2 - pw - S(8), py, pw, ph2);
@@ -550,6 +555,9 @@ addEventListener("load", () => {
   const go = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    // v44: the MAP pill opens the map on pointerdown; Android then fires the tap's click on whatever sits under the finger,
+    // which can be this button (it appears where the deck was) -> the map closed instantly. Ignore taps in the first 600 ms.
+    if (typeof bigmap !== "undefined" && performance.now() - (bigmap.openedAt || 0) < 600) return;
     if (typeof closeMap === "function") closeMap();
   };
   b.addEventListener("pointerdown", go);

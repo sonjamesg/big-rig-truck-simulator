@@ -352,12 +352,35 @@ function renderBoard() {
   renderSide();
 }
 function startMission(j) {
-  if (acceptJob(j)) {
+  career.blockMsg = null;
+  let ok = false;
+  try {
+    ok = acceptJob(j);
+  } catch (e) {
+    console.error("startMission failed", e);
+    career.blockMsg = "Couldn't start this job (" + String((e && e.message) || e) + ")";
+  }
+  if (ok) {
     closeUI();
     BigRig.emit("missionStart", { job: j });
     return true;
   }
+  // v44: a refused start used to flash on the canvas HUD, hidden behind the board, so the button seemed dead
+  uiStartBlocked(career.blockMsg || "This job can't be started right now");
   return false;
+}
+function uiStartBlocked(msg) {
+  const b = uiRoot && uiRoot.querySelector("#accept");
+  if (!b) return;
+  let n = uiRoot.querySelector("#acceptMsg");
+  if (!n) {
+    n = document.createElement("div");
+    n.id = "acceptMsg";
+    n.style.cssText =
+      "margin:6px 0 0;padding:8px 12px;border-radius:8px;background:#7f1d1d;color:#fff;font:700 13px system-ui;text-align:center";
+    b.insertAdjacentElement("afterend", n);
+  }
+  n.textContent = "\u26A0 " + msg;
 }
 function renderSide() {
   const b = uiRoot.querySelector(".mback");

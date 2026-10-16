@@ -504,6 +504,25 @@ function polViewR() {
   const v = viewRectM();
   return Math.max(v[2] - v[0], v[3] - v[1]) / 2;
 }
+// v44: police never appear on or near the player: well off-screen, a minimum distance away, and out of line of sight
+const POL_MIN_D = 170; // m
+function polLOS(x, y) {
+  // true when nothing solid (buildings, trees, hedges) lies between the truck and (x, y) [metres]
+  const d = Math.hypot(x - truck.x, y - truck.y),
+    n = Math.ceil(d / 3);
+  for (let k = 1; k < n; k++) {
+    const t = k / n,
+      tx = Math.floor((truck.x + (x - truck.x) * t) / M_T),
+      ty = Math.floor((truck.y + (y - truck.y) * t) / M_T);
+    if (isSolidTile(tx, ty)) return false;
+  }
+  return true;
+}
+function polSpawnOK(x, y) {
+  const d = Math.hypot(x - truck.x, y - truck.y);
+  if (d < POL_MIN_D || onScreen(x, y, 40)) return false;
+  return d > 380 || !polLOS(x, y);
+}
 function polSpawn() {
   const P = truck,
     R = polViewR(),
@@ -512,17 +531,17 @@ function polSpawn() {
   for (let t = 0; t < 40; t++) {
     let a = Math.random() * 6.283;
     if (mv && Math.random() < 0.7) a = Math.atan2(f[1], f[0]) + (Math.random() - 0.5) * 1.8;
-    const d = R * (1 + Math.random() * 0.5) + 15,
+    const d = Math.max(POL_MIN_D, R * 1.25) * (1 + Math.random() * 1.2) + 15,
       x = P.x + Math.cos(a) * d,
       y = P.y + Math.sin(a) * d;
     const tx = Math.floor(x / M_T),
       ty = Math.floor(y / M_T);
     if (!inb(tx, ty)) continue;
     const i = idx(tx, ty);
-    if ((world.roadH[i] < 0 && world.roadV[i] < 0) || onScreen(x, y, 12)) continue;
+    if ((world.roadH[i] < 0 && world.roadV[i] < 0) || !polSpawnOK(x, y)) continue;
     if (POL.cars.length >= (WANT.lvl >= 2 ? 10 : 6)) return null;
     const v = spawnVehicle(x, y, true, { kind: "estate" });
-    if (v && onScreen(v.x, v.y, 10)) {
+    if (v && !polSpawnOK(v.x, v.y)) {
       const k = traffic.vs.indexOf(v);
       if (k >= 0) traffic.vs.splice(k, 1);
       continue;

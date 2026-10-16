@@ -1501,9 +1501,15 @@ addEventListener("resize", () => {
 function openMap() {
   setTimeout(() => typeof flyBtnSync === "function" && flyBtnSync(), 0);
   if (!started) return;
+  // v44: a stale uiOpen (no modal on screen) used to block the map silently; clear it instead
+  if (career.uiOpen && !(uiRoot && uiRoot.querySelector(".mback,.celebrate"))) career.uiOpen = null;
   if (career.uiOpen) return;
-  if (career.active && career.active.phase === "unloading") return;
+  if (career.active && career.active.phase === "unloading") {
+    flash("Unloading \u2014 the map opens when the unload finishes");
+    return;
+  }
   bigmap.open = true;
+  bigmap.openedAt = performance.now();
   mapFull(true);
   bigmap.z = bigmap.zt = bigmap.saved || LOCAL_Z;
   mapCentreTruck();
