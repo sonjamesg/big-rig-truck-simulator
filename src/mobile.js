@@ -1,7 +1,7 @@
-'use strict';
+"use strict";
 // ===================== v11 MOBILE: landscape thumb layout (controls in side gutters, never over the HUD) + portrait handheld deck =====================
-const MOB={on:false,mode:'',steerId:null,ctx:{},lastCtx:0};
-const MOBCSS=`
+const MOB = { on: false, mode: "", steerId: null, ctx: {}, lastCtx: 0 };
+const MOBCSS = `
 body.touch{overflow:hidden;position:fixed;inset:0;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}
 body.touch #titlebar,body.touch #help,body.touch #credits,body.touch #touch,body.touch #fs{display:none!important}
 body.touch #wrap{margin:0;width:auto} body.touch #scaler{transform:none!important;width:auto}
@@ -73,78 +73,478 @@ body.touch #ui .mback{pointer-events:auto} #mapX{display:none} body.touch.mapo #
 @media (min-width:761px) and (max-height:460px){ #ui .tlw{width:210px} #ui .tl{width:auto;-webkit-mask-image:linear-gradient(180deg,#000 85%,transparent);mask-image:linear-gradient(180deg,#000 85%,transparent);touch-action:pan-y} #ui .tlh{display:block} #ui .stage{overflow-y:auto;min-height:0;justify-content:flex-start} #ui .stage .floor{flex:none} }
 @media (max-height:460px){ #ui .mh{padding:8px 12px} #ui .bar{padding:6px 12px} #ui .stage .floor{height:150px} }
 `;
-function mobBtn(id,html,cls,k){ const b=document.createElement('div'); b.className='b '+(cls||''); b.id=id; b.innerHTML=html; document.getElementById('mob').appendChild(b);
-  const on=e=>{ e.preventDefault(); b.classList.add('on'); if(e.pointerType!=='mouse'&&typeof hapPress==='function') hapPress(id); if(audio.ctx&&audio.ctx.state==='suspended') audio.ctx.resume();
-      if(typeof k==='string'){ if(career.uiOpen&&MOB.nav[k]){ MOB.nav[k](); return; } input[k]=true; } else if(k) k(); },
-    off=e=>{ e.preventDefault(); b.classList.remove('on'); if(typeof k==='string') input[k]=false; };
-  b.addEventListener('pointerdown',on); b.addEventListener('pointerup',off); b.addEventListener('pointercancel',off); b.addEventListener('pointerleave',off); return b; }
-MOB.nav={ left:()=>padNav('l'), right:()=>padNav('r'), up:()=>padNav('u'), down:()=>padNav('d'),
-  okA:()=>{ const el=padFocusEl(); if(el){ el.click(); setTimeout(()=>padNav(null),40); } else padNav(null); }, back:()=>{ if(career.uiOpen==='result'){ const k=document.querySelector('#ui #keep'); if(k) k.click(); } else closeUI(); } };
-const act=f=>()=>{ if(!started) return; f(); };
-function mobCSS(){ if(MOB.css) return; MOB.css=1; const st=document.createElement('style'); st.textContent=MOBCSS; document.head.appendChild(st); }
-if(('ontouchstart' in window)||navigator.maxTouchPoints>0){ document.body.classList.add('touch'); mobCSS(); }
-function mobInit(){ if(!document.body.classList.contains('touch')) return; MOB.on=true; mobCSS();
-  const vp=document.querySelector('meta[name=viewport]'); if(vp) vp.content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover';
-  const m=document.createElement('div'); m.id='mob'; document.body.appendChild(m); const dk=document.createElement('div'); dk.id='deck'; dk.innerHTML='<div class="brand">BIG RIG <b>BOY</b></div><div class="grille"></div>'; document.body.insertBefore(dk,m);
-  for(const [id,h] of [['deckL','BIG RIG'],['deckR','<b>BOY</b>']]){ const d=document.createElement('div'); d.id=id; d.className='dside'; d.innerHTML='<div class="brand">'+h+'</div>'; document.body.insertBefore(d,m); }
-  // driving
-  mobBtn('mGas','<div class="pedal-ribs"></div><small>GAS</small>','gas','up'); mobBtn('mBrk','<div class="pedal-ribs"></div><small>BRAKE</small>','brk','down');
-  const s=mobBtn('mSteer','<div class="knob">\u25C0\u25B6</div>','steer',null); mobSteer(s);
-  mobBtn('mLeft','\u25C0','dp','left'); mobBtn('mRight','\u25B6','dp','right'); mobBtn('mUp','\u25B2','dp',()=>{ if(career.uiOpen) MOB.nav.up(); else if(MP.on) mpToggleList(); }); mobBtn('mDown','\u25BC','dp',()=>{ if(career.uiOpen) MOB.nav.down(); });
-  mobBtn('mCen','','dp dpc',null);
-  mobBtn('mA','A<small>GAS</small>','ab',()=>{ if(career.uiOpen) MOB.nav.okA(); else { if(!started) return; input.up=true; } });
-  mobBtn('mB','B<small>BRAKE</small>','ab',()=>{ if(career.uiOpen) MOB.nav.back(); else input.down=true; });
-  for(const id of ['mA','mB']){ const el=document.getElementById(id); const off=()=>{ input[id==='mA'?'up':'down']=false; }; el.addEventListener('pointerup',off); el.addEventListener('pointercancel',off); el.addEventListener('pointerleave',off); }
-  mobBtn('mIndL','\u2B05<small>IND</small>','fn',act(()=>indToggle(1))); mobBtn('mIndR','\u27A1<small>IND</small>','fn',act(()=>indToggle(2))); mobBtn('mHaz','\u26A0<small>HAZ</small>','fn',act(()=>hazToggle())); mobBtn('mBeam','<i class="hbi"></i><small>BEAM</small>','fn',act(()=>hbToggle())); mobBtn('mHand','P<small>H/BRAKE</small>','fn','hand'); mobBtn('mHorn','\u{1F4E3}<small>HORN</small>','fn','horn');
-  mobBtn('mCouple','\u{1F517}<small>COUPLE</small>','fn ctx',act(()=>toggleCouple())); mobBtn('mFuel','\u26FD<small>REFUEL</small>','fn ctx',act(()=>toggleRefuel())); mobBtn('mUnload','\u{1F4E6}<small>UNLOAD</small>','fn ctx',act(()=>tryUnload()));
-  mobBtn('mJobs','\u{1F4CB}<small>JOBS</small>','fn pill',act(()=>{ if(career.uiOpen) closeUI(); else openBoard(); })); mobBtn('mMap','\u{1F5FA}<small>MAP</small>','fn pill',act(()=>{ bigmap.open?closeMap():openMap(); }));
-  document.getElementById('frame').addEventListener('touchmove',e=>{ if(e.target.closest&&e.target.closest('#overlay,#ui .mback,#ui .celebrate,#bdPanel')) return; e.preventDefault(); },{passive:false});
-  addEventListener('resize',mobLayout); addEventListener('orientationchange',()=>setTimeout(mobLayout,200)); if(window.visualViewport) visualViewport.addEventListener('resize',mobLayout); document.addEventListener('fullscreenchange',()=>setTimeout(mobLayout,50)); mobLayout(); setInterval(mobContext,250); }
-function mobSteer(el){ const knob=el.querySelector('.knob');
-  const upd=e=>{ const r=el.getBoundingClientRect(); const u=Math.max(-1,Math.min(1,(e.clientX-(r.left+r.width/2))/(r.width/2-30))); input.padSteer=Math.abs(u)<0.06?0:u; knob.style.left=(50+u*(50-30/r.width*100))+'%'; };
-  el.addEventListener('pointerdown',e=>{ if(career.uiOpen) return; MOB.steerId=e.pointerId; el.setPointerCapture(e.pointerId); upd(e); });
-  el.addEventListener('pointermove',e=>{ if(e.pointerId===MOB.steerId) upd(e); });
-  const end=e=>{ if(e.pointerId!==MOB.steerId) return; MOB.steerId=null; input.padSteer=0; knob.style.left='50%'; el.classList.remove('on'); };
-  el.addEventListener('pointerup',end); el.addEventListener('pointercancel',end); }
-function place(id,x,y,w,h,show=true){ const b=document.getElementById(id); if(!b) return; b.style.left=x+'px'; b.style.top=y+'px'; b.style.width=w+'px'; b.style.height=h+'px'; b.style.display=show?'flex':'none'; }
-function mobLayout(){ if(!MOB.on) return; const W=innerWidth, H=innerHeight, por=H>W; document.body.classList.toggle('portrait',por); MOB.mode=por?'portrait':'landscape';
-  const cv=document.getElementById('game'), fr=document.getElementById('frame'); const sa=(n)=>parseFloat(getComputedStyle(document.documentElement).getPropertyValue(n))||0;
-  let cw,ch,cx,cy;
-  if(!por){ // landscape: canvas centred, controls live in the side gutters
-    const G=Math.max(150,Math.min(230,W*0.19)); cw=W-2*G; ch=H-8; cx=G; cy=4;   // fill the whole box between the panels; backing store follows its aspect (mobView) so nothing stretches
-    const g=(W-cw)/2, pad=8, iw=g-2*pad, sat=sa('--sat');
-    for(const id of ['deckL','deckR']){ const d=document.getElementById(id); if(d){ d.style.width=(g-2)+'px'; d.querySelector('.brand').style.top=(6+sat)+'px'; } }
-    const top=26+sat, stH=Math.min(120,H*0.30), sb=Math.max(40,Math.min(58,(iw-pad)/2,(H-top-stH-5*pad)/2.6)), sw=(iw-pad)/2, iy=top+2*(sb+pad);
-    place('mHand',pad,top,sw,sb); place('mHorn',pad+sw+pad,top,sw,sb); place('mJobs',pad,top+sb+pad,sw,sb); place('mMap',pad+sw+pad,top+sb+pad,sw,sb);
-    const tw=(iw-2*6)/3; ['mIndL','mHaz','mIndR'].forEach((id,k)=>place(id,pad+k*(tw+6),iy,tw,sb*0.6)); { const by=iy+sb*0.6+pad, bh=sb*0.6, stTop=H-stH-pad; if(by+bh<=stTop-4) place('mBeam',pad,by,iw,bh); else { const t4=(iw-3*6)/4; ['mIndL','mHaz','mBeam','mIndR'].forEach((id,k)=>place(id,pad+k*(t4+6),iy,t4,sb*0.6)); } }
-    place('mSteer',pad,H-stH-pad,iw,stH);
-    const R=W-g+pad; place('mCouple',R,top,sw,sb); place('mFuel',R+sw+pad,top,sw,sb); place('mUnload',R,top+sb+pad,iw,sb);
-    const py=top+2*(sb+pad), ph=Math.max(70,H-py-pad); place('mBrk',R,py+ph*0.22,sw,ph*0.78); place('mGas',R+sw+pad,py,sw,ph);
-    for(const id of ['mLeft','mRight','mUp','mDown','mCen','mA','mB']) place(id,0,0,0,0,false);
-  } else { // portrait: handheld — screen on top, deck below
-    const top=sa('--sat'); cw=Math.min(W-12,H*0.56); ch=cw; cx=(W-cw)/2; cy=6+Math.max(0,top); const deckTop=cy+ch+6; const dk=document.getElementById('deck'); dk.style.top=deckTop+'px';
-    const DH=H-deckTop, u=Math.min(W/412,DH/330); const S=v=>v*u;
-    const dcx=S(78), dcy=deckTop+S(98), k=S(38); place('mUp',dcx-k/2,dcy-k*1.5,k,k); place('mDown',dcx-k/2,dcy+k/2,k,k); place('mLeft',dcx-k*1.5,dcy-k/2,k,k); place('mRight',dcx+k/2,dcy-k/2,k,k); place('mCen',dcx-k/2,dcy-k/2,k,k);
-    const ab=S(58); place('mB',W-S(150),dcy-ab*0.2,ab,ab); place('mA',W-S(78),dcy-ab*0.85,ab,ab);
-    const fy=deckTop+S(178), fw=Math.min(S(66),(W-24)/5-6), gap=(W-5*fw)/6; ['mCouple','mFuel','mUnload','mHand','mHorn'].forEach((id,i)=>place(id,gap+i*(fw+gap),fy,fw,fw*0.78)); { const g4=gap, w4=(W-5*g4)/4; ['mIndL','mHaz','mBeam','mIndR'].forEach((id,i)=>place(id,g4+i*(w4+g4),fy+fw*1.08,w4,fw*0.5)); }
-    const py=fy+fw*1.78; const pw=S(84),ph2=S(26); place('mMap',W/2-pw-S(8),py,pw,ph2); place('mJobs',W/2+S(8),py,pw,ph2); const gr=document.querySelector('#deck .grille'); if(gr){ gr.style.top=(py-deckTop+ph2/2-S(9))+'px'; gr.style.bottom='auto'; gr.style.height=S(18)+'px'; gr.style.width=S(40)+'px'; }
-    for(const id of ['mSteer','mGas','mBrk']) place(id,0,0,0,0,false);
+function mobBtn(id, html, cls, k) {
+  const b = document.createElement("div");
+  b.className = "b " + (cls || "");
+  b.id = id;
+  b.innerHTML = html;
+  document.getElementById("mob").appendChild(b);
+  const on = (e) => {
+      e.preventDefault();
+      b.classList.add("on");
+      if (e.pointerType !== "mouse" && typeof hapPress === "function") hapPress(id);
+      if (audio.ctx && audio.ctx.state === "suspended") audio.ctx.resume();
+      if (typeof k === "string") {
+        if (career.uiOpen && MOB.nav[k]) {
+          MOB.nav[k]();
+          return;
+        }
+        input[k] = true;
+      } else if (k) k();
+    },
+    off = (e) => {
+      e.preventDefault();
+      b.classList.remove("on");
+      if (typeof k === "string") input[k] = false;
+    };
+  b.addEventListener("pointerdown", on);
+  b.addEventListener("pointerup", off);
+  b.addEventListener("pointercancel", off);
+  b.addEventListener("pointerleave", off);
+  return b;
+}
+MOB.nav = {
+  left: () => padNav("l"),
+  right: () => padNav("r"),
+  up: () => padNav("u"),
+  down: () => padNav("d"),
+  okA: () => {
+    const el = padFocusEl();
+    if (el) {
+      el.click();
+      setTimeout(() => padNav(null), 40);
+    } else padNav(null);
+  },
+  back: () => {
+    if (career.uiOpen === "result") {
+      const k = document.querySelector("#ui #keep");
+      if (k) k.click();
+    } else closeUI();
+  },
+};
+const act = (f) => () => {
+  if (!started) return;
+  f();
+};
+function mobCSS() {
+  if (MOB.css) return;
+  MOB.css = 1;
+  const st = document.createElement("style");
+  st.textContent = MOBCSS;
+  document.head.appendChild(st);
+}
+if ("ontouchstart" in window || navigator.maxTouchPoints > 0) {
+  document.body.classList.add("touch");
+  mobCSS();
+}
+function mobInit() {
+  if (!document.body.classList.contains("touch")) return;
+  MOB.on = true;
+  mobCSS();
+  const vp = document.querySelector("meta[name=viewport]");
+  if (vp)
+    vp.content =
+      "width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover";
+  const m = document.createElement("div");
+  m.id = "mob";
+  document.body.appendChild(m);
+  const dk = document.createElement("div");
+  dk.id = "deck";
+  dk.innerHTML = '<div class="brand">BIG RIG <b>BOY</b></div><div class="grille"></div>';
+  document.body.insertBefore(dk, m);
+  for (const [id, h] of [
+    ["deckL", "BIG RIG"],
+    ["deckR", "<b>BOY</b>"],
+  ]) {
+    const d = document.createElement("div");
+    d.id = id;
+    d.className = "dside";
+    d.innerHTML = '<div class="brand">' + h + "</div>";
+    document.body.insertBefore(d, m);
   }
-  if(!document.body.classList.contains('mapo')) mobView(cw,ch,por);
-  cv.style.width=cw+'px'; cv.style.height=ch+'px'; fr.style.left=cx+'px'; fr.style.top=cy+'px'; fr.style.width=cw+'px'; fr.style.height=ch+'px';
-  MOB.fitOk=0; mobFit();
+  // driving
+  mobBtn("mGas", '<div class="pedal-ribs"></div><small>GAS</small>', "gas", "up");
+  mobBtn("mBrk", '<div class="pedal-ribs"></div><small>BRAKE</small>', "brk", "down");
+  const s = mobBtn("mSteer", '<div class="knob">\u25C0\u25B6</div>', "steer", null);
+  mobSteer(s);
+  mobBtn("mLeft", "\u25C0", "dp", "left");
+  mobBtn("mRight", "\u25B6", "dp", "right");
+  mobBtn("mUp", "\u25B2", "dp", () => {
+    if (career.uiOpen) MOB.nav.up();
+    else if (MP.on) mpToggleList();
+  });
+  mobBtn("mDown", "\u25BC", "dp", () => {
+    if (career.uiOpen) MOB.nav.down();
+  });
+  mobBtn("mCen", "", "dp dpc", null);
+  mobBtn("mA", "A<small>GAS</small>", "ab", () => {
+    if (career.uiOpen) MOB.nav.okA();
+    else {
+      if (!started) return;
+      input.up = true;
+    }
+  });
+  mobBtn("mB", "B<small>BRAKE</small>", "ab", () => {
+    if (career.uiOpen) MOB.nav.back();
+    else input.down = true;
+  });
+  for (const id of ["mA", "mB"]) {
+    const el = document.getElementById(id);
+    const off = () => {
+      input[id === "mA" ? "up" : "down"] = false;
+    };
+    el.addEventListener("pointerup", off);
+    el.addEventListener("pointercancel", off);
+    el.addEventListener("pointerleave", off);
+  }
+  mobBtn(
+    "mIndL",
+    "\u2B05<small>IND</small>",
+    "fn",
+    act(() => indToggle(1)),
+  );
+  mobBtn(
+    "mIndR",
+    "\u27A1<small>IND</small>",
+    "fn",
+    act(() => indToggle(2)),
+  );
+  mobBtn(
+    "mHaz",
+    "\u26A0<small>HAZ</small>",
+    "fn",
+    act(() => hazToggle()),
+  );
+  mobBtn(
+    "mBeam",
+    '<i class="hbi"></i><small>BEAM</small>',
+    "fn",
+    act(() => hbToggle()),
+  );
+  mobBtn("mHand", "P<small>H/BRAKE</small>", "fn", "hand");
+  mobBtn("mHorn", "\u{1F4E3}<small>HORN</small>", "fn", "horn");
+  mobBtn(
+    "mCouple",
+    "\u{1F517}<small>COUPLE</small>",
+    "fn ctx",
+    act(() => toggleCouple()),
+  );
+  mobBtn(
+    "mFuel",
+    "\u26FD<small>REFUEL</small>",
+    "fn ctx",
+    act(() => toggleRefuel()),
+  );
+  mobBtn(
+    "mUnload",
+    "\u{1F4E6}<small>UNLOAD</small>",
+    "fn ctx",
+    act(() => tryUnload()),
+  );
+  mobBtn(
+    "mJobs",
+    "\u{1F4CB}<small>JOBS</small>",
+    "fn pill",
+    act(() => {
+      if (career.uiOpen) closeUI();
+      else openBoard();
+    }),
+  );
+  mobBtn(
+    "mMap",
+    "\u{1F5FA}<small>MAP</small>",
+    "fn pill",
+    act(() => {
+      bigmap.open ? closeMap() : openMap();
+    }),
+  );
+  document.getElementById("frame").addEventListener(
+    "touchmove",
+    (e) => {
+      if (e.target.closest && e.target.closest("#overlay,#ui .mback,#ui .celebrate,#bdPanel"))
+        return;
+      e.preventDefault();
+    },
+    { passive: false },
+  );
+  addEventListener("resize", mobLayout);
+  addEventListener("orientationchange", () => setTimeout(mobLayout, 200));
+  if (window.visualViewport) visualViewport.addEventListener("resize", mobLayout);
+  document.addEventListener("fullscreenchange", () => setTimeout(mobLayout, 50));
+  mobLayout();
+  setInterval(mobContext, 250);
+}
+function mobSteer(el) {
+  const knob = el.querySelector(".knob");
+  const upd = (e) => {
+    const r = el.getBoundingClientRect();
+    const u = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / (r.width / 2 - 30)));
+    input.padSteer = Math.abs(u) < 0.06 ? 0 : u;
+    knob.style.left = 50 + u * (50 - (30 / r.width) * 100) + "%";
+  };
+  el.addEventListener("pointerdown", (e) => {
+    if (career.uiOpen) return;
+    MOB.steerId = e.pointerId;
+    el.setPointerCapture(e.pointerId);
+    upd(e);
+  });
+  el.addEventListener("pointermove", (e) => {
+    if (e.pointerId === MOB.steerId) upd(e);
+  });
+  const end = (e) => {
+    if (e.pointerId !== MOB.steerId) return;
+    MOB.steerId = null;
+    input.padSteer = 0;
+    knob.style.left = "50%";
+    el.classList.remove("on");
+  };
+  el.addEventListener("pointerup", end);
+  el.addEventListener("pointercancel", end);
+}
+function place(id, x, y, w, h, show = true) {
+  const b = document.getElementById(id);
+  if (!b) return;
+  b.style.left = x + "px";
+  b.style.top = y + "px";
+  b.style.width = w + "px";
+  b.style.height = h + "px";
+  b.style.display = show ? "flex" : "none";
+}
+function mobLayout() {
+  if (!MOB.on) return;
+  const W = innerWidth,
+    H = innerHeight,
+    por = H > W;
+  document.body.classList.toggle("portrait", por);
+  MOB.mode = por ? "portrait" : "landscape";
+  const cv = document.getElementById("game"),
+    fr = document.getElementById("frame");
+  const sa = (n) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(n)) || 0;
+  let cw, ch, cx, cy;
+  if (!por) {
+    // landscape: canvas centred, controls live in the side gutters
+    const G = Math.max(150, Math.min(230, W * 0.19));
+    cw = W - 2 * G;
+    ch = H - 8;
+    cx = G;
+    cy = 4; // fill the whole box between the panels; backing store follows its aspect (mobView) so nothing stretches
+    const g = (W - cw) / 2,
+      pad = 8,
+      iw = g - 2 * pad,
+      sat = sa("--sat");
+    for (const id of ["deckL", "deckR"]) {
+      const d = document.getElementById(id);
+      if (d) {
+        d.style.width = g - 2 + "px";
+        d.querySelector(".brand").style.top = 6 + sat + "px";
+      }
+    }
+    const top = 26 + sat,
+      stH = Math.min(120, H * 0.3),
+      sb = Math.max(40, Math.min(58, (iw - pad) / 2, (H - top - stH - 5 * pad) / 2.6)),
+      sw = (iw - pad) / 2,
+      iy = top + 2 * (sb + pad);
+    place("mHand", pad, top, sw, sb);
+    place("mHorn", pad + sw + pad, top, sw, sb);
+    place("mJobs", pad, top + sb + pad, sw, sb);
+    place("mMap", pad + sw + pad, top + sb + pad, sw, sb);
+    const tw = (iw - 2 * 6) / 3;
+    ["mIndL", "mHaz", "mIndR"].forEach((id, k) => place(id, pad + k * (tw + 6), iy, tw, sb * 0.6));
+    {
+      const by = iy + sb * 0.6 + pad,
+        bh = sb * 0.6,
+        stTop = H - stH - pad;
+      if (by + bh <= stTop - 4) place("mBeam", pad, by, iw, bh);
+      else {
+        const t4 = (iw - 3 * 6) / 4;
+        ["mIndL", "mHaz", "mBeam", "mIndR"].forEach((id, k) =>
+          place(id, pad + k * (t4 + 6), iy, t4, sb * 0.6),
+        );
+      }
+    }
+    place("mSteer", pad, H - stH - pad, iw, stH);
+    const R = W - g + pad;
+    place("mCouple", R, top, sw, sb);
+    place("mFuel", R + sw + pad, top, sw, sb);
+    place("mUnload", R, top + sb + pad, iw, sb);
+    const py = top + 2 * (sb + pad),
+      ph = Math.max(70, H - py - pad);
+    place("mBrk", R, py + ph * 0.22, sw, ph * 0.78);
+    place("mGas", R + sw + pad, py, sw, ph);
+    for (const id of ["mLeft", "mRight", "mUp", "mDown", "mCen", "mA", "mB"])
+      place(id, 0, 0, 0, 0, false);
+  } else {
+    // portrait: handheld — screen on top, deck below
+    const top = sa("--sat");
+    cw = Math.min(W - 12, H * 0.56);
+    ch = cw;
+    cx = (W - cw) / 2;
+    cy = 6 + Math.max(0, top);
+    const deckTop = cy + ch + 6;
+    const dk = document.getElementById("deck");
+    dk.style.top = deckTop + "px";
+    const DH = H - deckTop,
+      u = Math.min(W / 412, DH / 330);
+    const S = (v) => v * u;
+    const dcx = S(78),
+      dcy = deckTop + S(98),
+      k = S(38);
+    place("mUp", dcx - k / 2, dcy - k * 1.5, k, k);
+    place("mDown", dcx - k / 2, dcy + k / 2, k, k);
+    place("mLeft", dcx - k * 1.5, dcy - k / 2, k, k);
+    place("mRight", dcx + k / 2, dcy - k / 2, k, k);
+    place("mCen", dcx - k / 2, dcy - k / 2, k, k);
+    const ab = S(58);
+    place("mB", W - S(150), dcy - ab * 0.2, ab, ab);
+    place("mA", W - S(78), dcy - ab * 0.85, ab, ab);
+    const fy = deckTop + S(178),
+      fw = Math.min(S(66), (W - 24) / 5 - 6),
+      gap = (W - 5 * fw) / 6;
+    ["mCouple", "mFuel", "mUnload", "mHand", "mHorn"].forEach((id, i) =>
+      place(id, gap + i * (fw + gap), fy, fw, fw * 0.78),
+    );
+    {
+      const g4 = gap,
+        w4 = (W - 5 * g4) / 4;
+      ["mIndL", "mHaz", "mBeam", "mIndR"].forEach((id, i) =>
+        place(id, g4 + i * (w4 + g4), fy + fw * 1.08, w4, fw * 0.5),
+      );
+    }
+    const py = fy + fw * 1.78;
+    const pw = S(84),
+      ph2 = S(26);
+    place("mMap", W / 2 - pw - S(8), py, pw, ph2);
+    place("mJobs", W / 2 + S(8), py, pw, ph2);
+    const gr = document.querySelector("#deck .grille");
+    if (gr) {
+      gr.style.top = py - deckTop + ph2 / 2 - S(9) + "px";
+      gr.style.bottom = "auto";
+      gr.style.height = S(18) + "px";
+      gr.style.width = S(40) + "px";
+    }
+    for (const id of ["mSteer", "mGas", "mBrk"]) place(id, 0, 0, 0, 0, false);
+  }
+  if (!document.body.classList.contains("mapo")) mobView(cw, ch, por);
+  cv.style.width = cw + "px";
+  cv.style.height = ch + "px";
+  fr.style.left = cx + "px";
+  fr.style.top = cy + "px";
+  fr.style.width = cw + "px";
+  fr.style.height = ch + "px";
+  MOB.fitOk = 0;
+  mobFit();
   // overlays (#ui / lobby) cover the whole screen in portrait, the canvas area in landscape is too small for modals so they also go full-screen
 }
 // keep the canvas backing store at exactly the CSS box aspect (1:1 world pixels). Landscape keeps ~600 logical px tall and shows more world sideways; portrait stays square 640.
-function mobView(cw,ch,por){ const c=document.getElementById('game'); let w,h; if(por){ w=h=640; } else { h=600; w=Math.round(h*cw/ch); } if(VW!==w||VH!==h||c.width!==w||c.height!==h){ VW=w; VH=h; c.width=w; c.height=h; } }
-function mobFit(){ for(const sm of document.querySelectorAll('#mob .b small')){ if(sm.closest('.ab')||sm.closest('.pill')) continue; sm.style.fontSize=''; let f=parseFloat(getComputedStyle(sm).fontSize); while(f>9&&sm.scrollWidth>sm.clientWidth+1){ f-=0.5; sm.style.fontSize=f+'px'; } } }
-function mobContext(){ if(!MOB.on) return; if(document.querySelector('#mob .b')&&document.getElementById('mHand').clientWidth&&!MOB.fitOk){ mobFit(); MOB.fitOk=1; } const a=career.active; const s=truck;
-  const fuel=!!(started&&fuelStationAt&&fuelStationAt())||refuel.active; let cpl=false; if(started){ if(s.trl) cpl=Math.abs(s.v)<1; else { const c=coupleCandidate(); cpl=!!(c&&c.d<8); } }
-  let unl=false; if(a&&(a.phase==='deliver'||a.phase==='unloading')){ const al=bayAlign(a.bay); unl=!!(al&&al.dist<30); }
-  const por=MOB.mode==='portrait'; const set=(id,on)=>{ const b=document.getElementById(id); if(!b) return; if(true){ b.classList.remove('hide'); b.classList.toggle('ctxon',on); b.classList.toggle('dim',!on); } else { b.classList.toggle('hide',!on); } };
-  { const bm=document.getElementById('mBeam'); if(bm) bm.classList.toggle('beamon',!!(typeof HB!=='undefined'&&HB.on)); } set('mCouple',cpl); set('mFuel',fuel); set('mUnload',unl); const c=document.getElementById('mChat'); if(c) c.style.display=MP.on?'flex':'none';
-  const cb=document.getElementById('mCouple'); if(cb) { const sm=cb.querySelector('small'), t=s.trl?'UNCOUPLE':'COUPLE'; if(sm.textContent!==t){ sm.textContent=t; mobFit(); } } }
+function mobView(cw, ch, por) {
+  const c = document.getElementById("game");
+  let w, h;
+  if (por) {
+    w = h = 640;
+  } else {
+    h = 600;
+    w = Math.round((h * cw) / ch);
+  }
+  if (VW !== w || VH !== h || c.width !== w || c.height !== h) {
+    VW = w;
+    VH = h;
+    c.width = w;
+    c.height = h;
+  }
+}
+function mobFit() {
+  for (const sm of document.querySelectorAll("#mob .b small")) {
+    if (sm.closest(".ab") || sm.closest(".pill")) continue;
+    sm.style.fontSize = "";
+    let f = parseFloat(getComputedStyle(sm).fontSize);
+    while (f > 9 && sm.scrollWidth > sm.clientWidth + 1) {
+      f -= 0.5;
+      sm.style.fontSize = f + "px";
+    }
+  }
+}
+function mobContext() {
+  if (!MOB.on) return;
+  if (
+    document.querySelector("#mob .b") &&
+    document.getElementById("mHand").clientWidth &&
+    !MOB.fitOk
+  ) {
+    mobFit();
+    MOB.fitOk = 1;
+  }
+  const a = career.active;
+  const s = truck;
+  const fuel = !!(started && fuelStationAt && fuelStationAt()) || refuel.active;
+  let cpl = false;
+  if (started) {
+    if (s.trl) cpl = Math.abs(s.v) < 1;
+    else {
+      const c = coupleCandidate();
+      cpl = !!(c && c.d < 8);
+    }
+  }
+  let unl = false;
+  if (a && (a.phase === "deliver" || a.phase === "unloading")) {
+    const al = bayAlign(a.bay);
+    unl = !!(al && al.dist < 30);
+  }
+  const por = MOB.mode === "portrait";
+  const set = (id, on) => {
+    const b = document.getElementById(id);
+    if (!b) return;
+    if (true) {
+      b.classList.remove("hide");
+      b.classList.toggle("ctxon", on);
+      b.classList.toggle("dim", !on);
+    } else {
+      b.classList.toggle("hide", !on);
+    }
+  };
+  {
+    const bm = document.getElementById("mBeam");
+    if (bm) bm.classList.toggle("beamon", !!(typeof HB !== "undefined" && HB.on));
+  }
+  set("mCouple", cpl);
+  set("mFuel", fuel);
+  set("mUnload", unl);
+  const c = document.getElementById("mChat");
+  if (c) c.style.display = MP.on ? "flex" : "none";
+  const cb = document.getElementById("mCouple");
+  if (cb) {
+    const sm = cb.querySelector("small"),
+      t = s.trl ? "UNCOUPLE" : "COUPLE";
+    if (sm.textContent !== t) {
+      sm.textContent = t;
+      mobFit();
+    }
+  }
+}
 
-(function ovlWatch(){ const f=()=>{ const ov=document.getElementById('overlay'); const on=!!(typeof career!=='undefined'&&career.uiOpen)||!!document.getElementById('bdPanel')||!!document.querySelector('#ui .celebrate')||!!(ov&&!ov.classList.contains('hidden')&&ov.offsetParent!==null); document.body.classList.toggle('ovl',on); }; setInterval(f,150); })();
+(function ovlWatch() {
+  const f = () => {
+    const ov = document.getElementById("overlay");
+    const on =
+      !!(typeof career !== "undefined" && career.uiOpen) ||
+      !!document.getElementById("bdPanel") ||
+      !!document.querySelector("#ui .celebrate") ||
+      !!(ov && !ov.classList.contains("hidden") && ov.offsetParent !== null);
+    document.body.classList.toggle("ovl", on);
+  };
+  setInterval(f, 150);
+})();
 // v33: a real DOM close button for the phone full-screen map (the deck + MAP pill are hidden while it's open)
-addEventListener('load',()=>{ const b=document.createElement('button'); b.id='mapX'; b.style.display='none'; b.innerHTML='\u2715 CLOSE MAP'; const go=e=>{ e.preventDefault(); e.stopPropagation(); if(typeof closeMap==='function') closeMap(); }; b.addEventListener('pointerdown',go); b.addEventListener('click',go); document.body.appendChild(b); });
+addEventListener("load", () => {
+  const b = document.createElement("button");
+  b.id = "mapX";
+  b.style.display = "none";
+  b.innerHTML = "\u2715 CLOSE MAP";
+  const go = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (typeof closeMap === "function") closeMap();
+  };
+  b.addEventListener("pointerdown", go);
+  b.addEventListener("click", go);
+  document.body.appendChild(b);
+});
