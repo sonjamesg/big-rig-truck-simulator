@@ -126,24 +126,48 @@ function setVib(on) {
   if (on) haptic(20);
 }
 addEventListener("load", () => {
-  if (!document.body.classList.contains("touch") || typeof navigator.vibrate !== "function") return;
+  if (!document.body.classList.contains("touch")) return;
   const ov = document.getElementById("overlay");
   if (!ov || document.getElementById("vibM")) return;
-  const d = document.createElement("label");
+  const can = typeof navigator.vibrate === "function";
+  const d = document.createElement("div");
   d.style.cssText =
-    "margin-top:10px;display:flex;align-items:center;gap:10px;justify-content:center;color:#cfd6e0;font-weight:700;pointer-events:auto";
+    "margin-top:10px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;justify-content:center;color:#cfd6e0;font-weight:700;pointer-events:auto";
   d.innerHTML =
-    '&#x1F4F3; Vibration <input id="vibM" type="checkbox" style="width:22px;height:22px;accent-color:#e8a317">';
+    '<label style="display:flex;align-items:center;gap:8px">&#x1F4F3; Vibration <input id="vibM" type="checkbox" style="width:22px;height:22px;accent-color:#e8a317"' +
+    (can ? "" : " disabled") +
+    '></label><button id="vibTest" style="font:inherit;font-weight:800;font-size:13px;padding:8px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;min-height:38px">Test vibration</button><div id="vibRes" style="flex-basis:100%;text-align:center;font-size:12px;font-weight:600;opacity:.9"></div>';
   ov.appendChild(d);
-  const el = d.querySelector("input");
-  el.checked = !(SETTINGS.vib === false && SETTINGS.vibV === 2);
+  const el = d.querySelector("input"),
+    res = d.querySelector("#vibRes");
+  el.checked = can && !(SETTINGS.vib === false && SETTINGS.vibV === 2);
   el.addEventListener("change", (e) => {
     e.stopPropagation();
     setVib(el.checked);
   });
+  // diagnostic: calls the browser API directly (bypasses the game toggle) and reports what it said
+  d.querySelector("#vibTest").addEventListener("click", (e) => {
+    e.stopPropagation();
+    let r;
+    try {
+      r = can ? navigator.vibrate(200) : "unsupported";
+    } catch (x) {
+      r = "error: " + x.message;
+    }
+    const off = SETTINGS.vib === false && SETTINGS.vibV === 2;
+    res.textContent =
+      r === true
+        ? "vibrate(200) returned TRUE \u2014 the browser sent it. No buzz? Check the phone: silent/mute mode, Do Not Disturb, touch vibration or vibration intensity, power saving." +
+          (off ? " (In-game vibration is switched OFF above.)" : "")
+        : r === false
+          ? "vibrate(200) returned FALSE \u2014 the browser blocked it (tap the page once first, or it\u2019s blocked in this browser/iframe)."
+          : r === "unsupported"
+            ? "This browser has no vibration API (iPhone Safari never supports it)."
+            : "vibrate() threw " + r;
+  });
   for (const ev of ["pointerdown", "click", "touchstart"])
     d.addEventListener(ev, (e) => e.stopPropagation());
   setTimeout(() => {
-    el.checked = !(SETTINGS.vib === false && SETTINGS.vibV === 2);
+    el.checked = can && !(SETTINGS.vib === false && SETTINGS.vibV === 2);
   }, 500);
 });
