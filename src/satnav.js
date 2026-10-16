@@ -827,6 +827,7 @@ function navPOIAt(x, y, BX, BY) {
     );
   }
   if (typeof homePOIs === "function") homePOIs(test);
+  if (typeof bmPOIs === "function") bmPOIs(test);
   if (best && best.o.brand) best.name = best.o.brand.name;
   return best;
 }
@@ -1085,6 +1086,8 @@ function ftBlock(o, peek) {
   const s = truck;
   if (typeof WANT !== "undefined" && (WANT.lvl || (typeof POL !== "undefined" && POL.chase)))
     return "Can\u2019t fast travel while wanted";
+  const bmb = typeof bmBlockFT === "function" && bmBlockFT();
+  if (bmb) return bmb;
   if (o && o.hide) return "No fast travel to hide boxes \u2014 use sat nav and drive there";
   if (Math.abs(s.v) >= 1.35)
     return (

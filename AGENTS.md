@@ -86,13 +86,14 @@ sim. `main.js` owns the loop (update → draw → HUD), the camera, the minimap 
 | 48 | `airport.js` | ALBION AIRPORT: runway, taxiways, HAS dispersals, hangars, civil terminal, landside car parks; aircraft as pure functions of timeS |
 | 49 | `milbase.js` | SANDVALE MILITARY BASE (replaced Sandvale Intl): base roads (sg.mil, civilians filtered out), fence/towers/buildings, Army Logistics Depot (ALD) + military trailers, AI military gate traffic + barriers, helicopter art, rifle range + parade soldiers, night lighting (base street lamps + baked floodlights), searchlights |
 | 50 | `heli.js` | HELICOPTERS: 4 real entities flying missions base <-> remote helipads (hospital/police roofs, airport, docks); take-off/cruise/landing state machine, shadow, rotors, nav lights + strobes, rotor sound, minimap + map icons; airborne (no traffic collisions) |
-| 51 | `ambulance.js` | AMBULANCE: casualties stay down until paramedics treat them |
-| 52 | `fire.js` | FIRES: buildings near the player catch fire; the nearest fire station's engine responds |
-| 53 | `flycam.js` | admin-only fly camera (G / FLY button): truck holds its handbrake, free camera pans/zooms, click/tap or Tab/LB/RB to follow AI vehicles |
-| 54 | `accounts.js` | Supabase accounts: name + 4-digit PIN via SECURITY DEFINER RPCs; cloud save sync; guest/offline fallback |
-| 55 | `invite.js` | Invite landing: opened via ?join=TRUCK-1234 -> dedicated "You're invited" card (log in / create / guest / remembered), then straight into the host's game |
-| 56 | `server.js` | Public servers over Supabase Realtime (no host needed). Presence = player list + cap, Broadcast = poses. |
-| 57 | `homecard.js` | Home card: one clear "who am I" card. Account remembered -> Welcome back <name> + CONTINUE + Switch account |
+| 51 | `bm.js` | BLACK MARKET: 4 seedy yards (fenced, shed, drop bay, sign; map/minimap/fast travel/sat nav), separate Black Market Jobs board (same design as the normal board; BM_MISSIONS registry), Tank Heist (ALD low-loader, alarm + firing soldiers, 2-star escape, deliver when clear) |
+| 52 | `ambulance.js` | AMBULANCE: casualties stay down until paramedics treat them |
+| 53 | `fire.js` | FIRES: buildings near the player catch fire; the nearest fire station's engine responds |
+| 54 | `flycam.js` | admin-only fly camera (G / FLY button): truck holds its handbrake, free camera pans/zooms, click/tap or Tab/LB/RB to follow AI vehicles |
+| 55 | `accounts.js` | Supabase accounts: name + 4-digit PIN via SECURITY DEFINER RPCs; cloud save sync; guest/offline fallback |
+| 56 | `invite.js` | Invite landing: opened via ?join=TRUCK-1234 -> dedicated "You're invited" card (log in / create / guest / remembered), then straight into the host's game |
+| 57 | `server.js` | Public servers over Supabase Realtime (no host needed). Presence = player list + cap, Broadcast = poses. |
+| 58 | `homecard.js` | Home card: one clear "who am I" card. Account remembered -> Welcome back <name> + CONTINUE + Switch account |
 
 Notes on ownership:
 - **Police**: all police logic is in `police.js` (patrols, detection, chase, fines and arrest, hide boxes, the siren

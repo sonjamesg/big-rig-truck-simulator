@@ -1420,6 +1420,7 @@ function updateCareer(dt) {
     Math.abs(s.v) < 0.1 &&
     !career.depotLatch &&
     !career.uiOpen &&
+    !(typeof BM !== "undefined" && BM.act) &&
     started &&
     timeS > 3
   ) {

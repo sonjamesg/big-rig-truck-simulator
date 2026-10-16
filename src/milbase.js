@@ -813,6 +813,7 @@ function mbUpdate(dt) {
     chk(v.x, v.y);
   }
   chk(truck.x, truck.y);
+  if (typeof BM !== "undefined" && BM.alarm) want[0] = want[1] = 1; // v46: alarm -> both barriers up (escape route)
   for (let k = 0; k < 2; k++)
     R.bars[k] = Math.max(0, Math.min(1, R.bars[k] + (want[k] ? 1.4 : -0.8) * dt));
   R.mil = nm;

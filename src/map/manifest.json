@@ -280,6 +280,11 @@
   },
   {
    "root": "world",
+   "key": "bmYards",
+   "file": "state/world.bmYards.json"
+  },
+  {
+   "root": "world",
    "key": "fuel",
    "file": "state/world.fuel.json"
   },

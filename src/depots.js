@@ -667,6 +667,7 @@ function* buildDepotsSteps(objs, R) {
       dp.region = region(M.D.x, M.D.y);
     }
   }
+  bmGenYards(findSpot, access, clearObjs, objs, R); // v46: Black Market yards (bm.js)
   D0.region = "Westmere";
   yield "Building fuel stations";
   // ---- petrol / truck stops

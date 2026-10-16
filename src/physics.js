@@ -54,7 +54,8 @@ function solidAtM(mx, my) {
     isSolidTile(Math.floor((mx * PPM) / TILE), Math.floor((my * PPM) / TILE)) ||
     (typeof apSolidM === "function" && apSolidM(mx, my)) ||
     (typeof portFenceSolid === "function" && portFenceSolid(mx, my)) ||
-    mbSolidM(mx, my)
+    mbSolidM(mx, my) ||
+    bmSolidM(mx, my)
   );
 }
 function bodyHits(cx, cy, a, yf, yr, w) {

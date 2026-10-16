@@ -233,6 +233,7 @@ function trlSVG(type, col) {
 const boardState = { filter: "all", sort: "near", sel: null };
 function openBoard() {
   if (!started) return;
+  if (typeof bmOpenBoard === "function" && bmOpenBoard()) return; // v46: at a Black Market yard -> its own board
   boardState.sort = "near";
   boardState.sel = null;
   if (!world.malls || !world.malls.length) return;

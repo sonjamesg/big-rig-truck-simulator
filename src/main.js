@@ -472,6 +472,7 @@ function frame(ts) {
   updatePort(dt);
   mbUpdate(dt);
   hlUpdate(dt);
+  bmUpdate(dt);
   {
     const z = cam.z;
     updateAmbient(dt, [
@@ -568,6 +569,7 @@ function draw() {
   hlDrawPads(vx0, vy0, vx1, vy1);
   drawTraffic(vx0, vy0, vx1, vy1);
   mbDrawLow(vx0, vy0, vx1, vy1);
+  bmDrawLow(vx0, vy0, vx1, vy1);
   drawPortLow(vx0, vy0, vx1, vy1);
   drawFXLow(vx0, vy0, vx1, vy1);
   drawRemotePlayers(vx0, vy0, vx1, vy1);
@@ -588,6 +590,7 @@ function draw() {
   drawAmbientHigh(VR);
   mbDrawHigh(vx0, vy0, vx1, vy1);
   hlDrawHigh(vx0, vy0, vx1, vy1);
+  bmDrawHigh();
   drawWeather(vx0, vy0, vx1, vy1, z);
   drawNight(vx0, vy0, vx1, vy1, z);
   mbDrawNight(vx0, vy0, vx1, vy1);
@@ -598,6 +601,7 @@ function draw() {
   if (typeof ptYardCounter === "function") ptYardCounter(vx0, vy0, vx1, vy1);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   drawHUD();
+  bmHUD();
   if (bigmap.open) {
     drawBigMap();
     drawPadMapCursor();
