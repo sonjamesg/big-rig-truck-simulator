@@ -1106,6 +1106,7 @@ function spawnVehicle(x, y, force, opt) {
   }
   if (along < sg.b0 + 2 || along > sg.b1 - 1) return null;
   if (segDeadEnd(sg)) return null; // v26: never spawn onto a road that leads nowhere
+  if (sg.mil && mbFull()) return null; // v45: base traffic capped (MB_CAP military vehicles in total)
   const dir = opt && opt.dir ? opt.dir : r() < 0.5 ? 1 : -1,
     lane = opt ? 0 : (r() * nLanes(sg)) | 0;
   const p = lanePt(sg, dir, lane, along);

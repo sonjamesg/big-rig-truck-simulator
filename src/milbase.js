@@ -842,6 +842,13 @@ function mbDress(v) {
   }
   return v;
 }
+const MB_CAP = 12;
+// military vehicles alive (gate traffic included); background spawns on base roads and the gate generator both respect MB_CAP
+function mbFull() {
+  let n = 0;
+  for (const v of traffic.vs) if (v.mil && ++n >= MB_CAP) return true;
+  return false;
+}
 function mbUpdate(dt) {
   const B = world.milbase;
   if (!B) return;
@@ -871,7 +878,7 @@ function mbUpdate(dt) {
     gy = 345 * M_T;
   if (R.spT > 0) return;
   R.spT = 4 + Math.random() * 5;
-  if (Math.hypot(truck.x - gx, truck.y - gy) > 900 || nm >= 12) return;
+  if (Math.hypot(truck.x - gx, truck.y - gy) > 900 || nm >= MB_CAP) return;
   try {
     const r = tRand;
     const inbound = r() < 0.55;
