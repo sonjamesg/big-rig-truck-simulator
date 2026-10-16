@@ -1,7 +1,7 @@
 /**
  * @file bm.js — BLACK MARKET: shady yards (world gen, art, fence collision, map icons, fast travel), the Black Market Jobs board
  *   (illegal missions only, registry BM_MISSIONS for more theft jobs later) Tank Heist + Depot Thefts (soldiers, 2-star escape, numbered reverse-in drop bays, payout breakdown).
- * Exposes (globals): BM, BM_MISSIONS, bmGenYards, bmSolidM, bmMapIcons, bmPOIs, bmAtYard, bmOpenBoard, bmBlockFT, bmUpdate, bmWanted2, bmLoseUpdate, bmBays, bmOnDrop, bmPayout,
+ * Exposes (globals): BM, BM_MISSIONS, bmGenYards, bmSolidM, bmMapIcons, bmPOIs, bmAtYard, bmOpenBoard, bmBlockFT, bmUpdate, bmWanted2, bmLoseUpdate, bmBays, bmOnDrop, bmPayout, bmJeepStart, bmExtrasUpdate,
  *   BM_THEFT, BM_OFFER_S, bmTheftOffers, bmBoardList, bmBoardBox, bmInBoardBox,
  *   bmDrawLow, bmDrawHigh, bmHUD (+ bm* helpers)
  * Depends on: depots.js (findSpot/access passed in, makeTrailer, BigRig events), milbase.js (MB, world.milbase, mbSoldier),
@@ -354,7 +354,18 @@ const BM_MISSIONS = [];
 function bmTankTarget() {
   const D = (world.depots || []).find((d) => d.mil);
   if (!D) return null;
-  let tr = world.trailers.find((t) => t.type === "lowtank" && !t.coupled && t.depot === D && t.bay);
+  // v47: every replay picks a different tank: a random parked one, often moved to a random free bay
+  const C = world.trailers.filter(
+    (t) => t.type === "lowtank" && !t.coupled && t.depot === D && t.bay,
+  );
+  let tr = C.length ? C[(Math.random() * C.length) | 0] : null;
+  const free = D.bays.filter((q) => !q.trailer);
+  if (tr && free.length && Math.random() < 0.7 && !onScreen(tr.x, tr.y, 20)) {
+    const b = free[(Math.random() * free.length) | 0];
+    tr.bay.trailer = null;
+    Object.assign(tr, { x: b.kx, y: b.ky, th: b.th, bay: b });
+    b.trailer = tr;
+  }
   if (!tr) {
     const b = D.bays.find((q) => !q.trailer);
     if (!b) return null;
@@ -396,8 +407,13 @@ BM_MISSIONS.push({
     tr.target = false;
     if (a.step === 0) {
       a.step = 1;
-      bmAlarm(true);
-      flash("\u{1F6A8} ALARM! Soldiers are shooting \u2014 get out through the gate!");
+      // short stealth window: the alarm goes off a few seconds after coupling (sooner if you're spotted)
+      if (!BM.alarm) {
+        a.alarmAt = timeS + BM_STEALTH_S;
+        flash(
+          "\u{1F92B} Coupled. Quietly now \u2014 the alarm will go any second, head for the gate!",
+        );
+      }
       setRoute({ x: (MB.av + 2) * M_T, y: 356 * M_T, name: "Base gate" });
     }
     a.lost = false;
@@ -420,6 +436,7 @@ BM_MISSIONS.push({
     if (a.step === 1 && !inBase && s.trl === a.tr) {
       a.step = 2;
       bmWanted2(a);
+      bmJeepStart();
       flash("\u2605\u2605 The police are after the tank \u2014 lose them!");
       clearRoute();
     }
@@ -1011,7 +1028,9 @@ function bmShoot(S, d, R) {
   });
   bmGunSound(S.mg, d);
   if (h) {
-    truck.damage = Math.min(100, (truck.damage || 0) + (S.mg ? BM_DMG.mg : BM_DMG.rifle));
+    // phone touch steering is coarser: rounds land a little softer there
+    const tk = document.body.classList.contains("touch") ? 0.8 : 1;
+    truck.damage = Math.min(100, (truck.damage || 0) + (S.mg ? BM_DMG.mg : BM_DMG.rifle) * tk);
     cam.shake = Math.max(cam.shake || 0, 1.2);
     BM.hits = (BM.hits || 0) + 1;
     for (let k = 0; k < 4; k++)
@@ -1088,6 +1107,7 @@ function bmUpdate(dt) {
       const near = bmNearBase(25);
       for (const S of BM.sol) bmSoldierUpdate(S, dt, near);
     }
+    bmExtrasUpdate(a, dt);
     for (let i = BM.tr.length - 1; i >= 0; i--) if ((BM.tr[i].t -= dt) <= 0) BM.tr.splice(i, 1);
     for (let i = (BM.fx || []).length - 1; i >= 0; i--) {
       const q = BM.fx[i];
@@ -1173,6 +1193,9 @@ function bmSoldierSprite(S) {
 }
 function bmDrawLow(vx0, vy0, vx1, vy1) {
   const A = BM.act;
+  bmStingerDraw();
+  bmSmokeDraw();
+  bmJeepDraw();
   if (A && A.step === A.m.delStep) {
     // bays: amber when close, green when lined up (like depot bays); pulsing arrow over the free bays near the yard
     const st = bmBayState(A),
@@ -1320,6 +1343,15 @@ function bmHUD() {
           ? "   \u25CB Leave the red search circle on the map"
           : "   \u23F1 Stay hidden " + Math.max(0, BM_LOSE_S - Z.unseen).toFixed(0) + " s",
     );
+  // live cargo value: drops as the rig gets shot up / crashed
+  if (a.step >= 1) {
+    const P = bmPayout(a);
+    L.push(
+      "   \u{1F4B0} Cargo value " +
+        money(a.m.pay + P.ded) +
+        (P.ded ? " (" + money(P.ded) + " damage)" : ""),
+    );
+  }
   const x = 14,
     y = 140,
     w = 240,
@@ -1386,3 +1418,317 @@ setTimeout(() => {
     return ph.apply(this, arguments);
   };
 }, 0);
+
+// ===================== v47 heist extras: stealth window, army jeep pursuit, smoke, stingers, busted, save safety, chase music
+const BM_STEALTH_S = 5, // s after coupling before the alarm sounds (unless you're spotted first)
+  BM_BUST_FINE = 2500, // £ fine for being caught with stolen army/depot cargo
+  BM_JEEP_S = 38; // s the army jeep keeps after you once you're out of the gate
+// stealth: searchlights (night) and the guard huts notice you; coupling starts a short countdown to the alarm
+function bmStealthUpdate(a, dt) {
+  if (a.m.id !== "tank" || BM.alarm) return;
+  const s = truck;
+  if (!bmNearBase(0)) {
+    a.sus = Math.max(0, (a.sus || 0) - dt);
+    return;
+  }
+  let seen = false;
+  const night = typeof DN !== "undefined" && DN.dark > 0.5;
+  if (night && typeof mbSearch === "function")
+    for (const p of mbSearch(timeS))
+      if (Math.hypot(s.x - (p.x / TILE) * M_T, s.y - (p.y / TILE) * M_T) < 22) seen = true;
+  // the guard huts by the gate notice anything moving fast near them
+  if (Math.hypot(s.x - 1250 * M_T, s.y - 334.5 * M_T) < 60 && Math.abs(s.v) > 6) seen = true;
+  a.sus = Math.max(0, (a.sus || 0) + (seen ? dt : -dt * 0.5));
+  if (seen && !a.susMsg) {
+    a.susMsg = true;
+    flash("\u{1F441} Careful \u2014 you're being watched. Slow down, keep out of the lights");
+  }
+  if (!seen) a.susMsg = false;
+  const trip = a.sus > 2.5 || (a.alarmAt && timeS >= a.alarmAt);
+  if (trip) {
+    bmAlarm(true);
+    flash(
+      a.sus > 2.5
+        ? "\u{1F6A8} SPOTTED! Alarm \u2014 the gate is in lockdown, ram the barrier!"
+        : "\u{1F6A8} ALARM! Soldiers are coming out \u2014 smash through the gate barrier!",
+    );
+  }
+}
+// the army jeep: follows your trail out of the gate with a gunner on the back
+function bmJeepStart() {
+  BM.crumbs = [[truck.x, truck.y]];
+  BM.jeep = {
+    x: 1250 * M_T,
+    y: 330 * M_T,
+    h: Math.PI,
+    v: 0,
+    k: 0,
+    t: timeS,
+    S: { x: 0, y: 0, a: 0, mg: true, f: 0, burst: 0, cd: 1.5 },
+  };
+  flash("\u{1F699} Army jeep on your tail \u2014 keep moving!");
+}
+function bmJeepUpdate(dt) {
+  const J = BM.jeep,
+    C = BM.crumbs;
+  if (!J) return;
+  const L = C[C.length - 1];
+  if (Math.hypot(truck.x - L[0], truck.y - L[1]) > 2) C.push([truck.x, truck.y]);
+  const dT = Math.hypot(truck.x - J.x, truck.y - J.y),
+    over = timeS - J.t > BM_JEEP_S || dT > 170;
+  // drive along the breadcrumb trail, holding ~14 m off the trailer
+  while (J.k < C.length - 1 && Math.hypot(C[J.k][0] - J.x, C[J.k][1] - J.y) < 3) J.k++;
+  const P = C[Math.min(J.k, C.length - 1)],
+    want = Math.atan2(P[0] - J.x, -(P[1] - J.y)),
+    vt = over ? 0 : dT > 30 ? 22 : dT > 18 ? Math.abs(truck.v) + 2 : Math.abs(truck.v) * 0.8;
+  J.h += Math.max(-2.2 * dt, Math.min(2.2 * dt, wrapA(want - J.h)));
+  J.v += Math.max(-9 * dt, Math.min(6 * dt, vt - J.v));
+  const f = fwd(J.h);
+  J.x += f[0] * J.v * dt;
+  J.y += f[1] * J.v * dt;
+  if (over && J.v < 0.5) {
+    if (!J.gone) flash("The jeep has given up \u2014 now lose the police");
+    BM.jeep = null;
+    return;
+  }
+  const S = J.S;
+  S.x = J.x - f[0] * 1.2;
+  S.y = J.y - f[1] * 1.2;
+  S.st = "stand";
+  S.f = Math.max(0, S.f - dt);
+  const want2 = Math.atan2(truck.y - S.y, truck.x - S.x),
+    da = wrapA(want2 - S.a);
+  S.a += Math.max(-3 * dt, Math.min(3 * dt, da));
+  if (over || dT > BM_RANGE.mg) return;
+  S.cd -= dt;
+  if (S.cd > 0 || Math.abs(da) > 0.3) return;
+  if (S.burst <= 0) S.burst = 4 + ((Math.random() * 4) | 0);
+  S.burst--;
+  S.cd = S.burst > 0 ? 0.11 : 2.6 + Math.random() * 1.6;
+  bmShoot(S, dT, BM_RANGE.mg * 1.3); // bouncing jeep: wider spread
+}
+function bmJeepDraw() {
+  const J = BM.jeep;
+  if (!J) return;
+  const g = ctx,
+    T_ = TILE / M_T;
+  g.save();
+  g.translate(J.x * T_, J.y * T_);
+  g.rotate(J.h);
+  g.fillStyle = "rgba(0,0,0,.3)";
+  g.fillRect(-1.1 * T_ + 2, -2.2 * T_ + 2, 2.2 * T_, 4.4 * T_);
+  g.fillStyle = "#4d5b34";
+  g.fillRect(-1.1 * T_, -2.2 * T_, 2.2 * T_, 4.4 * T_);
+  g.fillStyle = "#39452a";
+  g.fillRect(-1.1 * T_, -2.2 * T_, 2.2 * T_, 1.3 * T_);
+  g.fillStyle = "#1c2214";
+  g.fillRect(-0.95 * T_, -0.8 * T_, 1.9 * T_, 0.35 * T_);
+  g.fillStyle = "#2b2b2b";
+  for (const [sx, sy] of [
+    [-1.2, -1.5],
+    [1, -1.5],
+    [-1.2, 1.2],
+    [1, 1.2],
+  ])
+    g.fillRect(sx * T_, sy * T_, 0.2 * T_, 0.7 * T_);
+  g.restore();
+  bmSoldierSprite(J.S);
+}
+// smoke from a badly shot-up cab
+function bmSmokeUpdate(dt) {
+  const d = truck.damage || 0;
+  if (d < 55) return;
+  BM.smT = (BM.smT || 0) - dt;
+  if (BM.smT > 0) return;
+  BM.smT = d > 80 ? 0.06 : 0.14;
+  const f = fwd(truck.h);
+  bmFx("smoke", truck.x + f[0] * 2.4, truck.y + f[1] * 2.4, {
+    vx: (Math.random() - 0.5) * 1.5 - f[0] * truck.v * 0.3,
+    vy: (Math.random() - 0.5) * 1.5 - f[1] * truck.v * 0.3,
+    life: 1.4 + Math.random(),
+    dark: d > 80,
+  });
+}
+function bmSmokeDraw() {
+  const g = ctx,
+    T_ = TILE / M_T;
+  for (const q of BM.fx || []) {
+    if (q.k !== "smoke") continue;
+    const u = q.t / q.life;
+    g.fillStyle = q.dark
+      ? `rgba(30,30,30,${0.55 * (1 - u)})`
+      : `rgba(150,150,150,${0.45 * (1 - u)})`;
+    g.beginPath();
+    g.arc(q.x * T_, q.y * T_, (0.8 + u * 2.6) * T_, 0, 6.283);
+    g.fill();
+  }
+}
+// stingers: a spike strip laid across half the road in front of each roadblock (swerve round it)
+function bmStingerUpdate() {
+  if (typeof RB === "undefined") return;
+  for (const B of RB.list)
+    if (!B.st) {
+      const half = Math.random() < 0.5 ? 0 : 1,
+        h = B.u[1] === 0,
+        c = h ? B.y : B.x,
+        span = 4.2;
+      B.st = {
+        x: B.x - B.u[0] * 22,
+        y: B.y - B.u[1] * 22,
+        h,
+        c0: half ? c : c - span,
+        c1: half ? c + span : c,
+      };
+    }
+  const s = truck;
+  if (BM.flatT && timeS > BM.flatT) BM.flatT = 0;
+  for (const B of RB.list) {
+    const S = B.st;
+    if (!S || S.hit) continue;
+    const along = S.h ? s.x - S.x : s.y - S.y,
+      cr = S.h ? s.y : s.x;
+    if (Math.abs(along) < 1.6 && cr > S.c0 - 1.2 && cr < S.c1 + 1.2) {
+      S.hit = true;
+      BM.flatT = timeS + 25;
+      s.damage = Math.min(100, (s.damage || 0) + 4);
+      flash("\u{1F4A5} STINGER! Tyres shredded \u2014 you're limping");
+      if (typeof noiseBurst === "function" && audio.ctx) noiseBurst(0.6, 2500, 0.5, 0.4);
+    }
+  }
+  if (BM.flatT) s.v = Math.max(-6, Math.min(s.v, 11)); // ~25 mph on shredded tyres
+}
+function bmStingerDraw() {
+  if (typeof RB === "undefined") return;
+  const g = ctx,
+    T_ = TILE / M_T;
+  for (const B of RB.list) {
+    const S = B.st;
+    if (!S) continue;
+    g.fillStyle = S.hit ? "#555" : "#d8d8d8";
+    for (let c = S.c0; c < S.c1; c += 0.5) {
+      const x = S.h ? S.x : c,
+        y = S.h ? c : S.y;
+      g.fillRect(x * T_ - 3, y * T_ - 3, 6, 6);
+      g.fillStyle = S.hit ? "#444" : "#222";
+      g.fillRect(x * T_ - 1, y * T_ - 1, 2, 2);
+      g.fillStyle = S.hit ? "#555" : "#d8d8d8";
+    }
+  }
+}
+// chase music: a pulsing bass + hats loop that gets louder in a pursuit
+function bmMusicUpdate(a) {
+  if (typeof audio === "undefined" || !audio.ctx || !audio.master) return;
+  const on = a && a.step >= 1 && a.step <= a.m.loseStep;
+  if (!on) {
+    BM.mus = 0;
+    return;
+  }
+  const ac = audio.ctx,
+    lvl = POL.chase || BM.jeep || BM.alarm ? 1 : 0.55;
+  if (!BM.mus || BM.mus < ac.currentTime) BM.mus = ac.currentTime + 0.05;
+  const BEAT = 0.18;
+  while (BM.mus < ac.currentTime + 0.3) {
+    const t = BM.mus,
+      n = (BM.musN = ((BM.musN || 0) + 1) % 16);
+    const o = ac.createOscillator(),
+      gn = ac.createGain();
+    o.type = "sawtooth";
+    o.frequency.value = [55, 55, 65.4, 55, 49, 55, 73.4, 65.4][(n >> 1) % 8];
+    gn.gain.setValueAtTime(0.0001, t);
+    gn.gain.exponentialRampToValueAtTime(0.09 * lvl, t + 0.01);
+    gn.gain.exponentialRampToValueAtTime(0.0001, t + BEAT * 0.9);
+    o.connect(gn).connect(audio.master);
+    o.start(t);
+    o.stop(t + BEAT);
+    if (n % 2 && typeof noiseBurst === "function")
+      setTimeout(
+        () => noiseBurst(0.03, 7000, 1, 0.08 * lvl, "highpass"),
+        (t - ac.currentTime) * 1000,
+      );
+    BM.mus += BEAT;
+  }
+}
+// busted during a heist: arrested, cargo seized, fine taken, you keep your truck
+const _bmFinePopup = polFinePopup;
+polFinePopup = function () {
+  const a = BM.act,
+    c = POL.chase;
+  if (a && c && !c.paying && a.step >= 1 && a.step <= a.m.loseStep && truck.trl === a.tr) {
+    c.arrest = true;
+    a.busted = true;
+    c.offs.push({
+      type: "heist",
+      amount: BM_BUST_FINE,
+      reason: "Caught with stolen " + (a.m.id === "tank" ? "army tank" : "trailer"),
+    });
+  }
+  return _bmFinePopup();
+};
+const _bmPolPay = polPay;
+polPay = function () {
+  const a = BM.act;
+  _bmPolPay();
+  if (a && a.busted) {
+    const tr = a.tr;
+    if (tr && truck.trl === tr) {
+      tr.coupled = false;
+      truck.trl = null;
+    }
+    const i = tr ? world.trailers.indexOf(tr) : -1;
+    if (i >= 0) world.trailers.splice(i, 1);
+    a.tr = null;
+    BM.jeep = null;
+    bmEnd(
+      false,
+      "\u{1F6A8} BUSTED \u2014 cargo seized, fined " +
+        money(BM_BUST_FINE) +
+        ". You keep your truck.",
+    );
+    if (typeof saveGame === "function") saveGame();
+  }
+};
+// save safety: a heist is never saved mid-way, so quitting abandons it (the stolen trailer isn't written out) and pay can't repeat
+const _bmSaveGame = saveGame;
+saveGame = function () {
+  const a = BM.act,
+    t = truck.trl;
+  if (!a) return _bmSaveGame();
+  const hide = t && t === a.tr;
+  if (hide) truck.trl = null;
+  try {
+    localStorage.setItem("bigrig.bmAbandon", a.m.name);
+    return _bmSaveGame();
+  } finally {
+    if (hide) truck.trl = t;
+  }
+};
+function bmLoadCheck() {
+  if (BM.loadChk || !world.ready) return;
+  BM.loadChk = true;
+  const n = localStorage.getItem("bigrig.bmAbandon");
+  if (n && !BM.act) {
+    localStorage.removeItem("bigrig.bmAbandon");
+    flash(
+      "\u2620 " +
+        n +
+        " was abandoned when you left \u2014 no pay. Take a new job at a Black Market yard.",
+    );
+  }
+}
+// per-frame hook for all of the above (called from bmUpdate)
+function bmExtrasUpdate(a, dt) {
+  bmLoadCheck();
+  if (!a) {
+    BM.jeep = null;
+    BM.flatT = 0;
+    localStorage.removeItem("bigrig.bmAbandon");
+  } else {
+    if (a.step === 1 && a.m.id === "tank" && !BM.alarm) bmStealthUpdate(a, dt);
+    else if (a.step === 0) bmStealthUpdate(a, dt);
+    if (a.step >= a.m.delStep) BM.jeep = null;
+  }
+  bmJeepUpdate(dt);
+  bmSmokeUpdate(dt);
+  bmStingerUpdate();
+  bmMusicUpdate(a);
+}
