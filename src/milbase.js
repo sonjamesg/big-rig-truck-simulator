@@ -18,7 +18,7 @@ const MB = {
   gx1: 1254, // gap in the south fence for the gate avenue
   av: 1248, // gate avenue (2-way, 4 tiles: x1248..1251) from the spine down to the external road at y353
   barY: 335.5,
-  rt: { bars: [0, 0], mil: 0, spT: 3, err: null },
+  rt: { bars: [0, 0], broke: [false, false], mil: 0, spT: 3, err: null },
 };
 const MB_HP = [
   [1092, 180],
@@ -76,7 +76,7 @@ function mbSolidM(mx, my) {
   // closed gate barriers
   if (Math.abs(y - MB.barY) < 0.12 && x > MB.av && x < MB.av + 4) {
     const k = x < MB.av + 2 ? 0 : 1;
-    if (MB.rt.bars[k] < 0.5) return true;
+    if (MB.rt.bars[k] < 0.5 && !MB.rt.broke[k]) return true;
   }
   for (const s of B.sol) if (x > s[0] && x < s[2] && y > s[1] && y < s[3]) return true;
   return false;
@@ -813,7 +813,22 @@ function mbUpdate(dt) {
     chk(v.x, v.y);
   }
   chk(truck.x, truck.y);
-  if (typeof BM !== "undefined" && BM.alarm) want[0] = want[1] = 1; // v46: alarm -> both barriers up (escape route)
+  // v47: alarm -> lockdown: both barriers drop and stay down; ram one at speed to smash it
+  if (typeof BM !== "undefined" && BM.alarm) {
+    want[0] = want[1] = 0;
+    const s = truck;
+    const fy = s.y - Math.cos(s.h) * 3.6 * Math.sign(s.v || 1); // cab front (or rear when reversing)
+    if (Math.abs(fy - by) < 2.5 && s.x > xa - 1 && s.x < xa + 4 * M_T + 1 && Math.abs(s.v) > 3) {
+      const k = s.x < xa + 2 * M_T ? 0 : 1;
+      if (!R.broke[k]) {
+        R.broke[k] = true;
+        s.damage = Math.min(100, (s.damage || 0) + 2);
+        cam.shake = Math.max(cam.shake || 0, 3);
+        if (typeof flash === "function") flash("\u{1F4A5} Barrier smashed!");
+        if (typeof noiseBurst === "function" && audio.ctx) noiseBurst(0.35, 900, 0.8, 0.6);
+      }
+    }
+  } else if (typeof BM === "undefined" || !BM.act) R.broke[0] = R.broke[1] = false;
   for (let k = 0; k < 2; k++)
     R.bars[k] = Math.max(0, Math.min(1, R.bars[k] + (want[k] ? 1.4 : -0.8) * dt));
   R.mil = nm;
@@ -1039,8 +1054,19 @@ function mbDrawHigh(vx0, vy0, vx1, vy1) {
   for (let k = 0; k < 2; k++) {
     const px = (k ? MB.av + 4 : MB.av) * T_,
       py = MB.barY * T_,
-      L = 2 * T_ * Math.cos(MB.rt.bars[k] * 1.45),
+      L = MB.rt.broke[k] ? 0.45 * T_ : 2 * T_ * Math.cos(MB.rt.bars[k] * 1.45),
       s = k ? -1 : 1;
+    if (MB.rt.broke[k]) {
+      // snapped arm lying in the verge
+      g.save();
+      g.translate(px + s * 1.2 * T_, py + 0.7 * T_);
+      g.rotate(0.5 * s);
+      for (let i = 0; i < 4; i++) {
+        g.fillStyle = i % 2 ? "#f2f2f2" : "#d02020";
+        g.fillRect((i * T_) / 4 - T_ / 2, -1.8, T_ / 4, 3.6);
+      }
+      g.restore();
+    }
     g.fillStyle = "#333";
     g.fillRect(px - 4, py - 4, 8, 8);
     for (let i = 0; i < 6; i++) {
