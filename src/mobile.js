@@ -88,9 +88,9 @@ function mobBtn(id, html, cls, k) {
   b.innerHTML = html;
   document.getElementById("mob").appendChild(b);
   const on = (e) => {
+      if (e.pointerType !== "mouse" && typeof hapPress === "function") hapPress(id); // buzz first
       e.preventDefault();
       b.classList.add("on");
-      if (e.pointerType !== "mouse" && typeof hapPress === "function") hapPress(id);
       if (audio.ctx && audio.ctx.state === "suspended") audio.ctx.resume();
       if (typeof k === "string") {
         if (career.uiOpen && MOB.nav[k]) {
@@ -158,11 +158,11 @@ function mobInit() {
   document.body.appendChild(m);
   const dk = document.createElement("div");
   dk.id = "deck";
-  dk.innerHTML = '<div class="brand">BIG RIG <b>BOY</b></div><div class="grille"></div>';
+  dk.innerHTML = '<div class="grille"></div>';
   document.body.insertBefore(dk, m);
   for (const [id, h] of [
-    ["deckL", "BIG RIG"],
-    ["deckR", "<b>BOY</b>"],
+    ["deckL", ""],
+    ["deckR", ""],
   ]) {
     const d = document.createElement("div");
     d.id = id;

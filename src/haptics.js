@@ -1,6 +1,6 @@
 /**
  * @file haptics.js — Haptics: phone vibration on touch controls. Feature-detected, touch-only, toggle in SETTINGS.vib (saved with game).
- * Exposes (globals): HAP, HAP_PRESS, haptic, HAP_STRONG, hapPress, hapRecent, setVib
+ * Exposes (globals): HAP, HAP_PRESS, haptic, HAP_STRONG, HAP_DP, hapPress, HAP_SLIDE, hapRecent, setVib
  * Depends on: physics.js, depots.js, career.js
  * Load order: #22 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
  */
@@ -37,27 +37,61 @@ function haptic(p, force) {
   } catch (e) {}
 }
 const HAP_STRONG = { mHorn: 1, mCouple: 1, mFuel: 1, mUnload: 1 };
-const HAP_DP = { mLeft: 15, mRight: 15 }; // v44: short crisp pulse on the steering arms of the D-pad
+// short crisp click (12 ms) on the D-pad arms and A/B: fired first thing in touchstart/pointerdown
+const HAP_DP = { mLeft: 12, mRight: 12, mUp: 12, mDown: 12, mA: 12, mB: 12 };
 // Old saves: an off switch from before vibV=2 (start screen became scrollable, easy to knock) is ignored until re-chosen.
 // Deck presses are touch by definition: force past the HAP.touch gate (a keydown from a paired pad/keyboard used to zero it), dedupe pointerdown+touchstart.
 function hapPress(id) {
   const n = performance.now();
-  if (HAP.pid === id && n - HAP.pt < 60) return;
+  if (HAP.pid === id && n - HAP.pt < 60) return; // same press seen by touchstart and pointerdown
+  if (SETTINGS.vib !== false || SETTINGS.vibV !== 2)
+    try {
+      navigator.vibrate && navigator.vibrate(HAP_STRONG[id] ? 35 : HAP_DP[id] || HAP_PRESS);
+    } catch (e) {}
   HAP.pid = id;
   HAP.pt = n;
   HAP.touch = 1;
   HAP.last = n;
-  haptic(HAP_STRONG[id] ? 35 : HAP_DP[id] || HAP_PRESS, true);
 }
-// Backup path: if a browser skips/cancels pointerdown on a deck button, buzz on touchstart instead.
+// Instant buzz: touchstart on the button itself (capture, passive) calls vibrate before any other logic.
+// Holding never repeats (one buzz per touch); sliding a finger onto another deck button buzzes once for it
+// (touch pointers are implicitly captured, so the new button never gets its own pointerdown).
+const HAP_SLIDE = {};
 addEventListener(
   "touchstart",
   (e) => {
-    const b = e.target && e.target.closest && e.target.closest("#mob .b");
-    if (b && b.id) hapPress(b.id);
+    for (const t of e.changedTouches) {
+      const b = t.target && t.target.closest && t.target.closest("#mob .b");
+      if (b && b.id) {
+        hapPress(b.id);
+        HAP_SLIDE[t.identifier] = b.id;
+      }
+    }
   },
   { capture: true, passive: true },
 );
+addEventListener(
+  "touchmove",
+  (e) => {
+    for (const t of e.changedTouches) {
+      if (!(t.identifier in HAP_SLIDE)) continue;
+      const el = document.elementFromPoint(t.clientX, t.clientY),
+        b = el && el.closest && el.closest("#mob .b");
+      const id = b && b.id && b.id !== "mSteer" && b.id !== "mCen" ? b.id : null;
+      if (id && id !== HAP_SLIDE[t.identifier]) hapPress(id);
+      if (id) HAP_SLIDE[t.identifier] = id;
+    }
+  },
+  { capture: true, passive: true },
+);
+for (const ev of ["touchend", "touchcancel"])
+  addEventListener(
+    ev,
+    (e) => {
+      for (const t of e.changedTouches) delete HAP_SLIDE[t.identifier];
+    },
+    { capture: true, passive: true },
+  );
 const hapRecent = () => performance.now() - HAP.last < 800;
 for (const ev of ["couple", "uncouple", "refuel", "unloadStart", "missionStart"])
   BigRig.on &&
