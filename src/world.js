@@ -1785,6 +1785,7 @@ function* genWorldSteps() {
     road("h", 692, 392, 433, 3, "town"); // v44: frontage moved 3 tiles south, clear of the terminal canopy
     road("v", 392, 692, 702, 3, "town");
     road("v", 431, 692, 709, 3, "town"); // v41: arrivals/drop-off frontage loop (real road)
+    mbRoads(road); // v45: Sandvale Military Base internal roads + gate avenue
     // v39: car park access roads (MSCP ramp, surface parks)
     const tg = world.segs.find((q) => q.dir === "v" && q.a === 346 && q.b0 === 780);
     if (tg) {
@@ -3095,18 +3096,7 @@ function* genWorldSteps() {
         if (G[idx(x, y)] !== T.ROAD && G[idx(x, y)] !== T.BRIDGE) R_[idx(x, y)] = 1;
       }
   } // v37: the Albion airport footprint is off-limits to later depots/shops/services (layout wins)
-  airport(
-    "Sandvale Intl",
-    1070,
-    160,
-    1445,
-    340,
-    [
-      [1090, 180, 330],
-      [1090, 300, 330],
-    ],
-    [1110, 215, 80],
-  );
+  mbGen(objs); // v45: Sandvale Military Base (milbase.js) replaces Sandvale Intl
   airport("Kingsbridge Field", 1195, 1792, 1385, 1905, [[1205, 1860, 175]], [1210, 1812, 40]);
   if (world.quarry) {
     const { x, y } = world.quarry;
@@ -3655,7 +3645,7 @@ function* genWorldSteps() {
     ["Mount Greyfell", MTN.x, MTN.y - 40],
     ["River Moor", riverX(1500) + 30, 1500],
     ["Albion Airport", 400, 560],
-    ["Sandvale Intl", 1260, 250],
+    ["Sandvale Military Base", 1260, 250],
     ["Kingsbridge Field", 1290, 1830],
     ["Albion Port", 540, PORT_Y0 - 6],
     ["Kingsbridge Harbour", 1600, 1905],
@@ -3874,11 +3864,13 @@ function worldChunkIndex(objs) {
                 o.kind === "bay" ||
                 o.kind === "drive"
               ? 0
-              : o.kind === "tree"
-                ? 3
-                : o.kind === "awning"
-                  ? 2.5
-                  : 2;
+              : o.kind === "mb"
+                ? (o.zz ?? 2)
+                : o.kind === "tree"
+                  ? 3
+                  : o.kind === "awning"
+                    ? 2.5
+                    : 2;
     for (let cy = Math.floor(y0 / CHUNK); cy <= Math.floor(y1 / CHUNK); cy++)
       for (let cx = Math.floor(x0 / CHUNK); cx <= Math.floor(x1 / CHUNK); cx++) {
         const k = cx + "," + cy;

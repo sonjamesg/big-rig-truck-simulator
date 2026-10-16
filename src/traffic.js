@@ -646,6 +646,10 @@ function planPiece(v, r) {
     const lineA = ap ? ap.lineA : stop,
       lanes = ap ? ap.lanes : null;
     let opts = o.opts;
+    if (!v.mil && !sg.mil) {
+      const f = opts.filter((q) => !(q[1] && q[1].mil)); // v45: civilians never turn into the military base
+      if (f.length) opts = f;
+    }
     const distT = Math.abs(lineA - P.pos);
     if (lanes && distT < 5) {
       const f = opts.filter((op) => lanes[P.lane] && lanes[P.lane].indexOf(op[0]) >= 0);
@@ -1105,7 +1109,8 @@ function spawnVehicle(x, y, force, opt) {
   const dir = opt && opt.dir ? opt.dir : r() < 0.5 ? 1 : -1,
     lane = opt ? 0 : (r() * nLanes(sg)) | 0;
   const p = lanePt(sg, dir, lane, along);
-  const kind = opt && opt.kind ? opt.kind : pickW(MIX[sg.type] || MIX.city, r()),
+  const kind =
+      opt && opt.kind ? opt.kind : sg.mil ? mbKind(r) : pickW(MIX[sg.type] || MIX.city, r()),
     t = VTYPES[kind];
   {
     const dv = dirVec(sg, dir),
@@ -1157,6 +1162,7 @@ function spawnVehicle(x, y, force, opt) {
   v.s = pathEnd(v);
   while (pathEnd(v) - v.s < 90) if (!planPiece(v, v.r)) break;
   v.v = Math.min(SPEED[sg.type] || 12, v.heavy ? 20 : 30) * 0.6;
+  if (sg.mil) mbDress(v); // v45: anything spawned on a base road is a military vehicle
   placeVeh(v);
   traffic.vs.push(v);
   traffic.spawned++;

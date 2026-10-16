@@ -235,6 +235,11 @@
   },
   {
    "root": "world",
+   "key": "milbase",
+   "file": "state/world.milbase.json"
+  },
+  {
+   "root": "world",
    "key": "crops",
    "file": "state/world.crops.json"
   },

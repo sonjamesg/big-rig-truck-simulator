@@ -470,6 +470,7 @@ function frame(ts) {
     updateFX(dt);
   }
   updatePort(dt);
+  mbUpdate(dt);
   {
     const z = cam.z;
     updateAmbient(dt, [
@@ -564,6 +565,7 @@ function draw() {
   drawCareerWorld(vx0, vy0, vx1, vy1);
   drawParkedTrailers(vx0, vy0, vx1, vy1);
   drawTraffic(vx0, vy0, vx1, vy1);
+  mbDrawLow(vx0, vy0, vx1, vy1);
   drawPortLow(vx0, vy0, vx1, vy1);
   drawFXLow(vx0, vy0, vx1, vy1);
   drawRemotePlayers(vx0, vy0, vx1, vy1);
@@ -582,8 +584,10 @@ function draw() {
   for (const o of world.overhead)
     if (o.x > vx0 - 400 && o.x < vx1 + 400 && o.y > vy0 - 400 && o.y < vy1 + 400) drawOverhead(o);
   drawAmbientHigh(VR);
+  mbDrawHigh(vx0, vy0, vx1, vy1);
   drawWeather(vx0, vy0, vx1, vy1, z);
   drawNight(vx0, vy0, vx1, vy1, z);
+  mbDrawNight(vx0, vy0, vx1, vy1);
   drawStreetLamps(vx0, vy0, vx1, vy1);
   drawSigNight();
   drawPortNight(vx0, vy0, vx1, vy1);

@@ -66,6 +66,44 @@ const TRAILER_TYPES = {
     ],
     cols: ["#dfe3e6"],
   },
+  army: {
+    name: "ARMY container",
+    tare: 5200,
+    level: 3,
+    cargos: [
+      ["Field rations", 9000],
+      ["Ammunition (ADR)", 18000],
+      ["Tentage + stores", 7000],
+    ],
+    cols: ["#4f5d36"],
+  },
+  lowtank: {
+    name: "Tank low-loader",
+    tare: 14000,
+    level: 4,
+    cargos: [["Main battle tank", 62000]],
+    cols: ["#4a4c44"],
+  },
+  lowveh: {
+    name: "Vehicle low-loader",
+    tare: 12000,
+    level: 4,
+    cargos: [
+      ["2 x Land Rovers", 6000],
+      ["Foxhound patrol vehicles", 15000],
+    ],
+    cols: ["#4a4c44"],
+  },
+  oil: {
+    name: "OIL tanker",
+    tare: 7600,
+    level: 4,
+    cargos: [
+      ["Aviation fuel (ADR)", 24000],
+      ["Diesel (military)", 24000],
+    ],
+    cols: ["#d8d8d2"],
+  },
   box: {
     name: "Box van",
     tare: 7500,
@@ -148,7 +186,8 @@ function trailerArt(kind, col, logo) {
   const key = "dt" + kind + col + logo;
   if (traffic.arts[key]) return traffic.arts[key];
   let c;
-  if (kind === "tank" || kind === "flat" || kind === "box")
+  if (MB_TRL[kind]) c = mbTrailerCanvas(kind);
+  else if (kind === "tank" || kind === "flat" || kind === "box")
     c = makeTrailerArtAI(col, logo, kind === "box" ? "box" : kind);
   else {
     const L = TRL_LEN,
@@ -433,17 +472,20 @@ function* buildDepotsSteps(objs, R) {
     objs.push({
       kind: "yard",
       dp,
-      x: (x + (opts.keep ? 2 : 8)) * TILE,
-      y: (y + (opts.keep ? 7 : 1.5)) * TILE,
+      x: (opts.yardAt ? opts.yardAt[0] : x + (opts.keep ? 2 : 8)) * TILE,
+      y: (opts.yardAt ? opts.yardAt[1] : y + (opts.keep ? 7 : 1.5)) * TILE,
       w: 12 * TILE,
       h: 2 * TILE,
     });
     const nb = Math.min(opts.maxBays || 14, Math.floor((w - 1.5) / 1.25)),
       bx0 = x + (w - nb * 1.25) / 2;
-    for (let k = 0; k < nb; k++) {
-      const cxT = bx0 + k * 1.25 + 0.625,
-        y0 = y + h - 4.7,
-        y1 = y + h - 0.3;
+    // v45: opts.rows = [{x0,y0,y1,n,bw}] custom bay rows (military depot); default = one row along the bottom
+    const RW = opts.rows || [{ x0: bx0, y0: y + h - 4.7, y1: y + h - 0.3, n: nb, bw: 1.25 }],
+      BS = [];
+    for (const rw of RW)
+      for (let k = 0; k < rw.n; k++) BS.push([rw.x0 + k * rw.bw + rw.bw / 2, rw.y0, rw.y1, rw.bw]);
+    for (let k = 0; k < BS.length; k++) {
+      const [cxT, y0, y1, bw] = BS[k];
       const bay = {
         id: k + 1,
         label: code + "-" + (k + 1),
@@ -451,12 +493,12 @@ function* buildDepotsSteps(objs, R) {
         cx: cxT * M_T,
         cy: ((y0 + y1) / 2) * M_T,
         th: 0,
-        w: 1.25 * M_T,
+        w: bw * M_T,
         L: (y1 - y0) * M_T,
         target: false,
         trailer: null,
-        x0: (cxT - 0.625) * M_T,
-        x1: (cxT + 0.625) * M_T,
+        x0: (cxT - bw / 2) * M_T,
+        x1: (cxT + bw / 2) * M_T,
         y0: y0 * M_T,
         y1: y1 * M_T,
         dock: y1 * M_T,
@@ -467,9 +509,9 @@ function* buildDepotsSteps(objs, R) {
       objs.push({
         kind: "tbay",
         bay,
-        x: (cxT - 0.625) * TILE,
+        x: (cxT - bw / 2) * TILE,
         y: (y0 - 0.6) * TILE,
-        w: 1.25 * TILE,
+        w: bw * TILE,
         h: (y1 - y0 + 0.6) * TILE,
       });
     }
@@ -579,7 +621,6 @@ function* buildDepotsSteps(objs, R) {
     ["Ashby Farm Supplies", "AFS", 1, 280, 1170],
     ["Greyfell Quarry", "GQY", 4, 120, 1610],
     ["Sandvale Distribution", "SVD", 3, 1560, 520],
-    ["Sandvale Air Cargo", "SAC", 4, 1300, 360],
     ["Dustwater Outpost", "DWO", 2, 1020, 500],
     ["Coppermine Mine", "CMM", 4, 1640, 660],
     ["Kingsbridge Freight Park", "KFP", 3, 1415, 1386],
@@ -616,6 +657,15 @@ function* buildDepotsSteps(objs, R) {
       entrance: { x: (x + 10) * M_T, y: (y - gap) * M_T },
     });
     dp.region = region(x, y);
+  }
+  {
+    // v45: Sandvale Military Base depot (layout from milbase.js; custom bay rows, military trailers)
+    const M = mbDepotOpts();
+    if (M) {
+      const dp = makeDepot("Army Logistics Depot", "ALD", 4, M.D.x, M.D.y, M.D.w, M.D.h, M.opts);
+      dp.mil = 1;
+      dp.region = region(M.D.x, M.D.y);
+    }
   }
   D0.region = "Westmere";
   yield "Building fuel stations";
@@ -1213,8 +1263,12 @@ function* buildDepotsSteps(objs, R) {
   const types = ["curtain", "curtain", "fridge", "cont", "flat", "tank"];
   for (const dp of world.depots)
     dp.bays.forEach((bay, i) => {
-      if (R() < (dp === D0 ? 0.7 : 0.55)) {
-        const tr = makeTrailer(types[(R() * types.length) | 0], R);
+      if (R() < (dp === D0 ? 0.7 : dp.mil ? 0.62 : 0.55)) {
+        const MT = ["army", "army", "lowtank", "lowveh", "oil"];
+        const tr = makeTrailer(
+          dp.mil ? MT[(R() * MT.length) | 0] : types[(R() * types.length) | 0],
+          R,
+        );
         tr.x = bay.kx;
         tr.y = bay.ky;
         tr.th = bay.th;
