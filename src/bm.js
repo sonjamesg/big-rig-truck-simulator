@@ -832,41 +832,56 @@ function bmDrawHigh() {
 }
 // mission HUD (left, under the job panel): steps with the current one highlighted
 function bmHUD() {
-  const a = BM.act;
-  if (!a || bigmap.open) return;
+  const a = BM.act,
+    hb = document.getElementById("hudbtns");
+  if (!a || bigmap.open) {
+    if (hb && hb.style.top) hb.style.top = "";
+    return;
+  }
+  // compact panel tucked under the money (fuel) and XP panels, top-left
   const L = a.m.steps(a),
     x = 14,
-    y = 262,
-    w = 330,
-    h = 34 + L.length * 22 + (a.lost ? 20 : 0);
+    y = 140,
+    w = 240,
+    h = 24 + L.length * 15 + (a.lost ? 15 : 0);
   ctx.save();
-  ctx.fillStyle = "rgba(14,6,10,0.86)";
+  ctx.fillStyle = "rgba(14,6,10,0.82)";
   ctx.strokeStyle = BM.alarm && timeS % 0.6 < 0.3 ? "#ff3b4e" : "#6b1420";
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.roundRect ? ctx.roundRect(x, y, w, h, 10) : ctx.rect(x, y, w, h);
+  ctx.roundRect ? ctx.roundRect(x, y, w, h, 8) : ctx.rect(x, y, w, h);
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = "#ff3b4e";
-  ctx.font = "bold 13px 'Courier New',monospace";
   ctx.textBaseline = "middle";
   ctx.textAlign = "left";
+  const fit = (t) => {
+    if (ctx.measureText(t).width <= w - 18) return t;
+    while (t.length > 4 && ctx.measureText(t + "\u2026").width > w - 18) t = t.slice(0, -1);
+    return t + "\u2026";
+  };
+  ctx.fillStyle = "#ff5a6a";
+  ctx.font = "bold 11px system-ui,sans-serif";
   ctx.fillText(
-    "\u2620 BLACK MARKET \u2022 " + a.m.name.toUpperCase() + " \u2022 " + money(a.m.pay),
-    x + 12,
-    y + 17,
+    fit("\u2620 " + a.m.name.toUpperCase() + " \u2022 " + money(a.m.pay)),
+    x + 9,
+    y + 12,
   );
-  ctx.font = "12px system-ui,sans-serif";
+  ctx.font = "11px system-ui,sans-serif";
   L.forEach((s, i) => {
     const done = i < a.step,
       cur = i === a.step;
     ctx.fillStyle = done ? "#7dff8a" : cur ? "#ffd23f" : "rgba(230,220,220,0.5)";
-    const t = (done ? "\u2714 " : cur ? "\u25B6 " : "\u2022 ") + s;
-    ctx.fillText(t.length > 54 ? t.slice(0, 53) + "\u2026" : t, x + 12, y + 40 + i * 22);
+    ctx.fillText(fit((done ? "\u2714 " : cur ? "\u25B6 " : "\u2022 ") + s), x + 9, y + 28 + i * 15);
   });
   if (a.lost) {
     ctx.fillStyle = "#ff8a8a";
-    ctx.fillText("\u26A0 Re-couple the marked trailer", x + 12, y + 40 + L.length * 22);
+    ctx.fillText(fit("\u26A0 Re-couple the marked trailer"), x + 9, y + 28 + L.length * 15);
   }
   ctx.restore();
+  // keep the desktop JOBS pill below the panel (canvas px -> CSS px)
+  if (hb) {
+    const c = document.getElementById("game"),
+      k = c && c.clientHeight ? c.clientHeight / VH : 1;
+    hb.style.top = Math.round((y + h + 8) * k) + "px";
+  }
 }

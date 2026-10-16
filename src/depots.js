@@ -1597,7 +1597,7 @@ function drawCoupleHUD() {
       sub =
         `gap ${Math.max(0, c.along).toFixed(1)} m \u2022 offset ${c.lat > 0 ? "R" : "L"} ${Math.abs(c.lat).toFixed(2)} m \u2022 angle ${(c.a * 57.3).toFixed(0)}\u00b0` +
         (Math.abs(s.v) > 1.2 ? " \u2022 slow down" : "");
-    } else text = "SOLO CAB \u2022 T: couple (reverse onto a trailer)";
+    } else text = "SOLO CAB \u2022 T: couple";
   } else if (Math.abs(s.v) < 0.3) {
     text = "T: uncouple";
     col = "rgba(255,255,255,0.8)";
@@ -1608,18 +1608,48 @@ function drawCoupleHUD() {
     col = "#ffe9a8";
   }
   if (!text) return;
+  // top-right aligned, clear of the money panel (left) and the DOM Fullscreen button (desktop)
   ctx.save();
-  ctx.font = "bold 17px system-ui,sans-serif";
-  ctx.textAlign = "center";
-  const w = Math.max(ctx.measureText(text).width, sub ? ctx.measureText(sub).width * 0.8 : 0) + 30;
+  let R = VW - 14;
+  {
+    const fs = document.getElementById("fs"),
+      cv = document.getElementById("game");
+    if (fs && cv && fs.offsetParent) {
+      const fr = fs.getBoundingClientRect(),
+        cr = cv.getBoundingClientRect();
+      if (cr.width && fr.width && fr.top - cr.top < 60)
+        R = Math.min(R, ((fr.left - cr.left) * VW) / cr.width - 8);
+    }
+  }
+  const maxW = R - 218; // money/fuel panel ends at x = 204
+  let fsz = 17;
+  ctx.font = "bold " + fsz + "px system-ui,sans-serif";
+  while (fsz > 11 && ctx.measureText(text).width + 24 > maxW) {
+    fsz--;
+    ctx.font = "bold " + fsz + "px system-ui,sans-serif";
+  }
+  ctx.font = "13px system-ui,sans-serif";
+  let ssz = 13;
+  while (sub && ssz > 9 && ctx.measureText(sub).width + 24 > maxW) {
+    ssz--;
+    ctx.font = ssz + "px system-ui,sans-serif";
+  }
+  const sw = sub ? ctx.measureText(sub).width : 0;
+  ctx.font = "bold " + fsz + "px system-ui,sans-serif";
+  const w = Math.min(maxW, Math.max(ctx.measureText(text).width, sw) + 24),
+    h = sub ? 22 + fsz + ssz : 14 + fsz;
   ctx.fillStyle = "rgba(8,12,20,0.72)";
-  ctx.fillRect(VW / 2 - w / 2, 14, w, sub ? 52 : 32);
+  ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(R - w, 14, w, h, 8) : ctx.rect(R - w, 14, w, h);
+  ctx.fill();
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
   ctx.fillStyle = col;
-  ctx.fillText(text, VW / 2, 36);
+  ctx.fillText(text, R - 12, 14 + 7 + fsz / 2, maxW - 24);
   if (sub) {
-    ctx.font = "13px system-ui,sans-serif";
+    ctx.font = ssz + "px system-ui,sans-serif";
     ctx.fillStyle = "rgba(255,255,255,0.85)";
-    ctx.fillText(sub, VW / 2, 56);
+    ctx.fillText(sub, R - 12, 14 + 14 + fsz + ssz / 2, maxW - 24);
   }
   ctx.restore();
 }
