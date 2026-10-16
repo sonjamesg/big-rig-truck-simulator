@@ -1,3 +1,10 @@
+/**
+ * @file world.js — WORLD GENERATION: tile grid (MW x MH, TILE px / M_T m per tile), landmasses, road segments + junctions, roundabouts, curves, flyovers, towns
+ * Exposes (globals): TILE, PPM, MW, T, PORT_Y0, M_TILE, SOLID, mulberry, hash2, CHUNK, world, G,
+ *   idx, inb (+41 more)
+ * Depends on: lorry.js, traffic.js, markings.js, depots.js, gamepad.js, rail.js, main.js
+ * Load order: #2 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== WORLD GENERATION (v2: 640x640 tiles, ~2.5 km square) =====================
 const TILE = 32; // px per tile (4 m)

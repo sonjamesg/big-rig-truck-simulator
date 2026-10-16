@@ -1,3 +1,10 @@
+/**
+ * @file mapov.js — map overview: the M map + minimap are drawn from the real game chunks (same renderer as the world / fly-mode LOD),
+ * Exposes (globals): OV, ovInit, ovSheet, ovBuild, ovTick, ovDraw, OVL, ovlBoxes, ovlHits,
+ *   ovlPaint, ovlFlush, ovlNow
+ * Depends on: world.js, render.js, physics.js, career.js, main.js, airport.js
+ * Load order: #40 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 // ---- map overview: the M map + minimap are drawn from the real game chunks (same renderer as the world / fly-mode LOD),
 // downscaled to 2 px per tile into persistent sheets that are never evicted (no flicker). Built progressively near the
 // view first; anything not yet built falls back to the per-tile MINIMAP image underneath (same coordinates).

@@ -1,3 +1,10 @@
+/**
+ * @file markings.js — UK HIGHWAY CODE ROAD MARKINGS + approach lane rules
+ * Exposes (globals): RANK, jOptions, assignLanes, rbLanes, apprBox, prevEdge, buildMarkings,
+ *   arrowHead, drawLaneArrow, drawApproach, drawBoxJunction, drawLaneDrop
+ * Depends on: world.js, render.js, traffic.js, career.js, main.js
+ * Load order: #9 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== UK HIGHWAY CODE ROAD MARKINGS + approach lane rules =====================
 const RANK = { hwy: 5, dual: 4.5, city: 4, town: 3, rural: 2, res: 1, lane: 0.5 };

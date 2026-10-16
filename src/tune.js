@@ -1,3 +1,11 @@
+/**
+ * @file tune.js — TRUCK CUSTOMISER core (cz): CZ_PARTS catalogue, tune shop bays at repair garages + owned yards, fitting/effects
+ * Exposes (globals): CZ_TABS, CZ_SLOTS, CZ_PARTS, czPart, CZ, czSetup, czFitted, czLook, czFx,
+ *   czStats, czApply, czArtCache, czArt, czFinish (+24 more)
+ * Depends on: world.js, render.js, lorry.js, physics.js, traffic.js, depots.js, career.js, ui.js,
+ *   gamepad.js, owndepot.js, tune2.js, tune3.js, daynight.js, main.js
+ * Load order: #31 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== cz: TRUCK CUSTOMISER (tune shop bays at every repair garage + owned yard garages) =====================
 // Parts are per truck model, bought once, fitted per slot. All prices / level gates / effects live in CZ_PARTS below (easy to edit).

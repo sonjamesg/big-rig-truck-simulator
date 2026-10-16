@@ -1,3 +1,9 @@
+/**
+ * @file tune4.js — truck customiser stage 3b: truck model art overhaul (in-game + dealer)
+ * Exposes (globals): czDealerImg
+ * Depends on: world.js, render.js, lorry.js, career.js, ui.js, tune.js, main.js
+ * Load order: #34 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== cz stage 3b: truck model art overhaul (in-game + dealer) =====================
 // Adds a detail pass on top of every model's base art: chrome trim, mirror heads, glass glare, panel seams, air lines,

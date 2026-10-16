@@ -1,3 +1,12 @@
+/**
+ * @file port.js — living container ports (Albion + Kingsbridge)
+ * Exposes (globals): PORTSIM, portList, portInit, PL, portSegNear, portSpawn, aiGoal, aiDepot,
+ *   updatePort, updateOnePort, portLoadPlayer, portJob, portFrame, portVisible (+73 more)
+ * Depends on: world.js, render.js, physics.js, audio.js, traffic.js, signals.js, depots.js,
+ *   career.js, satnav.js, gamepad.js, indicators.js, porttrucks.js, repair.js, rail.js,
+ *   daynight.js, nightmap.js, weather.js, main.js
+ * Load order: #27 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== v18 living container ports (Albion + Kingsbridge) =====================
 // Each port works in a local frame: u = metres-in-tiles from the quay edge towards the water, v = along the quay.

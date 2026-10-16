@@ -1,3 +1,9 @@
+/**
+ * @file haptics.js — Haptics: phone vibration on touch controls. Feature-detected, touch-only, toggle in SETTINGS.vib (saved with game).
+ * Exposes (globals): HAP, HAP_PRESS, haptic, HAP_STRONG, hapPress, hapRecent, setVib
+ * Depends on: physics.js, depots.js, career.js
+ * Load order: #22 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 // Haptics: phone vibration on touch controls. Feature-detected, touch-only, toggle in SETTINGS.vib (saved with game).
 const HAP = { touch: 0, last: 0, dmg: null, dmgT: 0 };
 if (SETTINGS.vib === undefined) SETTINGS.vib = true;

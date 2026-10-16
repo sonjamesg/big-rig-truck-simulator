@@ -1,3 +1,9 @@
+/**
+ * @file invite.js — Invite landing: opened via ?join=TRUCK-1234 -> dedicated "You're invited" card (log in / create / guest / remembered), then straight into the host's game
+ * Exposes (globals): (no top-level names; registers hooks/listeners only)
+ * Depends on: world.js, ui.js, gamepad.js, mp.js, main.js, accounts.js
+ * Load order: #53 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== Invite landing: opened via ?join=TRUCK-1234 -> dedicated "You're invited" card (log in / create / guest / remembered), then straight into the host's game =====================
 (function () {

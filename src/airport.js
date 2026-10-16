@@ -1,3 +1,10 @@
+/**
+ * @file airport.js — ALBION AIRPORT: runway, taxiways, HAS dispersals, hangars, civil terminal, landside car parks; aircraft as pure functions of timeS
+ * Exposes (globals): APX, apA, apT, apCR, apPath, apAt, apSm, AP_LOOP, apBuild, apFillet,
+ *   apTimed, apAtT, AP_G, apApp (+42 more)
+ * Depends on: world.js, traffic.js, ambient.js, porttrucks.js, repair.js, daynight.js, main.js
+ * Load order: #48 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== v35 ALBION AIRPORT (Honington-style): 08/26 runway (081 deg), perimeter taxiway loop, HAS dispersals,
 // 4 Type C hangars + military apron, civil terminal over the main line (Airport station), landside forecourt + car parks.

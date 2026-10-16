@@ -1,3 +1,11 @@
+/**
+ * @file porttrucks.js — port hauliers: persistent AI container trucks on the real road network
+ * Exposes (globals): PTRUCK, ptArt, ptSetArt, ptVisible, ptGateGoal, ptDest, ptDepotGeo, ptPoly,
+ *   ptBay, ptDepotPath, ptPose, ptToRoad, ptSegAt, updatePortTrucks (+9 more)
+ * Depends on: world.js, physics.js, traffic.js, satnav.js, port.js, owndepot.js, tune.js,
+ *   daynight.js, main.js
+ * Load order: #28 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 // ===================== v30 port hauliers: persistent AI container trucks on the real road network =====================
 // Cycle: road (normal traffic routing/rules) -> port gate approach (handed to the gate lane script: yard crane loads/unloads)
 //  -> back onto the road loaded -> depot/shop -> under the depot gantry (lift-off, sometimes an export box goes on) -> back to the port.

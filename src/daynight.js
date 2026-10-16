@@ -1,3 +1,12 @@
+/**
+ * @file daynight.js — day / night cycle (game clock)
+ * Exposes (globals): DAY_LEN, gameT, DN, dnSmooth, updateDayNight, dnClock, dnSprite, dnRGBA,
+ *   dnGlow, dnBuild, DN_COL, DN_AWN, DN_NEON, drawNight (+14 more)
+ * Depends on: world.js, bldg2.js, lorry.js, physics.js, traffic.js, services.js, career.js,
+ *   ambient.js, gamepad.js, mp.js, indicators.js, beams.js, port.js, repair.js, rail.js,
+ *   weather.js, main.js
+ * Load order: #38 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 // ---------- day / night cycle (game clock) ----------
 const DAY_LEN = 1200; // real seconds per 24h game day (20 min => 1 game hour = 50 s)
 let gameT = 8,

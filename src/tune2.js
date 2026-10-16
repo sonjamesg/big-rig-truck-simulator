@@ -1,3 +1,9 @@
+/**
+ * @file tune2.js — truck customiser stage 2: gearbox, suspension, fuel tank, exhaust, armour
+ * Exposes (globals): czIcon2
+ * Depends on: world.js, render.js, lorry.js, physics.js, career.js, tune.js, main.js
+ * Load order: #32 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== cz stage 2: gearbox, suspension, fuel tank, exhaust, armour =====================
 CZ_TABS.push(

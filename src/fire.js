@@ -1,3 +1,11 @@
+/**
+ * @file fire.js — FIRES: buildings near the player catch fire; the nearest fire station's engine responds
+ * Exposes (globals): FIRE, fireArt, fireStations, fireStart, firePickBuilding, fireEngNear,
+ *   fireDispatch, fireTraffic, fireSpawnFar, fireDrop, fireUpdate, fireDraw, emBlitF, fireMapDots
+ * Depends on: world.js, lorry.js, physics.js, traffic.js, depots.js, services.js, ui.js,
+ *   breakdown.js, port.js, daynight.js, main.js, police.js, wanted.js, ambulance.js
+ * Load order: #50 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== v29 FIRES: buildings near the player catch fire; the nearest fire station's engine responds =====================
 // Flow: fire starts (flames + smoke + night glow + map marker) -> engine leaves its station (roller door opens) or, if the station is

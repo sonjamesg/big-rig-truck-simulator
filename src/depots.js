@@ -1,3 +1,12 @@
+/**
+ * @file depots.js — DEPOTS, TRAILERS, COUPLING & EVENT HOOKS
+ * Exposes (globals): TRAILER_TYPES, TRL_KP_TO_CENTRE, BigRig, trlSeq, trailerArt, makeTrailer,
+ *   trailerBox, buildDepots, YARD_BRANDS, YD_H, yardSpot, buildDepotsSteps, drawTrailerBay,
+ *   drawYardSign (+13 more)
+ * Depends on: world.js, lorry.js, physics.js, audio.js, traffic.js, sites.js, services.js,
+ *   homes.js, main.js
+ * Load order: #11 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== DEPOTS, TRAILERS, COUPLING & EVENT HOOKS =====================
 // Data is mission-ready: depots (name, tier, entrance, numbered reverse-in bays), trailers (id, type, cargo, weight, reqLevel, target flag),

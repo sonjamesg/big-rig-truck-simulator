@@ -1,3 +1,12 @@
+/**
+ * @file traffic.js — AI TRAFFIC (GTA2-style ring spawning, lane graph, IDM following)
+ * Exposes (globals): VTYPES, CAR_COLS, MIX, SPEED, AREAW, traffic, pickW, ang, wrapA, mod2pi, VS,
+ *   vCanvas, grad, glass (+66 more)
+ * Depends on: world.js, render.js, lorry.js, physics.js, audio.js, markings.js, signals.js,
+ *   depots.js, indicators.js, beams.js, rail.js, main.js, police.js, wanted.js, rbx.js,
+ *   ambulance.js
+ * Load order: #8 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== AI TRAFFIC (GTA2-style ring spawning, lane graph, IDM following) =====================
 const VTYPES = {

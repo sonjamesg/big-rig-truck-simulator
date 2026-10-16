@@ -1,3 +1,10 @@
+/**
+ * @file bldg2.js — buildings: seeded footprints, materials, facades, roof furniture (baked into chunk canvases)
+ * Exposes (globals): ROOF2, MATS, WINC, bShadow, bMat, bParts, bWindows, bBlock, bFurniture,
+ *   bHouse, bWarehouse, bLandmark, roof2
+ * Depends on: world.js, render.js, lorry.js, traffic.js
+ * Load order: #4 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 // ---------- v20 buildings: seeded footprints, materials, facades, roof furniture (baked into chunk canvases) ----------
 const ROOF2 = {
   office: 1,

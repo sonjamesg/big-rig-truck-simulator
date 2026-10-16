@@ -1,3 +1,10 @@
+/**
+ * @file repair.js — REPAIR BAYS: a drive-in REPAIR box beside the TUNE SHOP box at every truck repair garage
+ * Exposes (globals): rpBays, RP, rpHere, rpCost, rpDo, rpTick, rpDraw, rpAudit, siteLights
+ * Depends on: world.js, physics.js, traffic.js, depots.js, career.js, ui.js, breakdown.js,
+ *   porttrucks.js, tune.js, daynight.js, main.js
+ * Load order: #35 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== v29 REPAIR BAYS: a drive-in REPAIR box beside the TUNE SHOP box at every truck repair garage =====================
 function rpBays() {

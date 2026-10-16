@@ -1,3 +1,10 @@
+/**
+ * @file indicators.js — PLAYER INDICATORS (UK): Q/E, pad D-pad L/R, LB+RB or Z hazards, touch; self-cancelling; lamps, HUD, tick-tock, MP
+ * Exposes (globals): IND, indToggle, hazToggle, indOn, indBlink, updateIndicators, indTick,
+ *   indLampsAt, drawIndHUD, indYield
+ * Depends on: world.js, physics.js, audio.js, traffic.js, depots.js, career.js, main.js
+ * Load order: #24 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== PLAYER INDICATORS (UK): Q/E, pad D-pad L/R, LB+RB or Z hazards, touch; self-cancelling; lamps, HUD, tick-tock, MP =====================
 const IND = { side: 0, haz: false, t0: 0, h0: 0, x0: 0, y0: 0, ph: 0, lastBlink: false };

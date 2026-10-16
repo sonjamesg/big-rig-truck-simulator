@@ -1,3 +1,11 @@
+/**
+ * @file wanted.js — wanted stars (capped at 2 for now): heat score, 2-star police response, roadblocks
+ * Exposes (globals): HEAT, RB, wantStars, wantHeat, wantProp, wantHit, want2Update, rbCands,
+ *   rbTry, rbExtent, rbMake, rbRemove, rbUpdate, wantStarsHUD (+1 more)
+ * Depends on: world.js, physics.js, traffic.js, ui.js, satnav.js, port.js, porttrucks.js,
+ *   main.js, roadlaw.js, police.js
+ * Load order: #46 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== v44 wanted stars (capped at 2 for now): heat score, 2-star police response, roadblocks
 // 1 star = the existing wanted / chase behaviour. Heat builds from offences (more while already wanted); 100 heat while wanted -> 2 stars.

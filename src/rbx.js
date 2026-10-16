@@ -1,3 +1,9 @@
+/**
+ * @file rbx.js — ROUNDABOUTS: 3-lane spiral markings, signalised entries, landscaped lit island
+ * Exposes (globals): RBSIG, rbArmKey, rbSigState, rbMouths, rbLaneLines, rbIsland, rbSigHeads
+ * Depends on: world.js, traffic.js, repair.js
+ * Load order: #47 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== v31 ROUNDABOUTS: 3-lane spiral markings, signalised entries, landscaped lit island =====================
 // Entries are signal-controlled in turn (like big UK roundabouts): each arm gets ~9 s green, amber, then a short all-red; the give-way

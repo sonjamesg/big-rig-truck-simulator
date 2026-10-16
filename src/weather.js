@@ -1,3 +1,9 @@
+/**
+ * @file weather.js — weather: random clear / rain / fog cycles (host-synced in MP, saved)
+ * Exposes (globals): WX, wxPick, updateWeather, drawWeather, drawWeatherHUD, drawPuddles
+ * Depends on: world.js, mp.js, daynight.js, main.js
+ * Load order: #41 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 // ---------- weather: random clear / rain / fog cycles (host-synced in MP, saved) ----------
 const WX = {
   st: "clear",

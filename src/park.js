@@ -1,3 +1,10 @@
+/**
+ * @file park.js — owned trucks you aren't driving, parked in marked bays at your home yard (local only, never sent in MP)
+ * Exposes (globals): PY, pyYard, pyBays, pyParked, pyArtC, pyArt, drawParkedTrucks, pyHit
+ * Depends on: world.js, lorry.js, physics.js, traffic.js, depots.js, career.js, owndepot.js,
+ *   tune.js, daynight.js, main.js
+ * Load order: #36 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== py: owned trucks you aren't driving, parked in marked bays at your home yard (local only, never sent in MP) =====================
 const PY = { n: 6 };

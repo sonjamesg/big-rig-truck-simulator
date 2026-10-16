@@ -1,3 +1,9 @@
+/**
+ * @file sites.js — SITES: shopping malls / supermarkets (delivery docks), truck dealerships, forecourt art + visitor cars
+ * Exposes (globals): OBJX, buildCareerSites, pill, fcv, updateForecourts, drawForecourtCars
+ * Depends on: world.js, render.js, lorry.js, physics.js, traffic.js, career.js, gamepad.js
+ * Load order: #13 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== v7 SITES: shopping malls / supermarkets (delivery docks), truck dealerships, forecourt art + visitor cars =====================
 const OBJX = {};

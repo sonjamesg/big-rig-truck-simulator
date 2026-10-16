@@ -1,3 +1,12 @@
+/**
+ * @file police.js — POLICE AI: patrols from police stations, line-of-sight detection, chase, fines + arrest
+ * Exposes (globals): POL_FINES, POL, EMV, POL_T, polArt, emArt, emDrawBar, emBlit, SIRK, emSiren,
+ *   emSirenVol, emRoadPt, emFollow, emToTraffic (+53 more)
+ * Depends on: world.js, render.js, lorry.js, physics.js, audio.js, traffic.js, signals.js,
+ *   depots.js, services.js, career.js, ui.js, ambient.js, satnav.js, gamepad.js, breakdown.js,
+ *   beams.js, port.js, daynight.js, main.js, roadlaw.js, wanted.js, ambulance.js, fire.js
+ * Load order: #45 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== v28 POLICE AI: patrols from police stations, line-of-sight detection, chase, fines + arrest =====================
 // Patrol cars are ordinary traffic vehicles (v.role='police') so they keep UK lane discipline + signals; a chasing car leaves the traffic

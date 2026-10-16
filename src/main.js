@@ -1,3 +1,12 @@
+/**
+ * @file main.js — MAIN: staged world generation + loading bar, game loop (update/draw), camera, HUD, minimap + full map (M), input, window.__bigrig debug hook
+ * Exposes (globals): PORTRAIT_SQ, VW, VW0, cv, input, cam, started, CABART, LOADMS, bootYield,
+ *   boot, KEYMAP, welcomeCard, startGame (+44 more)
+ * Depends on: world.js, render.js, lorry.js, physics.js, traffic.js, depots.js, fuel.js,
+ *   sites.js, career.js, ui.js, satnav.js, gamepad.js, mp.js, mobile.js, breakdown.js, rail.js,
+ *   police.js, server.js
+ * Load order: #42 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== MAIN =====================
 const PORTRAIT_SQ =

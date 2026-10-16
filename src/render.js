@@ -1,3 +1,11 @@
+/**
+ * @file render.js — TEXTURES & CHUNK RENDERING
+ * Exposes (globals): mkCanvas, speckle, TEX, makeTextures, drawRoadTile, shade, LINE_COLS,
+ *   contTop, drawYardBlock, drawLorryPark, drawShadowRect, acUnit, roof, drawSign (+32 more)
+ * Depends on: world.js, bldg2.js, lorry.js, traffic.js, markings.js, depots.js, sites.js,
+ *   career.js, mp.js, rail.js, main.js, rbx.js
+ * Load order: #3 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== TEXTURES & CHUNK RENDERING =====================
 function mkCanvas(w, h) {

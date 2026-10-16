@@ -1,3 +1,9 @@
+/**
+ * @file homecard.js — Home card: one clear "who am I" card. Account remembered -> Welcome back <name> + CONTINUE + Switch account
+ * Exposes (globals): (no top-level names; registers hooks/listeners only)
+ * Depends on: ui.js, homes.js
+ * Load order: #55 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== Home card: one clear "who am I" card. Account remembered -> Welcome back <name> + CONTINUE + Switch account
 // (no reset, no username form, no name box). Not signed in -> account form; a guest local save gets a small guest card with a guarded reset.

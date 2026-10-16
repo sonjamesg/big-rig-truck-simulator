@@ -1,3 +1,11 @@
+/**
+ * @file mp.js — MULTIPLAYER — PeerJS (WebRTC, free public broker, no backend). Star topology: host relays.
+ * Exposes (globals): MP, MP_PREFIX, mpName, R2, mpGid, mpSelfPose, mpSendAll, mpSend, mpRoster,
+ *   mpOnMsg, mpNewPlayer, mpPlayerGone, mpPose, mpHoldTrailer (+32 more)
+ * Depends on: world.js, lorry.js, physics.js, traffic.js, depots.js, career.js, indicators.js,
+ *   beams.js, tune3.js, daynight.js, weather.js, main.js, server.js
+ * Load order: #20 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== v10 MULTIPLAYER — PeerJS (WebRTC, free public broker, no backend). Star topology: host relays. =====================
 const MP = {

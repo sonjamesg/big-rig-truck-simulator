@@ -1,3 +1,11 @@
+/**
+ * @file ambulance.js — AMBULANCE: casualties stay down until paramedics treat them
+ * Exposes (globals): AMBU, ambHospitals, ambPedHit, ambViewR, ambTrySpawn, ambRejoin, ambDrop,
+ *   ambIsRd, ambForce, ambRear, ambMove, ambCrewOnS, ambUpdate, ambDrawMedic (+3 more)
+ * Depends on: world.js, physics.js, traffic.js, depots.js, services.js, ui.js, ambient.js,
+ *   breakdown.js, port.js, police.js, wanted.js
+ * Load order: #49 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== v29 AMBULANCE: casualties stay down until paramedics treat them =====================
 // Flow per incident: spawn on a road just out of view (~1 screen) with a working route -> drive in (blue lights + siren) -> pull up ->

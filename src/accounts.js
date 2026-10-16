@@ -1,3 +1,9 @@
+/**
+ * @file accounts.js — Supabase accounts: name + 4-digit PIN via SECURITY DEFINER RPCs; cloud save sync; guest/offline fallback
+ * Exposes (globals): ACC, accRpc, accNorm, accSetSession, accClear, accPull, accPush, accAdmin
+ * Depends on: world.js, career.js, mp.js, main.js
+ * Load order: #52 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== Supabase accounts: name + 4-digit PIN via SECURITY DEFINER RPCs; cloud save sync; guest/offline fallback =====================
 const ACC = {

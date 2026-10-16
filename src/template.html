@@ -1,4 +1,9 @@
 <!doctype html>
+<!--
+  @file template.html — page shell: canvas #game, HUD/overlay DOM, styles, mobile deck; build.py replaces the SCRIPT placeholder comment
+  with the concatenated src/*.js bundle and the BUILD_ID placeholder with a UTC build stamp -> index.html / BigRig.html / dist.
+  Exposes: DOM ids used by the scripts (e.g. #game, #overlay, #frame). Depends on: nothing (scripts are inlined at build).
+-->
 <html lang="en">
   <head>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />

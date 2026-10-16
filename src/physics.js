@@ -1,3 +1,11 @@
+/**
+ * @file physics.js — LORRY PHYSICS
+ * Exposes (globals): GEARS, MASS, torqueAt, truck, fwd, kingpin, solidAtM, bodyHits, hitTest,
+ *   surfaceAt, stepTruck
+ * Depends on: world.js, lorry.js, traffic.js, depots.js, fx.js, port.js, rail.js, weather.js,
+ *   wanted.js, airport.js
+ * Load order: #6 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== LORRY PHYSICS =====================
 const GEARS = [4.2, 3.1, 2.3, 1.75, 1.35, 1.08, 0.88, 0.72],

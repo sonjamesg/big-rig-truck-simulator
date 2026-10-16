@@ -1,3 +1,10 @@
+/**
+ * @file services.js — emergency services: fire stations, police stations, hospitals
+ * Exposes (globals): SVC, SVC_ICON, SVC_BAY, SVC_SIZE, svcGen, svcList, svcNearest, svcMapIcons,
+ *   svcLights, svcRoller, svcBays, svcSign
+ * Depends on: world.js, render.js, traffic.js, depots.js, sites.js, mobile.js
+ * Load order: #14 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== v27 emergency services: fire stations, police stations, hospitals =====================
 // Generated deterministically from depots.js (after fuel/garages, before homes). Each site sits south of a non-motorway road with

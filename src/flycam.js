@@ -1,3 +1,11 @@
+/**
+ * @file flycam.js — admin-only fly camera (G / FLY button): truck holds its handbrake, free camera pans/zooms, click/tap or Tab/LB/RB to follow AI vehicles
+ * Exposes (globals): FLY, flyAllowed, flySet, flyPos, flyTargets, flyCycle, flyPick, flyInfo,
+ *   flyCamTick, flyHUD, flyBtnSync
+ * Depends on: world.js, traffic.js, depots.js, career.js, gamepad.js, porttrucks.js, main.js,
+ *   accounts.js
+ * Load order: #51 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 // ===================== admin-only fly camera (G / FLY button): truck holds its handbrake, free camera pans/zooms, click/tap or Tab/LB/RB to follow AI vehicles =====================
 const FLY = {
   on: false,

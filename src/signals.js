@@ -1,3 +1,10 @@
+/**
+ * @file signals.js — SIGNAL PHASING (UK, drive on the left)
+ * Exposes (globals): SIG_CLEAR, sigMovePaths, sigConflict, SIG_RA2, sigOpp, sigAllowedPair,
+ *   buildSig, sigOf, sigCur, sigState, sigFilter, sigArrow, lightState, sigOncoming (+1 more)
+ * Depends on: world.js, physics.js, traffic.js, markings.js, indicators.js
+ * Load order: #10 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== v12 SIGNAL PHASING (UK, drive on the left) =====================
 // Each movement (approach key + L/S/R) gets a conflict-free stage. Stages are built greedily from the actual

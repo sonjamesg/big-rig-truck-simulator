@@ -1,3 +1,9 @@
+/**
+ * @file nightmap.js — night map style (world map + minimap)
+ * Exposes (globals): NM, nmK, nmBuild, nightMapLayer, nmIconRing
+ * Depends on: world.js, render.js, career.js, daynight.js
+ * Load order: #39 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 // ===================== v27 night map style (world map + minimap) =====================
 // Precomputed once: NM.base = 1 px/tile night colouring (dark ground, navy water, lighter roads, lit windows, lamp dots),
 // NM.lit = transparent lights-only layer (windows/lamps/quays) at 1 px/tile, NM.glow = low-res orange sky-glow over built-up areas,

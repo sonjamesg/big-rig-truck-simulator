@@ -1,3 +1,10 @@
+/**
+ * @file server.js — Public servers over Supabase Realtime (no host needed). Presence = player list + cap, Broadcast = poses.
+ * Exposes (globals): SERVERS, SRV, srvLib, srvCount, srvPeek, CSS, srvCard, srvName, srvJoin,
+ *   srvRate, srvSend, srvLeave, srvGone
+ * Depends on: world.js, physics.js, depots.js, career.js, mp.js, main.js, accounts.js
+ * Load order: #54 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== Public servers over Supabase Realtime (no host needed). Presence = player list + cap, Broadcast = poses.
 // Free-plan quota: 100 Realtime events/s per project, where an event is a message sent OR delivered. N players at r Hz cost

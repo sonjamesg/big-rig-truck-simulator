@@ -1,3 +1,9 @@
+/**
+ * @file home.js — home / title screen: animated night-road backdrop, green loading bar, settings panel, version footer
+ * Exposes (globals): (no top-level names; registers hooks/listeners only)
+ * Depends on: world.js, mp.js, main.js
+ * Load order: #43 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== v27 home / title screen: animated night-road backdrop, green loading bar, settings panel, version footer =====================
 (function () {

@@ -1,3 +1,12 @@
+/**
+ * @file satnav.js — SAT NAV: A* over the road tiles, route guidance
+ * Exposes (globals): NAV, NAV_COST, NAV_SPEED, navUp, navTileInfo, isRoadT, navSnap,
+ *   navSnapTruck, navAStar, navBuild, setRoute, clearRoute, navIsMission, userCancelRoute (+36
+ *   more)
+ * Depends on: world.js, lorry.js, physics.js, audio.js, traffic.js, depots.js, career.js, ui.js,
+ *   mp.js, breakdown.js, owndepot.js, homes.js, rail.js, nightmap.js, main.js, police.js
+ * Load order: #18 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== SAT NAV: A* over the road tiles, route guidance =====================
 const NAV = { route: null, reroutes: 0, offT: 0, lastCalc: -9, hover: null };

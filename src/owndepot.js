@@ -1,3 +1,11 @@
+/**
+ * @file owndepot.js — player-owned haulage yards: purchase, tiers, yard trucks (ownership is local to this client save)
+ * Exposes (globals): OWN_TIERS, OWN_MAX, OWN, ownCompany, ownSave, ownLoad, ownT, ownApplyTier,
+ *   ownUpgrade, ownYards, ownedYard, ownTier, ydBrand, ownIn (+34 more)
+ * Depends on: world.js, physics.js, traffic.js, sites.js, career.js, ui.js, gamepad.js,
+ *   mobile.js, port.js, porttrucks.js, homes.js, rail.js, daynight.js, main.js
+ * Load order: #29 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 // ===================== v33 player-owned haulage yards (tier 1). Per player: ownership lives in this client's save only, so in
 // multiplayer other players keep seeing an empty FOR SALE yard and never get the owner's trucks (traffic is local per client).
 const OWN_TIERS = {

@@ -1,3 +1,11 @@
+/**
+ * @file audio.js — AUDIO: WebAudio context + master volume, diesel engine (recorded idle pitch-shifted by RPM + synth rumble), horn, tyres, ambience
+ * Exposes (globals): audio, b64ToBuf, initAudio, noiseBurst, airHiss, thump, updateAudio,
+ *   audioLoop, chirp, AMB, updateAudioExtra, setVolume, posOut, distVol (+6 more)
+ * Depends on: world.js, physics.js, traffic.js, depots.js, career.js, breakdown.js, owndepot.js,
+ *   tune3.js, rail.js, daynight.js, main.js
+ * Load order: #7 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== AUDIO =====================
 // Engine: real diesel idle recording (BigSoundBank #1145, CC0) pitch-shifted with RPM, layered with a synthesised low firing rumble.

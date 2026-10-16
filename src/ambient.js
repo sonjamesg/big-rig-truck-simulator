@@ -1,3 +1,10 @@
+/**
+ * @file ambient.js — AMBIENT LIFE (cheap, culled to the view)
+ * Exposes (globals): amb, inView, boatPos, updateAmbient, drawWaterFx, BOAT, drawBoat,
+ *   drawAnimal, drawCropWind, drawAmbientLow, drawPlane, planeShape, drawPlanes, drawAmbientHigh
+ * Depends on: world.js, career.js, daynight.js
+ * Load order: #17 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== AMBIENT LIFE (cheap, culled to the view) =====================
 const amb = { birds: [], r: mulberry(777), wind: [0.82, 0.57] };

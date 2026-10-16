@@ -1,3 +1,11 @@
+/**
+ * @file gamepad.js — XBOX CONTROLLER (Gamepad API, standard mapping) — works alongside the keyboard
+ * Exposes (globals): pad, GLYPH, padList, padSeen, padGone, dz, padUpdate, padFocusables,
+ *   padFocusEl, padNav, padGlyphs, padInstall, padHud, drawPadMapCursor
+ * Depends on: keyguard.js, world.js, physics.js, depots.js, fuel.js, career.js, ui.js, satnav.js,
+ *   mp.js, breakdown.js, indicators.js, beams.js, tune.js, repair.js, main.js, wanted.js
+ * Load order: #19 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== v8 XBOX CONTROLLER (Gamepad API, standard mapping) — works alongside the keyboard =====================
 // Buttons: 0 A, 1 B, 2 X, 3 Y, 4 LB, 5 RB, 6 LT, 7 RT, 8 View, 9 Menu, 10 LS, 11 RS, 12 Up, 13 Down, 14 Left, 15 Right. Axes: 0 LX, 1 LY.

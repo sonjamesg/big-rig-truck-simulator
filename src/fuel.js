@@ -1,3 +1,11 @@
+/**
+ * @file fuel.js — FUEL, CASH, DAMAGE (stub)
+ * Exposes (globals): DIESEL_RATE, refuel, fuelWhy, fuelStationAt, updateFuel, stopRefuel,
+ *   toggleRefuel, drawFuelHUD, drawPOIs
+ * Depends on: world.js, lorry.js, physics.js, depots.js, services.js, career.js, ui.js,
+ *   owndepot.js, homes.js, nightmap.js, main.js
+ * Load order: #12 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== FUEL, CASH, DAMAGE (stub) =====================
 const DIESEL_RATE = 22; // litres per second at the pump

@@ -1,3 +1,11 @@
+/**
+ * @file breakdown.js — BREAKDOWN at 100% damage
+ * Exposes (globals): BD_IN, BREAKDOWN, bdNearestService, bdFailMission, bdStart, bdEnd, bdPanel,
+ *   bdFocus, updateBreakdown, drawBreakdown
+ * Depends on: world.js, physics.js, audio.js, depots.js, career.js, ui.js, satnav.js, gamepad.js,
+ *   main.js
+ * Load order: #23 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== v12 BREAKDOWN at 100% damage =====================
 // Data-driven: options are records {id,label,sub(),enabled(),run()}. A later "call roadside repair" option

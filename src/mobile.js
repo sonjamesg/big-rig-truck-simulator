@@ -1,3 +1,11 @@
+/**
+ * @file mobile.js — MOBILE: landscape thumb layout (controls in side gutters, never over the HUD) + portrait handheld deck
+ * Exposes (globals): MOB, MOBCSS, mobBtn, act, mobCSS, mobInit, mobSteer, place, mobLayout,
+ *   mobView, mobFit, mobContext
+ * Depends on: world.js, physics.js, audio.js, depots.js, fuel.js, sites.js, career.js, ui.js,
+ *   gamepad.js, mp.js, haptics.js, indicators.js, beams.js, main.js
+ * Load order: #21 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== v11 MOBILE: landscape thumb layout (controls in side gutters, never over the HUD) + portrait handheld deck =====================
 const MOB = { on: false, mode: "", steerId: null, ctx: {}, lastCtx: 0 };

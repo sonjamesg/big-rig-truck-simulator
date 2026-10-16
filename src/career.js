@@ -1,3 +1,12 @@
+/**
+ * @file career.js — CAREER: missions to malls, XP / tiers, truck dealership, save game
+ * Exposes (globals): TIERS, CARGOS, TRUCK_MODELS, career, SAVE_KEY_OLD, saveKey, SETTINGS,
+ *   levelNeed, levelOf, tierOf, tierInfo, addXP, modelArtCache, modelArt (+38 more)
+ * Depends on: world.js, render.js, lorry.js, physics.js, traffic.js, depots.js, sites.js, ui.js,
+ *   satnav.js, gamepad.js, beams.js, fx.js, port.js, porttrucks.js, owndepot.js, tune.js,
+ *   daynight.js, weather.js, main.js, accounts.js
+ * Load order: #15 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== v7 CAREER: missions to malls, XP / tiers, truck dealership, save game =====================
 // Data-driven: add a tier or a cargo by adding a row below.

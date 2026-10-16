@@ -1,3 +1,11 @@
+/**
+ * @file homes.js — purchasable homes + estate agents
+ * Exposes (globals): HOME_DEFS, HOMES, HCITY, homeOwned, homesSave, homesLoad, homesGen,
+ *   homeClrB, homeNearCity, homeLayout, hShade, hTree, hRoof, hDrawPlot (+17 more)
+ * Depends on: world.js, render.js, lorry.js, physics.js, traffic.js, depots.js, career.js, ui.js,
+ *   satnav.js, gamepad.js, porttrucks.js, owndepot.js, daynight.js, main.js, wanted.js
+ * Load order: #30 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 // ===================== py2: purchasable homes + estate agents =====================
 // Homes sit on flat existing ground beside the road network (no elevation changes). Each plot: driveway from the road -> lorry hardstanding
 // (1-2 rigs) -> house + gardens. Buying happens ONLY on the property's own driveway; estate agents list homes + commercial yards (view / fast travel).

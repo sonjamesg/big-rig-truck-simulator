@@ -1,3 +1,11 @@
+/**
+ * @file rail.js — RAILWAY: double-track main line, stations, passenger + freight trains as pure functions of game time
+ * Exposes (globals): RAIL, RAIL_WP, RAIL_ST, RW_P, rlHash, rlMod, rlSm, RR_C, rlDT, RR_HARDT,
+ *   RR_HARDO, railHardMask, railRoute, railHashArr (+56 more)
+ * Depends on: world.js, render.js, lorry.js, physics.js, traffic.js, depots.js, career.js,
+ *   owndepot.js, daynight.js, nightmap.js, main.js
+ * Load order: #37 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== RAILWAY (decorative, v28) =====================
 // One double-track main line loops the whole map. Up line (w>0, travels +s) = passenger, stops at stations.

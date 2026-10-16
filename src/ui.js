@@ -1,3 +1,10 @@
+/**
+ * @file ui.js — UI: job board, dealership, results, tier unlock (DOM overlay inside #frame so it works in fullscreen)
+ * Exposes (globals): UICSS, uiRoot, uiInit, uiBlocking, closeUI, openModal, esc, money, trlSVG,
+ *   boardState, openBoard, renderBoard, startMission, renderSide (+9 more)
+ * Depends on: physics.js, audio.js, depots.js, career.js, main.js
+ * Load order: #16 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== v7 UI: job board, dealership, results, tier unlock (DOM overlay inside #frame so it works in fullscreen) =====================
 const UICSS = `

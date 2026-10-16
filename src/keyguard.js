@@ -1,3 +1,9 @@
+/**
+ * @file keyguard.js — key guard, loaded FIRST: wraps window key handlers so inputs never reach the game and hotkeys wait for game start
+ * Exposes (globals): isTyping
+ * Depends on: main.js
+ * Load order: #1 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 // v10.1 key guard — loaded FIRST. Every game keydown/keyup handler registered on window is wrapped so that:
 // 1) typing in any input/textarea never reaches the game (no hotkeys, no preventDefault) — the field's own listeners still run;
 // 2) until the game has started (lobby/title screen) every game hotkey is ignored; only Enter (start solo) passes.

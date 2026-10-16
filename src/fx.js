@@ -1,3 +1,10 @@
+/**
+ * @file fx.js — FX: exhaust puffs, wheel-lock skid marks/smoke, crash explosions
+ * Exposes (globals): FX_CRASH_V, FX, fxEmit, updateFX, fxExplode, drawFXLow, drawFXHigh
+ * Depends on: world.js, lorry.js, physics.js, audio.js, depots.js, career.js, ui.js,
+ *   breakdown.js, main.js
+ * Load order: #26 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== v14 FX: exhaust puffs, wheel-lock skid marks/smoke, crash explosions =====================
 const FX_CRASH_V = 19; // m/s (~43 mph) impact speed that destroys the rig

@@ -1,3 +1,9 @@
+/**
+ * @file lorry.js — LORRY ART (drawn once, rotated freely)
+ * Exposes (globals): ART_SCALE, CAB, TRL, rr, makeCabArt, makeTrailerArt, silhouette
+ * Depends on: world.js, render.js
+ * Load order: #5 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== LORRY ART (drawn once, rotated freely) =====================
 const ART_SCALE = 3; // art pixels per world px

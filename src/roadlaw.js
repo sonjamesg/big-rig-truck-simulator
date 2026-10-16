@@ -1,3 +1,11 @@
+/**
+ * @file roadlaw.js — ROAD LAW: offences & fines (one module), UK speed limits, speed cameras
+ * Exposes (globals): ROLES, OFF, MPH, slMph, slOfSeg, slSegAt, CAM, CAM_VERGE, camLotNear,
+ *   camVerge, camBuild, camSound, CAMP, updateRoadLaw (+4 more)
+ * Depends on: world.js, physics.js, audio.js, traffic.js, depots.js, career.js, ui.js,
+ *   breakdown.js, port.js, porttrucks.js, daynight.js, main.js
+ * Load order: #44 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== ROAD LAW: offences & fines (one module), UK speed limits, speed cameras =====================
 // Hook points for later emergency services:

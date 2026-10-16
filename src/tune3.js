@@ -1,3 +1,11 @@
+/**
+ * @file tune3.js — truck customiser stage 3: bumpers, lights, horns, cab extras, decals + company livery, MP sync
+ * Exposes (globals): CZ_HORNS, czYardBrand, czDriver, czHornPreview, czStar, czLightsPreview,
+ *   czLightsSide, czTruckGlow, czCosStr, mpCosmetic, czRemoteArt
+ * Depends on: world.js, render.js, lorry.js, physics.js, audio.js, career.js, ui.js,
+ *   indicators.js, beams.js, owndepot.js, tune.js, tune2.js, daynight.js, main.js
+ * Load order: #33 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 "use strict";
 // ===================== cz stage 3: bumpers, lights, horns, cab extras, decals + company livery, truck art overhaul, MP sync =====================
 CZ_TABS.push(

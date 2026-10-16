@@ -1,3 +1,9 @@
+/**
+ * @file beams.js — HEADLIGHTS: dipped (default, UK left-biased) / full beam toggle. L key, pad D-pad down, touch BEAM; saved; MP flag bit 64
+ * Exposes (globals): HB, hbToggle, hbStep, drawBeamHUD
+ * Depends on: world.js, depots.js, career.js, main.js
+ * Load order: #25 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
+ */
 // ===================== HEADLIGHTS: dipped (default, UK left-biased) / full beam toggle. L key, pad D-pad down, touch BEAM; saved; MP flag bit 64 =====================
 const HB = { on: false, k: 0, t: 0 };
 function hbToggle() {
