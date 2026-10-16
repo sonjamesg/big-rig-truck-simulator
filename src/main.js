@@ -221,7 +221,7 @@ async function boot() {
   };
   truck.fuel = 260;
   truck.tank = 400;
-  truck.money = 2500;
+  truck.money = 5000; // v45: new players start with £5,000 (existing saves keep their own balance via loadGame)
   truck.damage = 0;
   const hadSave = loadGame();
   if (!hadSave) applyModel("rigger");

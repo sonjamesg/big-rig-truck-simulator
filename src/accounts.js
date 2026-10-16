@@ -99,10 +99,33 @@ async function accPull() {
         accPush(false);
       }
     } else ACC.pulled = 1;
+    setTimeout(accClaim, 1500);
   } catch (e) {
     ACC.online = false;
   }
 }
+// one-off server grants (players.pending_cash): claimed atomically, added to the live game and saved at once, so no session can overwrite them
+async function accClaim() {
+  if (!ACC.tok || !ACC.online || !ACC.pulled || typeof world === "undefined" || !world.ready)
+    return;
+  if (ACC.claiming) return;
+  ACC.claiming = 1;
+  try {
+    const j = await accRpc("claim_cash", { token: ACC.tok });
+    const c = j && j.ok ? +j.cash || 0 : 0;
+    if (c) {
+      truck.money += c;
+      saveGame();
+      accPush(false);
+      if (typeof toast === "function")
+        toast("\u00a3" + c.toLocaleString("en-GB") + " added to your account");
+    }
+  } catch (e) {
+    ACC.online = navigator.onLine !== false;
+  }
+  ACC.claiming = 0;
+}
+setInterval(accClaim, 30000);
 function accPush(keep) {
   if (!ACC.tok || !ACC.online || !ACC.pulled) return; // never push before the cloud save has been compared (stale local must not overwrite it)
   try {
