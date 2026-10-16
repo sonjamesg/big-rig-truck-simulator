@@ -208,7 +208,6 @@ function drawPOIs(px, py, big, R) {
     );
   for (const d of world.dealers || []) icon(px(d.entrance.x), py(d.entrance.y), "#8e44ad", "$");
   if (typeof svcMapIcons === "function") svcMapIcons(icon, px, py);
-  if (typeof bmMapIcons === "function") bmMapIcons(icon, px, py);
   if (typeof homeMapIcons === "function") homeMapIcons(icon, px, py);
   for (const y of world.forSale || [])
     icon(

@@ -110,9 +110,42 @@ function bmAtYard() {
   return !!(world.bmYards && bmYardAt(truck.x, truck.y, 0.5));
 }
 // ---------------------------------------------------------------- map: icon + POIs (sat nav / fast travel)
-function bmMapIcons(icon, px, py) {
-  for (const Y of world.bmYards || [])
-    icon(px(Y.entrance.x), py(Y.entrance.y), "#1b1022", "\u2620");
+// Black Market yards on the minimap and M map: drawn last (on top of every other POI) with a
+// red glow ring and a minimum size so they stand out at any zoom; label when zoomed in (lbl)
+function bmMapIcons(px, py, R, lbl) {
+  const r = Math.max(9, (R || 6) * 1.4);
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (const Y of world.bmYards || []) {
+    const X = px(Y.entrance.x),
+      Z = py(Y.entrance.y);
+    ctx.fillStyle = "rgba(255,40,60,0.4)";
+    ctx.beginPath();
+    ctx.arc(X, Z, r + 7, 0, 7);
+    ctx.fill();
+    ctx.fillStyle = "#14070c";
+    ctx.strokeStyle = "#ff3b4e";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(X, Z, r, 0, 7);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#fff";
+    ctx.font = `bold ${Math.round(r * 1.35)}px system-ui,sans-serif`;
+    ctx.fillText("\u2620", X, Z + 0.5);
+    if (lbl) {
+      ctx.font = "bold 12px system-ui,sans-serif";
+      ctx.textAlign = "left";
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(0,0,0,0.85)";
+      ctx.strokeText(Y.name, X + r + 5, Z);
+      ctx.fillStyle = "#ff8a96";
+      ctx.fillText(Y.name, X + r + 5, Z);
+      ctx.textAlign = "center";
+    }
+  }
+  ctx.restore();
 }
 function bmPOIs(test) {
   for (const Y of world.bmYards || []) test(Y, Y.entrance.x, Y.entrance.y, "Black Market yard");

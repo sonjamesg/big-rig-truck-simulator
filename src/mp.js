@@ -26,7 +26,7 @@ const MP = {
   sendT: 0,
   rate: 1 / 20,
   ended: false,
-  max: 8,
+  max: 6,
 };
 const MP_PREFIX = "bigrig-tsim-";
 function mpName() {
@@ -835,7 +835,7 @@ function mpInit() {
   lb.innerHTML = `<div class="row"><span style="opacity:.7;font-weight:700">Your name</span><input id="lbName" maxlength="16" placeholder="Driver name" value="${nm}"></div>
    <div class="row"><button class="lb solo" id="lbSolo">\u25B6 PLAY SOLO</button><button class="lb host" id="lbHost">\u{1F310} HOST GAME</button></div>
    <div class="row"><input id="lbCode" placeholder="TRUCK-0000" value="${jq ? (jq.startsWith("TRUCK-") ? jq : "TRUCK-" + jq.replace(/\D/g, "")) : ""}" style="width:160px"><button class="lb join" id="lbJoin">JOIN</button></div>
-   <div class="hostbox" id="lbHostBox"><div style="font-size:12px;opacity:.7;letter-spacing:2px">ROOM CODE</div><div class="code" id="lbCodeOut"></div><div class="link" id="lbLink"></div><div class="row"><button class="lb" id="lbCopy">\u{1F4CB} Copy invite link</button><button class="lb solo" id="lbDrive">\u25B6 START DRIVING</button></div><div style="font-size:11px;opacity:.6">Friends can join any time. Up to 8 players.</div></div>
+   <div class="hostbox" id="lbHostBox"><div style="font-size:12px;opacity:.7;letter-spacing:2px">ROOM CODE</div><div class="code" id="lbCodeOut"></div><div class="link" id="lbLink"></div><div class="row"><button class="lb" id="lbCopy">\u{1F4CB} Copy invite link</button><button class="lb solo" id="lbDrive">\u25B6 START DRIVING</button></div><div style="font-size:11px;opacity:.6">Friends can join any time. Up to 6 players.</div></div>
    <div class="st" id="lbStatus"></div>`;
   {
     const ref = document.getElementById("loadBox") || document.getElementById("loading");

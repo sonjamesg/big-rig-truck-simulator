@@ -1357,6 +1357,12 @@ function drawMinimap() {
     (m) => y + (m / 4 - (cyT - sh / 2)) * sc,
     false,
   );
+  bmMapIcons(
+    (m) => x + (m / 4 - (cxT - span / 2)) * sc,
+    (m) => y + (m / 4 - (cyT - sh / 2)) * sc,
+    5.5,
+    false,
+  );
   for (const t of world.trailers) {
     if (t.coupled) continue;
     const mx = x + (t.x / 4 - (cxT - span / 2)) * sc,
@@ -1685,6 +1691,12 @@ function drawBigMap() {
     (m) => BY(m / 4),
     true,
   );
+  bmMapIcons(
+    (m) => BX(m / 4),
+    (m) => BY(m / 4),
+    IR,
+    z > 1.2,
+  );
   if (typeof ownMapLabels === "function") ownMapLabels(BX, BY, z, IR);
   if (typeof czMapMarks === "function") czMapMarks(BX, BY, z, IR);
   if (z > 1.2)
@@ -1894,6 +1906,7 @@ function drawBigMap() {
       ["#ff9f1a", "~F", "Freight train"],
       ["#f39c12", "Y", "Haulage yard"],
       ["#d63b2f", "H", "Haulage truck"],
+      ["#14070c", "\u2620", "Black Market"],
     ];
     const lx0 = 28,
       w = bigmap.leg ? 232 : 92,
