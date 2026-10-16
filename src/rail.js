@@ -97,6 +97,32 @@ const RW_P = 2.1,
   HUB_W = 9,
   HUB_HALF = 150,
   HUB_RAMP = 80;
+// Track lateral-offset functions. Built from (kind, hub position H, loop length L) so the map data file
+// can store them as {"$f":"rlTrackFn","a":[kind,H,L]} and rebuild them (see mapload.js).
+const RL_FNARGS = new WeakMap();
+function rlTrackFn(kind, H, L) {
+  const hb = (s, half, ramp) => {
+    const d = Math.abs(rlMod(s - H + L / 2, L) - L / 2);
+    return d < half ? 1 : d < half + ramp ? rlSm(1 - (d - half) / ramp) : 0;
+  };
+  const f =
+    kind === "hubB"
+      ? (s) => hb(s, HUB_HALF, HUB_RAMP)
+      : kind === "up"
+        ? () => RW_P
+        : kind === "down"
+          ? () => RW_F
+          : kind === "loop"
+            ? (s) => RW_P + HUB_W * RAIL.hubB(s)
+            : kind === "sid1"
+              ? (s) => RW_F - 4.6 * hb(s, 110, 60)
+              : kind === "sid2"
+                ? (s) => RW_F - 9.2 * hb(s, 90, 70)
+                : null;
+  if (!f) throw new Error("rlTrackFn: unknown kind " + kind);
+  RL_FNARGS.set(f, [kind, H, L]);
+  return f;
+}
 function rlHash(n) {
   n = n ^ 61 ^ (n >>> 16);
   n = (n + (n << 3)) | 0;
@@ -1642,23 +1668,19 @@ function* railBuildSteps(objs) {
   RAIL.stations.sort((a, b) => a.s - b.s);
   RAIL.hub = RAIL.stations.find((s) => s.kind === "hub");
   // tracks (lateral offset functions)
-  const H = RAIL.hub.s,
-    hb = (s, half, ramp) => {
-      const d = Math.abs(rlMod(s - H + L / 2, L) - L / 2);
-      return d < half ? 1 : d < half + ramp ? rlSm(1 - (d - half) / ramp) : 0;
-    };
-  RAIL.hubB = (s) => hb(s, HUB_HALF, HUB_RAMP);
+  const H = RAIL.hub.s;
+  RAIL.hubB = rlTrackFn("hubB", H, L);
   RAIL.tracks = [
-    { id: "up", w: () => RW_P, s0: 0, s1: L, main: 1 },
-    { id: "down", w: () => RW_F, s0: 0, s1: L, main: 1 },
+    { id: "up", w: rlTrackFn("up", H, L), s0: 0, s1: L, main: 1 },
+    { id: "down", w: rlTrackFn("down", H, L), s0: 0, s1: L, main: 1 },
     {
       id: "loop",
-      w: (s) => RW_P + HUB_W * RAIL.hubB(s),
+      w: rlTrackFn("loop", H, L),
       s0: H - HUB_HALF - HUB_RAMP,
       s1: H + HUB_HALF + HUB_RAMP,
     },
-    { id: "sid1", w: (s) => RW_F - 4.6 * hb(s, 110, 60), s0: H - 170, s1: H + 170 },
-    { id: "sid2", w: (s) => RW_F - 9.2 * hb(s, 90, 70), s0: H - 160, s1: H + 160 },
+    { id: "sid1", w: rlTrackFn("sid1", H, L), s0: H - 170, s1: H + 170 },
+    { id: "sid2", w: rlTrackFn("sid2", H, L), s0: H - 160, s1: H + 160 },
   ];
   yield "Surveying the track";
   // sample tracks, classify ground under each sample

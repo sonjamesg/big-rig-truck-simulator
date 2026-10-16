@@ -1,0 +1,523 @@
+{
+ "format": "bigrig-map-state",
+ "version": 1,
+ "MW": 2048,
+ "parts": [
+  {
+   "root": "world",
+   "key": "ground",
+   "file": "state/world.ground.json"
+  },
+  {
+   "root": "world",
+   "key": "under",
+   "file": "state/world.under.json"
+  },
+  {
+   "root": "world",
+   "key": "roadH",
+   "file": "state/world.roadH.json"
+  },
+  {
+   "root": "world",
+   "key": "roadV",
+   "file": "state/world.roadV.json"
+  },
+  {
+   "root": "world",
+   "key": "segs",
+   "file": "state/world.segs.json"
+  },
+  {
+   "root": "world",
+   "key": "objects",
+   "file": "state/world.objects.json"
+  },
+  {
+   "root": "world",
+   "key": "overhead",
+   "file": "state/world.overhead.json"
+  },
+  {
+   "root": "world",
+   "key": "start",
+   "file": "state/world.start.json"
+  },
+  {
+   "root": "world",
+   "key": "junctions",
+   "file": "state/world.junctions.json"
+  },
+  {
+   "root": "world",
+   "key": "corners",
+   "file": "state/world.corners.json"
+  },
+  {
+   "root": "world",
+   "key": "rbs",
+   "file": "state/world.rbs.json"
+  },
+  {
+   "root": "world",
+   "key": "labels",
+   "file": "state/world.labels.json"
+  },
+  {
+   "root": "world",
+   "key": "curves",
+   "file": "state/world.curves.json"
+  },
+  {
+   "root": "world",
+   "key": "airports",
+   "file": "state/world.airports.json"
+  },
+  {
+   "root": "world",
+   "key": "boats",
+   "file": "state/world.boats.json"
+  },
+  {
+   "root": "world",
+   "key": "smokers",
+   "file": "state/world.smokers.json"
+  },
+  {
+   "root": "world",
+   "key": "flags",
+   "file": "state/world.flags.json"
+  },
+  {
+   "root": "world",
+   "key": "beacons",
+   "file": "state/world.beacons.json"
+  },
+  {
+   "root": "world",
+   "key": "animals",
+   "file": "state/world.animals.json"
+  },
+  {
+   "root": "world",
+   "key": "water",
+   "file": "state/world.water.json"
+  },
+  {
+   "root": "world",
+   "key": "tm",
+   "file": "state/world.tm.json"
+  },
+  {
+   "root": "world",
+   "key": "abRing",
+   "file": "state/world.abRing.json"
+  },
+  {
+   "root": "world",
+   "key": "port",
+   "file": "state/world.port.json"
+  },
+  {
+   "root": "world",
+   "key": "kbChan",
+   "file": "state/world.kbChan.json"
+  },
+  {
+   "root": "world",
+   "key": "kbDistricts",
+   "file": "state/world.kbDistricts.json"
+  },
+  {
+   "root": "world",
+   "key": "kbDiag",
+   "file": "state/world.kbDiag.json"
+  },
+  {
+   "root": "world",
+   "key": "dam",
+   "file": "state/world.dam.json"
+  },
+  {
+   "root": "world",
+   "key": "quarry",
+   "file": "state/world.quarry.json"
+  },
+  {
+   "root": "world",
+   "key": "cities",
+   "file": "state/world.cities.json"
+  },
+  {
+   "root": "world",
+   "key": "cvOwn",
+   "file": "state/world.cvOwn.json"
+  },
+  {
+   "root": "world",
+   "key": "cflog",
+   "file": "state/world.cflog.json"
+  },
+  {
+   "root": "world",
+   "key": "curveConflicts",
+   "file": "state/world.curveConflicts.json"
+  },
+  {
+   "root": "world",
+   "key": "kbMerged",
+   "file": "state/world.kbMerged.json"
+  },
+  {
+   "root": "world",
+   "key": "flyovers",
+   "file": "state/world.flyovers.json"
+  },
+  {
+   "root": "world",
+   "key": "foZ",
+   "file": "state/world.foZ.json"
+  },
+  {
+   "root": "world",
+   "key": "foF",
+   "file": "state/world.foF.json"
+  },
+  {
+   "root": "world",
+   "key": "tapers",
+   "file": "state/world.tapers.json"
+  },
+  {
+   "root": "world",
+   "key": "reserved",
+   "file": "state/world.reserved.json"
+  },
+  {
+   "root": "world",
+   "key": "jMask",
+   "file": "state/world.jMask.json"
+  },
+  {
+   "root": "world",
+   "key": "cornerAt",
+   "file": "state/world.cornerAt.json"
+  },
+  {
+   "root": "world",
+   "key": "rbfix",
+   "file": "state/world.rbfix.json"
+  },
+  {
+   "root": "world",
+   "key": "rbMask",
+   "file": "state/world.rbMask.json"
+  },
+  {
+   "root": "world",
+   "key": "roadLock",
+   "file": "state/world.roadLock.json"
+  },
+  {
+   "root": "world",
+   "key": "startDepot",
+   "file": "state/world.startDepot.json"
+  },
+  {
+   "root": "world",
+   "key": "cityFuel",
+   "file": "state/world.cityFuel.json"
+  },
+  {
+   "root": "world",
+   "key": "kbPort",
+   "file": "state/world.kbPort.json"
+  },
+  {
+   "root": "world",
+   "key": "crops",
+   "file": "state/world.crops.json"
+  },
+  {
+   "root": "world",
+   "key": "des",
+   "file": "state/world.des.json"
+  },
+  {
+   "root": "world",
+   "key": "fd",
+   "file": "state/world.fd.json"
+  },
+  {
+   "root": "world",
+   "key": "genMs",
+   "file": "state/world.genMs.json"
+  },
+  {
+   "root": "world",
+   "key": "susp",
+   "file": "state/world.susp.json"
+  },
+  {
+   "root": "world",
+   "key": "marks",
+   "file": "state/world.marks.json"
+  },
+  {
+   "root": "world",
+   "key": "depots",
+   "file": "state/world.depots.json"
+  },
+  {
+   "root": "world",
+   "key": "trailers",
+   "file": "state/world.trailers.json"
+  },
+  {
+   "root": "world",
+   "key": "fuel",
+   "file": "state/world.fuel.json"
+  },
+  {
+   "root": "world",
+   "key": "garages",
+   "file": "state/world.garages.json"
+  },
+  {
+   "root": "world",
+   "key": "malls",
+   "file": "state/world.malls.json"
+  },
+  {
+   "root": "world",
+   "key": "dealers",
+   "file": "state/world.dealers.json"
+  },
+  {
+   "root": "world",
+   "key": "tmMall",
+   "file": "state/world.tmMall.json"
+  },
+  {
+   "root": "world",
+   "key": "cityPOI",
+   "file": "state/world.cityPOI.json"
+  },
+  {
+   "root": "world",
+   "key": "forSale",
+   "file": "state/world.forSale.json"
+  },
+  {
+   "root": "world",
+   "key": "services",
+   "file": "state/world.services.json"
+  },
+  {
+   "root": "world",
+   "key": "tmSvc",
+   "file": "state/world.tmSvc.json"
+  },
+  {
+   "root": "world",
+   "key": "funcFP",
+   "file": "state/world.funcFP.json"
+  },
+  {
+   "root": "world",
+   "key": "roadClear",
+   "file": "state/world.roadClear.json"
+  },
+  {
+   "root": "world",
+   "key": "roadSweep",
+   "file": "state/world.roadSweep.json"
+  },
+  {
+   "root": "world",
+   "key": "chunkObjs",
+   "derived": "worldChunkIndex"
+  },
+  {
+   "root": "traffic",
+   "key": "arts",
+   "file": "state/traffic.arts.json"
+  },
+  {
+   "root": "BigRig",
+   "key": "depots",
+   "file": "state/BigRig.depots.json"
+  },
+  {
+   "root": "BigRig",
+   "key": "trailers",
+   "file": "state/BigRig.trailers.json"
+  },
+  {
+   "root": "BigRig",
+   "key": "services",
+   "file": "state/BigRig.services.json"
+  },
+  {
+   "root": "BigRig",
+   "key": "nearestService",
+   "file": "state/BigRig.nearestService.json"
+  },
+  {
+   "root": "SVC",
+   "key": "list",
+   "file": "state/SVC.list.json"
+  },
+  {
+   "root": "SVC",
+   "key": "byType",
+   "file": "state/SVC.byType.json"
+  },
+  {
+   "root": "HOMES",
+   "key": "list",
+   "file": "state/HOMES.list.json"
+  },
+  {
+   "root": "HOMES",
+   "key": "agents",
+   "file": "state/HOMES.agents.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "ready",
+   "file": "state/RAIL.ready.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "L",
+   "file": "state/RAIL.L.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "X",
+   "file": "state/RAIL.X.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "Y",
+   "file": "state/RAIL.Y.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "NX",
+   "file": "state/RAIL.NX.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "NY",
+   "file": "state/RAIL.NY.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "stations",
+   "file": "state/RAIL.stations.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "cross",
+   "file": "state/RAIL.cross.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "trains",
+   "file": "state/RAIL.trains.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "tracks",
+   "file": "state/RAIL.tracks.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "chunkRuns",
+   "file": "state/RAIL.chunkRuns.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "test",
+   "file": "state/RAIL.test.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "_GW",
+   "file": "state/RAIL._GW.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "route",
+   "file": "state/RAIL.route.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "_all",
+   "file": "state/RAIL._all.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "moved",
+   "file": "state/RAIL.moved.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "hub",
+   "file": "state/RAIL.hub.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "hubB",
+   "file": "state/RAIL.hubB.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "bridges",
+   "file": "state/RAIL.bridges.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "vP",
+   "file": "state/RAIL.vP.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "tabP",
+   "file": "state/RAIL.tabP.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "ev",
+   "file": "state/RAIL.ev.json"
+  },
+  {
+   "root": "RAIL",
+   "key": "vF",
+   "file": "state/RAIL.vF.json"
+  },
+  {
+   "root": "trlSeq",
+   "key": null,
+   "file": "state/trlSeq.json"
+  }
+ ],
+ "tiles": [
+  "ground",
+  "under",
+  "roadH",
+  "roadV",
+  "water",
+  "cvOwn",
+  "foZ",
+  "foF",
+  "reserved",
+  "jMask",
+  "cornerAt",
+  "rbMask",
+  "des",
+  "fd"
+ ]
+}

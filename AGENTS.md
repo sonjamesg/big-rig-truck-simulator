@@ -19,7 +19,8 @@ sim. `main.js` owns the loop (update → draw → HUD), the camera, the minimap 
 ## Build order (build.py) and why it matters
 
 `python3 build.py` concatenates, in this exact order, `peerjs.min.js`, the engine WAV (`engine_b64.txt` as
-`ENGINE_WAV_B64`), optional `railbake.json` (`window.RAIL_BAKE`), then the files below. The result goes into
+`ENGINE_WAV_B64`), optional `railbake.json` (`window.RAIL_BAKE`), `window.MAP_URL` (index.html) or the inlined `window.MAP_DATA`
+(BigRig.html) from `src/map/`, then the files below. `mapload.js` comes just before `main.js`. The result goes into
 `src/template.html` at `/*SCRIPT*/`, and writes `index.html`, `BigRig.html`, `dist/BigRigWeb/` and `BigRigWeb.zip`.
 
 **Every file shares one global scope**: one `<script>`, with no modules or imports. Consequences:
@@ -151,44 +152,48 @@ Check for `pageerror` / console errors when you add a test.
 - **Every feature must work on keyboard, Xbox-style controller (`gamepad.js`) and phone (`mobile.js`, touch).**
 - **Elevation changes (new bridges, flyovers, height levels) need James's approval first.**
 
-## Map data file (src/map/) — stage 1: export only
+## Map data file (src/map/) — the game loads the world from it
 
-`src/map/` is a **snapshot of the procedural world**, written by the exporter. The game does **not** read it yet;
-the world is still generated at load by `genWorldSteps` (world.js and the build steps it yields into). Editing these
-files changes nothing in-game until stage 2 (below) is done.
+`src/map/` **is the world**. At boot `mapload.js` restores every serialisable piece of state that `genWorldSteps`
+used to build (tiles, roads, junctions, objects, depots, services, homes, rail route, timetable…) from it; the
+generator does not run. **Edit these files and rebuild, and the game changes.**
 
-Regenerate after any change to world generation:
+- `src/map/manifest.json`: list of parts, one per `<root>.<key>` (roots: `world`, `traffic`, `BigRig`, `SVC`,
+  `HOMES`, `RAIL`, plus the scalar `trlSeq`). `derived` parts (`world.chunkObjs`) are rebuilt in code
+  (`worldChunkIndex`), not stored.
+- `src/map/state/<root>.<key>.json`: the value. Plain JSON plus markers (full list at the top of mapload.js):
+  `$i`/`$r` shared object + back-reference (keep ids consistent if you hand-edit), `$tab`/`$tabs` tables (one row
+  per object, column names in the header), `$t` typed arrays (`tile` = a file in tiles/), `$m` Map, `$s` Set,
+  `$n` NaN/±Inf/−0, `$u` undefined, `$h` hole, `$f` function rebuilt in code (`regionAt`, `isDesert`,
+  `taperHs`, `rlTrackFn` with args, `global:<name>`), `$c` trailer art canvas.
+- `src/map/tiles/<layer>.rle.gz`: full-grid typed arrays, gzip of LEB128 `(value,count)` runs, zig-zag for signed.
+- Canvases and functions are never stored: they're recreated in code. Objects that existed before generation
+  (`world.ground` aliased as `G`, etc.) are refilled in place so aliases survive.
+- Generator-only debug handles (`RAIL.hard`, `_CL`, `_CO`, `_dist`, `_tgt`, `_clearLine`) aren't stored.
 
-```bash
-python3 build.py && python3 tools/export_map.py          # rewrites src/map/ (deterministic: same code -> same bytes)
-python3 build.py && python3 tools/export_map.py --check  # only verifies the tile layers decode exactly, no write
-```
+Build: `build.py` packs the data into `mapdata.bin` (next to index.html, in dist/ and the zip), fetched at boot
+(started as soon as the script loads). `index.html` stays ~2.5 MB. `BigRig.html` (gitignored single file) inlines
+the same data as base64 so it works from `file://`. `index.html` opened from `file://` can't fetch, so it falls back
+to the generator (slow but identical). A decode failure after the world is touched reloads with `?mapgen=1`.
 
-`tools/map_export.js` runs inside the built page after generation (read-only). `tools/export_map.py` drives it
-with Playwright, then decodes every layer again and compares an FNV-1a hash against the live world before writing.
+Old generator / verification:
+- `?mapgen=1` (or `window.__BIGRIG_MAPGEN`) runs `genWorldSteps` as before.
+- **After any change to world generation code**: `python3 build.py && python3 tools/export_map.py && python3
+  build.py && python3 tools/verify_map.py`. The export rewrites src/map/ (deterministic). verify_map compares a
+  deep fingerprint of every global, a full re-serialisation, `G === world.ground` and sampled rebuilt functions
+  between the generator and the data path (served over http); it must print `OK`. Timings and the random
+  fire/police countdowns are masked (they differ between any two runs).
+- If you hand-edit src/map/ instead, verify_map will (correctly) report a mismatch with the generator; that's
+  expected — the data file is then the source of truth, and re-exporting would overwrite your edits.
 
-Format:
-- `src/map/map.json`
-  - `meta`: `MW`, `MH` (tiles), `TILE_px` (32), `metres_per_tile` (4), and a count of every `world.objects` kind.
-  - `layers`: one entry per full-grid typed array in `world` (`ground`, `under`, `water`, `roadH`, `roadV`, `fd`,
-    `des`, `reserved`, `jMask`, `rbMask`, `cornerAt`, `cvOwn`, `foZ`, `foF`). Each entry has `type`, `len`
-    (`MW*MH`, row-major `i = y*MW + x`), `fnv1a` (a hash of the raw bytes) and `file`.
-  - `entities`: labelled lists. Every item has an `id`, a `type`, a `name` and a position or geometry, in **tiles**
-    unless the field name says otherwise. The lists are `roads` (straight segments: `dir`, `a`, `w`, `b0`, `b1`,
-    `rect_tiles`), `curvedRoads` (`pts_tiles`), `junctions`, `roundabouts`, `buildings`, `depots`, `fuelStations`,
-    `garages`, `services` (hospital, police and fire), `malls`, `dealers`, `ports`, `airports`, `bridges`
-    (suspension, flyover and curved bridges), `rail` (main line, sampled every 8 track samples), `stations` and
-    `towns` (map labels).
-- `src/map/tiles/<layer>.rle.gz`: the exact grid, gzip of a run-length stream of LEB128 varint pairs
-  `(value, count)`. Values of `Int16Array`/`Int32Array` layers are zig-zag encoded (`v>=0 ? 2v : -2v-1`).
-- Size: about 0.85 MB of gzipped tiles plus 1.5 MB of JSON. Inline only what the game needs, gzipped, when wiring
-  stage 2, and measure phone load time against generation (~14 s on desktop today, mostly the railway route).
-
-Not done yet (stages 2–3): loading the world from this data instead of generating it. Doing that exactly needs more
-than these layers and lists:
-- the full `world` object graph (about 313k nodes, with shared references, Maps and per-object fields such as the
-  segment↔junction links, `chunkObjs` and the port, airport and rail internals);
-- the module globals that generation fills (for example `RAIL`, services, homes, trailers);
-- re-creating the canvases and functions it holds (trailer art, `regionAt`, `isDesert`, `roadClear`).
-
-Verification must then compare every list as well as the tile grids.
+## Reference map grid (tools/mapgrid.py, tools/mapviewer.py)
+James marks up these maps and sends screenshots; map each mark back to tiles with:
+- Column letters: A=0, B=1 … Z=25, AA=26, AB=27 …; rows are numbers from 1.
+- Whole-map square `<C><R>` (64 tiles): tiles x = 64·col … 64·col+63, y = 64·(R−1) … 64·(R−1)+63.
+- City square `<CITY>-<C><R>` (16 tiles): x = X0 + 16·col … +15, y = Y0 + 16·(R−1) … +15, where X0/Y0
+  (multiples of 16, = city street grid bounds minus 12 tiles, snapped down) are printed on the page / viewer.
+- Tile (tx, ty) = world pixels tx·32 … tx·32+31 (TILE = 32 px = 4 m); map is 2048×2048 tiles.
+Regenerate: `python3 build.py && python3 tools/mapviewer.py` → /workspace/mapgrid/BigRig_Map_Viewer.html
+(one offline HTML, WebP pyramid, grid toggle, live tile/grid readout, city jump + search incl. "ASHBY-C4",
+"K7" or "x,y"). `python3 tools/mapgrid.py [--pdf]` writes the gridded PNGs. The viewer's in-browser readout
+uses the same formulas.

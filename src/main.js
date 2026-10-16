@@ -74,7 +74,19 @@ const LOADMS = {
   "Drawing the map": 93,
   "Spawning traffic": 48,
   "Fuelling your truck": 19,
+  // map data path (mapload.js) instead of the generator stages
+  "Loading the map": 300,
+  "Building the map": 600,
 };
+// stages run when the world comes from src/map/ (MAP_DATA) instead of genWorldSteps()
+const LOADMS_MAP = [
+  "Painting textures",
+  "Loading the map",
+  "Building the map",
+  "Drawing the map",
+  "Spawning traffic",
+  "Fuelling your truck",
+];
 function bootYield() {
   return new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
 }
@@ -82,7 +94,13 @@ async function boot() {
   const tb = performance.now(),
     tim = {},
     order = [];
-  const tot = Object.values(LOADMS).reduce((a, b) => a + b, 0) || 1;
+  const useMap = typeof mapAvailable === "function" && mapAvailable();
+  const tot =
+    Object.keys(LOADMS)
+      .filter((k) =>
+        useMap ? LOADMS_MAP.includes(k) : k !== "Loading the map" && k !== "Building the map",
+      )
+      .reduce((a, k) => a + LOADMS[k], 0) || 1;
   let doneMs = 0,
     cur = null,
     curT = tb,
@@ -113,8 +131,28 @@ async function boot() {
   };
   await stage("Painting textures");
   makeTextures();
-  await stage("Shaping coastline & terrain");
-  for (const st of genWorldSteps()) await stage(st);
+  let gen = !useMap;
+  if (useMap) {
+    // world state from the map data file (src/map/); ?mapgen=1 runs the old generator instead
+    try {
+      await mapLoadWorld(stage);
+    } catch (e) {
+      MAPLOAD.err = String((e && e.stack) || e);
+      if (MAPLOAD.touched) {
+        // world half-overwritten: start again on the generator
+        console.error("map data failed to decode, reloading with the generator:", e);
+        const q = location.search ? location.search + "&mapgen=1" : "?mapgen=1";
+        location.replace(location.pathname + q + location.hash);
+        return;
+      }
+      console.warn("map data unavailable, generating the world instead:", e);
+      gen = true;
+    }
+  }
+  if (gen) {
+    await stage("Shaping coastline & terrain");
+    for (const st of genWorldSteps()) await stage(st);
+  }
   await stage("Drawing the map");
   makeMinimap();
   if (typeof railMinimap === "function") railMinimap();
@@ -2120,7 +2158,8 @@ addEventListener("keydown", (e) => {
     }
   }
 });
-requestAnimationFrame(() => setTimeout(boot, 30));
+// window.__BIGRIG_NOBOOT (set by a test before the page scripts run) stops the automatic boot
+requestAnimationFrame(() => setTimeout(() => window.__BIGRIG_NOBOOT || boot(), 30));
 
 cv.addEventListener("contextmenu", (e) => {
   e.preventDefault();

@@ -1,0 +1,18 @@
+[
+ ["// Greyfell Inlet",226],
+ ["// ground: water",242],
+ ["// beaches:",774],
+ ["// ---------------- ",940],
+ ["for(const f of pendi",962],
+ ["// segment continuat",1162],
+ ["// ---------------- ",1175],
+ ["// ---------------- ",1270],
+ ["// ---- farmland",1320],
+ ["const DES=world.des",1341],
+ ["// ---- boats",1741],
+ ["world.genMs=",1741],
+ ["if(typeof buildMarki",1757],
+ ["if(typeof buildDepot",1768],
+ ["world.labels=",5944],
+ ["// spatial index",5944]
+]

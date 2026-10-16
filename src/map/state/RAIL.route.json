@@ -1,0 +1,42 @@
+{
+ "ms": 6409,
+ "cells": 2939,
+ "stations": [
+  ["Albion Central",105,624],
+  ["Sound Coast",873,351],
+  ["Dustwater",1053,345],
+  ["Sandvale Parkway",1521,629],
+  ["Coppermine",1717,748.75],
+  ["Fenwick Forest",1555,1115],
+  ["Kingsbridge North",1353,1299],
+  ["Redhill Central",935,1375],
+  ["Greyfell Pass",395,1635],
+  ["Greyfell Sands",372.3033008588991,1920.696699141101],
+  ["Ashby",105,1151],
+  ["Wendwood",421,985],
+  ["Millford",343,735]
+ ],
+ "slid": 1,
+ "resv": [["Albion Central",337],["Coppermine",56],["Greyfell Sands",134]],
+ "resOK": {"Albion Central":1,"Coppermine":1,"Greyfell Sands":1},
+ "minRsm": 24,
+ "verts": 53,
+ "minR": 16,
+ "radii": [0,200,150,80,80,150,200,16,150,110,45,150,110,50,200,350,110,150,260,110,80,700,260,150,260,260,900,110,80,150,110,80,41,50,0,110,600,150,110,350,900,150,110,150,110,110,260,150,80,50,45,450,260],
+ "small": [[67,1087,80],[79,1075,80],[359,755,16],[105,579,45],[157,697,50],[703,659,80],[1545,649,80],[1672,682,80],[1710,682,41],[1717,689,50],[372,1886,80],[372,1958,50],[365,1965,45]],
+ "tgt": {"$tab":["name","kind","c"],"rows":[
+   ["Albion Central","city",276532],
+   ["Sound Coast","coast",179636],
+   ["Dustwater","desert",176654],
+   ["Sandvale Parkway","city",322296],
+   ["Coppermine","rural",371546],
+   ["Fenwick Forest","forest",571145],
+   ["Kingsbridge North","city",665252],
+   ["Redhill Central","hub",703955],
+   ["Greyfell Pass","hills",836805],
+   ["Greyfell Sands","coast",992446],
+   ["Ashby","rural",588852],
+   ["Wendwood","rural",504018],
+   ["Millford","town",375979]
+  ]}
+}

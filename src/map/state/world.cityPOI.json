@@ -1,0 +1,11 @@
+{
+ "Albion": {"fuel":4,"garages":4},
+ "Sandvale": {"fuel":4,"garages":4},
+ "Kingsbridge": {"fuel":4,"garages":4},
+ "Millford": {"fuel":4,"garages":4},
+ "Dustwater": {"fuel":2,"garages":1},
+ "Coppermine": {"fuel":2,"garages":3},
+ "Redhill": {"fuel":4,"garages":4},
+ "Fenwick": {"fuel":1,"garages":1},
+ "Ashby": {"fuel":1,"garages":1}
+}

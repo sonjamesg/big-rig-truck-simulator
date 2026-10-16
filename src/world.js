@@ -3808,9 +3808,13 @@ function* genWorldSteps() {
       }
     world.roadSweep = { removed, removedTrees, tiles };
   }
-  // spatial index of ground objects per chunk
-  world.chunkObjs = new Map();
   if (world.animals) world.animals = world.animals.filter((a) => !a._dead);
+  worldChunkIndex(objs);
+}
+// spatial index of ground objects per chunk (also sets each object's draw order o.z). Rebuilt by the map
+// data loader (mapload.js) from world.objects, so world.chunkObjs isn't stored in src/map/.
+function worldChunkIndex(objs) {
+  world.chunkObjs = new Map();
   for (const o of objs) {
     if (o._dead) continue;
     let x0, y0, x1, y1;
