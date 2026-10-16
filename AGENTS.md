@@ -150,3 +150,45 @@ Check for `pageerror` / console errors when you add a test.
 - **2D top-down canvas style.** No pixel art and no 3D.
 - **Every feature must work on keyboard, Xbox-style controller (`gamepad.js`) and phone (`mobile.js`, touch).**
 - **Elevation changes (new bridges, flyovers, height levels) need James's approval first.**
+
+## Map data file (src/map/) — stage 1: export only
+
+`src/map/` is a **snapshot of the procedural world**, written by the exporter. The game does **not** read it yet;
+the world is still generated at load by `genWorldSteps` (world.js and the build steps it yields into). Editing these
+files changes nothing in-game until stage 2 (below) is done.
+
+Regenerate after any change to world generation:
+
+```bash
+python3 build.py && python3 tools/export_map.py          # rewrites src/map/ (deterministic: same code -> same bytes)
+python3 build.py && python3 tools/export_map.py --check  # only verifies the tile layers decode exactly, no write
+```
+
+`tools/map_export.js` runs inside the built page after generation (read-only). `tools/export_map.py` drives it
+with Playwright, then decodes every layer again and compares an FNV-1a hash against the live world before writing.
+
+Format:
+- `src/map/map.json`
+  - `meta`: `MW`, `MH` (tiles), `TILE_px` (32), `metres_per_tile` (4), and a count of every `world.objects` kind.
+  - `layers`: one entry per full-grid typed array in `world` (`ground`, `under`, `water`, `roadH`, `roadV`, `fd`,
+    `des`, `reserved`, `jMask`, `rbMask`, `cornerAt`, `cvOwn`, `foZ`, `foF`). Each entry has `type`, `len`
+    (`MW*MH`, row-major `i = y*MW + x`), `fnv1a` (a hash of the raw bytes) and `file`.
+  - `entities`: labelled lists. Every item has an `id`, a `type`, a `name` and a position or geometry, in **tiles**
+    unless the field name says otherwise. The lists are `roads` (straight segments: `dir`, `a`, `w`, `b0`, `b1`,
+    `rect_tiles`), `curvedRoads` (`pts_tiles`), `junctions`, `roundabouts`, `buildings`, `depots`, `fuelStations`,
+    `garages`, `services` (hospital, police and fire), `malls`, `dealers`, `ports`, `airports`, `bridges`
+    (suspension, flyover and curved bridges), `rail` (main line, sampled every 8 track samples), `stations` and
+    `towns` (map labels).
+- `src/map/tiles/<layer>.rle.gz`: the exact grid, gzip of a run-length stream of LEB128 varint pairs
+  `(value, count)`. Values of `Int16Array`/`Int32Array` layers are zig-zag encoded (`v>=0 ? 2v : -2v-1`).
+- Size: about 0.85 MB of gzipped tiles plus 1.5 MB of JSON. Inline only what the game needs, gzipped, when wiring
+  stage 2, and measure phone load time against generation (~14 s on desktop today, mostly the railway route).
+
+Not done yet (stages 2–3): loading the world from this data instead of generating it. Doing that exactly needs more
+than these layers and lists:
+- the full `world` object graph (about 313k nodes, with shared references, Maps and per-object fields such as the
+  segment↔junction links, `chunkObjs` and the port, airport and rail internals);
+- the module globals that generation fills (for example `RAIL`, services, homes, trailers);
+- re-creating the canvases and functions it holds (trailer art, `regionAt`, `isDesert`, `roadClear`).
+
+Verification must then compare every list as well as the tile grids.
