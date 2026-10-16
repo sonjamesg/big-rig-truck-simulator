@@ -528,7 +528,7 @@ function polSpawn() {
     R = polViewR(),
     f = fwd(P.h),
     mv = Math.abs(P.v) > 3;
-  for (let t = 0; t < 40; t++) {
+  for (let t = 0; t < 90; t++) {
     let a = Math.random() * 6.283;
     if (mv && Math.random() < 0.7) a = Math.atan2(f[1], f[0]) + (Math.random() - 0.5) * 1.8;
     const d = Math.max(POL_MIN_D, R * 1.25) * (1 + Math.random() * 1.2) + 15,
@@ -569,7 +569,8 @@ function polUpdatePatrols(dt) {
     if (v === (POL.chase && POL.chase.v)) continue;
     if (
       (v.pol && v.pol.leave && !onScreen(v.x, v.y, 15)) ||
-      (Math.hypot(v.x - truck.x, v.y - truck.y) > R * 2.6 + 60 && !onScreen(v.x, v.y, 20))
+      (Math.hypot(v.x - truck.x, v.y - truck.y) > Math.max(R * 2.6 + 60, 480) &&
+        !onScreen(v.x, v.y, 20))
     ) {
       const i = traffic.vs.indexOf(v);
       if (i >= 0) {

@@ -1,7 +1,7 @@
 /**
  * @file bm.js — BLACK MARKET: shady yards (world gen, art, fence collision, map icons, fast travel), the Black Market Jobs board
- *   (illegal missions only, registry BM_MISSIONS for more theft jobs later) and the first mission, Tank Heist.
- * Exposes (globals): BM, BM_MISSIONS, bmGenYards, bmSolidM, bmMapIcons, bmPOIs, bmAtYard, bmOpenBoard, bmBlockFT, bmUpdate,
+ *   (illegal missions only, registry BM_MISSIONS for more theft jobs later) Tank Heist + Depot Thefts (soldiers, 2-star escape, numbered reverse-in drop bays, payout breakdown).
+ * Exposes (globals): BM, BM_MISSIONS, bmGenYards, bmSolidM, bmMapIcons, bmPOIs, bmAtYard, bmOpenBoard, bmBlockFT, bmUpdate, bmWanted2, bmLoseUpdate, bmBays, bmOnDrop, bmPayout,
  *   BM_THEFT, BM_OFFER_S, bmTheftOffers, bmBoardList, bmBoardBox, bmInBoardBox,
  *   bmDrawLow, bmDrawHigh, bmHUD (+ bm* helpers)
  * Depends on: depots.js (findSpot/access passed in, makeTrailer, BigRig events), milbase.js (MB, world.milbase, mbSoldier),
@@ -116,6 +116,22 @@ function bmAtYard() {
 function bmMapIcons(px, py, R, lbl) {
   const r = Math.max(5.5, R || 5.5);
   ctx.save();
+  const Z = BM.zone;
+  if (Z) {
+    // 2-star search area: leave it and stay out of sight to lose the police
+    const cx = px(Z.x),
+      cy = py(Z.y),
+      rr = Math.abs(px(Z.x + Z.r) - cx);
+    ctx.fillStyle = "rgba(255,40,60,0.12)";
+    ctx.strokeStyle = "rgba(255,60,80," + (0.6 + 0.3 * Math.sin(timeS * 5)) + ")";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, rr, 0, 7);
+    ctx.fill();
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   for (const Y of world.bmYards || []) {
@@ -186,24 +202,43 @@ OBJX.bm = function (g, o) {
     g.arc(x, y, 6, 0, 7);
     g.fill();
   }
-  // drop bay
+  // drop zone: red dashed outline + two numbered reverse-in bays (depot style) at its south end
   const [b0, b1, b2, b3] = Y.bay;
-  g.fillStyle = "rgba(200,30,40,0.18)";
+  g.fillStyle = "rgba(200,30,40,0.14)";
   g.fillRect(b0 * T_, b1 * T_, (b2 - b0) * T_, (b3 - b1) * T_);
   g.strokeStyle = "#d8283a";
   g.lineWidth = 4;
   g.setLineDash([16, 10]);
   g.strokeRect(b0 * T_, b1 * T_, (b2 - b0) * T_, (b3 - b1) * T_);
   g.setLineDash([]);
-  g.save();
-  g.translate(((b0 + b2) / 2) * T_, ((b1 + b3) / 2) * T_);
-  g.rotate(-Math.PI / 2);
-  g.fillStyle = "rgba(240,220,220,0.75)";
-  g.font = "bold 26px sans-serif";
+  const BB = bmBays(Y),
+    S_ = PPM;
+  g.strokeStyle = "rgba(240,240,240,0.85)";
+  g.lineWidth = 3;
+  for (const q of BB) {
+    g.beginPath();
+    g.moveTo(q.x0 * S_, q.y0 * S_);
+    g.lineTo(q.x0 * S_, q.y1 * S_);
+    g.lineTo(q.x1 * S_, q.y1 * S_);
+    g.lineTo(q.x1 * S_, q.y0 * S_);
+    g.stroke();
+    g.fillStyle = "#ececec";
+    g.font = "bold 22px Arial";
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText(String(q.id), q.cx * S_, q.y0 * S_ + 14);
+  }
+  g.fillStyle = "rgba(240,220,220,0.8)";
+  g.font = "bold 22px sans-serif";
   g.textAlign = "center";
   g.textBaseline = "middle";
-  g.fillText("DROP \u2022 NO QUESTIONS", 0, 0);
-  g.restore();
+  const tx = ((b0 + b2) / 2) * T_,
+    ty = ((b1 + BB[0].y0 / M_T) / 2) * T_;
+  g.fillText("DROP", tx, ty - 10);
+  g.font = "bold 12px sans-serif";
+  g.fillText("NO QUESTIONS", tx, ty + 12);
+  g.font = "bold 10px sans-serif";
+  g.fillText("REVERSE IN \u2193", tx, ty + 28);
   // JOB BOARD box: same marking style as the drop bay, amber
   {
     const [j0, j1, j2, j3] = bmBoardBox(Y);
@@ -334,6 +369,7 @@ BM_MISSIONS.push({
   id: "tank",
   name: "Tank Heist",
   pay: 5000,
+  par: 420,
   xp: 450,
   risk: 3,
   icon: "\u{1FA96}",
@@ -372,6 +408,8 @@ BM_MISSIONS.push({
     tr.target = true;
     flash("You dropped the tank \u2014 re-couple it!");
   },
+  loseStep: 2,
+  delStep: 3,
   update(a, dt) {
     const s = truck,
       inBase =
@@ -381,43 +419,156 @@ BM_MISSIONS.push({
         s.y < (MB.y1 + 1) * M_T;
     if (a.step === 1 && !inBase && s.trl === a.tr) {
       a.step = 2;
-      bmWanted2();
+      bmWanted2(a);
       flash("\u2605\u2605 The police are after the tank \u2014 lose them!");
       clearRoute();
     }
-    if (a.step === 2 && wantStars() === 0 && !POL.chase) {
-      a.step = 3;
-      flash("Police lost \u2714 Deliver the tank to " + a.yard.name);
-      setRoute(a.yard);
-    }
-    if (a.step >= 2 && s.trl === a.tr && bmInBay(a)) {
-      if (wantStars() > 0 || POL.chase) {
-        if (timeS - (a.blk || -9) > 4) {
-          a.blk = timeS;
-          flash("\u26D4 Not while you\u2019re wanted \u2014 lose the police first!");
-        }
-      } else if (Math.abs(s.v) < 0.6) bmComplete(a);
-    }
   },
 });
-function bmInBay(a) {
-  const tr = a.tr,
-    f = fwd(tr.th),
-    cx = tr.x - f[0] * TRL_KP_TO_CENTRE,
-    cy = tr.y - f[1] * TRL_KP_TO_CENTRE,
-    b = a.yard.bay;
-  return (
-    cx > (b[0] - 1) * M_T && cx < (b[2] + 1) * M_T && cy > (b[1] - 1) * M_T && cy < (b[3] + 1) * M_T
-  );
-}
-function bmWanted2() {
+// ---- shared heist flow: 2-star search zone (lose step), numbered yard bays + uncouple-to-deliver (deliver step)
+const BM_ZONE_R = 320, // m: search circle radius around the last place police saw you
+  BM_LOSE_S = 12; // s out of sight (and outside the circle) to shake them off
+function bmWanted2(a) {
   WANT.lvl = 2;
   WANT.t = 90;
   WANT.chased = false;
-  WANT.sp = 1;
+  WANT.sp = 0;
+  WANT.sp2 = 0;
   WANT.heat = Math.max(WANT.heat || 0, 230);
   WANT.ht = timeS;
   WANT.star = timeS;
+  BM.zone = { x: truck.x, y: truck.y, r: BM_ZONE_R, seen: timeS };
+  if (a) a.wantT = timeS;
+  // immediate response: a few cars from random off-screen points, sent straight at the player
+  for (let k = 0; k < 3; k++) bmCopSpawn(truck.x, truck.y);
+  BM.copT = timeS + 3;
+}
+// one police car from a random off-screen road point, sent to search around (x, y) [metres]
+function bmCopSpawn(x, y) {
+  const v = typeof polSpawn === "function" && polSpawn();
+  if (!v) return null;
+  v.pol.search = true;
+  v.pinT = timeS + 1e6;
+  aiGoal(v, { entrance: { x, y }, name: "search" });
+  v.pol.sg = timeS + 5;
+  return v;
+}
+// lose step: stay at 2 stars until really escaped: no pursuit, unseen for BM_LOSE_S, outside the search circle
+function bmLoseUpdate(a) {
+  const Z = BM.zone || (BM.zone = { x: truck.x, y: truck.y, r: BM_ZONE_R, seen: timeS });
+  const seen = POL.chase || (typeof polCanSee === "function" && polCanSee().length > 0);
+  if (seen) {
+    Z.x = truck.x;
+    Z.y = truck.y;
+    Z.seen = timeS;
+  }
+  const out = Math.hypot(truck.x - Z.x, truck.y - Z.y) > Z.r,
+    unseen = timeS - Z.seen;
+  Z.out = out;
+  Z.unseen = unseen;
+  // keep the area busy: top up to 4 searchers converging on the last sighting
+  if (timeS > (BM.copT || 0)) {
+    BM.copT = timeS + 4;
+    const n = POL.cars.filter((v) => Math.hypot(v.x - truck.x, v.y - truck.y) < 480).length;
+    if (n < 4) bmCopSpawn(Z.x, Z.y);
+  }
+  if (!(POL.chase && POL.chase.paying)) {
+    WANT.lvl = 2;
+    WANT.heat = Math.max(WANT.heat || 0, WANT2_HEAT + 20);
+    WANT.t = Math.max(WANT.t || 0, 60);
+  }
+  if (!POL.chase && out && unseen > BM_LOSE_S) {
+    BM.zone = null;
+    WANT.heat = 0;
+    WANT.chased = false;
+    WANT.lvl = 2;
+    wantClear();
+    WANT.lvl = 0;
+    if (typeof polEndChase === "function" && POL.chase) polEndChase(true);
+    a.step = a.m.delStep;
+    a.lostAt = timeS;
+    flash("Police lost \u2714 Reverse it into a bay at " + a.yard.name + " and uncouple");
+    setRoute(a.yard);
+  }
+}
+// two numbered reverse-in bays inside the yard's drop zone (metres), depot-style (nose north, dock at the south end)
+function bmBays(Y) {
+  if (Y._bays) return Y._bays;
+  const [b0, , b2, b3] = Y.bay,
+    bw = (b2 - b0 - 0.5) / 2,
+    y1 = b3 - 0.2,
+    y0 = y1 - 4.4;
+  Y._bays = [0, 1].map((k) => {
+    const cxT = b0 + 0.25 + bw * (k + 0.5),
+      b = {
+        id: k + 1,
+        label: "BM-" + (k + 1),
+        cx: cxT * M_T,
+        cy: ((y0 + y1) / 2) * M_T,
+        th: 0,
+        w: bw * M_T,
+        L: (y1 - y0) * M_T,
+        x0: (cxT - bw / 2) * M_T,
+        x1: (cxT + bw / 2) * M_T,
+        y0: y0 * M_T,
+        y1: y1 * M_T,
+        dock: y1 * M_T,
+        yard: Y,
+      };
+    b.kx = b.cx;
+    b.ky = b.cy - TRL_KP_TO_CENTRE + 0.2;
+    return b;
+  });
+  return Y._bays;
+}
+// a dropped trailer is "in" a bay when its body sits inside the lines (small margin) and it points along the bay
+function bmTrInBay(tr, Y) {
+  for (const b of bmBays(Y)) {
+    const f = fwd(tr.th),
+      box = {
+        x: tr.x - f[0] * TRL_KP_TO_CENTRE,
+        y: tr.y - f[1] * TRL_KP_TO_CENTRE,
+        h: tr.th,
+        L: TRL_LEN,
+        W: TRL_W,
+      };
+    const m = 0.35;
+    if (Math.abs(wrapA(tr.th - b.th)) > 0.14) continue;
+    if (
+      obbCorners(box).every(
+        (p) => p[0] > b.x0 - m && p[0] < b.x1 + m && p[1] > b.y0 - 1.2 && p[1] < b.y1 + m,
+      )
+    )
+      return b;
+  }
+  return null;
+}
+// while coupled and close: which bay is lined up (for the green outline / arrow)
+function bmBayState(a) {
+  if (!a || a.step !== a.m.delStep || truck.trl !== a.tr) return null;
+  let best = null;
+  for (const b of bmBays(a.yard)) {
+    const al = bayAlign(b);
+    if (!al || al.dist > 70) continue;
+    if (!best || al.dist < best.al.dist) best = { b, al };
+  }
+  return best;
+}
+// delivery happens ONLY here: uncoupling the stolen trailer inside a yard bay on the deliver step
+function bmOnDrop(a, tr) {
+  if (tr !== a.tr || a.step < 1) return false;
+  const b = bmTrInBay(tr, a.yard);
+  if (!b) return false;
+  if (a.step === a.m.loseStep || wantStars() > 0 || POL.chase) {
+    flash("\u26D4 Not while you\u2019re wanted \u2014 lose the police first!");
+    a.blk = timeS;
+    a.lost = true;
+    tr.target = true;
+    return true; // stays dropped in the bay; re-couple and drive off, or wait it out elsewhere
+  }
+  if (a.step !== a.m.delStep) return false;
+  bmComplete(a, b);
+  return true;
 }
 // JOB BOARD ground box (tiles): between the shed and the drop bay; stop in it to open the Black Market board
 function bmBoardBox(Y) {
@@ -457,7 +608,7 @@ const BM_THEFT = {
     a.lost = false;
     if (a.step === 0) {
       a.step = 1;
-      bmWanted2();
+      bmWanted2(a);
       clearRoute();
       flash("\u2605\u2605 Stolen! The police are on to you \u2014 lose them!");
     }
@@ -468,21 +619,9 @@ const BM_THEFT = {
     tr.target = true;
     flash("You dropped the trailer \u2014 re-couple it!");
   },
-  update(a) {
-    if (a.step === 1 && wantStars() === 0 && !POL.chase) {
-      a.step = 2;
-      flash("Police lost \u2714 Deliver it to " + a.yard.name);
-      setRoute(a.yard);
-    }
-    if (a.step >= 1 && truck.trl === a.tr && bmInBay(a)) {
-      if (wantStars() > 0 || POL.chase) {
-        if (timeS - (a.blk || -9) > 4) {
-          a.blk = timeS;
-          flash("\u26D4 Not while you\u2019re wanted \u2014 lose the police first!");
-        }
-      } else if (Math.abs(truck.v) < 0.6) bmComplete(a);
-    }
-  },
+  loseStep: 1,
+  delStep: 2,
+  update() {},
 };
 function bmTheftOffers(Y) {
   BM.offers = BM.offers || {};
@@ -518,6 +657,7 @@ function bmTheftOffers(Y) {
       pay,
       xp: Math.round(60 + pay * 0.09),
       tr: c.tr,
+      par: Math.round(150 + c.km * 50),
       from: c.D.name,
       cargo: TRAILER_TYPES[c.tr.type].name + (c.tr.cargo ? " \u2022 " + c.tr.cargo : ""),
       blurb:
@@ -586,7 +726,7 @@ function bmAccept(id, Y) {
     flash("Drop your trailer first \u2014 you\u2019ll need the fifth wheel free");
     return;
   }
-  const a = { m, yard: Y, step: 0, t0: timeS, lost: false };
+  const a = { m, yard: Y, step: 0, t0: timeS, lost: false, dmg0: truck.damage || 0, kills: 0 };
   if (!m.start(a)) {
     flash("No job available right now");
     return;
@@ -606,29 +746,54 @@ function bmEnd(ok, why) {
   if (why) flash(why);
   if (!ok && why && why !== "Job abandoned") bmResult(false, a, why);
 }
-function bmComplete(a) {
+// payout: base pay - cargo damage (damage taken during the job, up to 50%) + time bonus + no-kill bonus
+function bmPayout(a) {
+  const base = a.m.pay,
+    dmg = Math.max(0, (truck.damage || 0) - (a.dmg0 || 0)),
+    ded = -Math.round((base * Math.min(0.5, (dmg / 100) * 0.8)) / 10) * 10,
+    secs = timeS - (a.cT || a.t0),
+    par = a.m.par || 300,
+    tb = secs < par ? Math.round((base * 0.12 * (1 - secs / par) + base * 0.03) / 10) * 10 : 0,
+    nk = a.kills ? 0 : Math.round((base * 0.08) / 10) * 10;
+  return { base, dmg, ded, secs, tb, nk, total: Math.max(0, base + ded + tb + nk) };
+}
+function bmComplete(a, bay) {
+  if (BM.act !== a || a.paid) return; // one payout per job, ever
+  a.paid = 1;
   const tr = a.tr;
   if (!BM_MISSIONS.includes(a.m)) BM.offers = {};
-  truck.trl = null;
-  truck.th = truck.h;
+  if (truck.trl === tr) {
+    truck.trl = null;
+    truck.th = truck.h;
+  }
+  if (tr.bay && tr.bay.trailer === tr) tr.bay.trailer = null;
   const i = world.trailers.indexOf(tr);
   if (i >= 0) world.trailers.splice(i, 1);
-  truck.money += a.m.pay;
+  const P = bmPayout(a);
+  truck.money += P.total;
   addXP(a.m.xp);
   BM.done = (BM.done || 0) + 1;
+  BM.last = P;
   BM.act = null;
+  BM.zone = null;
   bmAlarm(false);
   clearRoute();
   if (typeof saveGame === "function") saveGame();
-  bmResult(true, a);
+  bmResult(true, a, null, P, bay);
 }
-function bmResult(ok, a, why) {
+function bmResult(ok, a, why, P, bay) {
   BM.res = { ok, t: timeS };
+  const row = (l, v, c) =>
+    `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.08)"><span>${l}</span><b style="color:${c || "#fff"}">${v}</b></div>`;
+  const mm = (s) => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
+  const brk = P
+    ? `<div style="text-align:left;margin:12px auto 0;max-width:340px;font-size:14px">${row("Base pay", money(P.base))}${row("Cargo damage (" + Math.round(P.dmg) + "% hit)", P.ded ? "\u2212" + money(-P.ded) : money(0), P.ded ? "#ff8a8a" : "#9aa")}${row("Time bonus (" + mm(P.secs) + ")", P.tb ? "+" + money(P.tb) : money(0), P.tb ? "#7dff8a" : "#9aa")}${row("No-kill bonus", P.nk ? "+" + money(P.nk) : "\u2014", P.nk ? "#7dff8a" : "#9aa")}<div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:17px"><span style="font-weight:900">TOTAL</span><b style="color:#7dff8a;font-size:20px">${money(P.total)}</b></div></div>`
+    : "";
   const b = openModal(
     "result",
     `<div style="padding:22px 26px;text-align:center"><div style="font-size:44px">${ok ? "\u{1F4B0}" : "\u{1F6A8}"}</div><h2>${ok ? "PAYOUT" : "JOB FAILED"}</h2>
-    <div class="sub">${esc(a.m.name)} \u2022 ${esc(a.yard.name)}</div>
-    ${ok ? `<div style="font-size:40px;font-weight:900;color:#7dff8a;margin:14px 0 4px">${money(a.m.pay)}</div><div style="color:#ffd23f;font-weight:800">+${a.m.xp} XP \u2022 cash in hand, no receipt</div>` : `<div style="font-size:18px;color:#ff8a8a;margin:14px 0">${esc(why || "")}</div>`}
+    <div class="sub">${esc(a.m.name)} \u2022 ${esc(a.yard.name)}${bay ? " \u2022 bay " + bay.id : ""}</div>
+    ${ok ? `<div style="font-size:40px;font-weight:900;color:#7dff8a;margin:14px 0 4px">${money(P ? P.total : a.m.pay)}</div><div style="color:#ffd23f;font-weight:800">+${a.m.xp} XP \u2022 cash in hand, no receipt</div>${brk}` : `<div style="font-size:18px;color:#ff8a8a;margin:14px 0">${esc(why || "")}</div>`}
     <button class="btn go" id="keep" style="margin-top:18px;width:100%">OK <kbd>${typeof pad !== "undefined" && pad.active ? "\u24B6" : "Enter"}</kbd></button></div>`,
   );
   const k = b.querySelector("#keep");
@@ -652,13 +817,66 @@ const BM_SOL_POS = [
   [1236, 345],
   [1264, 345],
 ];
+// guard huts (gate) + office doors near the logistics depot: soldiers pour out of these and run to cover
+const BM_DOORS = [
+  [1242, 336],
+  [1257.5, 336],
+  [1262, 238],
+  [1300, 240],
+  [1320, 290],
+];
+// riflemen (single aimed shots) and machine gunners (short bursts); every replay shuffles the posts
 function bmAlarm(on) {
   BM.alarm = on ? 1 : 0;
   BM.sol = [];
   BM.tr = [];
-  if (on)
-    for (const [x, y] of BM_SOL_POS)
-      BM.sol.push({ x: x * M_T, y: y * M_T, cd: 0.6 + Math.random() * 1.5, a: 0, f: 0 });
+  BM.fx = [];
+  if (!on) return;
+  BM.alarmT = timeS;
+  const pts = BM_SOL_POS.slice()
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 12);
+  pts.forEach(([x, y], i) => {
+    const cx = (x + (Math.random() - 0.5) * 2.5) * M_T,
+      cy = (y + (Math.random() - 0.5) * 2.5) * M_T;
+    let d0 = BM_DOORS[0],
+      dd = 1e9;
+    for (const q of BM_DOORS) {
+      const d = Math.hypot(q[0] * M_T - cx, q[1] * M_T - cy);
+      if (d < dd) {
+        dd = d;
+        d0 = q;
+      }
+    }
+    const far = dd > 90,
+      ang = Math.random() * 6.283;
+    BM.sol.push({
+      x: far ? cx + Math.cos(ang) * 22 : d0[0] * M_T + (Math.random() - 0.5) * 3,
+      y: far ? cy + Math.sin(ang) * 22 : d0[1] * M_T + (Math.random() - 0.5) * 2,
+      cx,
+      cy,
+      mg: i % 3 === 1,
+      st: "wait",
+      wait: 0.3 + i * 0.25 + Math.random() * 0.6,
+      a: 0,
+      ph: Math.random() * 6,
+      cd: 0.8 + Math.random() * 1.2,
+      burst: 0,
+      f: 0,
+      move: 0,
+    });
+  });
+}
+function bmGunSound(mg, d) {
+  if (typeof audio === "undefined" || !audio.ctx || !audio.master) return;
+  const v = 1 / (1 + (d / 50) ** 2);
+  if (mg) {
+    noiseBurst(0.07, 700 + Math.random() * 200, 1.2, 0.5 * v);
+    noiseBurst(0.04, 3200, 0.9, 0.18 * v, "highpass");
+  } else {
+    noiseBurst(0.14, 1700 + Math.random() * 400, 0.7, 0.55 * v);
+    noiseBurst(0.05, 5200, 1, 0.3 * v, "highpass");
+  }
 }
 function bmNearBase(pad) {
   const s = truck,
@@ -666,10 +884,6 @@ function bmNearBase(pad) {
   return (
     s.x > MB.x0 * M_T - p && s.x < MB.x1 * M_T + p && s.y > MB.y0 * M_T - p && s.y < MB.y1 * M_T + p
   );
-}
-function bmShotSound(d) {
-  if (typeof audio === "undefined" || !audio.ctx || !audio.master) return;
-  noiseBurst(0.09, 1400 + Math.random() * 600, 0.9, 0.55 / (1 + (d / 45) ** 2));
 }
 function bmAlarmSound() {
   if (typeof audio === "undefined" || !audio.ctx || !audio.master) return;
@@ -690,6 +904,131 @@ function bmAlarmSound() {
     v = BM.alarm ? 0.09 / (1 + (d / 400) ** 2) : 0;
   BM.snd.g.gain.setTargetAtTime(v, t, 0.1);
   BM.snd.o.frequency.setTargetAtTime(560 + 260 * (0.5 + 0.5 * Math.sin(timeS * 3.2)), t, 0.03);
+}
+const BM_RANGE = { rifle: 52, mg: 66 }, // m (was 120)
+  BM_DMG = { rifle: 1.2, mg: 0.8 }; // damage % per hit (was 0.9)
+function bmFx(k, x, y, o) {
+  if (!BM.fx) BM.fx = [];
+  if (BM.fx.length > 140) BM.fx.shift();
+  BM.fx.push(Object.assign({ k, x, y, t: 0, life: 0.5 }, o || {}));
+}
+// the stolen trailer/truck as hit boxes (metres)
+function bmTargets() {
+  const out = [{ x: truck.x, y: truck.y, h: truck.h, L: 6.4, W: 2.5, cab: 1 }];
+  const tr = truck.trl;
+  if (tr) {
+    const f = fwd(tr.th);
+    out.push({
+      x: tr.x - f[0] * TRL_KP_TO_CENTRE,
+      y: tr.y - f[1] * TRL_KP_TO_CENTRE,
+      h: tr.th,
+      L: TRL_LEN,
+      W: TRL_W,
+      tr,
+    });
+  }
+  return out;
+}
+function bmHitBox(px, py) {
+  for (const b of bmTargets()) {
+    const f = fwd(b.h),
+      dx = px - b.x,
+      dy = py - b.y,
+      al = dx * f[0] + dy * f[1],
+      la = dx * -f[1] + dy * f[0];
+    if (Math.abs(al) < b.L / 2 && Math.abs(la) < b.W / 2) return { b, al, la };
+  }
+  return null;
+}
+function bmSoldierUpdate(S, dt, near) {
+  S.f = Math.max(0, S.f - dt);
+  if (S.st === "wait") {
+    if ((S.wait -= dt) <= 0) S.st = "run";
+    return;
+  }
+  const dx = truck.x - S.x,
+    dy = truck.y - S.y,
+    d = Math.hypot(dx, dy),
+    R = S.mg ? BM_RANGE.mg : BM_RANGE.rifle;
+  // dive away from a truck bearing down on you
+  if (d < 11 && S.st !== "run" && Math.abs(truck.v) > 3) {
+    const q = Math.atan2(dy, dx) + (Math.random() < 0.5 ? 1.6 : -1.6);
+    S.cx = S.x + Math.cos(q) * 9;
+    S.cy = S.y + Math.sin(q) * 9;
+    S.st = "run";
+  }
+  if (S.st === "run") {
+    const ex = S.cx - S.x,
+      ey = S.cy - S.y,
+      e = Math.hypot(ex, ey),
+      sp = 5.4 * dt;
+    S.ph += dt * 13;
+    S.a = Math.atan2(ey, ex);
+    if (e <= sp) {
+      S.x = S.cx;
+      S.y = S.cy;
+      S.st = S.mg || Math.random() < 0.7 ? "kneel" : "stand";
+      S.cd = 0.6 + Math.random() * 0.9;
+    } else {
+      S.x += (ex / e) * sp;
+      S.y += (ey / e) * sp;
+    }
+    return;
+  }
+  // aim: turn toward the truck at a human rate
+  const want = Math.atan2(dy, dx),
+    da = wrapA(want - S.a);
+  S.a += Math.max(-3 * dt, Math.min(3 * dt, da));
+  if (!near || d > R) return;
+  S.cd -= dt;
+  if (S.cd > 0 || Math.abs(da) > 0.25) return;
+  if (S.mg) {
+    if (S.burst <= 0) S.burst = 5 + ((Math.random() * 5) | 0);
+    S.burst--;
+    S.cd = S.burst > 0 ? 0.085 : 2.2 + Math.random() * 1.4;
+  } else S.cd = 0.9 + Math.random() * 1.0;
+  bmShoot(S, d, R);
+}
+function bmShoot(S, d, R) {
+  S.f = 0.07;
+  const mx = S.x + Math.cos(S.a) * 1.4,
+    my = S.y + Math.sin(S.a) * 1.4;
+  // spread grows with range and the truck's speed; ~1 in 4 rounds falls short
+  const g = (Math.random() + Math.random() + Math.random() - 1.5) * 1.15,
+    spr = (S.mg ? 0.085 : 0.055) + Math.abs(truck.v) * 0.0035 + (d / R) * 0.03,
+    ang = Math.atan2(truck.y - S.y, truck.x - S.x) + g * spr,
+    short = Math.random() < 0.26,
+    dist = d * (short ? 0.45 + Math.random() * 0.4 : 0.92 + Math.random() * 0.22),
+    ix = S.x + Math.cos(ang) * dist,
+    iy = S.y + Math.sin(ang) * dist;
+  const h = !short && bmHitBox(ix, iy);
+  BM.tr.push({ x0: mx, y0: my, x1: ix, y1: iy, t: S.mg && Math.random() < 0.5 ? 0 : 0.16 });
+  bmFx("flash", mx, my, { a: S.a, life: 0.06, mg: S.mg });
+  bmFx("case", S.x, S.y, {
+    vx: Math.cos(S.a + 1.6) * (2 + Math.random()),
+    vy: Math.sin(S.a + 1.6) * (2 + Math.random()),
+    life: 0.5,
+  });
+  bmGunSound(S.mg, d);
+  if (h) {
+    truck.damage = Math.min(100, (truck.damage || 0) + (S.mg ? BM_DMG.mg : BM_DMG.rifle));
+    cam.shake = Math.max(cam.shake || 0, 1.2);
+    BM.hits = (BM.hits || 0) + 1;
+    for (let k = 0; k < 4; k++)
+      bmFx("spark", ix, iy, {
+        vx: (Math.random() - 0.5) * 14,
+        vy: (Math.random() - 0.5) * 14,
+        life: 0.18 + Math.random() * 0.12,
+      });
+    if (h.b.tr) {
+      const H = (h.b.tr.holes = h.b.tr.holes || []);
+      if (H.length < 48) H.push([h.al, h.la]);
+    }
+    if (typeof noiseBurst === "function" && audio.ctx) noiseBurst(0.05, 3800, 3, 0.25, "bandpass");
+  } else {
+    BM.miss = (BM.miss || 0) + 1;
+    bmFx("dust", ix, iy, { life: 0.7 + Math.random() * 0.4, r: 0.6 + Math.random() * 0.8 });
+  }
 }
 function bmUpdate(dt) {
   if (!world.ready) return;
@@ -741,41 +1080,22 @@ function bmUpdate(dt) {
         return;
       }
       a.m.update(a, dt);
+      if (BM.act === a && a.step === a.m.loseStep) bmLoseUpdate(a);
     }
-    // soldiers fire while the alarm is up and the player is in or near the base
+    // soldiers: run from the doors to cover, kneel, aim, fire (riflemen single shots, MG bursts) while you're near
     if (BM.alarm) {
       if (!a && !bmNearBase(60)) bmAlarm(false);
       const near = bmNearBase(25);
-      for (const S of BM.sol) {
-        const dx = truck.x - S.x,
-          dy = truck.y - S.y,
-          d = Math.hypot(dx, dy);
-        S.a = Math.atan2(dy, dx);
-        S.f = Math.max(0, S.f - dt);
-        if (!near || d > 120) continue;
-        S.cd -= dt;
-        if (S.cd > 0) continue;
-        S.cd = 0.55 + Math.random() * 1.1;
-        S.f = 0.08;
-        const hit = Math.random() < 0.55 * (1 - d / 140),
-          j = hit ? 0.8 : 4 + Math.random() * 6,
-          ja = Math.random() * 6.283;
-        BM.tr.push({
-          x0: S.x,
-          y0: S.y,
-          x1: truck.x + Math.cos(ja) * j,
-          y1: truck.y + Math.sin(ja) * j,
-          t: 0.22,
-        });
-        bmShotSound(d);
-        if (hit) {
-          truck.damage = Math.min(100, (truck.damage || 0) + 0.9);
-          cam.shake = Math.max(cam.shake || 0, 1.5);
-          BM.hits = (BM.hits || 0) + 1;
-        }
-      }
+      for (const S of BM.sol) bmSoldierUpdate(S, dt, near);
     }
     for (let i = BM.tr.length - 1; i >= 0; i--) if ((BM.tr[i].t -= dt) <= 0) BM.tr.splice(i, 1);
+    for (let i = (BM.fx || []).length - 1; i >= 0; i--) {
+      const q = BM.fx[i];
+      q.t += dt;
+      q.x += (q.vx || 0) * dt;
+      q.y += (q.vy || 0) * dt;
+      if (q.t > q.life) BM.fx.splice(i, 1);
+    }
     bmAlarmSound();
   } catch (e) {
     if (!BM.err) console.warn("Black Market", e);
@@ -784,49 +1104,198 @@ function bmUpdate(dt) {
 }
 BigRig.on("couple", (e) => {
   const a = BM.act;
+  if (a && e.trailer === a.tr && !a.cT) a.cT = timeS;
   if (a && a.m.onCouple) a.m.onCouple(a, e.trailer);
 });
 BigRig.on("uncouple", (e) => {
   const a = BM.act;
-  if (a && a.m.onUncouple) a.m.onUncouple(a, e.trailer);
+  if (!a) return;
+  if (bmOnDrop(a, e.trailer)) return;
+  if (a.m.onUncouple) a.m.onUncouple(a, e.trailer);
 });
+// top-down soldier: shadow, legs (running), body + pack, helmet, weapon (rifle or MG with ammo box)
+function bmSoldierSprite(S) {
+  const X = S.x * PPM,
+    Y = S.y * PPM,
+    g = ctx;
+  g.save();
+  g.translate(X, Y);
+  g.fillStyle = "rgba(0,0,0,0.28)";
+  g.beginPath();
+  g.ellipse(2, 2, 6, 4.5, 0, 0, 7);
+  g.fill();
+  g.rotate(S.a);
+  const run = S.st === "run",
+    kn = S.st === "kneel",
+    sw = run ? Math.sin(S.ph) * 3.2 : 0;
+  g.fillStyle = "#2b2f22";
+  if (run) {
+    g.fillRect(-1 + sw, -3.2, 4, 2);
+    g.fillRect(-1 - sw, 1.2, 4, 2);
+  } else if (kn) {
+    g.fillRect(1.5, -3.4, 5, 2.2); // forward knee
+    g.fillRect(-5, 1.1, 4.5, 2.2); // folded leg behind
+  }
+  // body (narrower when kneeling: hunched)
+  g.fillStyle = S.mg ? "#4a5530" : "#55603a";
+  g.beginPath();
+  g.ellipse(0, 0, kn ? 3.2 : 3.6, 4.6, 0, 0, 7);
+  g.fill();
+  g.fillStyle = "#3a4226";
+  g.fillRect(-4.6, -2.6, 2.4, 5.2); // pack
+  // weapon
+  g.fillStyle = "#151515";
+  if (S.mg) {
+    g.fillRect(1, -1.1, 13, 2.2);
+    g.fillRect(4, 1, 3.5, 3); // ammo box
+    g.strokeStyle = "#151515";
+    g.lineWidth = 0.8;
+    g.beginPath();
+    g.moveTo(11, 0);
+    g.lineTo(13, -3);
+    g.moveTo(11, 0);
+    g.lineTo(13, 3);
+    g.stroke();
+  } else g.fillRect(1, 1.2, 10, 1.6);
+  // arms toward the weapon
+  g.fillStyle = "#4b5532";
+  g.fillRect(0.5, -3.2, 4, 1.8);
+  g.fillRect(0.5, 1.6, 5, 1.8);
+  // helmet
+  g.fillStyle = "#4f5f2c";
+  g.beginPath();
+  g.arc(0.3, 0, 2.6, 0, 7);
+  g.fill();
+  g.strokeStyle = "rgba(0,0,0,0.35)";
+  g.lineWidth = 0.7;
+  g.stroke();
+  g.restore();
+}
 function bmDrawLow(vx0, vy0, vx1, vy1) {
+  const A = BM.act;
+  if (A && A.step === A.m.delStep) {
+    // bays: amber when close, green when lined up (like depot bays); pulsing arrow over the free bays near the yard
+    const st = bmBayState(A),
+      S_ = PPM,
+      p = 0.6 + 0.4 * Math.sin(timeS * 4);
+    if (st) {
+      const b = st.b,
+        col = st.al.ready || st.al.ok ? "#2ee66b" : "#f5b82e";
+      ctx.save();
+      ctx.globalAlpha = 0.35 * p;
+      ctx.fillStyle = col;
+      ctx.fillRect(b.x0 * S_, b.y0 * S_, (b.x1 - b.x0) * S_, (b.y1 - b.y0) * S_);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 4;
+      ctx.setLineDash(st.al.ok ? [] : [10, 7]);
+      ctx.strokeRect(b.x0 * S_, b.y0 * S_, (b.x1 - b.x0) * S_, (b.y1 - b.y0) * S_);
+      ctx.restore();
+      A.bayOk = st.al.ok ? st.b : null;
+    } else A.bayOk = null;
+    const Y = A.yard;
+    if (Math.hypot(truck.x - Y.entrance.x, truck.y - Y.entrance.y) < 160)
+      for (const b of bmBays(Y)) {
+        const X = b.cx * S_,
+          Yp = (b.y0 - 3 - Math.sin(timeS * 5) * 1.2) * S_;
+        ctx.fillStyle = "rgba(46,230,107,0.9)";
+        ctx.beginPath();
+        ctx.moveTo(X - 10, Yp - 14);
+        ctx.lineTo(X + 10, Yp - 14);
+        ctx.lineTo(X + 10, Yp);
+        ctx.lineTo(X + 18, Yp);
+        ctx.lineTo(X, Yp + 18);
+        ctx.lineTo(X - 18, Yp);
+        ctx.lineTo(X - 10, Yp);
+        ctx.closePath();
+        ctx.fill();
+      }
+  }
+  // dust kicked up by misses + brass casings on the ground
+  for (const q of BM.fx || []) {
+    const X = q.x * PPM,
+      Y = q.y * PPM;
+    if (q.k === "dust") {
+      const u = q.t / q.life;
+      ctx.fillStyle = "rgba(170,150,115," + 0.55 * (1 - u) + ")";
+      ctx.beginPath();
+      ctx.arc(X, Y, (q.r + u * 1.6) * PPM, 0, 7);
+      ctx.fill();
+    } else if (q.k === "case") {
+      ctx.fillStyle = "#d8b24a";
+      ctx.fillRect(X - 1, Y - 0.6, 2, 1.2);
+    }
+  }
   if (!BM.alarm) return;
   for (const S of BM.sol) {
+    if (S.st === "wait") continue;
     const X = S.x * PPM,
       Y = S.y * PPM;
     if (X < vx0 - 60 || X > vx1 + 60 || Y < vy0 - 60 || Y > vy1 + 60) continue;
-    mbSoldier(ctx, X, Y, S.a + Math.PI / 2, 0, "#4d5636");
+    bmSoldierSprite(S);
+  }
+}
+function bmDrawHigh() {
+  const a = BM.act;
+  // bullet holes on the stolen trailer
+  const tr = a && a.tr;
+  if (tr && tr.holes && tr.holes.length) {
+    const f = fwd(tr.th),
+      cx = tr.x - f[0] * TRL_KP_TO_CENTRE,
+      cy = tr.y - f[1] * TRL_KP_TO_CENTRE;
     ctx.save();
-    ctx.translate(X, Y);
-    ctx.rotate(S.a);
-    ctx.fillStyle = "#1c1c1c";
-    ctx.fillRect(2, -1, 11, 2.2);
-    if (S.f > 0) {
-      ctx.fillStyle = "rgba(255,220,120,0.95)";
+    ctx.translate(cx * PPM, cy * PPM);
+    ctx.rotate(tr.th);
+    for (const [al, la] of tr.holes) {
+      ctx.fillStyle = "rgba(20,20,20,0.85)";
       ctx.beginPath();
-      ctx.arc(15, 0, 4.5, 0, 7);
+      ctx.arc(la * PPM, -al * PPM, 1.6, 0, 7);
+      ctx.fill();
+      ctx.fillStyle = "rgba(200,200,200,0.5)";
+      ctx.beginPath();
+      ctx.arc(la * PPM + 0.6, -al * PPM - 0.6, 0.8, 0, 7);
       ctx.fill();
     }
     ctx.restore();
   }
-}
-function bmDrawHigh() {
-  if (!BM.tr.length) return;
   ctx.save();
   ctx.lineCap = "round";
   for (const t of BM.tr) {
-    const al = Math.min(1, t.t * 6);
+    if (t.t <= 0) continue;
+    const al = Math.min(1, t.t * 7);
     ctx.strokeStyle = "rgba(255,225,130," + al + ")";
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 2.2;
     ctx.beginPath();
-    ctx.moveTo(t.x0 * PPM, t.y0 * PPM);
+    // tracer streak: the leading 40% of the line
+    ctx.moveTo(t.x0 * PPM + (t.x1 - t.x0) * PPM * 0.6, t.y0 * PPM + (t.y1 - t.y0) * PPM * 0.6);
     ctx.lineTo(t.x1 * PPM, t.y1 * PPM);
     ctx.stroke();
-    ctx.fillStyle = "rgba(255,190,60," + al + ")";
-    ctx.beginPath();
-    ctx.arc(t.x0 * PPM, t.y0 * PPM, 7, 0, 7);
-    ctx.fill();
+  }
+  for (const q of BM.fx || []) {
+    const X = q.x * PPM,
+      Y = q.y * PPM,
+      u = q.t / q.life;
+    if (q.k === "flash") {
+      ctx.save();
+      ctx.translate(X, Y);
+      ctx.rotate(q.a);
+      ctx.fillStyle = "rgba(255,230,140," + (1 - u) + ")";
+      ctx.beginPath();
+      const L = q.mg ? 9 : 7;
+      ctx.moveTo(0, -2.5);
+      ctx.lineTo(L, 0);
+      ctx.lineTo(0, 2.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,255,220," + (1 - u) + ")";
+      ctx.beginPath();
+      ctx.arc(1, 0, 2.6, 0, 7);
+      ctx.fill();
+      ctx.restore();
+    } else if (q.k === "spark") {
+      ctx.fillStyle = "rgba(255," + (200 - u * 120) + ",60," + (1 - u) + ")";
+      ctx.fillRect(X - 1, Y - 1, 2.2, 2.2);
+    }
   }
   ctx.restore();
 }
@@ -839,8 +1308,19 @@ function bmHUD() {
     return;
   }
   // compact panel tucked under the money (fuel) and XP panels, top-left
-  const L = a.m.steps(a),
-    x = 14,
+  const L = a.m.steps(a).slice(),
+    Z = BM.zone;
+  if (a.step === a.m.loseStep && Z)
+    L.splice(
+      a.step + 1,
+      0,
+      POL.chase
+        ? "   \u{1F6A8} In pursuit \u2014 break line of sight"
+        : !Z.out
+          ? "   \u25CB Leave the red search circle on the map"
+          : "   \u23F1 Stay hidden " + Math.max(0, BM_LOSE_S - Z.unseen).toFixed(0) + " s",
+    );
+  const x = 14,
     y = 140,
     w = 240,
     h = 24 + L.length * 15 + (a.lost ? 15 : 0);
@@ -870,6 +1350,11 @@ function bmHUD() {
   L.forEach((s, i) => {
     const done = i < a.step,
       cur = i === a.step;
+    if (s.startsWith("   ")) {
+      ctx.fillStyle = "#7fd8ff";
+      ctx.fillText(fit(s.trim()), x + 19, y + 28 + i * 15);
+      return;
+    }
     ctx.fillStyle = done ? "#7dff8a" : cur ? "#ffd23f" : "rgba(230,220,220,0.5)";
     ctx.fillText(fit((done ? "\u2714 " : cur ? "\u25B6 " : "\u2022 ") + s), x + 9, y + 28 + i * 15);
   });
@@ -885,3 +1370,19 @@ function bmHUD() {
     hb.style.top = Math.round((y + h + 8) * k) + "px";
   }
 }
+
+// heist hooks: police chases during a heist are for the stolen goods (not a "pedestrian"); count pedestrian kills (no-kill bonus)
+setTimeout(() => {
+  const po = polOffence;
+  polOffence = function (type, v, reason) {
+    const a = BM.act;
+    if (a && a.step >= 1 && type === "pedestrian" && reason === "hit a pedestrian")
+      return po.call(this, type, v, "stolen " + (a.m.id === "tank" ? "tank" : "trailer"));
+    return po.apply(this, arguments);
+  };
+  const ph = polPedHit;
+  polPedHit = function () {
+    if (BM.act) BM.act.kills = (BM.act.kills || 0) + 1;
+    return ph.apply(this, arguments);
+  };
+}, 0);
