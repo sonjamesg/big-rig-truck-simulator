@@ -1906,7 +1906,7 @@ function drawBigMap() {
       ["#ff9f1a", "~F", "Freight train"],
       ["#f39c12", "Y", "Haulage yard"],
       ["#d63b2f", "H", "Haulage truck"],
-      ["#14070c", "\u2620", "Black Market"],
+      ["#1b1022", "\u2620", "Black Market"],
     ];
     const lx0 = 28,
       w = bigmap.leg ? 232 : 92,

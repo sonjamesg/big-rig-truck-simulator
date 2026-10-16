@@ -110,40 +110,28 @@ function bmAtYard() {
   return !!(world.bmYards && bmYardAt(truck.x, truck.y, 0.5));
 }
 // ---------------------------------------------------------------- map: icon + POIs (sat nav / fast travel)
-// Black Market yards on the minimap and M map: drawn last (on top of every other POI) with a
-// red glow ring and a minimum size so they stand out at any zoom; label when zoomed in (lbl)
+// Black Market yards on the minimap and M map: same badge as the depot/fuel icons (drawPOIs), drawn last
+// so they sit on top, never smaller than a minimap POI; label when zoomed in (lbl)
 function bmMapIcons(px, py, R, lbl) {
-  const r = Math.max(9, (R || 6) * 1.4);
+  const r = Math.max(5.5, R || 5.5);
   ctx.save();
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   for (const Y of world.bmYards || []) {
     const X = px(Y.entrance.x),
       Z = py(Y.entrance.y);
-    ctx.fillStyle = "rgba(255,40,60,0.4)";
-    ctx.beginPath();
-    ctx.arc(X, Z, r + 7, 0, 7);
-    ctx.fill();
-    ctx.fillStyle = "#14070c";
-    ctx.strokeStyle = "#ff3b4e";
-    ctx.lineWidth = 2.5;
+    if (typeof nmIconRing === "function") nmIconRing(X, Z, r);
+    ctx.fillStyle = "#1b1022";
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = R ? Math.max(1.5, r * 0.18) : 1.5;
     ctx.beginPath();
     ctx.arc(X, Z, r, 0, 7);
     ctx.fill();
     ctx.stroke();
     ctx.fillStyle = "#fff";
-    ctx.font = `bold ${Math.round(r * 1.35)}px system-ui,sans-serif`;
+    ctx.font = `bold ${Math.round(r * 1.25)}px system-ui,sans-serif`;
     ctx.fillText("\u2620", X, Z + 0.5);
-    if (lbl) {
-      ctx.font = "bold 12px system-ui,sans-serif";
-      ctx.textAlign = "left";
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "rgba(0,0,0,0.85)";
-      ctx.strokeText(Y.name, X + r + 5, Z);
-      ctx.fillStyle = "#ff8a96";
-      ctx.fillText(Y.name, X + r + 5, Z);
-      ctx.textAlign = "center";
-    }
+    if (lbl) mapLabel(Y.name, X + r + 4, Z, "#d6b8e0");
   }
   ctx.restore();
 }
