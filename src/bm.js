@@ -873,7 +873,10 @@ function bmAlarm(on) {
   BM.sol = [];
   BM.tr = [];
   BM.fx = [];
-  if (!on) return;
+  if (!on) {
+    bmAlarmStop(0.5); // every heist end (delivered, busted, failed, abandoned, wrecked) comes through here
+    return;
+  }
   BM.alarmT = timeS;
   const pts = BM_SOL_POS.slice()
     .sort(() => Math.random() - 0.5)
@@ -926,9 +929,29 @@ function bmNearBase(pad) {
     s.x > MB.x0 * M_T - p && s.x < MB.x1 * M_T + p && s.y > MB.y0 * M_T - p && s.y < MB.y1 * M_T + p
   );
 }
+// fade the base siren out over ~fade s and release the oscillator (a new one is made if the alarm trips again)
+function bmAlarmStop(fade) {
+  const S = BM.snd;
+  if (!S) return;
+  BM.snd = null;
+  try {
+    const t = S.o.context.currentTime;
+    S.g.gain.cancelScheduledValues(t);
+    S.g.gain.setValueAtTime(S.g.gain.value, t);
+    S.g.gain.linearRampToValueAtTime(0, t + fade);
+    S.o.stop(t + fade + 0.05);
+  } catch (e) {
+    BM.err = e;
+  }
+}
+addEventListener("pagehide", () => bmAlarmStop(0));
 function bmAlarmSound() {
   if (typeof audio === "undefined" || !audio.ctx || !audio.master) return;
   const ac = audio.ctx;
+  if (!BM.alarm) {
+    if (BM.snd) bmAlarmStop(0.5);
+    return;
+  }
   if (!BM.snd) {
     const o = ac.createOscillator(),
       g = ac.createGain();
@@ -942,7 +965,7 @@ function bmAlarmSound() {
   }
   const t = ac.currentTime,
     d = Math.hypot(truck.x - 1256 * M_T, truck.y - 260 * M_T),
-    v = BM.alarm ? 0.09 / (1 + (d / 400) ** 2) : 0;
+    v = 0.09 / (1 + (d / 400) ** 2);
   BM.snd.g.gain.setTargetAtTime(v, t, 0.1);
   BM.snd.o.frequency.setTargetAtTime(560 + 260 * (0.5 + 0.5 * Math.sin(timeS * 3.2)), t, 0.03);
 }
@@ -1148,6 +1171,7 @@ function bmUpdate(dt) {
   } catch (e) {
     if (!BM.err) console.warn("Black Market", e);
     BM.err = e;
+    if (!BM.alarm) bmAlarmStop(0.5); // never leave the siren running if the update above threw
   }
 }
 BigRig.on("couple", (e) => {

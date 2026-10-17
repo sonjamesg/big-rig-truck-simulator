@@ -1,6 +1,6 @@
 /**
  * @file weather.js — weather: random clear / rain / fog cycles (host-synced in MP, saved)
- * Exposes (globals): WX, wxPick, updateWeather, drawWeather, drawWeatherHUD, drawPuddles
+ * Exposes (globals): WX, wxPick, updateWeather, drawWeather, drawWeatherHUD, wxFit, drawPuddles
  * Depends on: world.js, mp.js, daynight.js, main.js
  * Load order: #41 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
  */
@@ -124,6 +124,7 @@ function drawWeatherHUD() {
   ctx.fillStyle = "#cfe3ff";
   ctx.font = "700 13px system-ui,sans-serif";
   ctx.textBaseline = "middle";
+  ctx.textAlign = "left"; // the HUD leaves textAlign "right" from the clock; the label sits inside the pill
   if (WX.rain >= 0.2) {
     const a = Math.sin(WX.wip) * 0.9;
     ctx.strokeStyle = "#cfe3ff";
@@ -135,11 +136,18 @@ function drawWeatherHUD() {
     ctx.moveTo(x + 16, y + 20);
     ctx.lineTo(x + 16 + Math.sin(a) * 12, y + 20 - Math.cos(a) * 12);
     ctx.stroke();
-    ctx.fillText("RAIN \u2022 wipers", x + 32, y + 13);
-  } else ctx.fillText("\u2601 FOG \u2022 low vis", x + 10, y + 13);
+    wxFit("RAIN \u2022 wipers", x + 32, y + 13, w - 38);
+  } else wxFit("\u2601 FOG \u2022 low vis", x + 8, y + 13, w - 14);
   ctx.restore();
 }
 
+// draw a pill label, shrinking the font until it fits the pill (phone fonts / long labels)
+function wxFit(t, x, y, mw) {
+  let f = 13;
+  while (f > 9 && ctx.measureText(t).width > mw)
+    ctx.font = "700 " + --f + "px system-ui,sans-serif";
+  ctx.fillText(t, x, y);
+}
 // v37: puddles live on the road surface, drawn in world space before vehicles so everything drives over them
 function drawPuddles(vx0, vy0, vx1, vy1, z) {
   const W = WX.wet;
