@@ -212,7 +212,7 @@ function openModal(kind, html, cls) {
   });
   const x = b.querySelector(".x");
   if (x) x.addEventListener("click", closeUI);
-  if (kind === "board" || kind === "bmboard") uiBoardFit(b.firstChild);
+  if (kind === "board" || kind === "bmboard" || kind === "armyboard") uiBoardFit(b.firstChild);
   return b;
 }
 // v50: desktop job boards (normal + Black Market) fill ~88% of the game area: the 916x552 card is zoomed (crisp text, bigger
@@ -230,12 +230,20 @@ function uiBoardFit(m) {
 addEventListener("resize", () => {
   if (typeof uiRoot === "undefined" || !uiRoot) return;
   const m = uiRoot.querySelector(".mback .modal");
-  if (m && (career.uiOpen === "board" || career.uiOpen === "bmboard")) uiBoardFit(m);
+  if (
+    m &&
+    (career.uiOpen === "board" || career.uiOpen === "bmboard" || career.uiOpen === "armyboard")
+  )
+    uiBoardFit(m);
 });
 document.addEventListener("fullscreenchange", () =>
   setTimeout(() => {
     const m = uiRoot && uiRoot.querySelector(".mback .modal");
-    if (m && (career.uiOpen === "board" || career.uiOpen === "bmboard")) uiBoardFit(m);
+    if (
+      m &&
+      (career.uiOpen === "board" || career.uiOpen === "bmboard" || career.uiOpen === "armyboard")
+    )
+      uiBoardFit(m);
   }, 60),
 );
 const esc = (s) =>

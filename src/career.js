@@ -907,7 +907,7 @@ function jobPay(km, c, T_, kg, band) {
 }
 function makeJob(tierWanted, band) {
   const tier = Math.max(1, Math.min(TIERS.length, tierWanted));
-  const cs = CARGOS.filter((c) => c.tier === tier && (band !== "local" || !c.dock));
+  const cs = CARGOS.filter((c) => c.tier === tier && !c.army && (band !== "local" || !c.dock));
   const c = cs[(R7() * cs.length) | 0];
   const T_ = tierInfo(tier);
   const H = jobHome();
@@ -984,6 +984,7 @@ function makeRepeat() {
     const c = CARGOS.find((c) => c.id === h.c);
     return (
       c &&
+      !c.army &&
       c.tier <= career.tier &&
       !career.jobs.some((j) => j.cargo.id === h.c && jobRef(j.from) === h.f && jobRef(j.to) === h.t)
     );

@@ -2261,7 +2261,10 @@ addEventListener(
   (e) => {
     if (!world.ready) return;
     if (career.uiOpen) {
-      if (e.code === "Escape" || (e.code === "KeyJ" && career.uiOpen === "board")) {
+      if (
+        e.code === "Escape" ||
+        (e.code === "KeyJ" && (career.uiOpen === "board" || career.uiOpen === "armyboard"))
+      ) {
         if (career.uiOpen !== "result") closeUI();
       }
       e.stopImmediatePropagation();

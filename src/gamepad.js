@@ -152,7 +152,7 @@ function padUpdate(dt) {
         if (k) k.click();
       } else closeUI();
     }
-    if (hit(9) && career.uiOpen === "board") closeUI();
+    if (hit(9) && (career.uiOpen === "board" || career.uiOpen === "armyboard")) closeUI();
     if (hit(3) && career.uiOpen === "board") {
       boardState.sort = boardState.sort === "near" ? "pay" : "near";
       renderBoard();

@@ -103,6 +103,13 @@ Notes on ownership:
   the old triangular outline (`rbSplitter(rb, arm, true)` = `g.spF`) is only painted hatching and is what `rbPaint` uses,
   so map tiles never change. Signal heads sit on the left verge (primary + repeater). Give-way dashes at every entry.
   Approach lanes (`rbLanes`): 2 lanes LS|R, 3 lanes L|S|R; `rbApprFix()` re-applies them after the map loads.
+- **Army Logistics** (`army.js`, v51, tier 3): new trailer kinds `heli`, `jeeps`, `oilmil`, `missile` (added to
+  `TRAILER_TYPES` + `MB_TRL`); `alTrailerCanvas` also redraws `lowtank` (tank wider than the 2.55 m deck, canvas 3.9 m)
+  and `army` (two green 20 ft ARMY containers), so parked/AI military trailers change too. `trlSVG` is wrapped for the
+  board card side views. Jobs: `AL_CARGOS` are pushed into `CARGOS` with `army: 1` (save/load and results work;
+  `makeJob`/`makeRepeat` skip them). `alJobs()` = one order per cargo from ALD to APT/KHT/AAC (refresh 10 min).
+  `alOpenBoard(force)` (modal kind `armyboard`) opens instead of the normal board at ALD; elsewhere the normal board gets
+  an "Army Logistics" chip. Starting uses the normal `startMission`/`acceptJob` (tier 3 gate). Map data unchanged.
 - **Lift bridge** (`liftbridge.js`, v51): constants in `LB` (span `XA..XB` x `Y0..Y1` tiles, leaf `L`, `AMAX`).
   `lbState()` derives lights/barriers/leaf angle from `lbOcc(t)` (ship hull over the span) looked ahead/back with
   `portT()`, so it is deterministic and needs no saved state; `LB.force` overrides it for tests/shots. Only ships already

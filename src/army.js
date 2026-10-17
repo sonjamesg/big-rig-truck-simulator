@@ -294,3 +294,230 @@ function alSVG(type) {
     return alSVG(type) || ts.apply(this, arguments);
   };
 }
+// ---------------------------------------------------------------- Army Logistics jobs (tier 3, ALD -> export terminals)
+// cargos join CARGOS (so save/load and results work) but carry `army`, which keeps them off the normal job board
+const AL_CARGOS = [
+  {
+    id: "al_heli",
+    name: "Merlin helicopter (rotors folded)",
+    icon: "\u{1F681}",
+    trl: "heli",
+    kg: [13000, 15500],
+    mult: 2.3,
+    col: "#55613e",
+    to: ["AAC", "APT"],
+  },
+  {
+    id: "al_jeep",
+    name: "Armoured patrol jeeps (x3)",
+    icon: "\u{1F699}",
+    trl: "jeeps",
+    kg: [20000, 23000],
+    mult: 2.0,
+    col: "#5b6a3c",
+    to: ["APT", "KHT", "AAC"],
+  },
+  {
+    id: "al_tank",
+    name: "Main battle tank",
+    icon: "\u{1F6E1}",
+    trl: "lowtank",
+    kg: [62000, 64000],
+    mult: 2.5,
+    col: "#4e5734",
+    to: ["APT", "KHT"],
+  },
+  {
+    id: "al_oil",
+    name: "Military diesel F-54 (ADR)",
+    icon: "\u26FD",
+    trl: "oilmil",
+    kg: [24000, 28000],
+    mult: 2.1,
+    col: "#4f5d36",
+    to: ["APT", "KHT", "AAC"],
+  },
+  {
+    id: "al_cont",
+    name: "ARMY containers (stores)",
+    icon: "\u{1F4E6}",
+    trl: "army",
+    kg: [18000, 26000],
+    mult: 1.9,
+    col: "#566640",
+    to: ["APT", "KHT"],
+  },
+  {
+    id: "al_msl",
+    name: "Missile + warhead (escorted)",
+    icon: "\u{1F680}",
+    trl: "missile",
+    kg: [28000, 34000],
+    mult: 2.9,
+    col: "#6b6f5c",
+    to: ["APT", "KHT", "AAC"],
+  },
+];
+for (const c of AL_CARGOS) CARGOS.push(Object.assign(c, { tier: 3, army: 1 }));
+const AL = { jobs: [], t: -1e9, REFRESH: 600, seq: 0 };
+function alDepot() {
+  return world.depots.find((d) => d.code === "ALD") || null;
+}
+function alAtDepot() {
+  const D = alDepot();
+  if (!D) return false;
+  const near = (x, y, r) => Math.hypot(truck.x - x, truck.y - y) < r;
+  return near(D.entrance.x, D.entrance.y, 90) || D.bays.some((b) => near(b.kx, b.ky, 45));
+}
+function alMakeJob(c) {
+  const D = alDepot(),
+    tos = c.to.map((k) => world.depots.find((d) => d.code === k)).filter((d) => d && d.bays.length);
+  if (!D || !tos.length) return null;
+  const to = tos[(Math.random() * tos.length) | 0],
+    km = (Math.hypot(to.entrance.x - D.entrance.x, to.entrance.y - D.entrance.y) * 1.3) / 1000,
+    kg = Math.round((c.kg[0] + Math.random() * (c.kg[1] - c.kg[0])) / 100) * 100,
+    TT = TRAILER_TYPES[c.trl],
+    band = km >= 7 ? "long" : "med";
+  return {
+    id: "AL" + ++AL.seq,
+    cargo: c,
+    tier: 3,
+    from: D,
+    to,
+    km,
+    kg,
+    weight: kg + TT.tare,
+    trailerType: TT.name,
+    pay: jobPay(km, c, tierInfo(3), kg, band),
+    xp: Math.round((55 + 38 * km) * c.mult * (0.8 + 3 * 0.35) * (band === "long" ? 1.2 : 1)),
+    mins: Math.round((km / 38) * 60 + 4),
+    approx: true,
+    fresh: true,
+    band,
+    army: 1,
+  };
+}
+// one offer per cargo; refreshed every AL.REFRESH s, and a taken job is replaced by a new one
+function alJobs() {
+  if (timeS - AL.t > AL.REFRESH || !AL.jobs.length) {
+    AL.t = timeS;
+    AL.jobs = AL_CARGOS.map(alMakeJob).filter(Boolean);
+  }
+  AL.jobs = AL.jobs.map((j) => (j.taken ? alMakeJob(j.cargo) || j : j));
+  return AL.jobs;
+}
+// ---------------------------------------------------------------- the board (same design as ui.js openBoard / renderBoard)
+const alBoard = { sel: null };
+function alOpenBoard(force) {
+  if (!started || (!force && !alAtDepot())) return false;
+  const js = alJobs(),
+    D = alDepot(),
+    lockAll = career.tier < 3,
+    T3 = tierInfo(3);
+  if (!alBoard.sel || !js.includes(alBoard.sel)) alBoard.sel = js[0] || null;
+  const b = openModal(
+    "armyboard",
+    `<div class="mh"><div style="font-size:28px">\u{1FA96}</div><div><h2>ARMY LOGISTICS</h2><div class="sub">${esc(D ? D.name : "Army Logistics Depot")}, Sandvale Military Base \u2022 export runs to the docks, harbour &amp; airport \u2022 heavy military loads</div></div><div class="sp"></div>
+    <div style="text-align:right;font-size:12px"><span class="tb" style="background:${T3.color}">TIER 3</span> <b>${esc(T3.name)}</b> required<br><span style="opacity:.7">You: Tier ${career.tier}</span></div><button class="x">\u2715</button></div>
+    <div class="bar"><span class="chip" id="alBack">\u{1F4CB} Job board</span><div style="flex:1"></div><span class="lbl">${js.length} export orders \u2022 new orders every ${Math.round(AL.REFRESH / 60)} min</span></div>
+    <div class="body"><div class="grid"></div></div><div class="detail"></div>
+    <div class="foot"><span>\u{1F4B0} ${money(truck.money)}</span>${career.active ? `<span style="color:#ffd866">Active: ${esc(career.active.job.cargo.name)} \u2192 ${esc(career.active.job.to.name)}</span>` : ""}<span class="sp"></span>${lockAll ? '<span style="color:#ffb4b4">\u{1F512} Reach Tier 3 (Specialist) to drive for the army</span>' : ""}</div>`,
+  );
+  b.querySelector("#alBack").addEventListener("click", () => {
+    closeUI();
+    AL.skip = 1;
+    openBoard();
+    AL.skip = 0;
+  });
+  alRender();
+  return true;
+}
+function alRender() {
+  const b = uiRoot && uiRoot.querySelector(".mback");
+  if (!b || career.uiOpen !== "armyboard") return;
+  const g = b.querySelector(".grid"),
+    js = AL.jobs;
+  for (const j of js) j.away = Math.hypot(j.from.entrance.x - truck.x, j.from.entrance.y - truck.y);
+  g.innerHTML = js
+    .map((j, i) => {
+      const lock = j.tier > career.tier,
+        c = j.cargo;
+      return `<div class="card ${lock ? "lock" : ""} ${j === alBoard.sel ? "sel" : ""}" data-j="${j.id}" style="animation-delay:${i * 30}ms">
+      <div class="ctop"><div class="ill" style="background:linear-gradient(145deg,${c.col},${shade(c.col, 0.45)})"><span class="em">${c.icon}</span>${trlSVG(c.trl, c.col)}</div>
+      <div class="cinfo"><div class="cn" title="${esc(c.name)}">${esc(c.name)}</div><span style="display:inline-block;font-size:9.5px;font-weight:900;letter-spacing:.5px;background:#4f5d36;color:#fff;border-radius:4px;padding:1px 5px;margin:2px 4px 0 0">ARMY \u2022 EXPORT</span>${j.band === "long" ? '<span style="display:inline-block;font-size:9.5px;font-weight:900;background:#7c3aed;color:#fff;border-radius:4px;padding:1px 5px">LONG HAUL</span>' : ""}<div class="ct">${esc(TRAILER_TYPES[c.trl].name)} \u2022 ${(j.weight / 1000).toFixed(1)} t</div></div></div>
+      <div class="prow"><span class="m">${money(j.pay)}</span><span class="xp">+${j.xp} XP</span><span class="aw" style="font-size:11px;opacity:.8">\u{1F4CD} ${(j.away / 1000).toFixed(1)} km away</span><span class="tb" style="background:${tierInfo(3).color}">TIER 3</span></div>
+      <div class="rt"><span>FROM</span><b title="${esc(j.from.name)}">${esc(j.from.name)}</b><span>TO</span><b title="${esc(j.to.name)}">${esc(j.to.name)}</b></div>
+      <div class="meta"><span>\u{1F4CD} ~${j.km.toFixed(1)} km</span><span>\u23F1 ${j.mins} min</span><span>\u{1F5FA} ${esc(j.to.region)}</span></div>
+      ${lock ? '<div class="lockov">\u{1F512} Tier 3 required</div>' : ""}</div>`;
+    })
+    .join("");
+  g.querySelectorAll(".card").forEach((el) =>
+    el.addEventListener("click", () => {
+      const j = AL.jobs.find((x) => x.id === el.dataset.j);
+      if (!j) return;
+      if (alBoard.sel === j && el.dataset.armed && j.tier <= career.tier) {
+        startMission(j);
+        return;
+      }
+      alBoard.sel = j;
+      g.querySelectorAll(".card").forEach((e2) => {
+        e2.classList.toggle("sel", e2 === el);
+        delete e2.dataset.armed;
+      });
+      setTimeout(() => {
+        el.dataset.armed = 1;
+      }, 0);
+      alSide();
+    }),
+  );
+  alSide();
+}
+function alSide() {
+  const b = uiRoot.querySelector(".mback"),
+    sd = b && b.querySelector(".detail"),
+    j = alBoard.sel;
+  if (!sd) return;
+  if (!j) {
+    sd.innerHTML = '<div style="opacity:.6">Select an order to see the details</div>';
+    return;
+  }
+  const lock = j.tier > career.tier,
+    c = j.cargo;
+  sd.innerHTML = `<div class="dic">${c.icon}</div><div class="dt"><div class="dn">${esc(c.name)} <span style="font-size:12px;opacity:.6;font-weight:700">\u2022 ${esc(TRAILER_TYPES[c.trl].name)} \u2022 ${(j.weight / 1000).toFixed(1)} t</span></div>
+    <div class="ds"><b>1</b> Collect at <b>${esc(j.from.name)}</b> <i>\u2192</i> <b>2</b> Deliver for export to <b>${esc(j.to.name)}</b></div>
+    <div class="dm">\u{1F4CD} ~${j.km.toFixed(1)} km \u2022 \u23F1 ${j.mins} min \u2022 <b style="color:#7dff9a">${money(j.pay)}</b> \u2022 <b style="color:#ffd866">+${j.xp} XP</b>${career.active ? ' \u2022 <span class="warn">replaces your current mission</span>' : ""}</div></div>
+    <button class="btn start" id="accept" ${lock ? "disabled" : ""}>${lock ? "\u{1F512} TIER 3 REQUIRED" : "\u25B6 START MISSION"}${lock ? "" : "<kbd>" + (pad.active ? GLYPH.A : "Enter") + "</kbd>"}</button>`;
+  sd.querySelector("#accept").addEventListener("click", () => startMission(j));
+}
+addEventListener(
+  "keydown",
+  (e) => {
+    if (
+      career.uiOpen === "armyboard" &&
+      (e.code === "Enter" || e.code === "NumpadEnter") &&
+      alBoard.sel
+    ) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (alBoard.sel.tier <= career.tier) startMission(alBoard.sel);
+    }
+  },
+  true,
+);
+// the normal board opens the army board at the depot and gets an "Army Logistics" chip everywhere else
+{
+  const ob = openBoard;
+  openBoard = function () {
+    if (!AL.skip && alOpenBoard(false)) return;
+    ob.apply(this, arguments);
+    const bar = career.uiOpen === "board" && uiRoot && uiRoot.querySelector(".mback .bar");
+    if (!bar) return;
+    const ch = document.createElement("span");
+    ch.className = "chip";
+    ch.id = "alChip";
+    ch.style.cssText = "background:#4f5d36;color:#fff";
+    ch.textContent = "\u{1FA96} Army Logistics" + (career.tier < 3 ? " \u{1F512}" : "");
+    ch.addEventListener("click", () => alOpenBoard(true));
+    bar.insertBefore(ch, bar.firstChild);
+  };
+}
