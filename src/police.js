@@ -1,6 +1,6 @@
 /**
  * @file police.js — POLICE AI: patrols from police stations, line-of-sight detection, chase (+ v49 2-star pursuers POL.aux: polAuxSpawn/polAuxUpdate/polAuxDrop), fines + arrest
- * Exposes (globals): POL_FINES, POL, EMV, POL_T, polArt, emArt, emDrawBar, emBlit, SIRK, emSiren,
+ * Exposes (globals): POL_FINES, POL, EMV, POL_T, polArt, emArt, emDrawBar, emBlit, SIRK, emSiren, emLaneAhead, emRejoin, emOnBlue,
  *   emSirenVol, emRoadPt, emFollow, emToTraffic (+53 more)
  * Depends on: world.js, render.js, lorry.js, physics.js, audio.js, traffic.js, signals.js,
  *   depots.js, services.js, career.js, ui.js, ambient.js, satnav.js, gamepad.js, breakdown.js,
@@ -485,6 +485,60 @@ function emToTraffic(x, y, role) {
     }
   }
   return null;
+}
+// v50: the kerb-lane point to rejoin traffic from where a kinematic vehicle is parked, facing the way it points:
+// same segment, nearest legal spot at or just ahead (clear of junction boxes); {sg, dir, along, x, y, h} or null
+function emLaneAhead(x, y, h) {
+  const s = navSnap(x / M_T, y / M_T, 3);
+  if (!s) return null;
+  const i = idx(s[0], s[1]),
+    f = fwd(h || 0);
+  for (const sid of [world.roadH[i], world.roadV[i]]) {
+    if (sid < 0) continue;
+    const sg = world.segs[sid],
+      fa = sg.dir === "h" ? f[0] : f[1];
+    if (Math.abs(fa) < 0.3 && sid !== Math.max(world.roadH[i], world.roadV[i])) continue;
+    const dir = fa >= 0 ? 1 : -1,
+      a0 = (sg.dir === "h" ? x : y) / M_T;
+    for (let k = 0; k <= 12; k++) {
+      const along = Math.floor(a0 + dir * k) + 0.5;
+      if (along < sg.b0 + 2 || along > sg.b1 - 1) break;
+      if (
+        sg.js.some((J) => {
+          const [a, b] = jRange(sg, J);
+          return along > a - 3 && along < b + 3;
+        })
+      )
+        continue;
+      const p = lanePt(sg, dir, 0, along),
+        dv = dirVec(sg, dir);
+      return { sg, dir, along, x: p[0], y: p[1], h: Math.atan2(dv[0], -dv[1]) };
+    }
+  }
+  return null;
+}
+// v50: drive a parked kinematic vehicle k (x,y,h) onto that lane point, then hand it to the traffic sim there
+// (no teleporting to another road); returns the traffic vehicle once it has rejoined, else null (call every frame)
+function emRejoin(k, role, dt, kind) {
+  if (!k.rj) {
+    k.rj = emLaneAhead(k.x, k.y, k.h);
+    if (!k.rj) return null;
+    k.path = [[k.rj.x, k.rj.y]];
+  }
+  if (!emFollow(k, dt, 3.5)) return null;
+  k.h += wrapA(k.rj.h - k.h) * Math.min(1, dt * 4);
+  const R = k.rj,
+    v = spawnVehicle(R.x, R.y, true, {
+      kind: kind || (role === "police" ? "estate" : "van"),
+      seg: R.sg.id,
+      dir: R.dir,
+      along: R.along,
+      clear: 3,
+    });
+  if (!v) return null;
+  v.role = role;
+  v.art = { body: emArt(role).body };
+  return v;
 }
 const onView = (x, y) => typeof onScreen === "function" && onScreen(x, y, -2);
 // ---------- patrols
@@ -1305,12 +1359,32 @@ function emSources() {
   const out = [];
   const c = POL.chase;
   if (c && !c.paying) out.push(c.v);
+  for (const a of POL.aux || []) if (a.v) out.push(a.v); // v50: every pursuer on blue lights
+  for (const v of POL.cars) if (emOnBlue(v) && traffic.vs.includes(v)) out.push(v);
   if (typeof AMBU !== "undefined")
     for (const j of AMBU.jobs) {
       if (j.st === "go" && j.v) out.push(j.v);
-      else if (j.st === "pull" && j.k) out.push(j.k);
+      else if ((j.st === "pull" || j.st === "drive") && j.k) out.push(j.k);
+    }
+  if (typeof FIRE !== "undefined")
+    for (const e of FIRE.eng) {
+      if (e.stt === "go" && e.v) out.push(e.v);
+      else if ((e.stt === "out" || e.stt === "arrive") && e.k) out.push(e.k);
     }
   return out;
+}
+// v50: a traffic-sim emergency vehicle currently on blue lights (responding), as opposed to patrolling / returning
+function emOnBlue(v) {
+  if (v.amb) return v.amb.st === "go";
+  if (v.fireE) return v.fireE.stt === "go";
+  return (
+    v.role === "police" &&
+    !!v.pol &&
+    !!v.pol.search &&
+    typeof WANT !== "undefined" &&
+    WANT.lvl > 0 &&
+    !v.pol.home
+  );
 }
 function emInJ(v) {
   const tx = v.x / M_T,
@@ -1321,11 +1395,12 @@ function emInJ(v) {
 }
 function emYield(v, acc, dt) {
   if (v.role === "police" || v.role === "ambulance" || v.role === "fire") {
-    v.emResp = !!(v.amb && v.amb.st === "go") || !!(v.fireE && v.fireE.stt === "go");
+    v.emResp = emOnBlue(v);
     if (v.emResp) {
-      v.ghostT = Math.max(v.ghostT || 0, 0.3);
-      emShift(v, 1.3, dt);
-    }
+      // v50: weave to the clearest offset (traffic.js probes v.emWant); only ghost through when genuinely stuck
+      emShift(v, v.emWant ?? 1.3, dt, 2.4);
+      if (v.stopT > 2.5 && !emInJ(v)) v.ghostT = Math.max(v.ghostT || 0, 1.2);
+    } else if (v.emO) emShift(v, 0, dt);
     return acc;
   }
   let y = false;
@@ -1353,9 +1428,9 @@ function emYield(v, acc, dt) {
   return acc;
 }
 // lateral shift relative to heading (+ = right / centre line, - = left / kerb), eased; tracked separately from crash offsets
-function emShift(v, to, dt) {
+function emShift(v, to, dt, rate) {
   const cur = v.emO || 0,
-    nw = cur + (to - cur) * Math.min(1, dt * 1.6),
+    nw = cur + (to - cur) * Math.min(1, dt * (rate || 1.6)),
     d = nw - cur,
     r = rgt(v.h || 0);
   v.offX += r[0] * d;
@@ -1383,7 +1458,7 @@ function emSirenLazy() {
       if (!j.siren && (j.st === "go" || j.st === "drive")) j.siren = emSiren("ambulance");
   if (typeof FIRE !== "undefined")
     for (const e of FIRE.eng)
-      if (!e.siren && (e.stt === "go" || e.stt === "out") && (e.v || e.k))
+      if (!e.siren && (e.stt === "go" || e.stt === "out" || e.stt === "arrive") && (e.v || e.k))
         e.siren = emSiren("fire");
 }
 function updatePolice(dt) {

@@ -79,8 +79,10 @@ function ambTrySpawn(job, close) {
   }
   return null;
 }
-function ambRejoin(j) {
-  const nv = emToTraffic(j.k.x, j.k.y, "ambulance");
+function ambRejoin(j, dt) {
+  // v50: pull out from where it parked (kinematic to the kerb lane ahead, then into traffic there), no jump elsewhere
+  let nv = emRejoin(j.k, "ambulance", dt || 0);
+  if (!nv && !j.k.rj && j.t > 6) nv = emToTraffic(j.k.x, j.k.y, "ambulance");
   j.v = nv;
   if (!nv) return false;
   nv.amb = j;
@@ -216,12 +218,12 @@ function ambUpdate(dt) {
     const v = j.v;
     if (j.siren && (j.v || j.k)) j.siren.set(emSirenVol((j.v || j.k).x, (j.v || j.k).y, j));
     emSirMode(j.siren, "ambulance", j);
-    if ((j.st === "spawn" || j.st === "go") && j.tt > 25) {
+    if ((j.st === "spawn" || j.st === "go") && j.tt > 14) {
       if (ambForce(j)) continue;
     }
     if (j.st === "spawn") {
-      if (j.t < 0.6) continue;
-      const nv = ambTrySpawn(j, j.tt > 3);
+      if (j.t < 0.25) continue;
+      const nv = ambTrySpawn(j, j.tt > 0.5); // v50: faster response: from just off screen almost at once
       if (nv) {
         j.v = nv;
         j.st = "go";
@@ -231,7 +233,7 @@ function ambUpdate(dt) {
         AMBU.spawns = (AMBU.spawns || 0) + 1;
       } else {
         j.t = 0;
-        if (j.tt > 6) ambForce(j);
+        if (j.tt > 3) ambForce(j);
       }
       continue;
     }
@@ -316,7 +318,7 @@ function ambUpdate(dt) {
         continue;
       }
       j.cur = p;
-      const ar = ambMove(j.S, p.x, p.y, 1.5, dt);
+      const ar = ambMove(j.S, p.x, p.y, 2.6, dt); // v50: brisk walk with the stretcher (was 1.5 m/s)
       ambCrewOnS(j, !ar, dt);
       if (ar || j.t > 40) {
         if (!ar) {
@@ -331,8 +333,8 @@ function ambUpdate(dt) {
     if (j.st === "load") {
       ambCrewOnS(j, false, dt);
       const p = j.cur;
-      p.prog = Math.min(1, j.t / 2);
-      if (j.t > 2) {
+      p.prog = Math.min(1, j.t / 1.4);
+      if (j.t > 1.4) {
         const i = traffic.peds.indexOf(p);
         if (i >= 0) traffic.peds.splice(i, 1);
         p.cas = false;
@@ -347,7 +349,7 @@ function ambUpdate(dt) {
     }
     if (j.st === "ret") {
       const [rx, ry] = ambRear(j),
-        ar = ambMove(j.S, rx, ry, 1.3, dt);
+        ar = ambMove(j.S, rx, ry, 2.2, dt);
       ambCrewOnS(j, !ar, dt);
       if (ar || j.t > 40) {
         j.st = "stow";
@@ -357,7 +359,7 @@ function ambUpdate(dt) {
     }
     if (j.st === "stow") {
       ambCrewOnS(j, false, dt);
-      if (j.t > 1.2) {
+      if (j.t > 0.8) {
         j.S.p = null;
         j.loaded = (j.loaded || 0) + 1;
         j.st = j.cas.some((p) => p.cas && traffic.peds.includes(p)) ? "fetch" : "close";
@@ -373,7 +375,7 @@ function ambUpdate(dt) {
         j.door = 0;
         j.st = "leave";
         j.t = 0;
-        ambRejoin(j);
+        ambRejoin(j, dt);
       }
       continue;
     }
@@ -381,11 +383,8 @@ function ambUpdate(dt) {
       const v = j.v;
       if (!v) {
         AMBU.why = "norejoin";
-        if (j.t > 1.5) {
-          j.t = 0;
-          if (ambRejoin(j)) continue;
-        }
-        if (j.k && !onScreen(j.k.x, j.k.y, 10)) j.done = true;
+        if (ambRejoin(j, dt)) continue;
+        if (j.k && j.t > 30 && !onScreen(j.k.x, j.k.y, 10)) j.done = true;
         continue;
       } // couldn't rejoin traffic: stays parked until out of view
       if (j.park) {

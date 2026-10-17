@@ -1118,7 +1118,7 @@ function spawnVehicle(x, y, force, opt) {
       back = kind === "lorry" ? 17 : t.L / 2 + 1,
       cx = p[0] - (dv[0] * back) / 2,
       cy = p[1] - (dv[1] * back) / 2,
-      R = back / 2 + 15; // v25: clearance covers our own trailer and theirs (no spawning on top of a lorry's trailer)
+      R = back / 2 + (opt && opt.clear != null ? opt.clear : 15); // v25: clearance covers our own trailer and theirs (no spawning on top of a lorry's trailer); v50: emergency rejoin only needs body clearance
     for (const o of traffic.vs) {
       for (const b of boxesOf(o)) if (Math.abs(b.x - cx) < R && Math.abs(b.y - cy) < R) return null;
     }
@@ -1603,6 +1603,7 @@ function stepVeh(v, dt, pbs) {
   const sg = world.segs[v.plan.seg];
   let v0 = (SPEED[sg.type] || 12) * v.drv;
   if (v.heavy) v0 = Math.min(v0, v.kind === "bus" ? 14 : 22);
+  if (v.emResp) v0 *= 1.3; // v50: blue lights drive ~30% over the road's normal speed
   const front = v.s + v.L / 2;
   let acc = 1e9,
     sig = 0;
@@ -1849,6 +1850,42 @@ function stepVeh(v, dt, pbs) {
         }
       }
     }
+  }
+  if (v.emResp) {
+    // v50: blue lights weave: probe the clear distance ahead at other lateral offsets (next lane over / the centre line /
+    // oncoming lane when empty) and steer to the clearest one (emYield eases v.emO towards v.emWant); never off the tarmac
+    const rr = rgt(v.h || 0),
+      cur = v.emO || 0,
+      gapAt = (o) => {
+        if (!cands.length) return 1e9;
+        const half = v.W / 2 + 0.35;
+        for (let k = 0; k < 15; k++) {
+          const sd = front + 0.4 + k * 2.5,
+            p = pathAt(v, sd),
+            px = p[0] + v.offX + rr[0] * (o - cur),
+            py = p[1] + v.offY + rr[1] * (o - cur);
+          if (k < 6) {
+            const ti = idx(Math.floor(px / M_T), Math.floor(py / M_T));
+            if (!(world.roadH[ti] >= 0 || world.roadV[ti] >= 0 || world.jMask[ti])) return -1;
+          }
+          for (const b of cands) if (ptBoxDist(px, py, b) < half) return sd - front;
+        }
+        return 1e9;
+      };
+    let best = v.emWant ?? 1.3,
+      bg = lgap < 1e8 ? lgap : 1e9;
+    if (lgap < 40)
+      for (const o of [1.3, 4.3, 2.6, -1.2]) {
+        if (Math.abs(o - best) < 0.01) continue;
+        const g = gapAt(o);
+        if (g > bg + 6) {
+          bg = g;
+          best = o;
+        }
+      }
+    else if (Math.abs(best - 1.3) > 0.01 && gapAt(1.3) > 60) best = 1.3; // rejoin our own lane once it's clear
+    v.emWant = best;
+    if (Math.abs(best - cur) > 0.4 && bg > lgap + 6) lgap = Math.max(lgap, 3.5); // keep rolling while we slide across
   }
   if (lgap < 1e8) acc = Math.min(acc, idmAcc(v, v0, lgap, lvel));
   acc = Math.min(acc, idmAcc(v, v0, 1e9, 0));

@@ -1,6 +1,7 @@
 /**
  * @file fire.js — FIRES: buildings near the player catch fire; the nearest fire station's engine responds
- * Exposes (globals): FIRE, fireArt, fireStations, fireStart, firePickBuilding, fireEngNear,
+ * Exposes (globals): FIRE, fireArt, fireStations, fireStart, fireRoadPt, firePickBuilding, fireEngNear,
+ *   fireGoal, fireStationFor, fireApproach,
  *   fireDispatch, fireTraffic, fireSpawnFar, fireDrop, fireUpdate, fireDraw, emBlitF, fireMapDots
  * Depends on: world.js, lorry.js, physics.js, traffic.js, depots.js, services.js, ui.js,
  *   breakdown.js, port.js, daynight.js, main.js, police.js, wanted.js, ambulance.js
@@ -140,6 +141,56 @@ function fireStart(o) {
   fireDispatch(f);
   return f;
 }
+// v50: where the engine parks: the kerb lane of the nearest ordinary road beside the building (not a junction box,
+// not a motorway), on the building's side; {x, y, h, tx, ty} in metres / tiles, or null when no road is close enough
+function fireRoadPt(o, fx, fy) {
+  const x0 = o ? o.x / TILE : fx / M_T - 2,
+    y0 = o ? o.y / TILE : fy / M_T - 2,
+    x1 = o ? (o.x + o.w) / TILE : fx / M_T + 2,
+    y1 = o ? (o.y + o.h) / TILE : fy / M_T + 2,
+    R = 9;
+  let best = null,
+    bd = 1e9;
+  for (let ty = Math.floor(y0 - R); ty <= Math.ceil(y1 + R); ty++)
+    for (let tx = Math.floor(x0 - R); tx <= Math.ceil(x1 + R); tx++) {
+      if (!inb(tx, ty)) continue;
+      const i = idx(tx, ty);
+      if (world.jMask[i] || (world.roadH[i] < 0 && world.roadV[i] < 0)) continue;
+      const sg = world.segs[Math.max(world.roadH[i], world.roadV[i])];
+      if (!sg || sg.type === "hwy" || sg.type === "dual" || sg.mil) continue;
+      const dx = Math.max(x0 - tx - 0.5, 0, tx + 0.5 - x1),
+        dy = Math.max(y0 - ty - 0.5, 0, ty + 0.5 - y1),
+        d = Math.hypot(dx, dy);
+      if (d >= bd) continue;
+      const along = (sg.dir === "h" ? tx : ty) + 0.5;
+      if (along < sg.b0 + 2 || along > sg.b1 - 1) continue;
+      if (
+        sg.js.some((J) => {
+          const [a, b] = jRange(sg, J);
+          return along > a - 2 && along < b + 2;
+        })
+      )
+        continue;
+      bd = d;
+      best = { sg, along, tx, ty };
+    }
+  if (!best) return null;
+  const { sg, along } = best,
+    cx = (x0 + x1) / 2,
+    cy = (y0 + y1) / 2;
+  let pick = null,
+    pd = 1e18;
+  for (const dir of [1, -1]) {
+    const p = lanePt(sg, dir, 0, along),
+      d = (p[0] / M_T - cx) ** 2 + (p[1] / M_T - cy) ** 2;
+    if (d < pd) {
+      pd = d;
+      const dv = dirVec(sg, dir);
+      pick = { x: p[0], y: p[1], h: Math.atan2(dv[0], -dv[1]), tx: best.tx, ty: best.ty, dir };
+    }
+  }
+  return pick;
+}
 function firePickBuilding() {
   const P = truck,
     c = [];
@@ -151,7 +202,15 @@ function firePickBuilding() {
     if (d < 50 || d > 260 || FIRE.list.some((f) => f.o === o)) continue;
     c.push({ o, x, y, r: Math.min(22, (Math.max(o.w, o.h) / PPM) * 0.45) });
   }
-  return c.length ? c[(Math.random() * c.length) | 0] : null;
+  // v50: only buildings an engine can actually park beside (road within ~36 m of the walls)
+  for (let n = 0; n < 12 && c.length; n++) {
+    const k = (Math.random() * c.length) | 0,
+      b = c[k];
+    b.rp = fireRoadPt(b.o);
+    if (b.rp) return b;
+    c.splice(k, 1);
+  }
+  return null;
 }
 function fireEngNear(x, y) {
   let st = null,
@@ -165,8 +224,29 @@ function fireEngNear(x, y) {
   }
   return [st, Math.sqrt(bd)];
 }
+// v50: the target every engine routes to (the kerb beside the fire), as an aiGoal destination
+function fireGoal(f) {
+  if (!f.rp) f.rp = fireRoadPt(f.o, f.x, f.y);
+  return { entrance: f.rp ? { x: f.rp.x, y: f.rp.y } : { x: f.x, y: f.y }, name: "fire" };
+}
+// v50: nearest station (by road) with a free appliance bay and a working route to the fire
+function fireStationFor(f) {
+  const rp = f.rp,
+    L = fireStations()
+      .map((s) => [s, Math.hypot(s.x - f.x, s.y - f.y)])
+      .sort((a, b) => a[1] - b[1]);
+  for (const [s, d] of L.slice(0, 4)) {
+    if (!s.bays.some((b) => b.kind === "appliance" && !FIRE.out.has(b))) continue;
+    if (!rp) return [s, d];
+    const e = emRoadPt(s),
+      a = navSnap(e.x / M_T, e.y / M_T, 12);
+    if (a && navAStar(a[0], a[1], rp.tx, rp.ty)) return [s, d];
+  }
+  return L.length ? L[0] : [null, 1e9];
+}
 function fireDispatch(f) {
-  const [st, d] = fireEngNear(f.x, f.y);
+  fireGoal(f);
+  const [st, d] = fireStationFor(f);
   const e = {
     f,
     st,
@@ -226,7 +306,7 @@ function fireSpawnFar(e) {
     if ((world.roadH[i] < 0 && world.roadV[i] < 0) || onScreen(x, y, 12)) continue;
     const v = spawnVehicle(x, y, true, { kind: "van" });
     if (!v) continue;
-    if (onScreen(v.x, v.y, 8) || !aiGoal(v, { entrance: { x: f.x, y: f.y }, name: "fire" })) {
+    if (onScreen(v.x, v.y, 8) || !aiGoal(v, fireGoal(f))) {
       const k = traffic.vs.indexOf(v);
       if (k >= 0) traffic.vs.splice(k, 1);
       continue;
@@ -238,6 +318,19 @@ function fireSpawnFar(e) {
     return v;
   }
   return null;
+}
+// v50: road path (metres) from (x,y) to the fire's kerb point: navAStar over road tiles, every 2nd tile, ending on the kerb lane
+function fireApproach(x, y, f) {
+  const rp = f.rp;
+  if (!rp) return [[f.x, f.y]];
+  const s = navSnap(x / M_T, y / M_T, 4),
+    P = s && navAStar(s[0], s[1], rp.tx, rp.ty);
+  const out = [];
+  if (P && P.length < 400)
+    for (let k = 1; k < P.length - 1; k += 2)
+      out.push([((P[k] % MW) + 0.5) * M_T, (Math.floor(P[k] / MW) + 0.5) * M_T]);
+  out.push([rp.x, rp.y]);
+  return out;
 }
 function fireDrop(v) {
   const i = traffic.vs.indexOf(v);
@@ -276,7 +369,7 @@ function fireUpdate(dt) {
       if (e.door < 1.6) continue;
       if (emFollow(e.k, dt, 4)) {
         const v = fireTraffic(e, e.k.x, e.k.y - 2);
-        if (v && aiGoal(v, { entrance: { x: f.x, y: f.y }, name: "fire" })) {
+        if (v && aiGoal(v, fireGoal(f))) {
           e.v = v;
           e.k = null;
           e.stt = "go";
@@ -307,17 +400,32 @@ function fireUpdate(dt) {
         e.far = true;
         continue;
       }
-      const d = Math.hypot(v.x - f.x, v.y - f.y);
+      const rp = f.rp || { x: f.x, y: f.y },
+        d = Math.hypot(v.x - rp.x, v.y - rp.y);
       if (d < e.best - 1) {
         e.best = d;
         e.prog = e.t;
       }
-      if (d < f.r + 22 || (d < f.r + 60 && e.t - (e.prog || 0) > 6)) {
+      // v50: close to the kerb point (or overshooting it / stalled near it): leave the sim and drive the last bit
+      // kinematically along the road so it always ends parked beside the fire
+      // (also when it stops gaining for 6 s within 160 m, or 12 s anywhere: jammed, or circling a block it can't turn into)
+      // crawling: under 16 m of progress in an 8 s window (twice in a row, or once within 250 m)
+      if (!e.chk || e.t < e.chk.t) e.chk = { t: e.t, b: e.best, n: 0 };
+      if (e.t - e.chk.t > 8)
+        e.chk = { t: e.t, b: e.best, n: e.chk.b - e.best < 16 ? e.chk.n + 1 : 0 };
+      const stall = e.t - (e.prog || 0),
+        slow = e.chk.n >= 2 || (e.chk.n >= 1 && d < 250),
+        ap =
+          d < 40 || (e.best < 60 && d > e.best + 4) || (d < 160 && stall > 6) || stall > 12 || slow
+            ? fireApproach(v.x, v.y, f)
+            : null;
+      if (ap && (ap.length > 1 || d < 60)) {
         fireDrop(v);
-        e.k = { x: v.x, y: v.y, h: v.h, path: [] };
+        e.k = { x: v.x, y: v.y, h: v.h, path: ap };
         e.v = null;
-        e.stt = "spray";
+        e.stt = "arrive";
         e.t = 0;
+        FIRE.arrN = (FIRE.arrN || 0) + 1;
       } else if (e.t - (e.prog || 0) > 16 && !onScreen(v.x, v.y, 10)) {
         fireDrop(v);
         e.v = null;
@@ -329,8 +437,17 @@ function fireUpdate(dt) {
       }
       continue;
     }
+    if (e.stt === "arrive") {
+      if (emFollow(e.k, dt, Math.min(12, 4 + e.k.path.length * 0.5)) || e.t > 90) {
+        if (f.rp) e.k.h += wrapA(f.rp.h - e.k.h) * 0.5;
+        e.stt = "spray";
+        e.t = 0;
+      }
+      continue;
+    }
     if (e.stt === "spray") {
       f.st = "fight";
+      if (f.rp && e.k) e.k.h += wrapA(f.rp.h - e.k.h) * Math.min(1, dt * 2.5); // settle square to the kerb
       f.int -= dt / 18;
       if (e.siren && e.t > 4) {
         e.siren.stop();
@@ -348,10 +465,15 @@ function fireUpdate(dt) {
     if (e.stt === "back") {
       if (!e.v) {
         if (e.t < 3) continue;
-        e.t = 0;
-        const v = fireTraffic(e, e.k.x, e.k.y);
+        // v50: pull out from where it parked (kinematic to the kerb lane ahead, then into traffic there)
+        let v = emRejoin(e.k, "fire", dt);
+        if (v) {
+          v.art = { body: fireArt().body };
+          v.fireE = e;
+          v.pinT = timeS + 1e6;
+        } else if (!e.k.rj && e.t > 6) v = fireTraffic(e, e.k.x, e.k.y);
         if (!v) {
-          if (!onScreen(e.k.x, e.k.y, 10)) e.done = true;
+          if (e.t > 30 && !onScreen(e.k.x, e.k.y, 10)) e.done = true;
           continue;
         }
         e.v = v;
@@ -441,7 +563,7 @@ function fireDraw(vx0, vy0, vx1, vy1) {
     }
     const v = e.v || e.k;
     if (!v || !inV(v.x, v.y, 80)) continue;
-    const onC = e.stt === "go" || e.stt === "out" || e.stt === "spray";
+    const onC = e.stt === "go" || e.stt === "out" || e.stt === "arrive" || e.stt === "spray";
     if (onC) {
       const fl = 0.55 + 0.45 * Math.abs(Math.sin(T * 9));
       ctx.save();

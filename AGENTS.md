@@ -99,6 +99,10 @@ Notes on ownership:
 - **Police**: all police logic is in `police.js` (patrols, detection, chase, fines and arrest, hide boxes, the siren
   synth `emSiren`) and `wanted.js` (heat score, stars, 2-star response, roadblocks). Offence and fine records live in
   `roadlaw.js` (`OFF`).
+- **Emergency response**: blue-light vehicles (`emOnBlue`) weave via a lateral-offset probe in `traffic.js`
+  (`v.emWant`) and creep through red lights; other cars yield to the kerb (`emYield`). Fire engines park at a kerb point
+  beside the burning building (`fireRoadPt`; the last stretch is kinematic, `fireApproach`). Fire and ambulance crews
+  leave from where they parked (`emRejoin`: drive to the kerb lane ahead, then spawn into traffic exactly there).
 - **Customiser**: `tune.js` (the `CZ_PARTS` catalogue and core logic), with `tune2.js`, `tune3.js` and `tune4.js` as
   later stages. `repair.js` holds the repair bays.
 - **Ports**: the yard, cranes, ships, gate lane and rail siding are in `port.js`. AI hauliers on public roads are in
