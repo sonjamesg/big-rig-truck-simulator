@@ -594,6 +594,25 @@ function updatePortTrucks(dt) {
     }
     if (T.st === "lost") {
       T.lt = (T.lt || 0) + dt;
+      if (T.lt > 6 && T.home) {
+        // v50: a company truck that dropped out of traffic pulls back out of its own yard (even in view: it's leaving
+        // the yard) and carries on: loaded -> heads home, empty -> a fresh pickup. It used to wait for the yard to be off
+        // screen, so a player standing in the yard saw "Starting up" forever.
+        T.lt = 0;
+        const g = ptDepotGeo(T.home);
+        if (T.box) {
+          T.pick = 0;
+          T.dest = T.home;
+          T.tgt = "depot";
+        } else if (typeof ownMission === "function") ownMission(T);
+        if (g)
+          for (const dir of [1, -1])
+            if (
+              ptToRoad(T, g.sg, dir, g.along + dir * 7, T.tgt === "port" ? ptGateGoal(T.P) : T.dest)
+            )
+              break;
+        continue;
+      }
       if (T.lt > 6) {
         T.lt = 0;
         const dp = ptDest(T) || T.dest,

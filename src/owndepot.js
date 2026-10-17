@@ -252,34 +252,71 @@ function updateOwnDepots(dt) {
     }
   }
 }
-// up: random mission for a company truck leaving its yard empty: a container terminal (docks) or another depot / container yard on the map
+// up: mission for a company truck leaving its yard empty: a container terminal (docks) or another depot / container yard.
+// v50: only places whose estimated round trip (route there and back at a typical lorry speed + loading) is ~10 min or less
+const OWN_SPD = 11, // m/s: typical urban + rural lorry average incl. junctions
+  OWN_LOAD = 75, // s: gate / loader dwell + yard manoeuvres
+  OWN_RT_MAX = 600;
+function ownRouteM(a, b) {
+  const k = (a.name || a.x) + "|" + (b.name || b.x);
+  OWN.rt = OWN.rt || {};
+  if (OWN.rt[k] != null) return OWN.rt[k];
+  const s = navSnap(a.x / M_T, a.y / M_T, 40),
+    g = navSnap(b.x / M_T, b.y / M_T, 40),
+    P = s && g && navAStar(s[0], s[1], g[0], g[1]);
+  let L = 0;
+  if (P)
+    for (let i = 1; i < P.length; i++) {
+      const d = Math.abs(P[i] - P[i - 1]);
+      L += d === 1 || d === MW ? M_T : M_T * 1.414;
+    }
+  return (OWN.rt[k] = P ? L : Math.hypot(a.x - b.x, a.y - b.y) * 1.4);
+}
+function ownRoundTrip(yd, e) {
+  return (2 * ownRouteM(yd.entrance, e)) / OWN_SPD + OWN_LOAD;
+}
 function ownMission(T) {
   const yd = T.home,
     e = yd.entrance;
-  const L = world.depots
+  const D = world.depots
     .filter(
       (d) =>
         d.bays &&
         d.bays.length &&
+        d !== yd &&
         !portList().some((Q) => Q.depot === d) &&
         ptDepotGeo(d) &&
-        d.bays.every((b) => !b.th),
+        d.bays.every((b) => !b.th) &&
+        Math.hypot(d.entrance.x - e.x, d.entrance.y - e.y) > 400 &&
+        Math.hypot(d.entrance.x - e.x, d.entrance.y - e.y) < OWN_SPD * OWN_RT_MAX * 0.5,
     )
-    .map((d) => [d, Math.hypot(d.entrance.x - e.x, d.entrance.y - e.y)])
-    .filter((q) => q[1] > 400 && q[1] < 7000);
-  if (L.length && Math.random() < 0.55) {
-    T.dest = L[(Math.random() * L.length) | 0][0];
+    .map((d) => ({ d, rt: ownRoundTrip(yd, d.entrance) }));
+  const Pp = portList()
+    .filter((P) => P.ready && P.lpath)
+    .map((P) => ({ P, rt: ownRoundTrip(yd, ptGateGoal(P).entrance) }));
+  const busy = new Set(PTRUCK.list.filter((o) => o !== T && o.pick && o.dest).map((o) => o.dest));
+  const okD = D.filter((q) => q.rt <= OWN_RT_MAX && !busy.has(q.d)), // one truck per pickup depot (no queueing)
+    okP = Pp.filter((q) => q.rt <= OWN_RT_MAX);
+  let pick = null;
+  if (okD.length && (!okP.length || Math.random() < 0.55))
+    pick = okD[(Math.random() * okD.length) | 0];
+  else if (okP.length) pick = okP[(Math.random() * okP.length) | 0];
+  else pick = D.concat(Pp).sort((a, b) => a.rt - b.rt)[0] || null; // nothing within 10 min: the quickest one
+  if (pick && pick.d) {
+    T.dest = pick.d;
     T.pick = 1;
     T.tgt = "depot";
     T.mis = T.dest.name;
   } else {
-    const P = portList().filter((P) => P.ready && P.lpath);
-    T.P = P[(Math.random() * P.length) | 0] || T.P;
+    if (pick) T.P = pick.P;
     T.dest = null;
     T.pick = 0;
     T.tgt = "port";
     T.mis = T.P && T.P.depot ? T.P.depot.name : "docks";
   }
+  T.mT0 = PTRUCK.t; // trip clock (dashboard ETA / progress)
+  T.rtEst = pick ? pick.rt : OWN_RT_MAX;
+  T.remK = null;
 }
 function ownDelivered(T) {
   const yd = T.home,
@@ -341,7 +378,7 @@ const OWN_CSS = `.ydc{display:flex;gap:18px;height:100%;padding:18px;box-sizing:
 .ody{border-radius:12px;background:rgba(255,255,255,.04);padding:8px}.odyh{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px}.dot{width:11px;height:11px;border-radius:50%;flex:none;outline:2px solid rgba(255,255,255,.4)}
 .odt{display:flex;gap:10px;padding:8px;border-radius:10px;background:rgba(0,0,0,.25);margin-top:6px}.odi{width:44px;height:44px;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:20px;flex:none;line-height:1}.odi small{font-size:10px;font-weight:900}
 .odb{flex:1;min-width:0}.odr{display:flex;align-items:center;gap:6px}.pill{font-size:10px;font-weight:900;padding:2px 7px;border-radius:99px;color:#fff;letter-spacing:.06em}.box{width:16px;height:9px;border-radius:2px;outline:1px solid rgba(0,0,0,.5)}.odm{color:#7dff9a;font-weight:800;font-size:13px}
-.ods{font-size:12px;opacity:.85;margin:3px 0}.odp{height:6px;border-radius:4px;background:#222a36;overflow:hidden}.odp i{display:block;height:100%;transition:width .8s}.ode{font-size:10px;opacity:.65;margin-top:2px}
+.odj{font-size:11.5px;margin:3px 0 1px;line-height:1.3;opacity:.95}.odj b{color:#ffd866}.ods{font-size:12px;opacity:.85;margin:3px 0}.odp{height:6px;border-radius:4px;background:#222a36;overflow:hidden}.odp i{display:block;height:100%;transition:width .8s}.ode{font-size:11px;opacity:.85;margin-top:3px;font-weight:700;color:#9be7a8}
 .odf{display:flex;align-items:center;gap:8px;font-size:12px;padding:7px 9px;border-radius:9px;background:rgba(255,255,255,.04)}.odf span:nth-child(2){flex:1;min-width:0}.odf b{color:#7dff9a}
 .odu{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;background:linear-gradient(120deg,rgba(245,184,46,.18),rgba(245,184,46,.04));border:1px solid rgba(245,184,46,.4);margin-top:4px}.odu>div:first-child{flex:1;display:flex;flex-direction:column;gap:2px}.odu small{font-size:10px;font-weight:900;letter-spacing:.12em;color:#f5b82e}.odu span{font-size:11px;opacity:.75}.odup{font-weight:900;font-size:16px;width:90px;text-align:right}.odup .odp{margin-top:4px}
 .odw .bt,.odw .hint{padding:0 14px}.odw .bt{display:flex;gap:10px}.odw .bt button{flex:1;min-height:60px;font-size:18px;font-weight:900;border-radius:14px;border:0;cursor:pointer}.odw .buy{background:linear-gradient(180deg,#3ddc84,#1f9d57);color:#06210f}.odw #ownUpg{flex:1.4}.odw .cn{background:#3a4352;color:#fff}.odw .hint{font-size:11px;opacity:.65;text-align:center}
@@ -527,50 +564,72 @@ function ownTruckStatus(T) {
       : "Driving empty to " + (T.pick && T.dest ? T.dest.name : port);
   return "Starting up";
 }
+// v50: live job card for a fleet truck: job (cargo, from, to), status, trip progress and 'back in ~mm:ss' from the remaining route
+function ownPickupPlace(T) {
+  return T.pick && T.dest && T.dest !== T.home
+    ? { name: T.dest.name, e: T.dest.entrance }
+    : T.P
+      ? { name: T.P.depot ? T.P.depot.name : "the docks", e: ptGateGoal(T.P).entrance }
+      : null;
+}
+function ownRemM(T, x, y, e) {
+  // remaining route (metres) from (x, y) to e, re-planned every ~3 s
+  if (!T.remK || T.remK.e !== e || PTRUCK.t - T.remK.t > 3) {
+    const s = navSnap(x / M_T, y / M_T, 12),
+      g = navSnap(e.x / M_T, e.y / M_T, 40),
+      P = s && g && navAStar(s[0], s[1], g[0], g[1]);
+    T.remK = { e, t: PTRUCK.t, m: P ? P.length * M_T * 1.1 : Math.hypot(e.x - x, e.y - y) * 1.4 };
+  }
+  return T.remK.m;
+}
 function ownTrkInfo(T) {
-  const st = ownTruckStatus(T);
-  let tgt = null,
-    ph,
-    col;
-  if (T.st === "road") {
-    tgt = T.box ? T.home : T.pick && T.dest ? T.dest : T.P && T.P.depot;
-    ph = T.box ? "RETURNING" : "OUTBOUND";
-    col = T.box ? "#3ddc84" : "#2f81f7";
-  } else if (T.st === "gate") {
-    ph = T.box ? "LOADED" : "AT DOCKS";
+  const yd = T.home,
+    pk = ownPickupPlace(T),
+    pkName = pk ? pk.name : "pickup",
+    home = ydBrand(yd).name,
+    atHome = T.st === "depot" && (T.dest === T.home || !T.pick),
+    loaded = !!T.box;
+  let ph, col, st;
+  if (T.st === "road" && !loaded) {
+    ph = "TO PICKUP";
+    col = "#2f81f7";
+    st = "Heading to pickup at " + pkName;
+  } else if (T.st === "gate" || (T.st === "depot" && !atHome)) {
+    ph = "LOADING";
     col = "#f5b82e";
-  } else if (T.st === "depot") {
-    const hm = T.dest === T.home || !T.pick;
-    ph = hm ? (T.ph === "drop" ? "UNLOADING" : "IN YARD") : "LOADING";
-    col = hm ? "#a371f7" : "#f5b82e";
+    st = ownTruckStatus(T);
+  } else if (T.st === "road" && loaded) {
+    ph = "DELIVERING";
+    col = "#3ddc84";
+    st = "Delivering the container to " + home;
+  } else if (atHome) {
+    ph = T.ph === "drop" ? "UNLOADING" : "RETURNING";
+    col = "#a371f7";
+    st = ownTruckStatus(T);
   } else {
     ph = "STARTING";
     col = "#8b949e";
+    st = "Pulling out of the yard";
   }
-  let pr =
-      T.st === "road"
-        ? T.box
-          ? 0.6
-          : 0.1
-        : T.st === "gate" || (T.st === "depot" && T.pick && T.dest !== T.home)
-          ? 0.5
-          : T.st === "depot"
-            ? 0.95
-            : 0,
-    eta = "";
-  const q = typeof ptPoses === "function" ? ptPoses().find((p) => p.T === T) : null;
-  if (q && tgt && tgt.entrance) {
-    const d = Math.hypot(tgt.entrance.x - q.x, tgt.entrance.y - q.y),
-      key = (tgt.name || "") + (T.box ? 1 : 0);
-    if (T.legK !== key) {
-      T.legK = key;
-      T.legD = Math.max(d, 1);
-    }
-    const f = Math.max(0, Math.min(1, 1 - d / T.legD));
-    pr = T.box ? 0.55 + 0.4 * f : 0.05 + 0.4 * f;
-    eta = (d / 1000).toFixed(1) + " km \u2022 ~" + Math.max(1, Math.round(d / 13 / 60)) + " min";
-  }
-  return { st, ph, col, pr, eta, to: (tgt && tgt.name) || "" };
+  const job = loaded
+    ? { cargo: "40ft container", from: T.mis || pkName, to: home }
+    : { cargo: "Empty \u2014 collecting a 40ft container", from: home, to: pkName };
+  // time left: rest of this leg + (outbound) loading + the leg back
+  const q = typeof ptPoses === "function" ? ptPoses().find((p) => p.T === T) : null,
+    back = pk ? ownRouteM(yd.entrance, pk.e) : 0;
+  let left = null;
+  if (q && T.st === "road") {
+    const e = loaded ? yd.entrance : pk && pk.e;
+    if (e) left = ownRemM(T, q.x, q.y, e) / OWN_SPD + (loaded ? 20 : OWN_LOAD + back / OWN_SPD);
+  } else if (T.st === "gate" || (T.st === "depot" && !atHome))
+    left = OWN_LOAD * 0.5 + back / OWN_SPD;
+  else if (atHome) left = T.ph === "drop" ? 10 : 25;
+  const el = T.mT0 != null ? Math.max(0, PTRUCK.t - T.mT0) : 0,
+    pr = left != null ? Math.max(0.02, Math.min(0.99, el / (el + left))) : 0.02,
+    mm = left != null ? Math.max(0, Math.round(left)) : null,
+    eta =
+      mm != null ? "back in ~" + Math.floor(mm / 60) + ":" + String(mm % 60).padStart(2, "0") : "";
+  return { st, ph, col, pr, eta, job, to: job.to };
 }
 function ownTrkHTML(y, B) {
   const tr = typeof PTRUCK !== "undefined" ? PTRUCK.list.filter((T) => T.home === y) : [];
@@ -579,7 +638,7 @@ function ownTrkHTML(y, B) {
       .map((T, i) => {
         const I = ownTrkInfo(T);
         return `<div class="odt"><div class="odi" style="background:${B.col};color:${B.acc}">\u{1F69A}<small>${i + 1}</small></div><div class="odb"><div class="odr"><b>Truck ${i + 1}</b><span class="pill" style="background:${I.col}">${I.ph}</span>${T.box ? `<span class="box" style="background:${T.box}" title="carrying a container"></span>` : ""}<span style="flex:1"></span><span class="odm">${money(T.earn || 0)}</span></div>
-    <div class="ods">${esc(I.st)}</div><div class="odp"><i style="width:${Math.round(I.pr * 100)}%;background:${I.col}"></i></div>${I.eta ? `<div class="ode">${esc(I.eta)}</div>` : ""}</div></div>`;
+    <div class="odj"><b>${esc(I.job.cargo)}</b><br>${esc(I.job.from)} \u2192 ${esc(I.job.to)}</div><div class="ods">${esc(I.st)}</div><div class="odp"><i style="width:${Math.round(I.pr * 100)}%;background:${I.col}"></i></div>${I.eta ? `<div class="ode">${esc(I.eta)}</div>` : ""}</div></div>`;
       })
       .join("") || '<div class="ods" style="padding:14px">Trucks are starting up\u2026</div>'
   );
