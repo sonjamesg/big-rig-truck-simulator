@@ -90,17 +90,28 @@ sim. `main.js` owns the loop (update → draw → HUD), the camera, the minimap 
 | 52 | `ambulance.js` | AMBULANCE: casualties stay down until paramedics treat them |
 | 53 | `fire.js` | FIRES: buildings near the player catch fire; the nearest fire station's engine responds |
 | 54 | `bikes.js` | MOTORBIKES: sport/cruiser/scooter/delivery bikes join AI traffic by road type (never MIX/parked, so map data is unchanged); single lamp at night; lane filtering past slow queues; knock-offs (bike slides, rider tumbles); biker gangs (kinematic followers on the leader trail); biker revenge chase (HUD banner, shooting, escape by distance/LOS/knock-offs, never during jobs/BM/heists) |
-| 55 | `flycam.js` | admin-only fly camera (G / FLY button): truck holds its handbrake, free camera pans/zooms, click/tap or Tab/LB/RB to follow AI vehicles |
-| 56 | `accounts.js` | Supabase accounts: name + 4-digit PIN via SECURITY DEFINER RPCs; cloud save sync; guest/offline fallback |
-| 57 | `invite.js` | Invite landing: opened via ?join=TRUCK-1234 -> dedicated "You're invited" card (log in / create / guest / remembered), then straight into the host's game |
-| 58 | `server.js` | Public servers over Supabase Realtime (no host needed, cap 15). Presence = player list + cap, Broadcast = poses. Home MULTIPLAYER card: SERVERS modal (list, count/cap, tap to join) + HOST GAME modal (PeerJS invite code, link copy/share, players x/6, start/close) |
-| 59 | `homecard.js` | Home card: one clear "who am I" card. Account remembered -> Welcome back <name> + CONTINUE + Switch account |
+| 55 | `liftbridge.js` | LIFT BRIDGE: double-leaf bascule in the M1 crossing over the bottom-docks channel (replaces the suspension cables there); opens on a timeline from the deterministic ship schedule; pseudo-3D leaves/towers (oblique projection), road signals + half barriers stopping AI and the player; jump off a rising leaf or fall in and get towed |
+| 56 | `flycam.js` | admin-only fly camera (G / FLY button): truck holds its handbrake, free camera pans/zooms, click/tap or Tab/LB/RB to follow AI vehicles |
+| 57 | `accounts.js` | Supabase accounts: name + 4-digit PIN via SECURITY DEFINER RPCs; cloud save sync; guest/offline fallback |
+| 58 | `invite.js` | Invite landing: opened via ?join=TRUCK-1234 -> dedicated "You're invited" card (log in / create / guest / remembered), then straight into the host's game |
+| 59 | `server.js` | Public servers over Supabase Realtime (no host needed, cap 15). Presence = player list + cap, Broadcast = poses. Home MULTIPLAYER card: SERVERS modal (list, count/cap, tap to join) + HOST GAME modal (PeerJS invite code, link copy/share, players x/6, start/close) |
+| 60 | `homecard.js` | Home card: one clear "who am I" card. Account remembered -> Welcome back <name> + CONTINUE + Switch account |
 
 Notes on ownership:
 - **Roundabouts (v51)**: splitters are narrow raised kerb medians (`rbSplitter(rb, arm)` = `g.spN`, half-width `RB_MED`);
   the old triangular outline (`rbSplitter(rb, arm, true)` = `g.spF`) is only painted hatching and is what `rbPaint` uses,
   so map tiles never change. Signal heads sit on the left verge (primary + repeater). Give-way dashes at every entry.
   Approach lanes (`rbLanes`): 2 lanes LS|R, 3 lanes L|S|R; `rbApprFix()` re-applies them after the map loads.
+- **Lift bridge** (`liftbridge.js`, v51): constants in `LB` (span `XA..XB` x `Y0..Y1` tiles, leaf `L`, `AMAX`).
+  `lbState()` derives lights/barriers/leaf angle from `lbOcc(t)` (ship hull over the span) looked ahead/back with
+  `portT()`, so it is deterministic and needs no saved state; `LB.force` overrides it for tests/shots. Only ships already
+  released by the port sim are seen ahead, which is fine since ships reach the bridge long after release. Drawing:
+  `lbProj` (oblique: height rises up-screen, `LB_OB`, plus a small swell `LB_K`), `lbSolid` culls faces by projected
+  winding. The generated suspension span over this crossing (`lbSusp()`) is skipped in `drawOverhead`; `lbRails` draws
+  plain parapets/lamps on the fixed decks. `lbGapClip(sh)` removes port deck shadow / street lamps over the open span.
+  Hooks: `railStopAcc` (AI stop line 0.8 tiles before each barrier), `railBarrierHit` (player; rigs already straddling
+  the line pass), `stepTruck` (`lbTruckStep`: leaf slope gravity, launch off the tip, landing damage, sink -> BREAKDOWN
+  "respawn" tow). Road layout and map data unchanged.
 - **Motorbikes** (`bikes.js`, v51): bike kinds live in `BK_T` (merged into `VTYPES`, flag `bike`). `spawnVehicle` is wrapped:
   random spawns without `opt.kind` become a bike with `BK_MIX[type][0]` probability. Gang followers and revenge hunters are
   kinematic (`v.bkK`, `stepVeh` wrapper skips the lane model; a 2-point stub path keeps `pathAt` working). They ride the

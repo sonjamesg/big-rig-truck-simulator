@@ -679,6 +679,8 @@ function drawPortLow(vx0, vy0, vx1, vy1) {
         b[1] * TILE < vy1 + 200
       ) {
         ctx.save();
+        if (P === world.kbPort && typeof lbGapClip === "function") lbGapClip(2.4); // v51 lift bridge: nothing across the open span
+        ctx.save();
         ctx.beginPath();
         ctx.rect(-1e5, -1e5, 2e5, 2e5);
         for (const r of P.brgW.runs) ctx.rect(r[0] * TILE, r[1] * TILE, r[2] * TILE, 1 * TILE);
@@ -708,6 +710,7 @@ function drawPortLow(vx0, vy0, vx1, vy1) {
         ctx.moveTo(b[0] * TILE, b[3] * TILE - 2);
         ctx.lineTo(b[2] * TILE, b[3] * TILE - 2);
         ctx.stroke();
+        ctx.restore();
       }
     }
     if (vis) {
