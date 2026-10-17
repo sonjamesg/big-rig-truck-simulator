@@ -1401,8 +1401,10 @@ function updateCareer(dt) {
     const p = d.pad;
     if (cx > p.x0 && cx < p.x1 && cy > p.y0 && cy < p.y1) inPad = d;
   }
-  if (inPad && Math.abs(s.v) < 0.2 && !career.padLatch && !career.uiOpen) {
+  const padFresh = trigFresh("dealer", inPad ? inPad.id || inPad.name : null); // v50: only after driving in
+  if (inPad && padFresh && Math.abs(s.v) < 0.2 && !career.padLatch && !career.uiOpen) {
     career.padLatch = true;
+    trigUsed("dealer");
     openDealer(inPad);
   }
   if (!inPad) career.padLatch = false;
@@ -1413,8 +1415,10 @@ function updateCareer(dt) {
       y0 = d.y * M_T;
     if (s.x > x0 && s.x < x0 + d.w * M_T && s.y > y0 && s.y < y0 + d.h * M_T) inDepot = d;
   }
+  const depFresh = trigFresh("depot", inDepot ? inDepot.id : null); // v50: only after driving in
   if (
     inDepot &&
+    depFresh &&
     !(typeof FX !== "undefined" && FX.boom) &&
     !career.active &&
     Math.abs(s.v) < 0.1 &&
@@ -1427,6 +1431,7 @@ function updateCareer(dt) {
     career.depotT = (career.depotT || 0) + dt;
     if (career.depotT > 1.2) {
       career.depotLatch = true;
+      trigUsed("depot");
       openBoard();
     }
   } else career.depotT = 0;

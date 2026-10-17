@@ -2,7 +2,7 @@
  * @file milbase.js — SANDVALE MILITARY BASE (replaces Sandvale Intl): layout + roads (generator), fence/tower/building/vehicle art,
  *   military trailers, AI military traffic + gate barriers, helicopters, rifle range + parade soldiers, floodlights + searchlights
  * Exposes (globals): MB, MB_SIG, MB_HP, mbRoads, mbGen, mbDepotOpts, mbSolidM, mbKind, mbDress, mbTrailerCanvas, MB_TRL, mbUpdate,
- *   mbDrawLow, mbDrawHigh, mbDrawNight (+ mb* helpers)
+ *   mbDrawLow, mbDrawHigh, mbDrawNight, mbMapPOI, mbMapIcon (+ mb* helpers)
  * Depends on: world.js (set/get/fill, T, TILE, M_T), traffic.js (vCanvas, VS, shadowOf, spawnVehicle, makeCarArt),
  *   render.js (shade, CUR_CHUNK), sites.js (OBJX), port.js (aiGoal), porttrucks.js (ptSegAt), daynight.js (DN, dnLight)
  * Load order: after airport.js in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
@@ -61,6 +61,21 @@ function mbDepotOpts() {
       yardAt: [1262, 243],
     },
   };
+}
+// v50: big-map icon + fast travel target for the base: the main gate, on the external road just outside the barrier
+let MB_POI = null;
+function mbMapPOI() {
+  if (!world.milbase) return null;
+  if (!MB_POI) {
+    const x = (MB.av + 2) * M_T,
+      y = 352 * M_T;
+    MB_POI = { name: "Sandvale Military Base (main gate)", x, y, entrance: { x, y } };
+  }
+  return MB_POI;
+}
+function mbMapIcon(icon, px, py) {
+  const b = mbMapPOI();
+  if (b) icon(px(b.x), py(b.y), "#4b5320", "\u2605");
 }
 function mbInside(tx, ty) {
   return tx >= MB.x0 - 2 && tx <= MB.x1 + 2 && ty >= MB.y0 - 2 && ty <= 352;

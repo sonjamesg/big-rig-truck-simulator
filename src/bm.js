@@ -1126,10 +1126,12 @@ function bmUpdate(dt) {
       BM.jbLatch = 0;
       BM.jbT = 0;
     }
-    if (inJ && Math.abs(truck.v) < 0.5 && !career.uiOpen && !BM.jbLatch) {
+    const jbFresh = trigFresh("bmjb", inJ ? Y.id || Y.name : null); // v50: only after driving in
+    if (inJ && jbFresh && Math.abs(truck.v) < 0.5 && !career.uiOpen && !BM.jbLatch) {
       BM.jbT = (BM.jbT || 0) + dt;
       if (BM.jbT > 0.8) {
         BM.jbLatch = 1;
+        trigUsed("bmjb");
         bmOpenBoard();
       }
     } else BM.jbT = 0;

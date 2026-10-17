@@ -1,7 +1,7 @@
 /**
  * @file heli.js — HELICOPTERS: real world entities flying missions between Sandvale Military Base and helipads around the map
  *   (hospital + police roofs, Albion Airport, the docks). Take-off -> cruise at altitude (ground shadow) -> landing -> wait -> next mission.
- * Exposes (globals): HL, hlPads, hlUpdate, hlDrawPads, hlDrawHigh, hlDrawNight, hlDrawMap
+ * Exposes (globals): HL, hlPads, hlUpdate, hlDrawPads, hlDrawHigh, hlDrawNight, hlDrawMap, hlMapPOIs
  * Depends on: milbase.js (MB_HP, mbHeliBody, mbDrawHeli), services.js (SVC), world.js, daynight.js (DN, dnLight), audio.js (audio, audioLoop)
  * Load order: after milbase.js in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
  * Airborne: never in traffic.vs, so no collisions with ground traffic. Pads are derived from world data at runtime (no map-data change).
@@ -318,6 +318,24 @@ function hlDrawNight(vx0, vy0, vx1, vy1) {
   g.restore();
 }
 // minimap + big map: pads as small H, helicopters as a heading arrow (fx/fy map metres -> screen)
+// v50: the H pads drawn on the big map are clickable fast travel / sat nav targets (land on the road beside them)
+function hlMapPOIs(cb) {
+  const P = world.milbase && (HL.pads || hlPads());
+  if (!P) return;
+  for (const p of P) {
+    if (p.base) continue;
+    const x = p.x / PPM,
+      y = p.y / PPM;
+    if (!p.ft)
+      p.ft = {
+        name: p.name + (/helipad/i.test(p.name) ? "" : " helipad"),
+        x,
+        y,
+        entrance: { x, y },
+      };
+    cb(p.ft, x, y, "Helipad");
+  }
+}
 function hlDrawMap(fx, fy, big) {
   if (!world.milbase || !HL.pads) return;
   const g = ctx;

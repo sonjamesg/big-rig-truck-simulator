@@ -603,6 +603,7 @@ function draw() {
   try {
     drawPuddles(vx0, vy0, vx1, vy1, z);
   } catch (e) {}
+  drawFXLow(vx0, vy0, vx1, vy1); // v50: skid marks are a ground decal: over the road paint, under every vehicle/ped/prop
   const VR = [vx0, vy0, vx1, vy1];
   drawAmbientLow(VR);
   drawNavWorld();
@@ -613,7 +614,6 @@ function draw() {
   mbDrawLow(vx0, vy0, vx1, vy1);
   bmDrawLow(vx0, vy0, vx1, vy1);
   drawPortLow(vx0, vy0, vx1, vy1);
-  drawFXLow(vx0, vy0, vx1, vy1);
   drawRemotePlayers(vx0, vy0, vx1, vy1);
   if (typeof drawParkedTrucks === "function") drawParkedTrucks(vx0, vy0, vx1, vy1);
   drawBreakdown();
@@ -1874,7 +1874,7 @@ function drawBigMap() {
     FT_BTN = [tx + 2 * G + (tw - 3 * G) / 2, ty + 64 * PK, (tw - 3 * G) / 2, bh];
     for (const [b, l, c] of [
       [NAV_BTN, (pad2 ? "X " : "") + "Sat nav", "#2e86de"],
-      [FT_BTN, (pad2 ? "A " : "") + "Fast travel", "#27ae60"],
+      [FT_BTN, (pad2 ? "A " : "") + "Fast travel", ftJobBlock() ? "#4b5563" : "#27ae60"], // v50: greyed during a job
     ]) {
       ctx.fillStyle = c;
       ctx.beginPath();
@@ -2072,7 +2072,7 @@ function popAct(k) {
       return;
     }
     NAV.sel = null;
-    fastTravel(sel.o);
+    fastTravel(sel.o, sel);
   } else {
     NAV.sel = null;
     const r = setRoute(sel.o);
@@ -2178,9 +2178,9 @@ cv.addEventListener("pointerup", (e) => {
       });
       const inB = (b) => b && x >= b[0] && x <= b[0] + b[2] && y >= b[1] && y <= b[1] + b[3];
       if (NAV.sel && inB(FT_BTN)) {
-        const d = NAV.sel.o;
+        const sel = NAV.sel;
         NAV.sel = null;
-        fastTravel(d);
+        fastTravel(sel.o, sel);
         return;
       }
       if (NAV.sel && inB(NAV_BTN)) {
@@ -2216,9 +2216,9 @@ cv.addEventListener(
 );
 addEventListener("keydown", (e) => {
   if (bigmap.open && NAV.sel && (e.code === "Enter" || e.code === "Space")) {
-    const d = NAV.sel.o;
+    const sel = NAV.sel;
     NAV.sel = null;
-    fastTravel(d);
+    fastTravel(sel.o, sel);
     e.preventDefault();
     return;
   }

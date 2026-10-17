@@ -111,6 +111,14 @@ Notes on ownership:
   frame on wide screens, compact rows below otherwise) and sets `RSF` (canvas backing px per logical px = CSS scale ×
   devicePixelRatio, max 2). Game code still draws in logical VW×VH coordinates; **every main-canvas `ctx.setTransform`
   must multiply by `RSF`** (phones keep RSF 1 and their own layout in `mobile.js`).
+- **Fast travel**: big-map icons and their targets come from one list, `mapPOIList` in `satnav.js` (the live data the
+  icons are drawn from). `ftTarget(o, icon)` picks the depot/yard rect, then the place's own drivable ground
+  (`ftPlaceSpot`: fuel HGV lane or forecourt, garage bay), then the nearest kerbside lane (`ftRoadSpot`, straight
+  segments) or bend (`ftCurveSpot`). `ftJobBlock` refuses fast travel during any job, heist or wanted level. Check:
+  `tests/fasttravel_poi_test.py`.
+- **Trigger popups** (yard sale, homes, dealers, depot and Black Market boards) are edge-triggered with `trigFresh` /
+  `trigUsed` (`ui.js`): they open only after the truck drives into the zone, never on load, respawn or fast travel
+  (`rigPlace` calls `trigReset`). Check: `tests/trigger_popup_test.py`.
 - **Map**: drawing is in `main.js` (`drawMinimap`, `drawBigMap`). The real-chunk overview and the airport overlay are
   in `mapov.js`, the night style is in `nightmap.js`, and route and POI hit-testing are in `satnav.js`.
 - `src/template.html` is the page shell (DOM, CSS and the mobile deck). `src/peerjs.min.js`, `src/engine_b64.txt` and

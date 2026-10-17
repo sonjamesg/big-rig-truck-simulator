@@ -1,11 +1,36 @@
 /**
  * @file ui.js — UI: job board, dealership, results, tier unlock (DOM overlay inside #frame so it works in fullscreen)
  * Exposes (globals): UICSS, uiRoot, uiInit, uiBlocking, closeUI, openModal, esc, money, trlSVG,
- *   boardState, openBoard, renderBoard, startMission, renderSide (+9 more)
+ *   boardState, openBoard, renderBoard, startMission, renderSide, TRIG, trigFresh, trigUsed, trigReset,
+ *   uiBoardFit (+9 more)
  * Depends on: physics.js, audio.js, depots.js, career.js, main.js
  * Load order: #16 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
  */
 "use strict";
+// v50: edge-triggered popups (yard sale, homes, dealers, depot / Black Market boards): a trigger zone only fires after the truck
+// has *driven into* it. The first look after load, respawn or fast travel (trigReset) just records the zone it is in, so a save
+// parked on a trigger never pops the card. key = the zone the truck is in (geometric, any speed) or null.
+const TRIG = { gen: 0 };
+function trigFresh(sys, key) {
+  const T = TRIG[sys] || (TRIG[sys] = { k: undefined, arm: false, gen: -1 });
+  if (T.gen !== TRIG.gen) {
+    T.gen = TRIG.gen;
+    T.k = key;
+    T.arm = false;
+    return false;
+  }
+  if (key !== T.k) {
+    T.k = key;
+    T.arm = key != null;
+  }
+  return T.arm;
+}
+function trigUsed(sys) {
+  if (TRIG[sys]) TRIG[sys].arm = false;
+}
+function trigReset() {
+  TRIG.gen++;
+}
 // ===================== v7 UI: job board, dealership, results, tier unlock (DOM overlay inside #frame so it works in fullscreen) =====================
 const UICSS = `
 #ui{position:absolute;inset:12px;pointer-events:none;z-index:6;border-radius:6px;overflow:hidden;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -186,8 +211,32 @@ function openModal(kind, html, cls) {
   });
   const x = b.querySelector(".x");
   if (x) x.addEventListener("click", closeUI);
+  if (kind === "board" || kind === "bmboard") uiBoardFit(b.firstChild);
   return b;
 }
+// v50: desktop job boards (normal + Black Market) fill ~88% of the game area: the 916x552 card is zoomed (crisp text, bigger
+// cards) to the #ui box, which matters in fullscreen where the frame is far bigger than the 984px core. Phones: unchanged.
+const UI_BOARD_K = 0.88;
+function uiBoardFit(m) {
+  if (!m || !uiRoot || document.body.classList.contains("touch")) return;
+  const w = uiRoot.clientWidth,
+    h = uiRoot.clientHeight;
+  if (!w || !h) return;
+  const k = Math.max(1, Math.min((w * UI_BOARD_K) / 916, (h * UI_BOARD_K) / 552, 3));
+  m.style.zoom = k.toFixed(3);
+  m.dataset.k = k.toFixed(3);
+}
+addEventListener("resize", () => {
+  if (typeof uiRoot === "undefined" || !uiRoot) return;
+  const m = uiRoot.querySelector(".mback .modal");
+  if (m && (career.uiOpen === "board" || career.uiOpen === "bmboard")) uiBoardFit(m);
+});
+document.addEventListener("fullscreenchange", () =>
+  setTimeout(() => {
+    const m = uiRoot && uiRoot.querySelector(".mback .modal");
+    if (m && (career.uiOpen === "board" || career.uiOpen === "bmboard")) uiBoardFit(m);
+  }, 60),
+);
 const esc = (s) =>
   String(s).replace(
     /[&<>"]/g,

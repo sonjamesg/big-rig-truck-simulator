@@ -185,18 +185,20 @@ function updateOwnDepots(dt) {
   }
   for (const yd of world.forSale) ownTrain(yd, dt);
   let hit = null;
-  if (Math.abs(truck.v) < 0.6)
-    for (const yd of ownYards()) {
-      const o = ownedYard(yd);
-      if (!o && ownIn(yd.slot)) hit = [yd, "buy"];
-      else if (o && yd.gslot && ownIn(yd.gslot)) hit = [yd, "garage"];
-      else if (o && yd.oslot && ownIn(yd.oslot)) hit = [yd, "office"];
-      else if (o && yd.sslot && ownIn(yd.sslot)) hit = [yd, "service"];
-    }
+  for (const yd of ownYards()) {
+    const o = ownedYard(yd);
+    if (!o && ownIn(yd.slot)) hit = [yd, "buy"];
+    else if (o && yd.gslot && ownIn(yd.gslot)) hit = [yd, "garage"];
+    else if (o && yd.oslot && ownIn(yd.oslot)) hit = [yd, "office"];
+    else if (o && yd.sslot && ownIn(yd.sslot)) hit = [yd, "service"];
+  }
+  const fresh = trigFresh("own", hit ? hit[0].id + hit[1] : null); // v50: only after driving in (never on load/spawn)
+  if (Math.abs(truck.v) >= 0.6) hit = null;
   const key = hit ? hit[0].id + hit[1] : null;
   if (key !== OWN.slot) {
     OWN.slot = key;
-    if (hit && !career.uiOpen && !(typeof bigmap !== "undefined" && bigmap.open)) {
+    if (hit && fresh && !career.uiOpen && !(typeof bigmap !== "undefined" && bigmap.open)) {
+      trigUsed("own");
       const [yd, k] = hit;
       if (k === "buy") ownBuyCard(yd);
       else if (k === "garage") {

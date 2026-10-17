@@ -2,7 +2,8 @@
  * @file satnav.js — SAT NAV: A* over the road tiles, route guidance; world arrows follow a smoothed
  *   keep-left path (navSmoothPath / navSmoothAt, NAV_ARROW_SP spacing, none in junction boxes)
  * Exposes (globals): NAV, NAV_COST, NAV_SPEED, navUp, navTileInfo, isRoadT, navSnap,
- *   navSnapTruck, navAStar, navBuild, setRoute, clearRoute, navIsMission, userCancelRoute (+36
+ *   navSnapTruck, navAStar, navBuild, setRoute, clearRoute, navIsMission, userCancelRoute, mapPOIList,
+ *   ftJobBlock (+36
  *   more)
  * Depends on: world.js, lorry.js, physics.js, audio.js, traffic.js, depots.js, career.js, ui.js,
  *   mp.js, breakdown.js, owndepot.js, homes.js, rail.js, nightmap.js, main.js, police.js
@@ -843,35 +844,45 @@ function railPOIs() {
     }));
   return RAIL_POI;
 }
-function navPOIAt(x, y, BX, BY) {
-  let best = null,
-    bd = mapHitR();
-  const test = (o, mx, my, kind) => {
-    const d = Math.hypot(BX(mx / M_T) - x, BY(my / M_T) - y);
-    if (d < bd) {
-      bd = d;
-      best = { o, kind, name: o.name };
-    }
-  };
-  for (const s of railPOIs()) test(s, s.x, s.y, "Station");
-  if (typeof hidePOIs === "function") for (const h of hidePOIs()) test(h, h.x, h.y, "Hide box");
+// v50: every clickable big-map icon, from the same live data the icons are drawn from (drawPOIs / bmMapIcons / hlDrawMap /
+// railBigMap): cb(o, mx, my, kind) with the icon's position in metres. navPOIAt, fast travel and tests/fasttravel_poi_test.py use it.
+function mapPOIList(cb) {
+  for (const s of railPOIs()) cb(s, s.x, s.y, "Station");
+  if (typeof hidePOIs === "function") for (const h of hidePOIs()) cb(h, h.x, h.y, "Hide box");
   for (const d of world.depots)
-    test(d, d.entrance.x, d.entrance.y, /Port/.test(d.name) ? "Port" : "Depot");
-  for (const f of world.fuel) test(f, f.x, f.y, "Fuel");
-  for (const g of world.garages) test(g, g.x, g.y, "Garage");
+    cb(d, d.entrance.x, d.entrance.y, /Port/.test(d.name) ? "Port" : "Depot");
+  for (const f of world.fuel) cb(f, f.x, f.y, "Fuel");
+  for (const g of world.garages) cb(g, g.x, g.y, "Garage");
   for (const m of world.malls || [])
-    test(m, m.entrance.x, m.entrance.y, m.kind === "mall" ? "Mall" : "Supermarket");
-  for (const d of world.dealers || []) test(d, d.entrance.x, d.entrance.y, "Truck dealer");
-  for (const y of world.forSale || []) {
-    const o = test(
+    cb(m, m.entrance.x, m.entrance.y, m.kind === "mall" ? "Mall" : "Supermarket");
+  for (const d of world.dealers || []) cb(d, d.entrance.x, d.entrance.y, "Truck dealer");
+  for (const y of world.forSale || [])
+    cb(
       y,
       y.entrance.x,
       y.entrance.y,
       typeof ownedYard === "function" && ownedYard(y) ? "Your yard" : "Yard for sale",
     );
+  if (typeof SVC !== "undefined")
+    for (const s of SVC.list) cb(s, s.entrance.x, s.entrance.y, SVC_ICON[s.type][2]);
+  if (typeof homePOIs === "function") homePOIs(cb);
+  if (typeof bmPOIs === "function") bmPOIs(cb);
+  if (typeof hlMapPOIs === "function") hlMapPOIs(cb);
+  if (typeof mbMapPOI === "function") {
+    const b = mbMapPOI();
+    if (b) cb(b, b.x, b.y, "Military base");
   }
-  if (typeof homePOIs === "function") homePOIs(test);
-  if (typeof bmPOIs === "function") bmPOIs(test);
+}
+function navPOIAt(x, y, BX, BY) {
+  let best = null,
+    bd = mapHitR();
+  mapPOIList((o, mx, my, kind) => {
+    const d = Math.hypot(BX(mx / M_T) - x, BY(my / M_T) - y);
+    if (d < bd) {
+      bd = d;
+      best = { o, kind, name: o.name, x: mx, y: my };
+    }
+  });
   if (best && best.o.brand) best.name = best.o.brand.name;
   return best;
 }
@@ -1010,8 +1021,10 @@ function ftRoadSpot(mx, my) {
     back = trl ? 15 : 5,
     front = 6,
     C = [];
+  const inMB = typeof mbInside === "function" && mbInside(mx / M_T, my / M_T);
   for (const sg of world.segs) {
     if (!sg || sg.b1 - sg.b0 < (back + front) / M_T + 6) continue;
+    if (sg.mil && !inMB) continue; // v50: never drop the rig behind the base fence for an outside place
     const lat = (sg.a + sg.w / 2) * M_T;
     const lo = sg.b0 * M_T,
       hi = (sg.b1 + 1) * M_T,
@@ -1021,18 +1034,34 @@ function ftRoadSpot(mx, my) {
     if (d0 < 2500) C.push([d0, sg]);
   }
   C.sort((a, b) => a[0] - b[0]);
-  for (const [, sg] of C) {
+  // v50: first clear spot on each of the nearest segments, keep the one closest to the target (was: first segment only,
+  // which could put the rig 20+ tiles along a road when a closer street was right beside the place)
+  let best = null,
+    bd = 1e9;
+  for (const [d0, sg] of C) {
+    if (d0 > bd * 1.5) break;
     const tgt = (sg.dir === "h" ? mx : my) / M_T,
       opts = [];
     for (let al = sg.b0 + 2; al <= sg.b1 - 1; al += 1) opts.push(al + 0.5);
     opts.sort((a, b) => Math.abs(a - tgt) - Math.abs(b - tgt));
-    for (const al of opts)
+    let found = null;
+    for (const al of opts) {
+      if (Math.abs(al - tgt) * M_T > bd) break;
       for (const dir of [1, -1]) {
         const p = rigLaneOK(sg, dir, al, back, front, trl);
-        if (p) return p;
+        if (p) {
+          const d = Math.hypot(p.x - mx, p.y - my);
+          if (d < bd) {
+            bd = d;
+            best = p;
+          }
+          found = p;
+        }
       }
+      if (found) break;
+    }
   }
-  return null;
+  return best;
 }
 function rigLaneOK(sg, dir, al, back, front, trl) {
   const r0 = al - (dir * back) / M_T,
@@ -1069,6 +1098,7 @@ function rigLaneOK(sg, dir, al, back, front, trl) {
 // put the rig at a pose: cab, trailer lined up straight behind it, AI cars cleared out of the rig's footprint
 function rigPlace(p) {
   const s = truck;
+  if (typeof trigReset === "function") trigReset(); // no popup for the trigger we land on
   s.x = p.x;
   s.y = p.y;
   s.h = s.th = p.h;
@@ -1126,10 +1156,20 @@ function ftStill() {
   }
   return false;
 } // v29: under ~3 mph just stop and go (residual creep used to block it)
+// v50: no fast travel during any job (career job, Black Market job / heist) or any wanted level / chase
+const FT_JOB_MSG = "Fast travel unavailable during a job";
+function ftJobBlock() {
+  if (typeof career !== "undefined" && career.active) return FT_JOB_MSG;
+  if (typeof BM !== "undefined" && BM.act) return FT_JOB_MSG;
+  if (typeof WANT !== "undefined" && (WANT.lvl || (typeof POL !== "undefined" && POL.chase)))
+    return FT_JOB_MSG;
+  return null;
+}
+BigRig.ftJobBlock = ftJobBlock;
 function ftBlock(o, peek) {
   const s = truck;
-  if (typeof WANT !== "undefined" && (WANT.lvl || (typeof POL !== "undefined" && POL.chase)))
-    return "Can\u2019t fast travel while wanted";
+  const jb = ftJobBlock();
+  if (jb) return jb;
   const bmb = typeof bmBlockFT === "function" && bmBlockFT();
   if (bmb) return bmb;
   if (o && o.hide) return "No fast travel to hide boxes \u2014 use sat nav and drive there";
@@ -1142,16 +1182,14 @@ function ftBlock(o, peek) {
   if (!peek) ftStill();
   if (typeof BREAKDOWN !== "undefined" && BREAKDOWN.active)
     return "Fast travel unavailable while broken down";
-  const a = typeof career !== "undefined" && career.active;
-  if (a && (a.phase === "deliver" || a.phase === "unloading" || a.phase === "recouple"))
-    return "No fast travel while delivering a load \u2014 drive it there or cancel the job";
   const f = ftFee(o);
   if (s.money < f) return "Fast travel costs \u00a3" + f + " \u2014 not enough money";
   return null;
 }
-// where fast travel puts the rig: inside a depot / yard (tile rect), else the nearest kerbside lane to the entrance
-function ftTarget(dp) {
-  const e = dp.entrance || dp;
+// where fast travel puts the rig: inside a depot / yard (tile rect), else the nearest kerbside lane to the map icon
+// (at = the icon position {x,y} in metres from mapPOIList / navPOIAt; defaults to the entrance)
+function ftTarget(dp, at) {
+  const e = at && at.x !== undefined ? at : dp.entrance || dp;
   if (dp.x0 !== undefined && dp.w) {
     const p = ftSpot({ x: dp.x0, y: dp.y0, w: dp.w, h: dp.h, entrance: e, bays: dp.bays });
     if (p) return p;
@@ -1165,17 +1203,105 @@ function ftTarget(dp) {
     const p = ftSpot(dp);
     if (p) return p;
   }
-  return ftRoadSpot(e.x, e.y);
+  const q = ftPlaceSpot(dp);
+  if (q) return q;
+  const r = ftRoadSpot(e.x, e.y),
+    c = ftCurveSpot(e.x, e.y, r ? Math.hypot(r.x - e.x, r.y - e.y) : 1e9);
+  return c || r;
+}
+// v50: kerbside lane of a curved road (world.curves polylines, tiles) when it is closer than any straight segment
+// (stations / pads beside bends); the rig sits on the chord between two polyline points, wholly on road, clear of solids
+function ftCurveSpot(mx, my, lim) {
+  const trl = truck.trl,
+    back = trl ? 15 : 5,
+    tx = mx / M_T,
+    ty = my / M_T;
+  let best = null,
+    bd = lim;
+  for (const cv of world.curves || []) {
+    const P = cv.pts,
+      off = (cv.w / 4) * M_T;
+    for (let k = 1; k < P.length - 1; k++) {
+      const dd = Math.hypot(P[k][0] - tx, P[k][1] - ty) * M_T;
+      if (dd - off > bd) continue;
+      for (const sd of [1, -1]) {
+        const a = P[k - sd] || P[k],
+          b = P[k + sd] || P[k],
+          h = Math.atan2(b[0] - a[0], -(b[1] - a[1])),
+          f = fwd(h),
+          rr = rgt(h),
+          x = P[k][0] * M_T - rr[0] * off,
+          y = P[k][1] * M_T - rr[1] * off,
+          d = Math.hypot(x - mx, y - my);
+        if (d >= bd) continue;
+        let ok = true;
+        for (let q = -back; q <= 6 && ok; q += 1)
+          for (const w of [-1.2, 1.2]) {
+            const px = x + f[0] * q + rr[0] * w,
+              py = y + f[1] * q + rr[1] * w,
+              i = idx(Math.floor(px / M_T), Math.floor(py / M_T));
+            if (!isRoadT(i)) ok = false;
+          }
+        if (ok && ftClear(x, y, h, trl)) {
+          bd = d;
+          best = { x, y, h, curve: cv.id };
+        }
+      }
+    }
+  }
+  return best;
+}
+// v50: places you drive into: fuel stations (rig -> the HGV diesel lane, cab only -> the forecourt) and garages (the repair bay)
+function ftPlaceSpot(dp) {
+  const trl = truck.trl,
+    back = trl ? 14 : 2.5,
+    rects = [];
+  if (dp.hgv) for (const b of dp.hgv) rects.push([b.x0, b.y0, b.x1, b.y1]);
+  if (dp.zones && (!trl || !dp.hgv)) for (const z of dp.zones) rects.push(z);
+  if (dp.bay && dp.bay.x !== undefined && dp.ratePerPct !== undefined) {
+    const b = dp.bay;
+    rects.push([b.x - 8, b.y - 8, b.x + 8, b.y + 8]);
+  }
+  for (const [x0, y0, x1, y1] of rects) {
+    const hz = x1 - x0 >= y1 - y0,
+      L0 = hz ? x0 : y0,
+      L1 = hz ? x1 : y1,
+      W0 = hz ? y0 : x0,
+      W1 = hz ? y1 : x1,
+      mid = (W0 + W1) / 2,
+      C = [];
+    for (let w = W0 + 1.6; w <= W1 - 1.6; w += 0.8)
+      for (let a = L0 + 1; a <= L1 - 1; a += 1)
+        for (const d of [1, -1]) {
+          const f0 = a + d * 5.2,
+            r0 = a - d * back;
+          if (Math.min(f0, r0) < L0 + 0.5 || Math.max(f0, r0) > L1 - 0.5) continue;
+          C.push([Math.abs(w - mid) + 0.02 * Math.abs(a - (L0 + L1) / 2), a, w, d]);
+        }
+    C.sort((p, q) => p[0] - q[0]);
+    for (const [, a, w, d] of C) {
+      const x = hz ? a : w,
+        y = hz ? w : a,
+        h = hz ? (d > 0 ? Math.PI / 2 : -Math.PI / 2) : d > 0 ? Math.PI : 0;
+      if (ftClear(x, y, h, trl)) return { x, y, h, place: true };
+    }
+  }
+  return null;
 }
 BigRig.ftTarget = ftTarget;
-function fastTravel(dp) {
+BigRig.mapPOIs = () => {
+  const L = [];
+  mapPOIList((o, x, y, kind) => L.push({ o, x, y, kind, name: o.name }));
+  return L;
+};
+function fastTravel(dp, at) {
   const s = truck;
   const why = ftBlock(dp);
   if (why) {
     flash(why);
     return false;
   }
-  const p = ftTarget(dp);
+  const p = ftTarget(dp, at);
   if (!p) {
     flash("Fast travel: no clear spot at " + dp.name);
     return false;

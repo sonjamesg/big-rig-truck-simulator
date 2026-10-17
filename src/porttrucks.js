@@ -11,40 +11,45 @@
 //  -> back onto the road loaded -> depot/shop -> under the depot gantry (lift-off, sometimes an export box goes on) -> back to the port.
 // While on public roads a truck IS a traffic.js vehicle (lights, roundabouts, give-way, IDM spacing); only the yard/depot loops are scripted.
 const PTRUCK = { list: [], per: 3, t: 0 };
+// v50: same solid art as the player's skeletal trailers: loaded = trailerArt("cont") (chassis + container), empty = a full
+// steel skeletal chassis (main beams, side rails, crossmembers, gooseneck, mudguards, rear light bar), not a faint outline
 function ptArt(col) {
-  const key = "ptc" + (col || "empty");
+  if (col) return trailerArt("cont", col, "");
+  const key = "ptc-empty2";
   if (traffic.arts[key]) return traffic.arts[key];
-  const L = 13.6,
-    W = 2.55,
+  const L = TRL_LEN,
+    W = TRL_W,
     c = vCanvas(L, W),
     g = c.getContext("2d"),
     cx = c.width / 2,
     X = (m) => cx + m * VS,
-    Y = (m) => 0.15 * VS + m * VS;
-  g.fillStyle = "#121212";
+    Y = (m) => 0.15 * VS + m * VS,
+    R = (x0, y0, w, h) => g.fillRect(X(x0), Y(y0), w * VS, h * VS);
+  g.fillStyle = "#121212"; // tyres
   for (const fy of [9.6, 10.7, 11.8])
-    for (const s of [-1, 1])
-      g.fillRect(X((s * W) / 2 - (s > 0 ? 0.12 : 0.08)), Y(fy), 0.2 * VS, 0.8 * VS);
-  g.fillStyle = "#3a3d42";
-  g.fillRect(X(-0.45), Y(0.2), 0.9 * VS, (L - 0.4) * VS);
-  for (const fy of [0.6, 6.8, L - 0.6])
-    g.fillRect(X(-W / 2 + 0.1), Y(fy - 0.15), (W - 0.2) * VS, 0.3 * VS); // skeletal chassis
-  if (col) {
-    g.fillStyle = col;
-    g.fillRect(X(-W / 2 + 0.05), Y(0.3), (W - 0.1) * VS, 12.2 * VS);
-    g.strokeStyle = "rgba(0,0,0,0.35)";
-    for (let k = 0.6; k < 12.4; k += 0.4) {
-      g.beginPath();
-      g.moveTo(X(-W / 2 + 0.1), Y(k));
-      g.lineTo(X(W / 2 - 0.1), Y(k));
-      g.stroke();
-    }
-    g.strokeStyle = "rgba(0,0,0,0.6)";
-    g.strokeRect(X(-W / 2 + 0.05), Y(0.3), (W - 0.1) * VS, 12.2 * VS);
-  }
-  g.fillStyle = "#6e0d0d";
-  g.fillRect(X(-W / 2 + 0.08), Y(L - 0.16), 0.35 * VS, 0.12 * VS);
-  g.fillRect(X(W / 2 - 0.43), Y(L - 0.16), 0.35 * VS, 0.12 * VS);
+    for (const s2 of [-1, 1]) R((s2 * W) / 2 - (s2 > 0 ? 0.32 : -0.02), fy, 0.3, 0.85);
+  g.fillStyle = "#24272b"; // mudguards over the axle group
+  for (const s2 of [-1, 1]) R(s2 > 0 ? W / 2 - 0.42 : -W / 2 + 0.02, 9.45, 0.4, 3.2);
+  g.fillStyle = "#5d636b"; // gooseneck plate at the kingpin
+  R(-W / 2 + 0.15, 0, W - 0.3, 1.25);
+  g.fillStyle = "#4a4f56"; // twin main beams
+  R(-0.62, 0, 0.32, L - 0.2);
+  R(0.3, 0, 0.32, L - 0.2);
+  g.fillStyle = "#6b7179"; // side rails + crossmembers with twist-locks
+  R(-W / 2 + 0.05, 1.2, 0.14, L - 1.5);
+  R(W / 2 - 0.19, 1.2, 0.14, L - 1.5);
+  for (const fy of [1.2, 3.4, 5.6, 7.8, 9.2, L - 0.75]) R(-W / 2 + 0.05, fy, W - 0.1, 0.26);
+  g.fillStyle = "#c9a227";
+  for (const fy of [1.25, L - 0.7])
+    for (const s2 of [-1, 1]) R(s2 * (W / 2 - 0.35) - 0.09, fy, 0.18, 0.16);
+  g.strokeStyle = "rgba(0,0,0,0.55)";
+  g.lineWidth = Math.max(1, VS * 0.05);
+  g.strokeRect(X(-W / 2 + 0.05), Y(1.2), (W - 0.1) * VS, (L - 1.95) * VS);
+  g.fillStyle = "#2b2e33"; // rear under-run bar
+  R(-W / 2 + 0.1, L - 0.42, W - 0.2, 0.22);
+  g.fillStyle = "#b31515"; // tail lights (dnLight adds the glow at night)
+  R(-W / 2 + 0.1, L - 0.28, 0.42, 0.14);
+  R(W / 2 - 0.52, L - 0.28, 0.42, 0.14);
   return (traffic.arts[key] = { c, sh: shadowOf(c) });
 }
 function ptSetArt(T) {

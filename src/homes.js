@@ -1445,7 +1445,7 @@ function homeIn(r) {
 function updateHomes(dt) {
   if (!world.ready || !started || !HOMES.list.length) return;
   let hit = null;
-  if (Math.abs(truck.v) < 4) {
+  {
     for (const h of HOMES.list) {
       if (homeIn({ x0: h.hard.x - 1, y0: h.y0 - h.gap, w: h.hard.w + 2, h: h.hard.h + h.gap })) {
         hit = ["h", h];
@@ -1459,10 +1459,13 @@ function updateHomes(dt) {
           break;
         }
   }
+  const fresh = trigFresh("home", hit ? hit[0] + hit[1].id : null); // v50: only after driving in
+  if (Math.abs(truck.v) >= 4) hit = null;
   const key = hit ? hit[0] + hit[1].id : null;
   if (key !== HOMES.slot) {
     HOMES.slot = key;
-    if (hit && !career.uiOpen && !(typeof bigmap !== "undefined" && bigmap.open)) {
+    if (hit && fresh && !career.uiOpen && !(typeof bigmap !== "undefined" && bigmap.open)) {
+      trigUsed("home");
       if (hit[0] === "h") homeCard(hit[1]);
       else estatePanel(hit[1]);
     }
@@ -1542,7 +1545,7 @@ const HOME_CSS = `.hmm{width:min(980px,96%)!important;max-width:none!important;h
 .hmm .li{display:flex;align-items:center;gap:12px;background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.07);border-radius:12px;padding:8px}.hmm .li img{width:92px;height:70px;border-radius:8px;object-fit:cover;flex:none;background:#2a3a2a}
 .hmm .li .md{flex:1;min-width:0}.hmm .li .nm{font-weight:800;font-size:14px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hmm .li .rg{font-size:11px;opacity:.7}.hmm .li .fx{font-size:11px;opacity:.85;margin-top:3px}.hmm .li .pr{font-weight:900;color:#f4e6b5;font-size:15px}
 .hmm .bdg{display:inline-block;font-size:9.5px;font-weight:900;letter-spacing:1px;padding:2px 6px;border-radius:5px;margin-left:6px;vertical-align:middle}.hmm .bdg.o{background:#1e8449;color:#fff}.hmm .bdg.s{background:#c0392b;color:#fff}
-.hmm .rt{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex:none}.hmm .ftb{background:#2563eb;color:#fff;border:0;border-radius:8px;padding:8px 10px;font-weight:800;font-size:11.5px;cursor:pointer;white-space:nowrap}.hmm .ftb.padfocus,.hmm .ti.padfocus,.hmm .hx.padfocus{outline:3px solid #ffd23f;outline-offset:1px}
+.hmm .rt{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex:none}.hmm .ftb{background:#2563eb;color:#fff;border:0;border-radius:8px;padding:8px 10px;font-weight:800;font-size:11.5px;cursor:pointer;white-space:nowrap}.hmm .ftb.off{background:#4b5563;color:#cbd5e1;cursor:not-allowed}.hmm .ftb.padfocus,.hmm .ti.padfocus,.hmm .hx.padfocus{outline:3px solid #ffd23f;outline-offset:1px}
 .hmm .vf{font-size:10px;opacity:.6;font-style:italic}.hmm .ft{flex:none;padding:8px 14px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;opacity:.75;display:flex;justify-content:space-between;gap:10px}
 @media (max-width:560px){.hmm .li{display:grid!important;grid-template-columns:64px 1fr;align-items:start}.hmm .li .rt{grid-column:1/-1;flex-direction:row;align-items:center;justify-content:space-between;width:100%}.hmm .li .nm{white-space:normal}.hmm .tabs .ti{min-height:0!important;height:auto!important;padding:8px 4px!important;font-size:11px!important}.hmm{width:100%!important;height:100%!important;max-height:100%!important;border-radius:0!important}.hmm .li{gap:8px;padding:6px}.hmm .li img{width:64px;height:52px}.hmm .li .nm{font-size:13px}.hmm .li .fx{font-size:10.5px}.hmm .ftb{padding:7px 8px;font-size:11px}.hmm .hh h2{font-size:15px}.hmm .ft span:last-child{display:none}}
 @media (max-height:480px){.hmm{height:96%!important;max-height:96%!important}.hmm .li img{height:46px;width:60px}.hmm .hh{padding:6px 12px}.hmm .tabs{padding-top:4px}.hmm .tabs .ti{padding:6px}}
@@ -1699,8 +1702,17 @@ function estatePanel(agent) {
         }
       }, 50);
     });
-  for (const f of b.querySelectorAll(".ftb"))
+  const jb = ftJobBlock();
+  for (const f of b.querySelectorAll(".ftb")) {
+    if (jb) {
+      f.classList.add("off"); // v50: greyed during a job; a click still explains why
+      f.title = jb;
+    }
     f.addEventListener("click", () => {
+      if (ftJobBlock()) {
+        flash(ftJobBlock());
+        return;
+      }
       const o = f.dataset.h
         ? HOMES.list.find((h) => h.id === f.dataset.h).ft
         : (world.forSale || []).find((y) => y.id === f.dataset.y);
@@ -1708,6 +1720,7 @@ function estatePanel(agent) {
       HOMES.slot = "ft";
       setTimeout(() => fastTravel(o), 60);
     });
+  }
   HOMES.agentOpen = agent;
   if (typeof padNav === "function") setTimeout(() => padNav(null), 40);
 }

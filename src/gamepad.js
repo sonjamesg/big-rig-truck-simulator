@@ -177,9 +177,9 @@ function padUpdate(dt) {
     if (zin > 0.05) mapZoomTo(bigmap.zt * Math.pow(2.4, zin * dt));
     if (zout > 0.05) mapZoomTo(bigmap.zt / Math.pow(2.4, zout * dt));
     if (NAV.sel && hit(0)) {
-      const d = NAV.sel.o;
+      const sel = NAV.sel;
       NAV.sel = null;
-      fastTravel(d);
+      fastTravel(sel.o, sel);
       return;
     }
     if (NAV.sel && hit(2)) {
