@@ -179,7 +179,7 @@ function flyHUD() {
   if (typeof bigmap !== "undefined" && bigmap.open) return;
   if (!FLY.on) return;
   ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.setTransform(RSF, 0, 0, RSF, 0, 0);
   ctx.font = "bold 13px system-ui,sans-serif";
   ctx.textAlign = "center";
   ctx.fillStyle = "rgba(200,40,40,0.85)";

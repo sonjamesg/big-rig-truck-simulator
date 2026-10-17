@@ -103,6 +103,10 @@ Notes on ownership:
   later stages. `repair.js` holds the repair bays.
 - **Ports**: the yard, cranes, ships, gate lane and rail siding are in `port.js`. AI hauliers on public roads are in
   `porttrucks.js`.
+- **Desktop window size**: `fit()` in `main.js` scales the title bar + frame to fill the viewport (legend beside the
+  frame on wide screens, compact rows below otherwise) and sets `RSF` (canvas backing px per logical px = CSS scale ×
+  devicePixelRatio, max 2). Game code still draws in logical VW×VH coordinates; **every main-canvas `ctx.setTransform`
+  must multiply by `RSF`** (phones keep RSF 1 and their own layout in `mobile.js`).
 - **Map**: drawing is in `main.js` (`drawMinimap`, `drawBigMap`). The real-chunk overview and the airport overlay are
   in `mapov.js`, the night style is in `nightmap.js`, and route and POI hit-testing are in `satnav.js`.
 - `src/template.html` is the page shell (DOM, CSS and the mobile deck). `src/peerjs.min.js`, `src/engine_b64.txt` and

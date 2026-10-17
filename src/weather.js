@@ -42,7 +42,7 @@ function drawWeather(vx0, vy0, vx1, vy1, z) {
     F = WX.fog;
   if (W < 0.02 && F < 0.02) return;
   ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.setTransform(RSF, 0, 0, RSF, 0, 0);
   if (W > 0.02) {
     ctx.globalCompositeOperation = "multiply";
     ctx.fillStyle = "rgba(150,165,190," + 0.45 * W + ")";

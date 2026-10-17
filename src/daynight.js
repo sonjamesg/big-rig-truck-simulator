@@ -206,7 +206,7 @@ function drawNight(vx0, vy0, vx1, vy1, z) {
     D = DN.dusk;
   if (K < 0.01 && D < 0.01) return;
   ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.setTransform(RSF, 0, 0, RSF, 0, 0);
   if (D > 0.01) {
     ctx.globalCompositeOperation = "multiply";
     ctx.fillStyle = "rgba(255,150,80," + 0.32 * D + ")";

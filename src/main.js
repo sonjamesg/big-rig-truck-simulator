@@ -409,19 +409,60 @@ document.getElementById("fs").addEventListener("click", () => {
   if (!document.fullscreenElement) (f.requestFullscreen || f.webkitRequestFullscreen).call(f);
   else document.exitFullscreen();
 });
-// scale the fixed 960x600 window down to fit small screens
+// desktop: scale the 960x600 window (title bar + frame) up or down to fill the viewport, legend below at its own size.
+// RSF = canvas backing pixels per logical pixel (CSS scale x devicePixelRatio, capped) so the bigger frame stays sharp;
+// every main-canvas setTransform multiplies by it. Phones (body.touch) keep RSF 1 and their own layout (mobile.js).
+let RSF = 1;
+function setRSF(r) {
+  r = Math.round(r * 100) / 100;
+  const w = Math.round(VW * r),
+    h = Math.round(VH * r);
+  RSF = r;
+  if (cv.width !== w || cv.height !== h) {
+    cv.width = w;
+    cv.height = h;
+  }
+}
 function fit() {
   if (document.body.classList.contains("touch")) return;
-  const wrap = document.getElementById("wrap");
-  const avail = Math.min(
-    innerWidth - 16,
-    (innerHeight - (document.body.classList.contains("touch") ? 40 : 140)) * 1.6,
-  );
-  const s = Math.min(1, avail / VW);
+  const wrap = document.getElementById("wrap"),
+    st = document.getElementById("stage"),
+    sc = document.getElementById("scaler"),
+    lg = document.getElementById("legend"),
+    fr = document.getElementById("frame");
+  const core = sc.offsetHeight || 680, // title bar + frame, unscaled
+    B = document.body;
+  // legend below the frame (compact rows) ...
+  B.classList.remove("lgs");
+  let s = 1;
+  for (let i = 0; i < 2; i++) {
+    wrap.style.setProperty("--s", s); // legend wraps to the scaled width: measure, then refit
+    const lh = lg ? lg.offsetHeight + 4 : 0;
+    s = Math.max(0.3, Math.min((innerWidth - 16) / 984, (innerHeight - 16 - lh) / core));
+  }
+  // ... or beside it (wide viewports: the frame then uses the full height); keep whichever gives the bigger frame
+  B.classList.add("lgs");
+  const ss = Math.min((innerWidth - 16 - 262) / 984, (innerHeight - 16) / core);
+  if (!lg || ss <= s || lg.offsetHeight + 60 > innerHeight) B.classList.remove("lgs");
+  else s = ss;
   wrap.style.setProperty("--s", s);
+  st.style.height = Math.round(core * s) + "px";
+  const fs = document.fullscreenElement === fr,
+    css = fs ? Math.min(innerWidth, innerHeight * 1.6) : VW * s;
+  setRSF(Math.max(1, Math.min(2, (css * (devicePixelRatio || 1)) / VW)));
 }
 addEventListener("resize", fit);
+document.addEventListener("fullscreenchange", fit);
 fit();
+// refit when the legend changes size (ui.js pad/keyboard legend switch, late styles / fonts)
+{
+  const lg = document.getElementById("legend");
+  let q = 0;
+  if (lg && typeof ResizeObserver === "function")
+    new ResizeObserver(() => {
+      if (!q) q = requestAnimationFrame(() => ((q = 0), fit()));
+    }).observe(lg);
+}
 // ---------- loop
 function frame(ts) {
   const dt = Math.min(0.1, (ts - last) / 1000 || 0.016);
@@ -522,10 +563,11 @@ function draw() {
     vy0 = cam.y - VH / 2 / z,
     vx1 = cam.x + VW / 2 / z,
     vy1 = cam.y + VH / 2 / z;
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.setTransform(RSF, 0, 0, RSF, 0, 0);
   ctx.fillStyle = "#5d9b3a";
   ctx.fillRect(0, 0, VW, VH);
-  ctx.setTransform(z, 0, 0, z, VW / 2 - cam.x * z + sx, VH / 2 - cam.y * z + sy);
+  const zr = z * RSF;
+  ctx.setTransform(zr, 0, 0, zr, (VW / 2 - cam.x * z + sx) * RSF, (VH / 2 - cam.y * z + sy) * RSF);
   ctx.imageSmoothingEnabled = true;
   let budget = started ? 2 : 99;
   const c0x = Math.floor(vx0 / CHUNK),
@@ -599,7 +641,7 @@ function draw() {
   drawSigNight();
   drawPortNight(vx0, vy0, vx1, vy1);
   if (typeof ptYardCounter === "function") ptYardCounter(vx0, vy0, vx1, vy1);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.setTransform(RSF, 0, 0, RSF, 0, 0);
   drawHUD();
   bmHUD();
   if (bigmap.open) {

@@ -12,7 +12,7 @@ const MOB = { on: false, mode: "", steerId: null, ctx: {}, lastCtx: 0 };
 const MOBCSS = `
 body.touch{overflow:hidden;position:fixed;inset:0;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}
 body.touch #titlebar,body.touch #help,body.touch #credits,body.touch #touch,body.touch #fs{display:none!important}
-body.touch #wrap{margin:0;width:auto} body.touch #scaler{transform:none!important;width:auto}
+body.touch #wrap{margin:0;width:auto} body.touch #scaler{transform:none!important;width:auto} body.touch #stage{width:auto;height:auto!important}
 body.touch #frame{position:fixed;padding:0;border:none;background:#000;box-shadow:none;border-radius:6px;width:auto;z-index:1}
 body.touch canvas{border-radius:6px}
 body.touch #overlay,body.touch #ui{position:fixed;inset:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);border-radius:0;z-index:20}
