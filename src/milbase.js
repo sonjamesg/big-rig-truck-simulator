@@ -1,7 +1,7 @@
 /**
  * @file milbase.js — SANDVALE MILITARY BASE (replaces Sandvale Intl): layout + roads (generator), fence/tower/building/vehicle art,
  *   military trailers, AI military traffic + gate barriers, helicopters, rifle range + parade soldiers, floodlights + searchlights
- * Exposes (globals): MB, MB_HP, mbRoads, mbGen, mbDepotOpts, mbSolidM, mbKind, mbDress, mbTrailerCanvas, MB_TRL, mbUpdate,
+ * Exposes (globals): MB, MB_SIG, MB_HP, mbRoads, mbGen, mbDepotOpts, mbSolidM, mbKind, mbDress, mbTrailerCanvas, MB_TRL, mbUpdate,
  *   mbDrawLow, mbDrawHigh, mbDrawNight (+ mb* helpers)
  * Depends on: world.js (set/get/fill, T, TILE, M_T), traffic.js (vCanvas, VS, shadowOf, spawnVehicle, makeCarArt),
  *   render.js (shade, CUR_CHUNK), sites.js (OBJX), port.js (aiGoal), porttrucks.js (ptSegAt), daynight.js (DN, dnLight)
@@ -20,6 +20,10 @@ const MB = {
   barY: 335.5,
   rt: { bars: [0, 0], broke: [false, false], mil: 0, spT: 3, err: null },
 };
+const MB_SIG = [
+  [MB.av, 220],
+  [1292, 220],
+]; // signalised T-junctions: gate avenue + depot yard road meeting the spine
 const MB_HP = [
   [1092, 180],
   [1116, 180],
@@ -304,8 +308,9 @@ function mbGen(objs) {
   // v49: yard runs out to the gate avenue (west) and the south street (south); split either side of the yard road (x1292..1295)
   pad(1252, 228, 1292, 296, "#989892", {});
   pad(1296, 228, 1330, 296, "#989892", {});
-  area(1292, 224, 1310, 228, T.CONC);
-  O("conc", 1292, 224, 1310, 228, { col: "#989892" }, -0.2);
+  // v50: hardstand apron starts east of the yard road's kerb radius (it used to paint over the T-junction mouth)
+  area(1301, 224, 1310, 228, T.CONC);
+  O("conc", 1301, 224, 1310, 228, { col: "#989892" }, -0.2);
   bld(1260, 229, 1290, 241, "#5a6446", "MILITARY DEPOT", "f", { units: 3, doors: 3 });
   for (let rr = 0; rr < 3; rr++)
     for (let cc = 0; cc < 3; cc++) {
@@ -437,9 +442,10 @@ function mbGen(objs) {
   for (let y = MB.y0 + 30; y < MB.y1 - 10; y += 40)
     (light(MB.x0 + 1.2, y, 8), light(MB.x1 - 1.2, y, 8));
   for (let x = 1100; x < 1430; x += 40) (light(x, 218.6, 8), light(x, 300.4, 8));
-  // base junctions: plain priority (no signals)
+  // base junctions: plain priority (no signals), except the two depot T-junctions on the spine (v50: UK signals)
   for (const J of world.junctions || [])
-    if (J.x >= MB.x0 && J.x <= MB.x1 && J.y >= MB.y0 && J.y < MB.y1) J.lights = false;
+    if (J.x >= MB.x0 && J.x <= MB.x1 && J.y >= MB.y0 && J.y < MB.y1)
+      J.lights = MB_SIG.some(([x, y]) => J.x === x && J.y === y);
 }
 // ---------------------------------------------------------------- vehicle sprites (16 px/m, nose up, like traffic art)
 const MBS = {};
