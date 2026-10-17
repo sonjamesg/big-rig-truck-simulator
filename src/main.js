@@ -267,6 +267,7 @@ async function boot() {
   });
   tim[cur] = performance.now() - curT;
   world.loadMs = performance.now() - tb;
+  if (typeof rbApprFix === "function") rbApprFix(); // v51 roundabout approach lanes: left / ahead / right on 3 lanes
   world.ready = true;
   window.__bigrig.loadStages = tim;
   if (typeof homeProgress === "function")

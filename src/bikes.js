@@ -36,9 +36,9 @@ const BK = {
   fx: [], // muzzle flashes / sparks
   gangs: [], // cruising formations
   heat: 0, // decaying count of riders knocked off (biker revenge)
-  need: 4 + (Math.random() < 0.5 ? 1 : 0),
+  need: 4.5, // re-rolled 4-5 after each chase (fixed at load so verify_map sees identical globals)
   hunt: null, // active revenge chase
-  nextGang: 40 + Math.random() * 50,
+  nextGang: 60,
   coolT: 0,
   msg: null,
   ptr: { x: [], y: [], h: [], d: [] }, // the player's recent path (hunters ride it)
@@ -1100,4 +1100,3 @@ function bkHUD() {
     return r;
   };
 }
-BigRig.BK = BK;

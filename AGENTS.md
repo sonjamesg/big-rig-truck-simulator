@@ -97,6 +97,10 @@ sim. `main.js` owns the loop (update → draw → HUD), the camera, the minimap 
 | 59 | `homecard.js` | Home card: one clear "who am I" card. Account remembered -> Welcome back <name> + CONTINUE + Switch account |
 
 Notes on ownership:
+- **Roundabouts (v51)**: splitters are narrow raised kerb medians (`rbSplitter(rb, arm)` = `g.spN`, half-width `RB_MED`);
+  the old triangular outline (`rbSplitter(rb, arm, true)` = `g.spF`) is only painted hatching and is what `rbPaint` uses,
+  so map tiles never change. Signal heads sit on the left verge (primary + repeater). Give-way dashes at every entry.
+  Approach lanes (`rbLanes`): 2 lanes LS|R, 3 lanes L|S|R; `rbApprFix()` re-applies them after the map loads.
 - **Motorbikes** (`bikes.js`, v51): bike kinds live in `BK_T` (merged into `VTYPES`, flag `bike`). `spawnVehicle` is wrapped:
   random spawns without `opt.kind` become a bike with `BK_MIX[type][0]` probability. Gang followers and revenge hunters are
   kinematic (`v.bkK`, `stepVeh` wrapper skips the lane model; a 2-point stub path keeps `pathAt` working). They ride the

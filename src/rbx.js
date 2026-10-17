@@ -1,5 +1,5 @@
 /**
- * @file rbx.js — ROUNDABOUTS: 3-lane spiral markings, signalised entries, landscaped lit island
+ * @file rbx.js — ROUNDABOUTS: 3-lane spiral markings, signalised entries (heads on the left verge), clean lit island
  * Exposes (globals): RBSIG, rbArmKey, rbSigState, rbMouths, rbLaneLines, rbIsland, rbSigHeads
  * Depends on: world.js, traffic.js, repair.js
  * Load order: #47 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
@@ -129,8 +129,7 @@ function rbLaneLines(g, rb, G2, X, Y, S) {
 }
 // landscaped central island: low kerb wall, clipped hedge ring, flower beds, specimen trees placed by the caller
 function rbIsland(g, rb, X, Y, S, seed) {
-  const R = rb.rin * S,
-    r = mulberry((seed | 0) + 77);
+  const R = rb.rin * S;
   g.save();
   g.strokeStyle = "#5f8f3a";
   g.lineWidth = S * 0.55;
@@ -142,25 +141,7 @@ function rbIsland(g, rb, X, Y, S, seed) {
   g.beginPath();
   g.arc(X, Y, R - S * 1.05, 0, 7);
   g.stroke();
-  const cols = ["#e84a5f", "#f6c445", "#ffffff", "#b25bd6", "#ff8c42"];
-  for (let k = 0; k < 5; k++) {
-    const a = (k / 5) * 6.283 + r() * 0.3,
-      d = R * 0.48;
-    const cx = X + Math.cos(a) * d,
-      cy = Y + Math.sin(a) * d;
-    g.fillStyle = "#6b4a2f";
-    g.beginPath();
-    g.ellipse(cx, cy, S * 0.9, S * 0.55, a, 0, 7);
-    g.fill();
-    for (let q = 0; q < 26; q++) {
-      const t = r() * 6.283,
-        e = Math.sqrt(r());
-      g.fillStyle = cols[(k + q) % cols.length];
-      g.beginPath();
-      g.arc(cx + Math.cos(t) * e * S * 0.8, cy + Math.sin(t) * e * S * 0.45, 1.6 + r() * 1.2, 0, 7);
-      g.fill();
-    }
-  }
+  // v51: clean island: hedge ring + small centre planter only (no flower beds / trees)
   g.fillStyle = "#a49c8a";
   g.beginPath();
   g.arc(X, Y, S * 0.7, 0, 7);
@@ -182,8 +163,9 @@ function rbSigHeads(vx0, vy0, vx1, vy1) {
     for (const a of rb.arms) {
       const gm = rbArmGeom(rb, a),
         st = rbSigState(rb, rbArmKey(a));
+      // v51: both heads on the LEFT verge (the narrow median has no room): primary at the line, repeater on the approach
       const p = rbW(gm, rb, rb.rout + 1.1, gm.c + gm.hw + 0.45),
-        q = rbW(gm, rb, rb.rout + 1.1, gm.c + 0.35);
+        q = rbW(gm, rb, gm.uE + 1.5, gm.c + gm.hw + 0.55);
       for (const pt of [p, q]) {
         const x = pt[0] * TILE,
           y = pt[1] * TILE,

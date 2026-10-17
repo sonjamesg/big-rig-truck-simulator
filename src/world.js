@@ -290,9 +290,16 @@ function rbExit(rb, arm, lane, Rt) {
   return { pts: rbBez(P0, [-Math.sin(phi), Math.cos(phi)], P1, g.o, 0.45, 0.28), phi };
 }
 // kerbed splitter island between the entry and exit paths (polygon in tiles) + painted hatch nose
-function rbSplitter(rb, arm) {
+// v51 (James 17 Oct): the island is a NARROW raised kerb median (g.spN, RB_MED half-width) on the arm centreline. The old
+// triangular outline (g.spF, full=true) survives only as painted hatching and for world generation (rbPaint), so the map
+// tiles are unchanged. New cache names: an arm's g can carry a stale g.split.
+const RB_MED = 0.15;
+function rbSplitter(rb, arm, full) {
   const g = rbArmGeom(rb, arm);
-  if (g.split !== undefined) return g.split;
+  if (g.spN === undefined) rbSplitBuild(rb, arm, g);
+  return full ? g.spF : g.spN;
+}
+function rbSplitBuild(rb, arm, g) {
   const sg = g.sg,
     nl = Math.max(1, Math.floor(sg.w / 2));
   const paths = [];
@@ -331,19 +338,30 @@ function rbSplitter(rb, arm) {
     Rr.push([u, g.c + b]);
   }
   if (L.length < 4) {
-    g.split = null;
-    return null;
+    g.spN = g.spF = null;
+    return;
   }
-  // the base hugs the ring edge: trim points inside rout
-  const poly = [...L, ...Rr.reverse()].map(([u, v]) => rbW(g, rb, u, v));
-  const nose = rbW(g, rb, L[L.length - 1][0], g.c);
-  return (g.split = {
-    poly,
-    nose,
+  const mk = (L, Rr) => ({
+    poly: [...L, ...Rr.slice().reverse()].map(([u, v]) => rbW(g, rb, u, v)),
+    nose: rbW(g, rb, L[L.length - 1][0], g.c),
     uN: L[L.length - 1][0],
-    base: [rbW(g, rb, L[0][0], L[0][1]), rbW(g, rb, Rr[Rr.length - 1][0], Rr[Rr.length - 1][1])],
-    baseV: [L[0][1], Rr[Rr.length - 1][1]],
+    base: [rbW(g, rb, L[0][0], L[0][1]), rbW(g, rb, Rr[0][0], Rr[0][1])],
+    baseV: [L[0][1], Rr[0][1]],
   });
+  g.spF = mk(L, Rr);
+  // narrow median: clamp to +-RB_MED round the centreline, rounded taper over the last 0.8 tiles to the nose
+  const uN = L[L.length - 1][0],
+    nL = [],
+    nR = [];
+  for (let k = 0; k < L.length; k++) {
+    const u = L[k][0],
+      t = Math.min(1, (uN - u) / 0.8),
+      w = RB_MED * Math.sqrt(Math.max(0.04, t));
+    nL.push([u, Math.min(L[k][1], g.c + w)]);
+    nR.push([u, Math.max(Rr[k][1], g.c - w)]);
+  }
+  g.spN = mk(nL, nR);
+  g.spN.full = g.spF;
 }
 function pinPoly(P, x, y) {
   let c = false;
@@ -355,12 +373,12 @@ function pinPoly(P, x, y) {
   return c;
 }
 // exact surface of a roundabout at tile-space point: 1 asphalt, 2 central island / splitter (kerbed), 0 verge
-function rbSurf(rb, x, y) {
+function rbSurf(rb, x, y, full) {
   const dx = x - rb.cx,
     dy = y - rb.cy,
     r = Math.hypot(dx, dy);
   for (const arm of rb.arms) {
-    const sp = rbSplitter(rb, arm);
+    const sp = rbSplitter(rb, arm, full);
     if (sp && pinPoly(sp.poly, x, y)) return 2;
   }
   if (r <= rb.rout) return r < rb.rin ? 2 : 1;
@@ -425,7 +443,7 @@ function rbPaint(rb) {
         [0.02, 0.98],
         [0.98, 0.98],
       ]) {
-        const s = rbSurf(rb, tx + ox, ty + oy);
+        const s = rbSurf(rb, tx + ox, ty + oy, true); // v51: generation keeps the original splitter outline
         if (s === 1) a++;
         else if (s === 2) isl++;
       }

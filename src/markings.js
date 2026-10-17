@@ -1,6 +1,6 @@
 /**
  * @file markings.js — UK HIGHWAY CODE ROAD MARKINGS + approach lane rules
- * Exposes (globals): RANK, jOptions, assignLanes, rbLanes, apprBox, prevEdge, buildMarkings,
+ * Exposes (globals): RANK, jOptions, assignLanes, rbLanes, rbApprFix, apprBox, prevEdge, buildMarkings,
  *   arrowHead, drawLaneArrow, drawApproach, drawBoxJunction, drawLaneDrop
  * Depends on: world.js, render.js, traffic.js, career.js, main.js
  * Load order: #9 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
@@ -45,8 +45,18 @@ function rbLanes(nl) {
     ? ["LSR"]
     : nl === 2
       ? ["LS", "R"]
-      : ["LS"].concat(new Array(nl - 2).fill("S"), ["R"]).slice(0, nl);
-} // left: 1st exit + ahead, right: right turns
+      : ["L"].concat(new Array(nl - 2).fill("S"), ["R"]).slice(0, nl);
+} // 2 lanes: left = 1st exit + ahead, right = right turns; 3+ lanes (v51): left / ahead / right
+// v51: map data baked the old 3-lane roundabout approach (LS|S|R); re-apply rbLanes in place (the arrays are shared with the
+// painted approach marks) once the world is restored, so arrows and AI lane choice agree. Idempotent for a fresh generation.
+function rbApprFix() {
+  for (const rb of world.rbs || [])
+    for (const k in rb.appr || {}) {
+      const L = rb.appr[k].lanes,
+        nw = rbLanes(L.length);
+      L.splice(0, L.length, ...nw);
+    }
+}
 function apprBox(o) {
   const sg = o.sg,
     A = Math.min(o.lineA, o.lineA - o.d * o.Lapp) - 0.5,

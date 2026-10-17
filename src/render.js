@@ -1006,18 +1006,7 @@ function drawRB(g, o) {
   g.arc(X, Y, rb.rin * S - 5, 0, 7);
   g.fill();
   if (typeof rbIsland === "function") rbIsland(g, rb, X, Y, S, o.seed);
-  const r = mulberry(o.seed);
-  for (let k = 0; k < 6; k++) {
-    const a = r() * 6.28,
-      d = r() * rb.rin * S * 0.6;
-    drawObject(g, {
-      kind: "tree",
-      x: X + Math.cos(a) * d,
-      y: Y + Math.sin(a) * d,
-      r: 9 + r() * 6,
-      seed: (r() * 1e9) | 0,
-    });
-  }
+  // v51: clean central island (no random trees)
   for (let k = 0; k < rb.arms.length; k++) {
     const arm = rb.arms[k],
       gm = G2[k],
@@ -1038,21 +1027,16 @@ function drawRB(g, o) {
     let da = a1 - a0;
     while (da < 0) da += Math.PI * 2;
     g.strokeStyle = "#ececec";
-    if (typeof RBSIG !== "undefined" && RBSIG.on) {
-      g.lineWidth = 6;
+    // v51: give-way double dashes at every entry, signalised or not
+    g.lineWidth = 4;
+    g.setLineDash([12, 9]);
+    for (const rr of [rb.rout + 0.12, rb.rout + 0.42]) {
       g.beginPath();
-      g.arc(X, Y, (rb.rout + 0.3) * S, a0 + 0.02, a0 + da - 0.02);
+      g.arc(X, Y, rr * S, a0 + 0.02, a0 + da - 0.02);
       g.stroke();
-    } else {
-      g.lineWidth = 4;
-      g.setLineDash([12, 9]);
-      for (const rr of [rb.rout + 0.12, rb.rout + 0.42]) {
-        g.beginPath();
-        g.arc(X, Y, rr * S, a0 + 0.02, a0 + da - 0.02);
-        g.stroke();
-      }
-      g.setLineDash([]);
-    } // v31: signalised entries get a solid stop line
+    }
+    g.setLineDash([]);
+
     const tri = W(gm, rb.rout + 2.4, (vb + gm.c + gm.hw + 1.2) / 2);
     g.save();
     g.translate(tri[0], tri[1]);
@@ -1066,7 +1050,41 @@ function drawRB(g, o) {
     g.stroke();
     g.restore();
     if (!sp) continue;
-    // painted hatched nose ahead of the raised island
+    // v51: the old triangular island is now paint only: white outline + diagonal hatching (keep off), no grass
+    if (sp.full) {
+      const fp = sp.full.poly.map(P),
+        fpath = () => {
+          g.beginPath();
+          g.moveTo(fp[0][0], fp[0][1]);
+          for (const q of fp) g.lineTo(q[0], q[1]);
+          g.closePath();
+        };
+      g.save();
+      fpath();
+      g.clip();
+      g.strokeStyle = "rgba(236,236,236,0.8)";
+      g.lineWidth = 2.5;
+      const cx = fp.reduce((t, q) => t + q[0], 0) / fp.length,
+        cy = fp.reduce((t, q) => t + q[1], 0) / fp.length,
+        oa = Math.atan2(gm.o[1], gm.o[0]) + 0.75,
+        ca = Math.cos(oa),
+        sa = Math.sin(oa);
+      for (let k = -13; k <= 13; k++) {
+        const ox = -sa * k * 18,
+          oy = ca * k * 18;
+        g.beginPath();
+        g.moveTo(cx + ox - ca * 400, cy + oy - sa * 400);
+        g.lineTo(cx + ox + ca * 400, cy + oy + sa * 400);
+        g.stroke();
+      }
+      g.restore();
+      g.strokeStyle = "#ececec";
+      g.lineWidth = 3;
+      g.lineJoin = "round";
+      fpath();
+      g.stroke();
+    }
+    // painted hatched nose ahead of the raised median
     const n0 = W(gm, sp.uN, gm.c),
       n1 = W(gm, gm.uE + RB_BACK + 2.5, gm.c),
       nl = W(gm, sp.uN, gm.c + 0.12),
@@ -1078,7 +1096,7 @@ function drawRB(g, o) {
     g.lineTo(nr[0], nr[1]);
     g.closePath();
     g.fill();
-    // raised splitter island: shadow, kerb, block paving / grass, keep-left bollards at both noses
+    // narrow raised kerb median: shadow, concrete top, kerb edge, keep-left bollard at the nose
     const pp = sp.poly.map(P);
     const path = () => {
       g.beginPath();
@@ -1087,60 +1105,43 @@ function drawRB(g, o) {
       g.closePath();
     };
     g.save();
-    g.translate(3, 3);
+    g.translate(2, 2);
     path();
-    g.fillStyle = "rgba(0,0,0,0.28)";
+    g.fillStyle = "rgba(0,0,0,0.3)";
     g.fill();
     g.restore();
     path();
-    g.fillStyle = "#c9c6bd";
+    g.fillStyle = "#d4d1c8";
     g.fill();
     g.lineJoin = "round";
-    g.strokeStyle = "#e8e6df";
-    g.lineWidth = 2;
+    g.strokeStyle = "#8e8b84";
+    g.lineWidth = 1.6;
     g.stroke();
-    g.save();
-    path();
-    g.clip();
-    g.fillStyle = g.createPattern(TEX.island[0], "repeat");
-    g.translate(0, 0);
-    g.beginPath();
-    g.moveTo(pp[0][0], pp[0][1]);
-    for (const q of pp) g.lineTo(q[0], q[1]);
-    g.closePath();
-    g.lineWidth = 8;
-    g.strokeStyle = "#c9c6bd";
-    g.fill();
-    g.stroke();
-    g.restore();
     const bol = (p) => {
       g.fillStyle = "rgba(0,0,0,0.35)";
       g.beginPath();
-      g.arc(p[0] + 3, p[1] + 3, 6, 0, 7);
+      g.arc(p[0] + 2, p[1] + 2, 4.5, 0, 7);
       g.fill();
       g.fillStyle = "#f4f4f4";
       g.beginPath();
-      g.arc(p[0], p[1], 6, 0, 7);
+      g.arc(p[0], p[1], 4.5, 0, 7);
       g.fill();
       g.fillStyle = "#1d5fbf";
       g.beginPath();
-      g.arc(p[0], p[1], 4.2, 0, 7);
+      g.arc(p[0], p[1], 3.2, 0, 7);
       g.fill();
       g.strokeStyle = "#fff";
-      g.lineWidth = 1.6;
+      g.lineWidth = 1.2;
       g.beginPath();
-      const dx = -gm.o[0] * 2.6,
-        dy = -gm.o[1] * 2.6,
-        lx = gm.l[0] * 2.6,
-        ly = gm.l[1] * 2.6;
+      const dx = -gm.o[0] * 2,
+        dy = -gm.o[1] * 2,
+        lx = gm.l[0] * 2,
+        ly = gm.l[1] * 2;
       g.moveTo(p[0] - dx - lx, p[1] - dy - ly);
       g.lineTo(p[0] + dx + lx, p[1] + dy + ly);
       g.stroke();
     };
-    const nose = W(gm, sp.uN - 0.35, gm.c);
-    bol(nose);
-    const bm = W(gm, rb.rout + 0.55, (sp.baseV[0] + sp.baseV[1]) / 2);
-    bol(bm);
+    bol(W(gm, sp.uN - 0.3, gm.c));
   }
   g.lineWidth = 1;
 }
