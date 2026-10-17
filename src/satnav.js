@@ -1,5 +1,6 @@
 /**
- * @file satnav.js — SAT NAV: A* over the road tiles, route guidance
+ * @file satnav.js — SAT NAV: A* over the road tiles, route guidance; world arrows follow a smoothed
+ *   keep-left path (navSmoothPath / navSmoothAt, NAV_ARROW_SP spacing, none in junction boxes)
  * Exposes (globals): NAV, NAV_COST, NAV_SPEED, navUp, navTileInfo, isRoadT, navSnap,
  *   navSnapTruck, navAStar, navBuild, setRoute, clearRoute, navIsMission, userCancelRoute (+36
  *   more)
@@ -596,18 +597,61 @@ function navLine(px, py, w, col) {
   ctx.stroke();
   ctx.restore();
 }
+// v48: smoothed route centreline for the painted arrows: keep-left offset points (navOff), [1,2,3,2,1] smoothing passes
+// so tile stair-steps round off, then regular arc-length sampling with headings from the smoothed tangent
+function navSmoothPath(R, k0, k1) {
+  let P = [];
+  for (let k = k0; k <= k1; k++) {
+    const q = navOff(R, k);
+    if (isFinite(q[0]) && isFinite(q[1])) P.push([q[0], q[1], k]);
+  }
+  for (let pass = 0; pass < 4; pass++) {
+    const O = P.map((p) => p.slice());
+    for (let i = 2; i < P.length - 2; i++)
+      for (let j = 0; j < 2; j++)
+        O[i][j] = (P[i - 2][j] + 2 * P[i - 1][j] + 3 * P[i][j] + 2 * P[i + 1][j] + P[i + 2][j]) / 9;
+    P = O;
+  }
+  const S = [0];
+  for (let i = 1; i < P.length; i++)
+    S.push(S[i - 1] + Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
+  return { P, S };
+}
+function navSmoothAt(L, s) {
+  const { P, S } = L;
+  let i = 1;
+  while (i < S.length - 1 && S[i] < s) i++;
+  const t = Math.max(0, Math.min(1, (s - S[i - 1]) / (S[i] - S[i - 1] || 1)));
+  return [
+    P[i - 1][0] + (P[i][0] - P[i - 1][0]) * t,
+    P[i - 1][1] + (P[i][1] - P[i - 1][1]) * t,
+    t < 0.5 ? P[i - 1][2] : P[i][2],
+  ];
+}
+const NAV_ARROW_SP = 11; // m between painted arrows
 function drawNavWorld() {
   const R = NAV.route;
   if (!R) return;
-  const end = Math.min(R.P.length - 5, R.idx + 100);
-  for (let k = R.idx + 3; k < end; k += 3) {
-    const p = navOff(R, k),
-      q = navOff(R, k + 3);
-    const t0 = R.P[k],
-      t1 = R.P[k + 3];
-    if ((q[0] - p[0]) * (t1[0] - t0[0]) + (q[1] - p[1]) * (t1[1] - t0[1]) <= 0.2) continue;
-    const h = Math.atan2(q[0] - p[0], -(q[1] - p[1]));
-    const a = 0.8 * Math.min(1, (k - R.idx) / 6);
+  const end = Math.min(R.P.length - 1, R.idx + 110);
+  if (end - R.idx < 6) return;
+  const L = navSmoothPath(R, R.idx, end),
+    tot = L.S[L.S.length - 1];
+  if (L.P.length < 6) return;
+  const s0 = NAV_ARROW_SP - (R.cum[L.P[0][2]] % NAV_ARROW_SP);
+  for (let s = s0; s < tot - 6; s += NAV_ARROW_SP) {
+    if (s < 6) continue;
+    const p = navSmoothAt(L, s),
+      a1 = navSmoothAt(L, s - 3),
+      b1 = navSmoothAt(L, s + 3),
+      a2 = navSmoothAt(L, s - 7),
+      b2 = navSmoothAt(L, s + 7);
+    const t = R.path && R.path[p[2]];
+    if (t != null && navInJ(t)) continue; // never in a junction box (stair-steps)
+    const h = Math.atan2(b1[0] - a1[0], -(b1[1] - a1[1])),
+      hA = Math.atan2(p[0] - a2[0], -(p[1] - a2[1])),
+      hB = Math.atan2(b2[0] - p[0], -(b2[1] - p[1]));
+    if (Math.abs(wrapA(hB - hA)) > 0.75) continue; // too sharp a kink to say which way the lane runs
+    const a = 0.8 * Math.min(1, s / 18);
     ctx.save();
     ctx.translate(p[0] * PPM, p[1] * PPM);
     ctx.rotate(h);

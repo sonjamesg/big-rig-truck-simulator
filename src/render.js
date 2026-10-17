@@ -1,5 +1,5 @@
 /**
- * @file render.js — TEXTURES & CHUNK RENDERING
+ * @file render.js — TEXTURES & CHUNK RENDERING (RD_NOCENTRE: road types drawn without a centre line)
  * Exposes (globals): mkCanvas, speckle, TEX, makeTextures, drawRoadTile, shade, LINE_COLS,
  *   contTop, drawYardBlock, drawLorryPark, drawShadowRect, acUnit, roof, drawSign (+32 more)
  * Depends on: world.js, bldg2.js, lorry.js, traffic.js, markings.js, depots.js, sites.js,
@@ -7,6 +7,8 @@
  * Load order: #3 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
  */
 "use strict";
+// road types drawn without a white centre line (the road audit reports these as unmarked); v48: none
+const RD_NOCENTRE = new Set();
 // ===================== TEXTURES & CHUNK RENDERING =====================
 function mkCanvas(w, h) {
   const c = document.createElement("canvas");
@@ -225,6 +227,7 @@ function drawRoadTile(g, tx, ty, px, py) {
   if (s.type === "lane") {
     if (off === 0) line(1, "rgba(120,110,90,0.5)", false, 3);
     if (off === s.w - 1) line(28, "rgba(120,110,90,0.5)", false, 3);
+    if (!RD_NOCENTRE.has("lane") && off === half - 1) line(30, "#e4e4dc", true, 2); // v48: lanes get a centre line too
     return;
   }
   if (s.type === "dual") {
@@ -2013,6 +2016,7 @@ function drawCurve(g, cv, rng) {
   const half = cv.w / 2;
   if (cv.type === "lane") {
     for (const sd of [-1, 1]) line(sd * (W / 2 - 3), "rgba(120,110,90,0.5)", 3);
+    if (!RD_NOCENTRE.has("lane")) line(0, "#e4e4dc", 2, [24, 24]);
     g.restore();
     return;
   }

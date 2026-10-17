@@ -3599,7 +3599,8 @@ function railBigMap(BX, BY, z, R) {
   R = R || 5;
   if (!RAIL.ready) return;
   ctx.save();
-  ctx.lineWidth = Math.max(2, z * 1.2);
+  // v48: thin track line with sleeper ticks, so the railway no longer reads as a marked road
+  ctx.lineWidth = Math.max(1.5, z * 0.7);
   ctx.strokeStyle = "rgba(40,30,25,0.9)";
   ctx.setLineDash([]);
   ctx.beginPath();
@@ -3610,11 +3611,29 @@ function railBigMap(BX, BY, z, R) {
     s ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
   }
   ctx.stroke();
-  ctx.strokeStyle = "rgba(255,255,255,0.85)";
-  ctx.lineWidth = Math.max(1, z * 0.5);
-  ctx.setLineDash([6, 6]);
+  const tk = Math.max(2.5, z * 1.6);
+  ctx.lineWidth = Math.max(1, z * 0.45);
+  ctx.beginPath();
+  let px = BX(RAIL.X[0] / M_T),
+    py = BY(RAIL.Y[0] / M_T),
+    acc = 0;
+  for (let s = 4; s <= RAIL.L; s += 4) {
+    const i = s % RAIL.L,
+      x = BX(RAIL.X[i] / M_T),
+      y = BY(RAIL.Y[i] / M_T),
+      d = Math.hypot(x - px, y - py);
+    acc += d;
+    if (acc >= 7 && d > 0) {
+      acc = 0;
+      const nx = (-(y - py) / d) * tk,
+        ny = ((x - px) / d) * tk;
+      ctx.moveTo(x - nx, y - ny);
+      ctx.lineTo(x + nx, y + ny);
+    }
+    px = x;
+    py = y;
+  }
   ctx.stroke();
-  ctx.setLineDash([]);
   railMapTrains(BX, BY, z, false);
   for (const st of RAIL.stations) {
     const x = BX(RAIL.X[st.s] / M_T),
