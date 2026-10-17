@@ -454,9 +454,34 @@ function rbPaint(rb) {
 function genWorld() {
   for (const _ of genWorldSteps());
 }
+// v50: draws made by the v49 generator before each stage (see pinR in genWorldSteps)
+const GEN_R_PIN = {
+  "bld:towns": 52566,
+  "bld:ind": 56099,
+  "Building the docks": 56328,
+  "Building airports": 57298,
+  "Planting farmland": 57359,
+  "Growing forests": 143709,
+  "Launching boats": 305222,
+  "Carving kerbs": 305273,
+  "Building depots & shops": 305273,
+  "Finishing towns": 305403,
+  "Routing the railway": 320928,
+};
 function* genWorldSteps() {
   const t0 = performance.now();
-  const R = mulberry(20261012);
+  let R0 = mulberry(20261012),
+    RN = 0; // v50: draws so far (see pinR)
+  const R = () => (RN++, R0());
+  // v50: the random stream at each later stage start is pinned to the v49 draw count (mulberry's state after n draws is seed + n*step,
+  // so this is exact), so re-laying a few city blocks only re-rolls those blocks: docks, farms, forests, depots, fuel, garages,
+  // services and homes everywhere else stay where they were
+  const pinR = (stage) => {
+    const n = GEN_R_PIN[stage];
+    if (n === undefined) return;
+    R0 = mulberry((20261012 + Math.imul(n, 0x6d2b79f5)) | 0);
+    RN = n;
+  };
   const water = new Uint8Array(MW * MH);
   world.water = water;
   const CE = new Float32Array(MW),
@@ -1182,15 +1207,16 @@ function* genWorldSteps() {
   mway(
     [
       [1530, 1680, "rb"],
-      [1400, 1680],
+      [1404, 1680],
     ],
     false,
     0,
     "K4 Westway",
     "dual",
   );
-  road("v", 1400, 1683, 1787, RW, "city");
-  road("h", 1589, 1400, 1526, 2, "rural"); // Airport Way + Dam Road (K5) feed in (v25 audit: Airport Way stub now ends flush with the T, was a 3-tile dead end)
+  // v50 (James 17 Oct): the x1400 spine (butted onto the Northgate x1404 column = an 8-lane double road with twin junctions) and the
+  // y1589 Dam Road feed (2 tiles under the y1583 street = stacked half-junctions, offset yellow boxes, doubled signals) are gone:
+  // Westway, Airport Way and Dam Road now meet the x1404 column / y1583 street directly as single clean junctions
   for (const k of [1, 3]) {
     road("h", KB.ys[k], 1533, KB.xs[0] - 1, RW, "city");
     road("h", KB.ys[k], KB.X1 + 1, 1701, RW, "city");
@@ -1210,15 +1236,27 @@ function* genWorldSteps() {
   };
   {
     // v24: snap district streets that nearly line up with a street across the loop/radials (no 1-8 tile doglegs at the dual carriageways)
-    const anc = { xs: [KB.xs[1], KB.xs[4]], ys: [KB.ys[1], KB.ys[3]] };
+    // v50: anchors carry their grid's span on the same axis; a district lying straight across from that grid (spans overlap) snaps up
+    // to 12 tiles (the 9-10 tile Northgate/Westmead and Old Harbour/Market doglegs), anything else keeps the old 8
+    const kbS = { xs: [KB.xs[0], KB.X1], ys: [KB.ys[0], KB.Y1] },
+      anc = {
+        xs: [KB.xs[1], KB.xs[4]].map((v) => [v, ...kbS.xs, ...kbS.ys]),
+        ys: [KB.ys[1], KB.ys[3]].map((v) => [v, ...kbS.ys, ...kbS.xs]),
+      };
     for (const g of Object.values(KD)) {
       for (const ax of ["xs", "ys"]) {
-        const v = g[ax];
+        const v = g[ax],
+          o = ax === "xs" ? g.ys : g.xs,
+          s0 = v[0],
+          s1 = v[v.length - 1] + RW - 1,
+          p0 = o[0],
+          p1 = o[o.length - 1] + RW - 1;
         for (let k = 0; k < v.length; k++) {
           let best = null;
-          for (const a of anc[ax]) {
-            const d = Math.abs(a - v[k]);
-            if (d > 0 && d <= 8 && (best === null || d < Math.abs(best - v[k]))) best = a;
+          for (const [a, lo, hi, plo, phi] of anc[ax]) {
+            const d = Math.abs(a - v[k]),
+              lim = lo <= s1 && hi >= s0 && Math.max(plo - p1, p0 - phi) <= 50 ? 12 : 8;
+            if (d > 0 && d <= lim && (best === null || d < Math.abs(best - v[k]))) best = a;
           }
           if (
             best !== null &&
@@ -1227,10 +1265,41 @@ function* genWorldSteps() {
           )
             v[k] = best;
         }
-        for (const x of v) anc[ax].push(x);
+        for (const x of v) anc[ax].push([x, s0, s1, p0, p1]);
       }
-      g.X1 = g.xs[g.xs.length - 1] + RW - 1;
-      g.Y1 = g.ys[g.ys.length - 1] + RW - 1;
+      // v50: an edge street laid alongside an existing parallel road (< 6 tiles apart, e.g. Riverside's last row under the K2 Eastway)
+      // made twin junctions on every crossing column: drop it, the columns' stitching then Ts them into that road instead
+      const keep = {};
+      for (const ax of ["xs", "ys"]) {
+        const v = g[ax],
+          o = ax === "xs" ? g.ys : g.xs,
+          lo = o[0],
+          hi = o[o.length - 1] + RW - 1;
+        for (const k of [v.length - 1, 0]) {
+          if (v.length < 3) break;
+          let hit = 0,
+            n = 0;
+          for (let b = lo; b <= hi; b += 3) {
+            n++;
+            for (let q = -6; q < RW + 6; q++) {
+              const x = ax === "xs" ? v[k] + q : b,
+                y = ax === "xs" ? b : v[k] + q;
+              if (!inb(x, y)) continue;
+              const i = idx(x, y);
+              if ((ax === "xs" ? world.roadV[i] : world.roadH[i]) >= 0) {
+                hit++;
+                break;
+              }
+            }
+          }
+          if (hit > n * 0.6) {
+            if (k === v.length - 1) keep[ax] = v[k] - 1; // cross streets still run up to that road
+            v.splice(k, 1);
+          }
+        }
+      }
+      g.X1 = Math.max(g.xs[g.xs.length - 1] + RW - 1, keep.xs || 0);
+      g.Y1 = Math.max(g.ys[g.ys.length - 1] + RW - 1, keep.ys || 0);
     }
   }
   for (const g of Object.values(KD)) gridRoads(g, "city", true);
@@ -1322,7 +1391,7 @@ function* genWorldSteps() {
   world.kbDistricts = KD;
   world.kbDiag = []; // v27: Northgate Diagonal removed — its staircase of mid-block stubs cut the NW Kingsbridge blocks into back-to-back double crossroads that gridlocked (James 14 Oct)
   const rbN = road("v", 1359, 1300, 1380 - RBT - 1, 2, "rural");
-  wind("h", 1784, 903, 1399, RW, "city", 30, "Airport Way"); // curved bridge over the River Moor                                             // Kingsbridge Airport road (over the River Moor)
+  wind("h", 1784, 903, 1403, RW, "city", 30, "Airport Way"); // curved bridge over the River Moor                                             // Kingsbridge Airport road (over the River Moor)
   wind("h", MF.ys[2], 103, MF.xs[0] - 1, RW, "town", 14, "Millford Road");
   wind("v", MF.xs[1], MF.Y1 + 1, 976, RW, "town", 10, "Millford South Road");
   road("v", AB.xs[2], 983, AB.ys[0] - 1, 2, "rural");
@@ -1456,7 +1525,7 @@ function* genWorldSteps() {
     const dy = 1589,
       dA = road("h", dy, 903, 912, 2, "rural"),
       dam = road("h", dy, Math.floor(riverX(dy)) - 22, Math.floor(riverX(dy)) + 22, 2, "rural"),
-      dB = road("h", dy, 1388, 1399, 2, "rural");
+      dB = road("h", 1583, 1388, 1403, RW, "city"); // v50: lines up with (and merges into) the y1583 street
     dam.name = "Moor Dam";
     dam.dam = true;
     world.dam = { x0: dam.b0, x1: dam.b1 + 1, y: dy };
@@ -2717,6 +2786,7 @@ function* genWorldSteps() {
         }
       }
   }
+  pinR("bld:towns"); // the towns' blocks never depend on the Kingsbridge districts above
   for (const g of [MF, DW, CM, RH, FW]) townBlocks(g.xs, g.ys, "town");
   townBlocks(AB.xs, AB.ys, "res");
   for (let k = 0; k < 6; k++) building(505 + k * 6, 906, 4, 4, "house", 12);
@@ -2770,6 +2840,7 @@ function* genWorldSteps() {
         });
     }
   }
+  pinR("bld:ind");
   for (let k = 0; k < 4; k++) ind(1770 + k * 40, 560, 34, 30); // Sandvale east industry (south of grid)
   for (let k = 0; k < 3; k++) ind(1190 + k * 50, 1395, 44, 24); // Kingsbridge west industry (north of M3)
   for (let k = 0; k < 3; k++) ind(160 + k * 50, 666, 44, 30); // Albion south industry
@@ -2812,6 +2883,7 @@ function* genWorldSteps() {
         });
       }
   }
+  pinR("Building the docks");
   yield "Building the docks";
   {
     // v14 Albion container terminal: quay apron + 3 berths, neat stack rows between the aisles, gate, loading-bay terminal
@@ -2955,6 +3027,7 @@ function* genWorldSteps() {
     for (let y = y0; y < y1; y++)
       for (let x = x0; x < x1; x++) if (get(x, y) === T.CONT) set(x, y, T.QUAY);
   }
+  pinR("Building airports");
   yield "Building airports";
   // airports: concrete apron, runways, terminal, hangars
   function airport(name, x0, y0, x1, y1, rws, term) {
@@ -3139,6 +3212,7 @@ function* genWorldSteps() {
     });
   }
   (world.tm = world.tm || []).push(["// ---- farmland", (performance.now() - t0) | 0]);
+  pinR("Planting farmland");
   yield "Planting farmland";
   // ---- farmland with hedgerows, pasture with livestock
   const crops = ["wheat", "green", "plough", "rape", "pasture", "wheat", "pasture", "green"];
@@ -3255,6 +3329,7 @@ function* genWorldSteps() {
       ph: R() * 6,
     });
   }
+  pinR("Growing forests");
   yield "Growing forests";
   // ---- forests (varied species), roadside trees, bushes, rocks, desert scrub & cacti
   (world.tm = world.tm || []).push(["const DES=world.des", (performance.now() - t0) | 0]);
@@ -3355,6 +3430,7 @@ function* genWorldSteps() {
       }
     }
   (world.tm = world.tm || []).push(["// ---- boats", (performance.now() - t0) | 0]);
+  pinR("Launching boats");
   yield "Launching boats";
   // ---- boats & ferries on the sea channels, river and harbours (ping-pong routes, tiles)
   const route = (f, a, b, st) => {
@@ -3409,6 +3485,7 @@ function* genWorldSteps() {
   }
   (world.tm = world.tm || []).push(["world.genMs=", (performance.now() - t0) | 0]);
   world.genMs = performance.now() - t0;
+  pinR("Carving kerbs");
   yield "Carving kerbs";
   // ---- kerb radii carving
   for (const c of world.corners) {
@@ -3529,6 +3606,7 @@ function* genWorldSteps() {
   yield "Painting road markings";
   if (typeof buildMarkings === "function") buildMarkings(objs);
   (world.tm = world.tm || []).push(["if(typeof buildDepot", (performance.now() - t0) | 0]);
+  pinR("Building depots & shops");
   yield "Building depots & shops";
   if (typeof buildDepotsSteps === "function") yield* buildDepotsSteps(objs, R);
   else if (typeof buildDepots === "function") buildDepots(objs, R);
@@ -3588,6 +3666,7 @@ function* genWorldSteps() {
         }
       }
   }
+  pinR("Finishing towns");
   yield "Finishing towns";
   // v24: functional areas stay paved: no trees/parks/fountains/ponds/hedges inside depots, fuel, garages, dealers, malls, port
   {
@@ -3673,6 +3752,7 @@ function* genWorldSteps() {
     ["Quarry", 1170, 590],
   ];
   (world.tm = world.tm || []).push(["// spatial index", (performance.now() - t0) | 0]);
+  pinR("Routing the railway");
   yield "Routing the railway";
   if (typeof railBuildSteps === "function") yield* railBuildSteps(objs);
   else if (typeof railBuild === "function") railBuild(objs);

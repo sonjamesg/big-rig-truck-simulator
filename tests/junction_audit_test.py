@@ -54,7 +54,9 @@ async def main():
     for x in st['bad'][:80]: print('  ',json.dumps(x))
     nav=[]; nn=0
     for i in range(st['nJ']):
-      r=await pg.evaluate(NAVT+f"({i})"); nn+=r['n']; nav+=r['bad']
+      try: r=await pg.evaluate(NAVT+f"({i})")
+      except Exception as e: r={'n':1,'bad':[{'J':i,'err':str(e).split(chr(10))[0][:120]}]}   # navAStar threw (reported, the audit keeps going)
+      nn+=r['n']; nav+=r['bad']
     print('NAV pairs',nn,'bad',len(nav),flush=True); [print('  ',json.dumps(x)) for x in nav[:30]]
     pts=await pg.evaluate("[...world.junctions.map(J=>[J.x+J.w/2,J.y+J.h/2,'J'+J.id]),...world.rbs.map(r=>[r.cx,r.cy,'RB'+r.id]),...(world.kbChan||[]).map(s=>[s.a+1,(s.b0+s.b1)/2,'Chan'+s.id])]")
     only=os.environ.get('ONLY'); cl=[]

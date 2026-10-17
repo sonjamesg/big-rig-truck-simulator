@@ -12,6 +12,7 @@
 "use strict";
 // ===================== SAT NAV: A* over the road tiles, route guidance =====================
 const NAV = { route: null, reroutes: 0, offT: 0, lastCalc: -9, hover: null };
+const NAV_OFF = ["off", 1, 11];
 const NAV_COST = {
   hwy: 0.55,
   dual: 0.7,
@@ -183,7 +184,7 @@ function navAStar(sx, sy, gx, gy) {
       return null;
     }
     const gi = navG[i],
-      ci = navTileInfo(i)[1];
+      ci = (navTileInfo(i) || NAV_OFF)[1]; // v50: a start tile on tarmac but off every segment (curve mouth) no longer throws
     for (const d of [1, -1, MW, -MW]) {
       let j = i + d,
         k = 1;
