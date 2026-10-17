@@ -59,6 +59,13 @@ PLACES_JS = """() => {
     if (inCity(l[1], l[2]) || out.some((o) => o.name.toLowerCase() === l[0].toLowerCase())) continue;
     out.push({ name: l[0], x0: l[1] - 50, y0: l[2] - 50, x1: l[1] + 50, y1: l[2] + 50 });
   }
+  // Sandvale Military Base (milbase.js): its own page / city box, short grid prefix BASE-<C><R>
+  const B = world.milbase;
+  if (B) {
+    const i = out.findIndex((o) => o.name.toLowerCase() === B.name.toLowerCase());
+    if (i >= 0) out.splice(i, 1); // drop the 100-tile label box, use the real fence bounds
+    out.push({ name: B.name, prefix: "BASE", x0: B.x0, y0: B.y0, x1: B.x1, y1: B.y1 });
+  }
   return out;
 }"""
 
@@ -236,7 +243,7 @@ async def main():
             x1 = min(MW, -(-(pl["x1"] + PAD) // CT_SQ) * CT_SQ)
             y1 = min(MW, -(-(pl["y1"] + PAD) // CT_SQ) * CT_SQ)
             name = pl["name"].upper()
-            pref = name.replace(" ", "")
+            pref = pl.get("prefix") or name.replace(" ", "")
             print(name, x0, y0, x1, y1, flush=True)
             img = await grab(pg, int(x0), int(y0), int(x1 - x0), int(y1 - y0), CT_PPT)
             sp = page_spec(name, int(x0), int(y0), int(x1 - x0), int(y1 - y0), CT_PPT, CT_SQ, pref)

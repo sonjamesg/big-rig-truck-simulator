@@ -5,6 +5,7 @@ Usage: python3 build.py && python3 tools/mapviewer.py [out.html]   (default /wor
 Grid labels match tools/mapgrid.py and AGENTS.md "Reference map grid":
   overview square <C><R> (64 tiles):  x = 64*col .. +63, y = 64*(R-1) .. +63   (A=0, B=1 .. Z=25, AA=26)
   city square <CITY>-<C><R> (16 tiles): x = X0 + 16*col .. +15, y = Y0 + 16*(R-1) .. +15  (X0,Y0 shown in the viewer)
+  (Sandvale Military Base uses prefix BASE.) Search also covers POIS_JS: depots, fuel, Black Market yards, helipads.
 """
 import asyncio, base64, io, json, os, sys
 from playwright.async_api import async_playwright
@@ -12,6 +13,16 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mapgrid import RENDER_JS, PLACES_JS, MW, CT_SQ, PAD, ROOT  # noqa: E402
+
+# searchable points of interest [name, tile x, tile y, kind]; shown as small markers when zoomed in
+POIS_JS = """() => {
+  const P = [], r = Math.round, mt = TILE / PPM;
+  for (const d of world.depots || []) P.push([d.name, r(d.x + d.w / 2), r(d.y + d.h / 2), "depot"]);
+  for (const y of world.bmYards || []) P.push([y.name, r(y.x0 + y.w / 2), r(y.y0 + y.h / 2), "Black Market yard"]);
+  for (const f of world.fuel || []) P.push([f.name, r(f.x / mt), r(f.y / mt), f.rural ? "rural fuel, HGV bay" : "fuel"]);
+  if (typeof hlPads === "function") for (const h of hlPads()) P.push([h.base ? "Base helipad " + h.name.split(" ").pop() : h.roof ? h.name + " helipad" : h.name, r(h.x / TILE), r(h.y / TILE), "helipad"]);
+  return P;
+}"""
 
 Image.MAX_IMAGE_PIXELS = None
 OUT = sys.argv[1] if len(sys.argv) > 1 else "/workspace/mapgrid/BigRig_Map_Viewer.html"
@@ -34,6 +45,7 @@ async def main():
         await pg.goto("file://" + os.path.join(ROOT, "BigRig.html"))
         await pg.wait_for_function("window.__bigrig&&__bigrig.world&&__bigrig.world.ready", timeout=600000, polling=500)
         places = await pg.evaluate(PLACES_JS)
+        pois = await pg.evaluate(POIS_JS)
         labels = await pg.evaluate("world.labels.map((l)=>[l[0],Math.round(l[1]),Math.round(l[2]),l[3]||0])")
         half = TOP_PPT // 2
         base = Image.new("RGB", (MW * half, MW * half))  # next level down, filled band by band
@@ -68,13 +80,13 @@ async def main():
         x1 = min(MW, -(-(pl["x1"] + PAD) // CT_SQ) * CT_SQ)
         y1 = min(MW, -(-(pl["y1"] + PAD) // CT_SQ) * CT_SQ)
         nm = pl["name"].upper()
-        cities.append({"name": nm, "prefix": nm.replace(" ", ""), "x0": int(x0), "y0": int(y0), "x1": int(x1), "y1": int(y1)})
-    data = {"MW": MW, "TS": TS, "levels": levels, "cities": cities, "labels": labels, "sq": 64, "csq": CT_SQ}
+        cities.append({"name": nm, "prefix": pl.get("prefix") or nm.replace(" ", ""), "x0": int(x0), "y0": int(y0), "x1": int(x1), "y1": int(y1)})
+    data = {"MW": MW, "TS": TS, "levels": levels, "cities": cities, "labels": labels, "pois": pois, "sq": 64, "csq": CT_SQ}
     html = open(os.path.join(ROOT, "tools", "mapviewer.html")).read()
     html = html.replace("/*DATA*/", "const D=" + json.dumps(data) + ";\nconst T=" + json.dumps(tiles, separators=(",", ":")) + ";")
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     open(OUT, "w").write(html)
-    print("tiles", len(tiles), "levels", levels, "size", os.path.getsize(OUT))
+    print("cities", len(cities), "pois", len(pois), "tiles", len(tiles), "levels", levels, "size", os.path.getsize(OUT))
 
 
 if __name__ == "__main__":

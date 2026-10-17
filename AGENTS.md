@@ -198,5 +198,6 @@ James marks up these maps and sends screenshots; map each mark back to tiles wit
 - Tile (tx, ty) = world pixels tx·32 … tx·32+31 (TILE = 32 px = 4 m); map is 2048×2048 tiles.
 Regenerate: `python3 build.py && python3 tools/mapviewer.py` → /workspace/mapgrid/BigRig_Map_Viewer.html
 (one offline HTML, WebP pyramid, grid toggle, live tile/grid readout, city jump + search incl. "ASHBY-C4",
-"K7" or "x,y"). `python3 tools/mapgrid.py [--pdf]` writes the gridded PNGs. The viewer's in-browser readout
+"K7" or "x,y"; Sandvale Military Base is a city box with prefix BASE-<C><R>; depots, fuel stations, Black Market
+yards and helipads are searchable POI markers — search "fuel", "helipad", "black market" etc.). `python3 tools/mapgrid.py [--pdf]` writes the gridded PNGs. The viewer's in-browser readout
 uses the same formulas.

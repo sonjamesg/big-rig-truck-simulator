@@ -40,6 +40,7 @@ function drawLevel(L,need){const tt=D.TS/L;let miss=0;
  const x0=Math.max(0,Math.floor(ox/tt)),y0=Math.max(0,Math.floor(oy/tt)),x1=Math.min(Math.ceil(D.MW/tt)-1,Math.floor((ox+W/s)/tt)),y1=Math.min(Math.ceil(D.MW/tt)-1,Math.floor((oy+H/s)/tt));
  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const im=need?img(L+"/"+x+"/"+y):(cache.get(L+"/"+x+"/"+y)||{}).ok&&cache.get(L+"/"+x+"/"+y).im;
   if(!im){miss++;continue}const sx=(x*tt-ox)*s,sy=(y*tt-oy)*s,w=im.width/L*s,h=im.height/L*s;g.drawImage(im,sx,sy,w+0.5,h+0.5)}return miss}
+const POI_C={depot:"#f2c14e","Black Market yard":"#e05cff",fuel:"#4fd08a","rural fuel, HGV bay":"#4fd08a",helipad:"#ff6a3d"};
 function cityAt(tx,ty){return D.cities.find(c=>tx>=c.x0&&tx<c.x1&&ty>=c.y0&&ty<c.y1)}
 function grid(x0,y0,x1,y1,sq,pre,color,lw,font){const sp=sq*s;if(sp<14)return;
  g.save();g.beginPath();g.rect((x0-ox)*s,(y0-oy)*s,(x1-x0)*s,(y1-y0)*s);g.clip();
@@ -69,6 +70,10 @@ function draw(){dirty=false;g.setTransform(dpr,0,0,dpr,0,0);g.fillStyle="#2a5f9a
    const fz=k===1?18:k===2?14:15;if(k===0&&s<0.25&&!/^[A-Z ]+$/.test(n))continue;
    g.font=(k===2?"italic 600 ":"700 ")+fz+"px system-ui,sans-serif";g.lineWidth=4;g.strokeStyle="rgba(0,0,0,.8)";g.strokeText(n,X,Y);g.fillStyle=k===2?"#bfe3ff":"#fff";g.fillText(n,X,Y)}
   g.textAlign="left"}
+ if(showLab&&s>=1.2){g.textAlign="left";g.textBaseline="middle";g.font="600 12px system-ui,sans-serif";
+  for(const[n,x,y,k]of D.pois||[]){const X=(x+.5-ox)*s,Y=(y+.5-oy)*s;if(X<-200||X>W+50||Y<-20||Y>H+20)continue;
+   g.fillStyle=POI_C[k]||"#fff";g.strokeStyle="#000";g.lineWidth=2;g.beginPath();g.arc(X,Y,5,0,7);g.fill();g.stroke();
+   g.lineWidth=3;g.strokeStyle="rgba(0,0,0,.8)";g.strokeText(n,X+8,Y);g.fillStyle="#fff";g.fillText(n,X+8,Y)}}
  if(pin){const X=(pin[0]+.5-ox)*s,Y=(pin[1]+.5-oy)*s;g.strokeStyle="#f33";g.lineWidth=2;g.strokeRect(X-Math.max(4,s/2),Y-Math.max(4,s/2),Math.max(8,s),Math.max(8,s))}
  readout()}
 function readout(){const p=pin||mouse;if(!p){ro.textContent="tile –";return}
@@ -105,6 +110,7 @@ function hits(t){t=t.trim().toLowerCase();if(!t)return[];const out=[];
  m=t.match(/^([a-z ]+)-([a-z]+\d+)$/);if(m){const c=D.cities.find(c=>c.prefix.toLowerCase()===m[1].replace(/ /g,""));if(c){const r=ref(m[2],D.csq,c.x0,c.y0);if(r)out.push({n:c.prefix+"-"+m[2].toUpperCase()+"  (tiles "+r[0]+"–"+(r[0]+15)+", "+r[1]+"–"+(r[1]+15)+")",go:()=>fit(r[0]-8,r[1]-8,r[0]+24,r[1]+24)})}}
  else{const r=ref(t,D.sq,0,0);if(r&&r[0]<D.MW&&r[1]<D.MW)out.push({n:t.toUpperCase()+"  (tiles "+r[0]+"–"+(r[0]+63)+", "+r[1]+"–"+(r[1]+63)+")",go:()=>fit(r[0]-16,r[1]-16,r[0]+80,r[1]+80)})}
  for(const c of D.cities)if(c.name.toLowerCase().includes(t))out.push({n:c.name+" (city page)",go:()=>fit(c.x0,c.y0,c.x1,c.y1)});
+ for(const[n,x,y,k]of D.pois||[])if(n.toLowerCase().includes(t)||k.toLowerCase().includes(t))out.push({n:n+"  ["+k+"]  ("+x+", "+y+")",go:()=>{pin=[x,y];fit(x-40,y-40,x+40,y+40)}});
  const seen=new Set();for(const[n,x,y]of D.labels)if(n.toLowerCase().includes(t)&&!seen.has(n+x)){seen.add(n+x);out.push({n:n+"  ("+x+", "+y+")",go:()=>fit(x-60,y-60,x+60,y+60)})}
  return out.slice(0,30)}
 q.oninput=()=>{const h=hits(q.value);res.innerHTML="";h.forEach(o=>{const d=document.createElement("div");d.textContent=o.n;d.onclick=()=>{o.go();res.style.display="none"};res.appendChild(d)});res.style.display=h.length?"block":"none"};
