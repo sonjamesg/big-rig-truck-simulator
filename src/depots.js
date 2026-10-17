@@ -1,5 +1,5 @@
 /**
- * @file depots.js — DEPOTS, TRAILERS, COUPLING & EVENT HOOKS
+ * @file depots.js — DEPOTS, TRAILERS, COUPLING & EVENT HOOKS (+ rural HGV fuel stations on long empty roads)
  * Exposes (globals): TRAILER_TYPES, TRL_KP_TO_CENTRE, BigRig, trlSeq, trailerArt, makeTrailer,
  *   trailerBox, buildDepots, YARD_BRANDS, YD_H, yardSpot, buildDepotsSteps, drawTrailerBay,
  *   drawYardSign (+13 more)
@@ -538,7 +538,7 @@ function* buildDepotsSteps(objs, R) {
     t === T.PGRASS ||
     t === T.ROCK ||
     t === T.CONC;
-  function findSpot(tx, ty, w, h, maxGap, rej, allowB, maxR) {
+  function findSpot(tx, ty, w, h, maxGap, rej, allowB, maxR, hwyOK) {
     const okB = allowB ? (t) => okT(t) || t === T.BLDG || t === T.LOT || t === T.PLAZA : okT,
       soft = (t) =>
         allowB && (t === T.WALK || t === T.PLAZA || t === T.PGRASS || t === T.BLDG || t === T.LOT);
@@ -594,7 +594,7 @@ function* buildDepotsSteps(objs, R) {
               if (
                 (get(i, j) === T.ROAD || get(i, j) === T.BRIDGE) &&
                 sid >= 0 &&
-                world.segs[sid].type !== "hwy" &&
+                (hwyOK || world.segs[sid].type !== "hwy") &&
                 world.roadV[idx(i, j)] < 0
               )
                 road++;
@@ -934,6 +934,23 @@ function* buildDepotsSteps(objs, R) {
       continue;
     }
     fuelStation(n, s[0], s[1], s[2], +(1.49 + R() * 0.25).toFixed(2));
+  }
+  // v48: rural forecourts (compact station + HGV diesel lane) on long empty stretches the road audit flagged as far from
+  // fuel (tests/road_audit_test.py fuel-gap): desert north of Dustwater, Greyfell, the M1 south and east, the M3 foot
+  for (const [n, tx, ty, hw, mr] of [
+    ["Old Desert Road Fuel", 905, 106, 1],
+    ["Greyfell Pass Fuel", 440, 1946, 1],
+    ["Southway Services", 700, 1946, 1],
+    ["Moor Field South Fuel", 1180, 1946, 1],
+    ["Sandreach East Fuel", 1890, 724, 1],
+  ]) {
+    const s = findSpot(tx, ty, 18, 12, 8, null, false, mr || 60, !!hw);
+    if (!s) {
+      console.warn("no rural fuel spot", n);
+      continue;
+    }
+    fuelStation(n, s[0], s[1], s[2], +(1.55 + R() * 0.2).toFixed(2));
+    world.fuel[world.fuel.length - 1].rural = 1;
   }
   yield "Building garages";
   // ---- repair garages (stub for later: damage repairs)

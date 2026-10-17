@@ -794,7 +794,11 @@ function* genWorldSteps() {
       E,
     ];
     pending.push(() => {
-      let pts = spline(ctrl, 0.5);
+      // v48: centripetal Catmull-Rom with phantom ends (as windLink): leaves each road end straight, no overshoot hooks
+      let pts = crSpline(
+        [[S[0] - dA[0] * h, S[1] - dA[1] * h], ...ctrl, [E[0] - dB[0] * h, E[1] - dB[1] * h]],
+        0.5,
+      );
       pts = pts.filter(
         (p, i) =>
           i === 0 ||
@@ -1103,7 +1107,7 @@ function* genWorldSteps() {
     world.abRing = { X0, Y0, X1, Y1 };
   }
   for (const k of [1, 5, 9]) road("h", C1.ys[k], C1.X1 + 1, 469, RW, "city");
-  road("v", 470, C1.ys[0], 459, RW, "city"); // docks
+  road("v", 470, C1.ys[1], 459, RW, "city"); // docks (v48: starts at the first cross street, no dead stub north of it)
   {
     // v14 port aisles: the city streets carry straight through the gate, two extra aisles tee off the boundary road, a quay road links them
     const A = [
@@ -1267,7 +1271,8 @@ function* genWorldSteps() {
       }
     }
   }
-  road("h", 1866, 1404, 1846, RW, "city"); // Kingsbridge coast road
+  road("h", 1866, 1398, 1846, RW, "city"); // Kingsbridge coast road
+  road("v", 1394, 1788, 1869, RW, "city").name = "Field Road"; // v48: coast road west end tied north to Airport Way (was a dead end)
   // Bath-style crescents: sweeping arcs joining grid ends (AI-drivable curves)
   link(
     "city",
@@ -1321,7 +1326,7 @@ function* genWorldSteps() {
   wind("h", MF.ys[2], 103, MF.xs[0] - 1, RW, "town", 14, "Millford Road");
   wind("v", MF.xs[1], MF.Y1 + 1, 976, RW, "town", 10, "Millford South Road");
   road("v", AB.xs[2], 983, AB.ys[0] - 1, 2, "rural");
-  wind("h", DW.ys[2], DW.X1 + 1, 1246, RW, "town", 22, "Dustwater Road");
+  wind("h", DW.ys[2], DW.X1 + 1, 1261, RW, "town", 22, "Dustwater Road"); // v48: meets Sandreach Road (T), was a dead end
   wind("v", CM.xs[1], CM.Y1 + 1, 716, RW, "town", 8, "Coppermine Road");
   wind("v", RH.xs[2], 1063, RH.ys[0] - 1, RW, "town", 10, "Redhill Road");
   wind("v", RH.xs[2], RH.Y1 + 1, 1376, RW, "town", 26, "Redhill South Road");
@@ -1359,13 +1364,14 @@ function* genWorldSteps() {
     12,
     "Greyfell Summit Road",
   );
-  const dwN = road("v", 900, 103, 300, 2, "rural");
+  const dwN = road("v", 900, 103, 300, 2, "rural"),
+    dwW = road("h", DW.ys[1], DW.xs[0] - 8, DW.xs[0] - 1, RW, "town"); // v48: west arm, so the road joins a crossroads not a box edge
   link(
     "rural",
     2,
     dwN,
     1,
-    DW.rows[1],
+    dwW,
     0,
     [
       [880, 360],
@@ -1374,7 +1380,11 @@ function* genWorldSteps() {
     10,
     "Old Desert Road",
   );
-  link("town", RW, DW.cols[1], 0, apRoad, 0, [], 10);
+  {
+    // v48: Dustwater north road leaves through a short straight arm (crossroads), not off the top of the junction box
+    const dwArm = road("v", DW.xs[1], DW.ys[0] - 8, DW.ys[0] - 1, RW, "town");
+    link("town", RW, dwArm, 0, apRoad, 0, [], 10);
+  }
   const fwS = road("v", FW.xs[1] + 1, FW.Y1 + 1, FW.Y1 + 18, 2, "rural");
   link(
     "rural",
@@ -1780,12 +1790,13 @@ function* genWorldSteps() {
     // v36: Albion Airport landside access: forecourt -> west along 716 -> down to the town grid (seg at x346 from y780), laid before junctions so AI + sat nav use it
     road("v", 410, 692, 715, 4, "town");
     road("h", 716, 346, 413, 4, "town");
-    road("h", 700, 388, 410, 3, "town");
+    road("h", 700, 392, 410, 3, "town"); // v48: no 4-tile stub west of the frontage
     road("h", 708, 414, 490, 3, "town");
     road("h", 692, 392, 433, 3, "town"); // v44: frontage moved 3 tiles south, clear of the terminal canopy
     road("v", 392, 692, 702, 3, "town");
     road("v", 431, 692, 709, 3, "town"); // v41: arrivals/drop-off frontage loop (real road)
     mbRoads(road); // v45: Sandvale Military Base internal roads + gate avenue
+    road("v", MB.av + 14, 357, DW.ys[2] + RW - 1, RW, "town").name = "Sandreach Road"; // v48: links the base road (y353) south to Dustwater Road (was a dead end); offset from the gate T so the junctions stay distinct
     // v39: car park access roads (MSCP ramp, surface parks)
     const tg = world.segs.find((q) => q.dir === "v" && q.a === 346 && q.b0 === 780);
     if (tg) {

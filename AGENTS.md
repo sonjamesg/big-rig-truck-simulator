@@ -129,7 +129,7 @@ python3 tests/roundabout_test.py
 python3 tests/spawn_lane_test.py
 ```
 
-Available: `channel_diagonal_usage_check.py`, `dock2_test.py`, `dock3_traffic_test.py`, `dock4_probe.py`, `dock_shots.py`, `flyover_test.py`, `haptics_test.py`, `junction_audit_test.py`, `junction_live_screens.py`, `kingsbridge_test.py`, `kn_live_screens.py`, `landscape_aspect_test.py`, `live_overlap_check.py`, `port_test.py`, `rail_route_test.py`, `reverse_lock_test.py`, `roundabout_test.py`, `spawn_lane_test.py`, `train_curve_probe.py`, `train_ship_shots.py`.
+Available: `channel_diagonal_usage_check.py`, `dock2_test.py`, `dock3_traffic_test.py`, `dock4_probe.py`, `dock_shots.py`, `flyover_test.py`, `haptics_test.py`, `junction_audit_test.py`, `junction_live_screens.py`, `kingsbridge_test.py`, `kn_live_screens.py`, `landscape_aspect_test.py`, `live_overlap_check.py`, `port_test.py`, `rail_route_test.py`, `reverse_lock_test.py`, `road_audit_test.py` (static road-network audit: dead ends, curve kinks, reachability, rail crossings, unmarked roads, fuel gaps), `roundabout_test.py`, `spawn_lane_test.py`, `train_curve_probe.py`, `train_ship_shots.py`.
 Each script waits on `window.__bigrig.world.ready`, calls `startGame()` and then evaluates game globals directly.
 Check for `pageerror` / console errors when you add a test.
 
