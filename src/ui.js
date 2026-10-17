@@ -119,6 +119,7 @@ const UICSS = `
 .buyrow .price{font-size:24px;font-weight:900;color:#7dff9a;flex:1}
 .nshort,.sub2{display:none}.wallet{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:99px;background:rgba(125,255,154,.1);border:1px solid rgba(125,255,154,.35);font-size:12px;font-weight:700;white-space:nowrap;color:#cfe}.wallet b{color:#7dff9a;font-size:15px}
 .tlw{display:flex;flex-direction:column;min-height:0;min-width:0}.tlw .tl{flex:1}.tlh{display:none;font-size:11px;text-align:center;opacity:.7;padding:2px 0 4px}
+body:not(.touch) .tl{gap:5px;padding:8px 10px} body:not(.touch) .tl .ti{padding:4px 8px} body:not(.touch) #ui .tl .ti canvas{width:22px!important;height:42px!important;max-width:22px}
 .bigbuy{min-height:48px;font-size:16px;padding:0 22px} .need{display:flex;flex-direction:column;gap:2px;padding:8px 12px;border-radius:10px;background:rgba(255,123,114,.12);border:1px solid rgba(255,123,114,.4)}.need b{color:#ff9b90;font-size:15px}.need span{font-size:11px;opacity:.8}
 .padfocus{outline:3px solid #f5b82e!important;outline-offset:2px;box-shadow:0 0 0 6px rgba(245,184,46,.25)!important}
 body:not(.padmode) .padhelp{display:none!important} body.padmode #help:not(.padhelp){display:none!important}

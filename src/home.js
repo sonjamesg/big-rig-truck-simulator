@@ -44,7 +44,17 @@ body:has(#overlay:not(.hidden)) #hudbtns,body:has(#overlay:not(.hidden)) #mpbadg
  body.touch #lobby .lb{padding:7px 10px!important;font-size:13px!important;min-height:36px}
  body.touch #lobby input{padding:6px 10px!important;min-height:36px;font-size:16px}
  body.touch #setPanel{width:min(44vw,400px);min-width:0;padding:6px 14px!important;gap:4px} body.touch #setPanel .sph{display:none}
-}`;
+}
+/* v50 PC home (James 17 Oct): two columns, whole menu fits the 960x600 frame with no scrolling; overlay covers the full frame (no game strip by the scrollbar) */
+body:not(.touch) #overlay{inset:0;border-radius:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr auto auto auto auto 1fr auto;column-gap:22px;row-gap:8px;align-items:center;justify-items:center;padding:12px 26px 6px;box-sizing:border-box;overflow:hidden}
+body:not(.touch) #overlay>*:not(#homeBg){grid-column:1;margin-top:0!important;margin-bottom:0!important}
+body:not(.touch) #overlay>#homeBg{grid-column:auto}
+body:not(.touch) #overlay>#logo{grid-row:2/span 2;max-height:210px!important;max-width:100%!important;align-self:end}
+body:not(.touch) #overlay>.go{grid-row:4} body:not(.touch) #overlay>#loadBox{grid-row:4;width:min(400px,100%)} body:not(.touch) #overlay>p:not(#loading){grid-row:5;margin:0!important;font-size:12px;line-height:1.5}
+body:not(.touch) #overlay>#acct,body:not(.touch) #overlay>#homeCard,body:not(.touch) #overlay>#lobby,body:not(.touch) #overlay>#setPanel,body:not(.touch) #overlay>#invite{grid-column:2;width:min(400px,100%)!important;box-sizing:border-box}
+body:not(.touch) #overlay>#acct,body:not(.touch) #overlay>#homeCard,body:not(.touch) #overlay>#invite{grid-row:2/span 2;align-self:end}
+body:not(.touch) #overlay>#lobby{grid-row:4;align-self:start;align-items:stretch;margin-top:0!important} body:not(.touch) #lobby .hbtns{display:flex;gap:8px} body:not(.touch) #lobby .hbtns button{flex:1} body:not(.touch) #lobby>*:not(.row){width:100%!important;max-width:100%;box-sizing:border-box;margin-left:0!important;margin-right:0!important} body:not(.touch) #overlay>#setPanel{grid-row:5;align-self:start;min-width:0}
+body:not(.touch) #overlay>#homeVer{grid-column:1/span 2;grid-row:7;margin:0!important;padding:0}`;
   const st = document.createElement("style");
   st.id = "homeCss";
   st.textContent = css;

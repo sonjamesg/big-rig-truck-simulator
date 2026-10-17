@@ -119,6 +119,17 @@ Notes on ownership:
 - **Trigger popups** (yard sale, homes, dealers, depot and Black Market boards) are edge-triggered with `trigFresh` /
   `trigUsed` (`ui.js`): they open only after the truck drives into the zone, never on load, respawn or fast travel
   (`rigPlace` calls `trigReset`). Check: `tests/trigger_popup_test.py`.
+- **Generator random stream is pinned per stage** (`GEN_R_PIN` + `pinR` in `world.js`): each later stage (and the towns /
+  industry parts of "Raising buildings") restarts the mulberry stream at the v49 draw count, so editing a few city blocks
+  only re-rolls those blocks. If you add or remove `R()` draws on purpose in a pinned stage, the pins downstream still
+  hold; to adopt a new baseline, recount (instrument `R`) and update the table.
+- **City-grid junctions**: never lay a street within ~5 tiles of a parallel road (twin junctions, offset yellow boxes,
+  doubled signals). Kingsbridge districts snap streets up to 12 tiles onto a neighbouring district straight across, and an
+  edge row/column that would sit alongside an existing road is dropped (its cross streets still run up to that road).
+  Check with the near-junction probe in `tests/junction_audit_test.py` (STATIC + duplicate-junction) after map changes.
+- **PC home screen and modals fit with no scrolling** down to 1024x576: the desktop home is a two-column grid
+  (`home.js`, `body:not(.touch) #overlay`, inset 0); dealer and estate lists are compacted on desktop. Job board lists
+  still scroll internally when there are more jobs than fit.
 - **Map**: drawing is in `main.js` (`drawMinimap`, `drawBigMap`). The real-chunk overview and the airport overlay are
   in `mapov.js`, the night style is in `nightmap.js`, and route and POI hit-testing are in `satnav.js`.
 - `src/template.html` is the page shell (DOM, CSS and the mobile deck). `src/peerjs.min.js`, `src/engine_b64.txt` and
