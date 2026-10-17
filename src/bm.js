@@ -1030,7 +1030,10 @@ function bmShoot(S, d, R) {
   if (h) {
     // phone touch steering is coarser: rounds land a little softer there
     const tk = document.body.classList.contains("touch") ? 0.8 : 1;
-    truck.damage = Math.min(100, (truck.damage || 0) + (S.mg ? BM_DMG.mg : BM_DMG.rifle) * tk);
+    // v49: bulletproof panels (customiser) scale every round: soldiers, jeep MG, police
+    const dm = (S.mg ? BM_DMG.mg : BM_DMG.rifle) * tk * (truck.bulM || 1);
+    truck.damage = Math.min(100, (truck.damage || 0) + dm);
+    BM.dmgGun = (BM.dmgGun || 0) + dm;
     cam.shake = Math.max(cam.shake || 0, 1.2);
     BM.hits = (BM.hits || 0) + 1;
     for (let k = 0; k < 4; k++)

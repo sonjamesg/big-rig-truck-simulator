@@ -1,5 +1,5 @@
 /**
- * @file tune2.js — truck customiser stage 2: gearbox, suspension, fuel tank, exhaust, armour
+ * @file tune2.js — truck customiser stage 2: gearbox, suspension, fuel tank, exhaust, armour (crash damage), bulletproof panels (bullet damage)
  * Exposes (globals): czIcon2
  * Depends on: world.js, render.js, lorry.js, physics.js, career.js, tune.js, main.js
  * Load order: #32 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
@@ -11,7 +11,7 @@ CZ_TABS.push(
   { id: "susp", n: "Suspension", ic: "\u{1F6E0}\uFE0F", slots: ["sus"] },
   { id: "tank", n: "Fuel tank", ic: "\u26FD", slots: ["tnk"] },
   { id: "exhaust", n: "Exhaust", ic: "\u{1F4A8}", slots: ["exh", "exs"] },
-  { id: "armour", n: "Chassis & armour", ic: "\u{1F6E1}\uFE0F", slots: ["arm"] },
+  { id: "armour", n: "Chassis & armour", ic: "\u{1F6E1}\uFE0F", slots: ["arm", "bpl"] },
 );
 Object.assign(CZ_SLOTS, {
   gbx: "Gearbox",
@@ -20,6 +20,7 @@ Object.assign(CZ_SLOTS, {
   exh: "Exhaust system",
   exs: "Stack style",
   arm: "Chassis & armour",
+  bpl: "Bulletproof panels",
 });
 CZ_PARTS.push(
   {
@@ -217,6 +218,37 @@ CZ_PARTS.push(
     fx: { dur: 0.45, econ: 1.05, acc: 0.97 },
     d: "Riveted plate everywhere: shrugs off crashes",
   },
+  // v49: bulletproof panels: cut gunfire damage (soldiers, the army jeep MG, police); crash damage is the armour slot above
+  {
+    id: "bpl1",
+    slot: "bpl",
+    n: "Ballistic door panels",
+    lv: 1,
+    p: 2400,
+    req: 2,
+    fx: { bp: 0.8 },
+    d: "Kevlar-backed steel in the doors",
+  },
+  {
+    id: "bpl2",
+    slot: "bpl",
+    n: "Ballistic cab kit",
+    lv: 2,
+    p: 5500,
+    req: 4,
+    fx: { bp: 0.62, econ: 1.02 },
+    d: "Plated cab sides + windscreen shutter",
+  },
+  {
+    id: "bpl3",
+    slot: "bpl",
+    n: "Full ballistic plating",
+    lv: 3,
+    p: 9800,
+    req: 7,
+    fx: { bp: 0.45, econ: 1.04, acc: 0.98 },
+    d: "Cab, roof and tanks: rounds just spark off",
+  },
 );
 // exhaust sound: snd adds (not multiplies)
 {
@@ -237,7 +269,8 @@ CZ_PARTS.push(
       tk = czPart(fit.tnk),
       ex = czPart(fit.exh),
       gb = czPart(fit.gbx),
-      ar = czPart(fit.arm);
+      ar = czPart(fit.arm),
+      bp = czPart(fit.bpl);
     // fuel tanks: cylinders on the chassis sides behind the cab, longer per level
     if (tk) {
       const len = 0.6 + tk.lv * 0.28,
@@ -341,6 +374,39 @@ CZ_PARTS.push(
       g.strokeRect(X(-0.9), Y(-0.2), 1.8 * S, 0.15 * S);
       g.restore();
     }
+    // bulletproof panels: olive-drab plates bolted over the cab sides (lv1), windscreen shutter (lv2), roof + tank plates (lv3)
+    if (bp) {
+      g.save();
+      g.fillStyle = "#4a5536";
+      g.strokeStyle = "#20261a";
+      g.lineWidth = 1.5;
+      const plate = (x, y, w, h) => {
+        rr(g, X(x), Y(y), w * S, h * S, 0.05 * S);
+        g.fill();
+        g.stroke();
+      };
+      for (const s of [-1, 1]) plate(s > 0 ? 1.08 : -1.36, front + 0.35, 0.28, -2.6 - front - 0.35);
+      if (bp.lv >= 2) {
+        plate(-1.1, front + 0.05, 2.2, 0.32);
+        g.fillStyle = "#111";
+        g.fillRect(X(-0.75), Y(front + 0.17), 1.5 * S, 0.07 * S);
+        g.fillStyle = "#4a5536";
+      }
+      if (bp.lv >= 3) {
+        plate(-0.95, front + 0.55, 1.9, -2.5 - front - 0.75);
+        for (const s of [-1, 1]) plate(s > 0 ? 0.95 : -1.3, -2.45, 0.35, 1.3);
+      }
+      g.fillStyle = "#c9c19a";
+      for (const s of [-1, 1])
+        for (let k = 0; k < 4 + bp.lv * 2; k++)
+          g.fillRect(
+            X(s > 0 ? 1.22 : -1.22) - 1,
+            Y(front + 0.45 + (k * (-2.75 - front)) / (4 + bp.lv * 2)),
+            2,
+            2,
+          );
+      g.restore();
+    }
     // exhaust: stacks behind the cab (style) / pipe diameter from the performance system
     const es = L.exs || (ex ? "chrome" : null);
     if (es) {
@@ -410,7 +476,8 @@ CZ_PARTS.push(
     const sus = czPart(fit.sus),
       tk = czPart(fit.tnk),
       ex = czPart(fit.exh),
-      ar = czPart(fit.arm);
+      ar = czPart(fit.arm),
+      bp = czPart(fit.bpl);
     const low = sus && sus.lv >= 2 ? 0.08 * sus.lv : 0;
     if (low) {
       g.save();
@@ -457,6 +524,14 @@ CZ_PARTS.push(
       if (ar.lv >= 4) g.fillRect(X(-2.4), Y(1.0), 2.0 * sc, 0.35 * sc);
       g.fillStyle = "#c8cdd2";
       for (let k = 0; k < ar.lv * 3; k++) g.fillRect(X(-5 + k * 0.3), Y(1.2), 2, 2);
+    }
+    if (bp) {
+      g.fillStyle = "rgba(74,85,54,0.96)";
+      g.fillRect(X(-4.9), Y(2.3), 1.9 * sc, 1.0 * sc);
+      if (bp.lv >= 2) g.fillRect(X(-5.25), Y(2.6), 0.3 * sc, 0.75 * sc);
+      if (bp.lv >= 3) g.fillRect(X(-5.0), Y(roofH + 0.1), 2.6 * sc, 0.2 * sc);
+      g.fillStyle = "#c9c19a";
+      for (let k = 0; k < 4 + bp.lv * 2; k++) g.fillRect(X(-4.8 + k * 0.28), Y(2.2), 2, 2);
     }
     if (sus && sus.lv >= 2) {
       g.fillStyle = "#3d7fd9";
@@ -615,6 +690,34 @@ function czIcon2(g, p, W, H, cx, cy, s, lv) {
     g.textAlign = "center";
     g.textBaseline = "middle";
     g.fillText("L" + lv, cx, cy);
+    return;
+  }
+  if (sl === "bpl") {
+    g.fillStyle = "#4a5536";
+    rr(g, cx - 26 * s, cy - 24 * s, 52 * s, 48 * s, 6 * s);
+    g.fill();
+    g.strokeStyle = "#20261a";
+    g.lineWidth = 2 * s;
+    g.stroke();
+    g.fillStyle = "#c9c19a";
+    for (const [x, y] of [
+      [-20, -18],
+      [20, -18],
+      [-20, 18],
+      [20, 18],
+    ])
+      g.fillRect(cx + x * s - 2 * s, cy + y * s - 2 * s, 4 * s, 4 * s);
+    g.fillStyle = "#1a1a1a";
+    for (let k = 0; k < lv + 1; k++) {
+      g.beginPath();
+      g.arc(cx - 10 * s + k * 9 * s, cy - 4 * s + (k % 2) * 9 * s, 3 * s, 0, 7);
+      g.fill();
+    }
+    g.fillStyle = "#f5b82e";
+    g.font = "bold " + Math.round(12 * s) + "px Arial";
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText("B" + lv, cx, cy + 14 * s);
     return;
   }
 }

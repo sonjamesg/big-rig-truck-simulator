@@ -36,7 +36,7 @@ const CZ_PARTS = [
     lv: 1,
     p: 800,
     req: 1,
-    fx: { pw: 1.06 },
+    fx: { pw: 1.08 },
     d: "Freer intake + injector tweak",
   },
   {
@@ -46,7 +46,7 @@ const CZ_PARTS = [
     lv: 2,
     p: 2500,
     req: 3,
-    fx: { pw: 1.13, acc: 1.05 },
+    fx: { pw: 1.16, acc: 1.05 },
     d: "Bigger hybrid turbo, more low-end shove",
   },
   {
@@ -56,7 +56,7 @@ const CZ_PARTS = [
     lv: 3,
     p: 4500,
     req: 5,
-    fx: { pw: 1.2, vm: 1.4, econ: 0.97 },
+    fx: { pw: 1.25, vm: 1.4, econ: 0.97 },
     d: "Remapped fuelling, limiter raised to 59 mph",
   },
   {
@@ -66,7 +66,7 @@ const CZ_PARTS = [
     lv: 4,
     p: 8500,
     req: 8,
-    fx: { pw: 1.3, vm: 2.2, acc: 1.08, econ: 1.04 },
+    fx: { pw: 1.35, vm: 2.2, acc: 1.08, econ: 1.04 },
     d: "Sequential twin turbos + intercooler",
   },
   {
@@ -76,7 +76,7 @@ const CZ_PARTS = [
     lv: 5,
     p: 15000,
     req: 12,
-    fx: { pw: 1.42, vm: 3.0, acc: 1.12, econ: 1.1, dur: 1.05 },
+    fx: { pw: 1.48, vm: 3.0, acc: 1.12, econ: 1.1, dur: 1.05 },
     d: "Forged internals, 63 mph, thirsty",
   },
   // brakes + engine brake
@@ -303,6 +303,7 @@ function czFx(fit) {
     econ: 1,
     tank: 0,
     dur: 1,
+    bp: 1,
     shift: 1,
     beam: 1,
     snd: 0,
@@ -326,12 +327,14 @@ function czStats(m, fit) {
     L = 36 * m.econ * F.econ;
   return [
     ["Power", hp + " hp", hp / 1100],
+    ["Torque", Math.round(2400 * ENG_BASE * m.power * F.pw) + " Nm", (m.power * F.pw) / 2.6],
     ["Top speed", Math.round(v) + " mph", (v - 44) / 28],
     ["Acceleration", (acc * 10).toFixed(1), acc / 2.6],
     ["Braking", Math.round(F.br * 100) + "%", (F.br - 0.6) / 1.1],
     ["Handling", Math.round(F.grip * F.hand * 100) + "%", (F.grip * F.hand + F.jk - 0.6) / 1.1],
     ["Economy", L.toFixed(0) + " L/100", (60 - L) / 40],
-    ["Durability", Math.round(100 / F.dur) + "%", (1 / F.dur - 0.5) / 0.9],
+    ["Crash damage", czPct(F.dur), (1 - F.dur) / 0.6],
+    ["Bullet damage", czPct(F.bp), (1 - F.bp) / 0.6],
   ];
 }
 // ---- apply to the live truck (called by applyModel)
@@ -349,6 +352,7 @@ function czApply() {
   truck.econ = m.econ * F.econ;
   truck.tank = m.tank + F.tank;
   truck.dmgM = F.dur;
+  truck.bulM = F.bp; // v49: gunfire damage multiplier (bulletproof panels), used by bmShoot
   truck.shiftM = F.shift;
   truck.beamM = F.beam;
   if (truck.fuel > truck.tank) truck.fuel = truck.tank;
@@ -1258,6 +1262,11 @@ function czIsFit(mid, p) {
   const f = czSetup(mid).fit[p.slot];
   return p.stock ? !f : f === p.id;
 }
+// damage multiplier as a signed % ("\u221220%", "+5%", "standard")
+function czPct(m) {
+  const v = Math.round((m - 1) * 100);
+  return v ? (v < 0 ? "\u2212" : "+") + Math.abs(v) + "%" : "standard";
+}
 function czFxText(p) {
   if (!p.fx) return p.look ? "cosmetic" : "";
   const t = [],
@@ -1272,7 +1281,8 @@ function czFxText(p) {
   if (f.econ)
     t.push((f.econ < 1 ? "-" : "+") + Math.abs(Math.round((f.econ - 1) * 100)) + "% fuel use");
   if (f.tank) t.push("+" + f.tank + " L tank");
-  if (f.dur) pc(1 / f.dur, "durability");
+  if (f.dur) t.push(czPct(f.dur) + " crash damage");
+  if (f.bp) t.push(czPct(f.bp) + " bullet damage");
   if (f.jk) t.push("anti-jackknife");
   if (f.shift) pc(1 / f.shift, "shift speed");
   if (f.beam) pc(f.beam, "beam reach");

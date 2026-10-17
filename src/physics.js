@@ -1,6 +1,6 @@
 /**
  * @file physics.js — LORRY PHYSICS
- * Exposes (globals): GEARS, MASS, torqueAt, truck, fwd, kingpin, solidAtM, bodyHits, hitTest,
+ * Exposes (globals): GEARS, MASS, ENG_BASE, torqueAt, truck, fwd, kingpin, solidAtM, bodyHits, hitTest,
  *   surfaceAt, stepTruck
  * Depends on: world.js, lorry.js, traffic.js, depots.js, fx.js, port.js, rail.js, weather.js,
  *   wanted.js, airport.js
@@ -12,6 +12,8 @@ const GEARS = [4.2, 3.1, 2.3, 1.75, 1.35, 1.08, 0.88, 0.72],
   FINAL = 4.0,
   WHEEL_R = 0.5,
   REV_RATIO = 4.5;
+// v49: base engine output +10% (James: a bit quicker with heavy trailers); customiser engine tunes multiply on top (truck.power)
+const ENG_BASE = 1.1;
 const MASS = 22000,
   IDLE = 650,
   REDLINE = 2300,
@@ -181,7 +183,7 @@ function stepTruck(s, inp, dt) {
   s.rpm += (Math.min(REDLINE, rpm) - s.rpm) * Math.min(1, dt * 8);
   let F = 0;
   if (s.shiftT <= 0) {
-    let tq = torqueAt(s.rpm) * s.throttle * (s.power || 1) * (av < 14 ? s.accM || 1 : 1);
+    let tq = torqueAt(s.rpm) * ENG_BASE * s.throttle * (s.power || 1) * (av < 14 ? s.accM || 1 : 1);
     if (s.govern && av > (s.vmax || VMAX) && dir > 0) tq = 0; // v40: no limiter unless s.govern (James: remove the 56 mph limiter) if(s.mode==='R' && av>3.5) tq=0;
     F += (dir * tq * ratio * FINAL * 0.9) / WHEEL_R;
     if (s.throttle < 0.05 && av > 1)
