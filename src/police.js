@@ -1360,17 +1360,12 @@ function emSources() {
   const c = POL.chase;
   if (c && !c.paying) out.push(c.v);
   for (const a of POL.aux || []) if (a.v) out.push(a.v); // v50: every pursuer on blue lights
-  for (const v of POL.cars) if (emOnBlue(v) && traffic.vs.includes(v)) out.push(v);
+  // every AI vehicle on blue lights (emYield sets v.emResp from emOnBlue each frame: police, ambulance, fire engine)
+  for (const v of traffic.vs) if (v.emResp && !out.includes(v)) out.push(v);
   if (typeof AMBU !== "undefined")
-    for (const j of AMBU.jobs) {
-      if (j.st === "go" && j.v) out.push(j.v);
-      else if ((j.st === "pull" || j.st === "drive") && j.k) out.push(j.k);
-    }
+    for (const j of AMBU.jobs) if ((j.st === "pull" || j.st === "drive") && j.k) out.push(j.k);
   if (typeof FIRE !== "undefined")
-    for (const e of FIRE.eng) {
-      if (e.stt === "go" && e.v) out.push(e.v);
-      else if ((e.stt === "out" || e.stt === "arrive") && e.k) out.push(e.k);
-    }
+    for (const e of FIRE.eng) if ((e.stt === "out" || e.stt === "arrive") && e.k) out.push(e.k);
   return out;
 }
 // v50: a traffic-sim emergency vehicle currently on blue lights (responding), as opposed to patrolling / returning

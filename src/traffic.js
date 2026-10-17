@@ -1108,7 +1108,7 @@ function spawnVehicle(x, y, force, opt) {
   if (segDeadEnd(sg)) return null; // v26: never spawn onto a road that leads nowhere
   if (sg.mil && mbFull()) return null; // v45: base traffic capped (MB_CAP military vehicles in total)
   const dir = opt && opt.dir ? opt.dir : r() < 0.5 ? 1 : -1,
-    lane = opt ? 0 : (r() * nLanes(sg)) | 0;
+    lane = opt ? Math.min(opt.lane || 0, nLanes(sg) - 1) : (r() * nLanes(sg)) | 0;
   const p = lanePt(sg, dir, lane, along);
   const kind =
       opt && opt.kind ? opt.kind : sg.mil ? mbKind(r) : pickW(MIX[sg.type] || MIX.city, r()),
@@ -1875,7 +1875,9 @@ function stepVeh(v, dt, pbs) {
     let best = v.emWant ?? 1.3,
       bg = lgap < 1e8 ? lgap : 1e9;
     if (lgap < 40)
-      for (const o of [1.3, 4.3, 2.6, -1.2]) {
+      // lanes are one tile (M_T) wide: own lane shifted right, the next lane's right half (yielders hug the left), its
+      // centre, the oncoming lanes, and the kerb side; gapAt rejects anything off the tarmac or blocked
+      for (const o of [1.3, M_T + 1.2, M_T, 2 * M_T, 2 * M_T + 1.2, 3 * M_T, -1.2]) {
         if (Math.abs(o - best) < 0.01) continue;
         const g = gapAt(o);
         if (g > bg + 6) {
@@ -1963,10 +1965,12 @@ function stepVeh(v, dt, pbs) {
       v.offX -= f[0] * along;
       v.offY -= f[1] * along;
     }
-    const k = Math.exp(-dt * (0.35 + 0.45 * Math.min(8, v.v)));
-    v.offX *= k;
-    v.offY *= k;
-    if (Math.abs(v.offX) + Math.abs(v.offY) < 0.02) {
+    const k = Math.exp(-dt * (0.35 + 0.45 * Math.min(8, v.v))),
+      eo = v.emO || 0, // v50: the deliberate blue-light / pull-over offset (emShift) is held, only the rest steers back
+      rr = rgt(v.h || 0);
+    v.offX = (v.offX - rr[0] * eo) * k + rr[0] * eo;
+    v.offY = (v.offY - rr[1] * eo) * k + rr[1] * eo;
+    if (!eo && Math.abs(v.offX) + Math.abs(v.offY) < 0.02) {
       v.offX = 0;
       v.offY = 0;
     }
