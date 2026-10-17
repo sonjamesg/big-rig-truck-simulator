@@ -37,6 +37,7 @@ function mbRoads(road) {
     ["v", 1078, 224, 331], // west ring
     ["v", 1434, 224, 331], // east ring
     ["v", MB.av, 224, 352], // gate avenue -> external road (y353)
+    ["v", 1292, 224, 295], // v49: depot yard road down the west edge of the AFV hardstand, spine -> south street
   ];
   for (const [d, a, b0, b1] of L) {
     const sg = road(d, a, b0, b1, 4, "town");
@@ -300,13 +301,15 @@ function mbGen(objs) {
   light(1185, 304, 9);
   light(1241, 325, 9);
   // ---- military depot (registered by depots.js via mbDepotOpts): shed, ARMY container stack, 3 rows of bays, AFV hardstand + staging
-  pad(1258, 228, 1330, 292, "#989892", {});
+  // v49: yard runs out to the gate avenue (west) and the south street (south); split either side of the yard road (x1292..1295)
+  pad(1252, 228, 1292, 296, "#989892", {});
+  pad(1296, 228, 1330, 296, "#989892", {});
   area(1292, 224, 1310, 228, T.CONC);
   O("conc", 1292, 224, 1310, 228, { col: "#989892" }, -0.2);
   bld(1260, 229, 1290, 241, "#5a6446", "MILITARY DEPOT", "f", { units: 3, doors: 3 });
-  for (let rr = 0; rr < 2; rr++)
-    for (let cc = 0; cc < 4; cc++) {
-      const x = 1293 + cc * 9,
+  for (let rr = 0; rr < 3; rr++)
+    for (let cc = 0; cc < 3; cc++) {
+      const x = 1297 + cc * 11,
         y = 230 + rr * 4.5;
       O("cstack", x, y, x + 8.4, y + 3.6, { height: 26 }, 2);
       area(x, y, x + 8.4, y + 3.6, T.CONT);
@@ -321,7 +324,7 @@ function mbGen(objs) {
     [1329, 229],
     [1259, 291],
     [1329, 291],
-    [1294, 262],
+    [1330, 262],
   ])
     light(x, y, 11);
   B.depot = {

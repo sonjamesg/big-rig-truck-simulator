@@ -1,5 +1,5 @@
 /**
- * @file police.js — POLICE AI: patrols from police stations, line-of-sight detection, chase, fines + arrest
+ * @file police.js — POLICE AI: patrols from police stations, line-of-sight detection, chase (+ v49 2-star pursuers POL.aux: polAuxSpawn/polAuxUpdate/polAuxDrop), fines + arrest
  * Exposes (globals): POL_FINES, POL, EMV, POL_T, polArt, emArt, emDrawBar, emBlit, SIRK, emSiren,
  *   emSirenVol, emRoadPt, emFollow, emToTraffic (+53 more)
  * Depends on: world.js, render.js, lorry.js, physics.js, audio.js, traffic.js, signals.js,
@@ -831,6 +831,7 @@ function polMapDots(px, py) {
       .filter((v) => v.pol && (v.pol.search || WANT.lvl) && traffic.vs.includes(v))
       .map((v) => v);
   if (POL.chase) L.push(POL.chase.v);
+  for (const a of POL.aux) L.push(a.v);
   for (const v of L) {
     const X = px(v.x),
       Y = py(v.y);
@@ -884,16 +885,15 @@ function polChaseAim(c) {
     l = Math.hypot(dx, dy) || 1;
   return [q[0] - (dy / l) * 1.4, q[1] + (dx / l) * 1.4];
 } // keep-left lane-ish
-function polUpdateChase(dt) {
-  const c = POL.chase;
-  if (!c) return;
+// drives one chase car (the main POL.chase or a 2-star pursuer); returns "spin" while spinning out, "spun" when a spin ends far away
+function polDriveChase(c, dt) {
   const v = c.v,
     P = truck;
   c.t += dt;
   const back = WANT.lvl >= 2 && c.t > 3 ? (P.trl ? 7 : 1) : P.trl ? 20 : 9,
     f = fwd(P.trl ? P.th : P.h),
-    tx = (P.trl ? P.trl.x : P.x) - f[0] * back,
-    ty = (P.trl ? P.trl.y : P.y) - f[1] * back,
+    tx = c.goal ? c.goal[0] : (P.trl ? P.trl.x : P.x) - f[0] * back,
+    ty = c.goal ? c.goal[1] : (P.trl ? P.trl.y : P.y) - f[1] * back,
     dP = Math.hypot(P.x - v.x, P.y - v.y);
   if (c.spin > 0) {
     c.spin -= dt;
@@ -905,10 +905,7 @@ function polUpdateChase(dt) {
     v.v = c.sp;
     polSep(c);
     if (c.siren) c.siren.set(emSirenVol(v.x, v.y, v));
-    if (c.spin <= 0 && dP > 45) {
-      polLose("crashed");
-    }
-    return;
+    return c.spin <= 0 && dP > 45 ? "spun" : "spin";
   }
   c.rp = (c.rp || 0) - dt;
   let aim = null;
@@ -975,14 +972,14 @@ function polUpdateChase(dt) {
         c.spin = 1.6;
         c.spinD = Math.random() < 0.5 ? -1 : 1;
         POL.crashes = (POL.crashes || 0) + 1;
-        return;
+        return "spin";
       }
       c.sp = Math.min(c.sp, Math.abs(blk.o.v || 0));
     }
   }
   const want =
       d > 25
-        ? Math.max(Math.abs(P.v) + 6, 15)
+        ? Math.max(Math.abs(P.v) + (c.aux ? 4 : 6), 15)
         : d > 6
           ? Math.abs(P.v) + d * 0.25
           : Math.abs(P.v) * 0.6,
@@ -1010,6 +1007,17 @@ function polUpdateChase(dt) {
       c.siren.whoop();
     }
   }
+  c.dP = dP;
+}
+function polUpdateChase(dt) {
+  const c = POL.chase;
+  if (!c) return;
+  const st = polDriveChase(c, dt),
+    v = c.v,
+    P = truck,
+    dP = Math.hypot(P.x - v.x, P.y - v.y);
+  if (st === "spun") polLose("crashed");
+  if (st) return;
   // losing them
   if (c.sp < 2 && dP > 40 && Math.abs(P.v) > 2) {
     c.stuckT = (c.stuckT || 0) + dt;
@@ -1029,6 +1037,86 @@ function polUpdateChase(dt) {
     POL.stopT += dt;
     if (POL.stopT > 5) polFinePopup();
   } else if (!c.paying) POL.stopT = 0;
+}
+// ---------- v49: 2-star pursuers: extra chase cars driven like the main chase car, kept topped up (3-5) by want2Update
+POL.aux = [];
+function polAuxSpawn() {
+  const v = polSpawn();
+  if (!v) return null;
+  const i = traffic.vs.indexOf(v);
+  if (i >= 0) {
+    releaseJ(v);
+    traffic.vs.splice(i, 1);
+  }
+  const c = {
+    v,
+    offs: [],
+    arrest: false,
+    t: 0,
+    siren: emSiren("police"),
+    sp: 14,
+    aux: 1,
+    goal: null,
+  };
+  POL.aux.push(c);
+  POL.auxSpawns = (POL.auxSpawns || 0) + 1;
+  return c;
+}
+function polAuxDrop(c, back) {
+  const k = POL.aux.indexOf(c);
+  if (k < 0) return;
+  POL.aux.splice(k, 1);
+  if (c.siren) c.siren.stop();
+  if (!back) return;
+  const nv = emToTraffic(c.v.x, c.v.y, "police");
+  if (nv) {
+    nv.polT = c.v.polT;
+    polMake(nv, null);
+    if (!WANT.lvl) {
+      nv.pol.end = timeS;
+      nv.pol.leave = true;
+      return;
+    }
+    nv.pol.search = true;
+    nv.pinT = timeS + 1e6;
+    wantSearchGoal(nv);
+  }
+}
+function polAuxUpdate(dt) {
+  if (!POL.aux.length) return;
+  const R = polViewR(),
+    P = truck;
+  for (const c of POL.aux.slice()) {
+    const st = polDriveChase(c, dt),
+      v = c.v,
+      dP = Math.hypot(P.x - v.x, P.y - v.y);
+    polSep(c);
+    if (st === "spun") {
+      polAuxDrop(c, false);
+      continue;
+    }
+    if (st) continue;
+    // close and no main chase car: this one takes over (stops / fines / busts work as usual)
+    if (!POL.chase && dP < 60 && !c.goal) {
+      POL.aux.splice(POL.aux.indexOf(c), 1);
+      c.aux = 0;
+      POL.chase = c;
+      POL.stopT = 0;
+      POL.lostT = 0;
+      continue;
+    }
+    if (c.sp < 2 && dP > 40 && Math.abs(P.v) > 2) {
+      if ((c.stuckT = (c.stuckT || 0) + dt) > 6) polAuxDrop(c, true);
+      continue;
+    }
+    c.stuckT = 0;
+    if (dP > Math.max(R * 2.6 + 60, 480) && !onScreen(v.x, v.y, 20)) {
+      polAuxDrop(c, false);
+      continue;
+    }
+    // searching the last sighting: arrived and nobody in sight -> back to a normal search car
+    if (c.goal && Math.hypot(c.goal[0] - v.x, c.goal[1] - v.y) < 20) polAuxDrop(c, true);
+  }
 }
 function polLose(why) {
   const c = POL.chase;
@@ -1309,6 +1397,7 @@ function updatePolice(dt) {
   polUpdatePatrols(dt);
   polUpdateChase(dt);
   if (POL.chase && POL.chase.v) polSep(POL.chase);
+  polAuxUpdate(dt);
   polDetect(dt);
   wantUpdate(dt);
 }
@@ -1323,6 +1412,10 @@ function drawPolice(vx0, vy0, vx1, vy1) {
   if (c) {
     emBlit(c.v, "police");
     emDrawBar(c.v, true, "police");
+  }
+  for (const a of POL.aux) {
+    emBlit(a.v, "police");
+    emDrawBar(a.v, true, "police");
   }
 }
 function drawPoliceHUD() {
@@ -1617,6 +1710,7 @@ function polObst() {
         if (a) for (const o of a) L.push([o, o.x, o.y, o.h || 0, o.L || 4.4, o.W || 1.9]);
       }
   } // parked cars are solid too
+  for (const c of [POL.chase, ...POL.aux]) if (c) L.push([c.v, c.v.x, c.v.y, c.v.h || 0, 4.6, 2]);
   L.push([truck, truck.x, truck.y, truck.h, 6.2, 2.5]);
   if (truck.trl) {
     const t = truck.trl;

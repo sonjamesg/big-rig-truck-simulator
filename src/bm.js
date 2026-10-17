@@ -410,6 +410,7 @@ BM_MISSIONS.push({
       // short stealth window: the alarm goes off a few seconds after coupling (sooner if you're spotted)
       if (!BM.alarm) {
         a.alarmAt = timeS + BM_STEALTH_S;
+        a.jeepAt = Math.min(a.jeepAt || 1e9, timeS + BM_JEEP_DELAY);
         flash(
           "\u{1F92B} Coupled. Quietly now \u2014 the alarm will go any second, head for the gate!",
         );
@@ -436,7 +437,6 @@ BM_MISSIONS.push({
     if (a.step === 1 && !inBase && s.trl === a.tr) {
       a.step = 2;
       bmWanted2(a);
-      bmJeepStart();
       flash("\u2605\u2605 The police are after the tank \u2014 lose them!");
       clearRoute();
     }
@@ -456,8 +456,12 @@ function bmWanted2(a) {
   WANT.star = timeS;
   BM.zone = { x: truck.x, y: truck.y, r: BM_ZONE_R, seen: timeS };
   if (a) a.wantT = timeS;
-  // immediate response: a few cars from random off-screen points, sent straight at the player
-  for (let k = 0; k < 3; k++) bmCopSpawn(truck.x, truck.y);
+  // immediate response: pursuers from off-screen road points straight at the player (v49: real chase cars, not searchers)
+  WANT.seenT = timeS;
+  WANT.pursueUntil = timeS + 40; // pursuers keep coming for the first 40 s whatever they can see
+  WANT.lx = truck.x;
+  WANT.ly = truck.y;
+  for (let k = 0; k < 3; k++) polAuxSpawn() || bmCopSpawn(truck.x, truck.y);
   BM.copT = timeS + 3;
 }
 // one police car from a random off-screen road point, sent to search around (x, y) [metres]
@@ -473,7 +477,8 @@ function bmCopSpawn(x, y) {
 // lose step: stay at 2 stars until really escaped: no pursuit, unseen for BM_LOSE_S, outside the search circle
 function bmLoseUpdate(a) {
   const Z = BM.zone || (BM.zone = { x: truck.x, y: truck.y, r: BM_ZONE_R, seen: timeS });
-  const seen = POL.chase || (typeof polCanSee === "function" && polCanSee().length > 0);
+  const seen =
+    POL.chase || polCanSee().length > 0 || POL.aux.some((c) => !c.goal && onView(c.v.x, c.v.y));
   if (seen) {
     Z.x = truck.x;
     Z.y = truck.y;
@@ -487,7 +492,7 @@ function bmLoseUpdate(a) {
   if (timeS > (BM.copT || 0)) {
     BM.copT = timeS + 4;
     const n = POL.cars.filter((v) => Math.hypot(v.x - truck.x, v.y - truck.y) < 480).length;
-    if (n < 4) bmCopSpawn(Z.x, Z.y);
+    if (n + POL.aux.length < 4) bmCopSpawn(Z.x, Z.y);
   }
   if (!(POL.chase && POL.chase.paying)) {
     WANT.lvl = 2;
@@ -820,7 +825,7 @@ function bmResult(ok, a, why, P, bay) {
 const BM_SOL_POS = [
   [1262, 246],
   [1280, 246],
-  [1294, 262],
+  [1331, 262],
   [1330.5, 250],
   [1330.5, 280],
   [1258, 296.5],
@@ -833,14 +838,34 @@ const BM_SOL_POS = [
   [1257.5, 340],
   [1236, 345],
   [1264, 345],
+  // v49: second wave (alarm now turns out ~24): yard edges, the south-street verge, accommodation fronts
+  [1300, 243.5],
+  [1322, 243.5],
+  [1336, 270],
+  [1336, 289],
+  [1270, 301],
+  [1286, 301],
+  [1312, 301],
+  [1328, 301],
+  [1246, 306],
+  [1253.5, 316],
+  [1246, 290],
+  [1254, 262],
+  [1338, 300.5],
 ];
-// guard huts (gate) + office doors near the logistics depot: soldiers pour out of these and run to cover
+// doors the soldiers pour out of when the alarm sounds (guard huts, depot office, accommodation blocks, armoury, NAAFI)
 const BM_DOORS = [
-  [1242, 336],
-  [1257.5, 336],
-  [1262, 238],
-  [1300, 240],
-  [1320, 290],
+  [1242, 337.6],
+  [1257.5, 337.6],
+  [1268, 241.8],
+  [1282, 241.8],
+  [1277, 303.4],
+  [1319, 303.4],
+  [1361, 303.4],
+  [1277, 327.6],
+  [1319, 327.6],
+  [1349, 246.8],
+  [1353, 259.4],
 ];
 // riflemen (single aimed shots) and machine gunners (short bursts); every replay shuffles the posts
 function bmAlarm(on) {
@@ -852,7 +877,7 @@ function bmAlarm(on) {
   BM.alarmT = timeS;
   const pts = BM_SOL_POS.slice()
     .sort(() => Math.random() - 0.5)
-    .slice(0, 12);
+    .slice(0, BM_SOL_N);
   pts.forEach(([x, y], i) => {
     const cx = (x + (Math.random() - 0.5) * 2.5) * M_T,
       cy = (y + (Math.random() - 0.5) * 2.5) * M_T;
@@ -865,16 +890,15 @@ function bmAlarm(on) {
         d0 = q;
       }
     }
-    const far = dd > 90,
-      ang = Math.random() * 6.283;
+    // v49: everyone turns out of a door (never pops up in place) and runs to the post before firing
     BM.sol.push({
-      x: far ? cx + Math.cos(ang) * 22 : d0[0] * M_T + (Math.random() - 0.5) * 3,
-      y: far ? cy + Math.sin(ang) * 22 : d0[1] * M_T + (Math.random() - 0.5) * 2,
+      x: d0[0] * M_T + (Math.random() - 0.5) * 3,
+      y: d0[1] * M_T + (Math.random() - 0.5) * 1.5,
       cx,
       cy,
       mg: i % 3 === 1,
       st: "wait",
-      wait: 0.3 + i * 0.25 + Math.random() * 0.6,
+      wait: 0.2 + i * 0.2 + Math.random() * 0.5,
       a: 0,
       ph: Math.random() * 6,
       cd: 0.8 + Math.random() * 1.2,
@@ -923,7 +947,8 @@ function bmAlarmSound() {
   BM.snd.o.frequency.setTargetAtTime(560 + 260 * (0.5 + 0.5 * Math.sin(timeS * 3.2)), t, 0.03);
 }
 const BM_RANGE = { rifle: 52, mg: 66 }, // m (was 120)
-  BM_DMG = { rifle: 1.2, mg: 0.8 }; // damage % per hit (was 0.9)
+  BM_DMG = { rifle: 1.0, mg: 0.7 }, // damage % per hit (v49: trimmed from 1.2/0.8 as the alarm now turns out twice the soldiers)
+  BM_SOL_N = 24; // soldiers turned out by the alarm (was 12)
 function bmFx(k, x, y, o) {
   if (!BM.fx) BM.fx = [];
   if (BM.fx.length > 140) BM.fx.shift();
@@ -1031,7 +1056,7 @@ function bmShoot(S, d, R) {
     // phone touch steering is coarser: rounds land a little softer there
     const tk = document.body.classList.contains("touch") ? 0.8 : 1;
     // v49: bulletproof panels (customiser) scale every round: soldiers, jeep MG, police
-    const dm = (S.mg ? BM_DMG.mg : BM_DMG.rifle) * tk * (truck.bulM || 1);
+    const dm = (S.mg ? BM_DMG.mg : BM_DMG.rifle) * (S.jeep ? 0.6 : 1) * tk * (truck.bulM || 1);
     truck.damage = Math.min(100, (truck.damage || 0) + dm);
     BM.dmgGun = (BM.dmgGun || 0) + dm;
     cam.shake = Math.max(cam.shake || 0, 1.2);
@@ -1425,7 +1450,8 @@ setTimeout(() => {
 // ===================== v47 heist extras: stealth window, army jeep pursuit, smoke, stingers, busted, save safety, chase music
 const BM_STEALTH_S = 5, // s after coupling before the alarm sounds (unless you're spotted first)
   BM_BUST_FINE = 2500, // £ fine for being caught with stolen army/depot cargo
-  BM_JEEP_S = 38; // s the army jeep keeps after you once you're out of the gate
+  BM_JEEP_S = 80, // s the army jeep keeps after you (v49: was 38)
+  BM_JEEP_DELAY = 12; // v49: s after coupling (or the alarm, whichever is first) before the jeep sets off
 // stealth: searchlights (night) and the guard huts notice you; coupling starts a short countdown to the alarm
 function bmStealthUpdate(a, dt) {
   if (a.m.id !== "tank" || BM.alarm) return;
@@ -1450,6 +1476,7 @@ function bmStealthUpdate(a, dt) {
   const trip = a.sus > 2.5 || (a.alarmAt && timeS >= a.alarmAt);
   if (trip) {
     bmAlarm(true);
+    a.jeepAt = Math.min(a.jeepAt || 1e9, timeS + BM_JEEP_DELAY);
     flash(
       a.sus > 2.5
         ? "\u{1F6A8} SPOTTED! Alarm \u2014 the gate is in lockdown, ram the barrier!"
@@ -1459,16 +1486,31 @@ function bmStealthUpdate(a, dt) {
 }
 // the army jeep: follows your trail out of the gate with a gunner on the back
 function bmJeepStart() {
-  BM.crumbs = [[truck.x, truck.y]];
+  // v49: sets off from the motor pool along your tyre track (recorded since coupling), ~60 m behind you if the track is long enough
+  const C = BM.crumbs && BM.crumbs.length > 1 ? BM.crumbs : [[truck.x, truck.y]];
+  let k = 0;
+  for (let q = C.length - 1; q >= 0; q--)
+    if (Math.hypot(C[q][0] - truck.x, C[q][1] - truck.y) > 60) {
+      k = q;
+      break;
+    }
+  BM.crumbs = C;
+  const far = Math.hypot(C[k][0] - truck.x, C[k][1] - truck.y) > 60,
+    x = far ? C[k][0] : 1243 * M_T,
+    y = far ? C[k][1] : 262 * M_T;
   BM.jeep = {
-    x: 1250 * M_T,
-    y: 330 * M_T,
-    h: Math.PI,
-    v: 0,
-    k: 0,
+    x,
+    y,
+    h: Math.atan2(
+      C[Math.min(k + 1, C.length - 1)][0] - x,
+      -(C[Math.min(k + 1, C.length - 1)][1] - y),
+    ),
+    v: far ? 12 : 0,
+    k,
     t: timeS,
-    S: { x: 0, y: 0, a: 0, mg: true, f: 0, burst: 0, cd: 1.5 },
+    S: { x: 0, y: 0, a: 0, mg: true, jeep: 1, f: 0, burst: 0, cd: 1.5 },
   };
+  BM.jeepT = timeS;
   flash("\u{1F699} Army jeep on your tail \u2014 keep moving!");
 }
 function bmJeepUpdate(dt) {
@@ -1478,12 +1520,12 @@ function bmJeepUpdate(dt) {
   const L = C[C.length - 1];
   if (Math.hypot(truck.x - L[0], truck.y - L[1]) > 2) C.push([truck.x, truck.y]);
   const dT = Math.hypot(truck.x - J.x, truck.y - J.y),
-    over = timeS - J.t > BM_JEEP_S || dT > 170;
-  // drive along the breadcrumb trail, holding ~14 m off the trailer
+    over = timeS - J.t > BM_JEEP_S || dT > 300;
+  // drive along the breadcrumb trail, holding ~24 m off the trailer (v49)
   while (J.k < C.length - 1 && Math.hypot(C[J.k][0] - J.x, C[J.k][1] - J.y) < 3) J.k++;
   const P = C[Math.min(J.k, C.length - 1)],
     want = Math.atan2(P[0] - J.x, -(P[1] - J.y)),
-    vt = over ? 0 : dT > 30 ? 22 : dT > 18 ? Math.abs(truck.v) + 2 : Math.abs(truck.v) * 0.8;
+    vt = over ? 0 : dT > 36 ? 28 : dT > 24 ? Math.abs(truck.v) + 3 : Math.abs(truck.v) * 0.85;
   J.h += Math.max(-2.2 * dt, Math.min(2.2 * dt, wrapA(want - J.h)));
   J.v += Math.max(-9 * dt, Math.min(6 * dt, vt - J.v));
   const f = fwd(J.h);
@@ -1723,12 +1765,23 @@ function bmExtrasUpdate(a, dt) {
   bmLoadCheck();
   if (!a) {
     BM.jeep = null;
+    BM.crumbs = null;
     BM.flatT = 0;
     localStorage.removeItem("bigrig.bmAbandon");
   } else {
     if (a.step === 1 && a.m.id === "tank" && !BM.alarm) bmStealthUpdate(a, dt);
     else if (a.step === 0) bmStealthUpdate(a, dt);
     if (a.step >= a.m.delStep) BM.jeep = null;
+    // v49: record the tyre track from coupling/alarm, then launch the jeep BM_JEEP_DELAY s later
+    else if (a.m.id === "tank" && a.jeepAt) {
+      const C = (BM.crumbs = BM.crumbs || [[truck.x, truck.y]]),
+        L = C[C.length - 1];
+      if (!BM.jeep && Math.hypot(truck.x - L[0], truck.y - L[1]) > 2) C.push([truck.x, truck.y]);
+      if (!a.jeepGo && timeS >= a.jeepAt) {
+        a.jeepGo = 1;
+        bmJeepStart();
+      }
+    }
   }
   bmJeepUpdate(dt);
   bmSmokeUpdate(dt);

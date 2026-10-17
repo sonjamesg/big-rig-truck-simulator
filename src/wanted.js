@@ -21,7 +21,8 @@ const HEAT = {
 const RB = { list: [], cool: 0, made: 0, removed: 0 };
 // v44b: 2 stars came far too easily (100 heat). Raised threshold, gentler while-wanted multiplier, faster decay.
 const WANT2_HEAT = 180,
-  WANT2_DROP = 90;
+  WANT2_DROP = 90,
+  WANT_PURSUE_S = 15; // v49: s since the last sighting that 2-star pursuers keep coming
 WANT.heat = 0;
 WANT.star = -9;
 function wantStars() {
@@ -132,7 +133,15 @@ setTimeout(() => {
 }, 0);
 function want2Update(dt) {
   if (!world.ready) return;
-  const seen = polCanSee().length > 0 || (POL.chase && onView(POL.chase.v.x, POL.chase.v.y));
+  const seen =
+    polCanSee().length > 0 ||
+    (POL.chase && onView(POL.chase.v.x, POL.chase.v.y)) ||
+    POL.aux.some((c) => onView(c.v.x, c.v.y));
+  if (seen) {
+    WANT.seenT = timeS;
+    WANT.lx = truck.x;
+    WANT.ly = truck.y;
+  }
   // heat decays out of sight (fast in a hide box), slowly even while seen; 2 stars drops back to 1 below WANT2_DROP
   if (!seen && !POL.chase) {
     const hid = WANT.hid;
@@ -143,10 +152,19 @@ function want2Update(dt) {
       WANT.lvl = 1;
       WANT.t = Math.min(WANT.t, 45);
     } else if (!POL.chase) WANT.t = Math.max(WANT.t, 20);
+    // v49: active pursuit: keep 3-5 chase cars on the player while they've been seen in the last few seconds
+    // (spawned off-screen, topped up); out of sight they head for the last sighting instead, so you can still get away
+    const recent = timeS - (WANT.seenT ?? -99) < WANT_PURSUE_S || timeS < (WANT.pursueUntil || 0);
+    for (const c of POL.aux) c.goal = recent ? null : [WANT.lx, WANT.ly];
+    if (recent && timeS > (WANT.auxT || 0)) {
+      WANT.auxT = timeS + 1.2;
+      WANT.auxN = WANT.auxN || 3 + ((Math.random() * 3) | 0);
+      if (POL.aux.length + (POL.chase ? 1 : 0) < WANT.auxN) polAuxSpawn();
+    }
     // more police: extra searchers, sent close to the player
     WANT.sp2 = (WANT.sp2 || 0) - dt;
     const n = POL.cars.filter((v) => v.pol && v.pol.search).length;
-    if (WANT.sp2 <= 0 && n < 7) {
+    if (WANT.sp2 <= 0 && n + POL.aux.length < 7) {
       WANT.sp2 = 3 + Math.random() * 2;
       const v = polSpawn();
       if (v) {
@@ -168,8 +186,8 @@ function want2Update(dt) {
         v.pol.sg = timeS + 6 + Math.random() * 4;
       }
     // ram: the chase car drives into the rig (real contact: speed loss, bump, slight yaw)
-    const c = POL.chase;
-    if (c && c.v) {
+    for (const c of [POL.chase, ...POL.aux]) {
+      if (!c || !c.v) continue;
       const d = Math.hypot(truck.x - c.v.x, truck.y - c.v.y);
       if (d < 5.6 && timeS - (c.ramT || 0) > 1.4 && c.sp > 2) {
         c.ramT = timeS;
@@ -181,6 +199,9 @@ function want2Update(dt) {
       }
     }
     rbTry();
+  } else {
+    WANT.auxN = 0;
+    for (const c of POL.aux.slice()) polAuxDrop(c, true);
   }
   rbUpdate();
 }
