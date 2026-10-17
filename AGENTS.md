@@ -89,13 +89,20 @@ sim. `main.js` owns the loop (update → draw → HUD), the camera, the minimap 
 | 51 | `bm.js` | BLACK MARKET: 4 seedy yards (fenced, shed, drop bay, sign; map/minimap/fast travel/sat nav), separate Black Market Jobs board (same design as the normal board; opened from the JOBS button/J/Menu or the JOB BOARD ground box; BM_MISSIONS registry + rotating Depot Theft offers), Tank Heist + Depot Theft shared heist flow: riflemen/MG soldiers (run to cover, kneel, tracers, flashes, casings, dust misses, bullet holes), 2-star escape (bmWanted2/bmLoseUpdate: search circle, off-screen police top-ups, lose timer), numbered reverse-in yard bays (bmBays; completes ONLY on uncouple in a valid bay, bmOnDrop), payout breakdown (bmPayout: damage deduction, time + no-kill bonus); v47 extras: stealth window + searchlight/guard detection, gate lockdown (ram the barrier, milbase.js), army jeep pursuit (bmJeep*), stingers at roadblocks, smoke at low health, live cargo value, chase music, busted ending (fine + cargo seized, keep truck), random tank/bay per replay, touch damage x0.8, save safety (heists never saved; bigrig.bmAbandon notice) |
 | 52 | `ambulance.js` | AMBULANCE: casualties stay down until paramedics treat them |
 | 53 | `fire.js` | FIRES: buildings near the player catch fire; the nearest fire station's engine responds |
-| 54 | `flycam.js` | admin-only fly camera (G / FLY button): truck holds its handbrake, free camera pans/zooms, click/tap or Tab/LB/RB to follow AI vehicles |
-| 55 | `accounts.js` | Supabase accounts: name + 4-digit PIN via SECURITY DEFINER RPCs; cloud save sync; guest/offline fallback |
-| 56 | `invite.js` | Invite landing: opened via ?join=TRUCK-1234 -> dedicated "You're invited" card (log in / create / guest / remembered), then straight into the host's game |
-| 57 | `server.js` | Public servers over Supabase Realtime (no host needed, cap 15). Presence = player list + cap, Broadcast = poses. Home MULTIPLAYER card: SERVERS modal (list, count/cap, tap to join) + HOST GAME modal (PeerJS invite code, link copy/share, players x/6, start/close) |
-| 58 | `homecard.js` | Home card: one clear "who am I" card. Account remembered -> Welcome back <name> + CONTINUE + Switch account |
+| 54 | `bikes.js` | MOTORBIKES: sport/cruiser/scooter/delivery bikes join AI traffic by road type (never MIX/parked, so map data is unchanged); single lamp at night; lane filtering past slow queues; knock-offs (bike slides, rider tumbles); biker gangs (kinematic followers on the leader trail); biker revenge chase (HUD banner, shooting, escape by distance/LOS/knock-offs, never during jobs/BM/heists) |
+| 55 | `flycam.js` | admin-only fly camera (G / FLY button): truck holds its handbrake, free camera pans/zooms, click/tap or Tab/LB/RB to follow AI vehicles |
+| 56 | `accounts.js` | Supabase accounts: name + 4-digit PIN via SECURITY DEFINER RPCs; cloud save sync; guest/offline fallback |
+| 57 | `invite.js` | Invite landing: opened via ?join=TRUCK-1234 -> dedicated "You're invited" card (log in / create / guest / remembered), then straight into the host's game |
+| 58 | `server.js` | Public servers over Supabase Realtime (no host needed, cap 15). Presence = player list + cap, Broadcast = poses. Home MULTIPLAYER card: SERVERS modal (list, count/cap, tap to join) + HOST GAME modal (PeerJS invite code, link copy/share, players x/6, start/close) |
+| 59 | `homecard.js` | Home card: one clear "who am I" card. Account remembered -> Welcome back <name> + CONTINUE + Switch account |
 
 Notes on ownership:
+- **Motorbikes** (`bikes.js`, v51): bike kinds live in `BK_T` (merged into `VTYPES`, flag `bike`). `spawnVehicle` is wrapped:
+  random spawns without `opt.kind` become a bike with `BK_MIX[type][0]` probability. Gang followers and revenge hunters are
+  kinematic (`v.bkK`, `stepVeh` wrapper skips the lane model; a 2-point stub path keeps `pathAt` working). They ride the
+  leader trail (`G.T`) or the player trail (`BK.ptr`). `wantHit` wrapper knocks riders off (kinematic ones only when the
+  truck closes on them, `bkK.cl` > 0.8 m/s). `BK.heat` (+1 per knock-off, ~5 min decay) triggers `bkRevenge()` at 4-5,
+  never while `career.active` / `BM.act`; `bkEnd(why)` = far / lost / wiped / job. Damage per hit `BK_DMG` x `truck.bulM`.
 - **Police**: all police logic is in `police.js` (patrols, detection, chase, fines and arrest, hide boxes, the siren
   synth `emSiren`) and `wanted.js` (heat score, stars, 2-star response, roadblocks). Offence and fine records live in
   `roadlaw.js` (`OFF`).

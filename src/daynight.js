@@ -458,7 +458,7 @@ function drawNight(vx0, vy0, vx1, vy1, z) {
     if (X < vx0 - 600 || X > vx1 + 600 || Y < vy0 - 600 || Y > vy1 + 600) continue;
     const r = [-V.f[1], V.f[0]],
       hw = V.W / 2 - 0.15;
-    for (const sd of [-1, 1]) {
+    for (const sd of V.one ? [0] : [-1, 1]) {
       const lx = V.fx + r[0] * sd * hw * 0.85,
         ly = V.fy + r[1] * sd * hw * 0.85;
       const hk = V.hb || 0;
@@ -474,7 +474,7 @@ function drawNight(vx0, vy0, vx1, vy1, z) {
     const rf = V.rf,
       rr = [-rf[1], rf[0]],
       rw = V.rW / 2 - 0.12;
-    for (const sd of [-1, 1]) {
+    for (const sd of V.one ? [0] : [-1, 1]) {
       const lx = V.rx + rr[0] * sd * rw,
         ly = V.ry + rr[1] * sd * rw;
       gz("rgba(255,30,20,0.95)", lx * PPM, ly * PPM, V.br ? 8 : 5, V.br ? 1 : 0.7);
@@ -572,6 +572,7 @@ function dnVehs() {
       rv: false,
       side: 0,
       haz: false,
+      one: !!(VTYPES[v.kind] && VTYPES[v.kind].bike), // v51 motorbikes: one headlamp, one tail lamp
     });
   }
   if (typeof MP !== "undefined" && MP.on)

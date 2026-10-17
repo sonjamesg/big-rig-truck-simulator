@@ -118,7 +118,11 @@ function flyInfo(t) {
   }
   const v = t;
   return [
-    (v.role || "civilian").toUpperCase() + " \u2022 " + (v.kind || "car"),
+    (
+      v.role || (v.bkHunt ? "biker gang (hunting)" : v.bkG ? "biker gang" : "civilian")
+    ).toUpperCase() +
+      " \u2022 " +
+      (v.kind || "car"),
     Math.abs(v.v || 0) < 0.5 ? "stopped" : Math.round(Math.abs(v.v) * 2.23694) + " mph",
     "\u2192 " + ((v.goal && v.goal.name) || "cruising"),
   ];
