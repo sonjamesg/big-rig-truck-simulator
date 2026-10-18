@@ -94,11 +94,12 @@ sim. `main.js` owns the loop (update → draw → HUD), the camera, the minimap 
 | 56 | `liftbridge.js` | LIFT BRIDGE: double-leaf bascule in the M1 crossing over the bottom-docks channel (replaces the suspension cables there); opens on a timeline from the deterministic ship schedule; pseudo-3D leaves/towers (oblique projection), road signals + half barriers stopping AI and the player; jump off a rising leaf or fall in and get towed |
 | 57 | `gfx.js` | GRAPHICS: quality setting (Auto/High/Low, `bigrig.gfx`) + FPS auto-fallback; time-of-day colour grade; coloured half-res light layer (headlight cones, streetlight pools, window/neon halos), brake/indicator glow, vehicles lit by lamps/headlights |
 | 58 | `gfxshade.js` | GRAPHICS stage 2: sun-driven soft shadows (high quality): baked building/tree casters recorded per chunk, cached half-res world-space shadow layer composited after vehicles; blurred, sun-offset vehicle/trailer shadows |
-| 59 | `flycam.js` | admin-only fly camera (G / FLY button): truck holds its handbrake, free camera pans/zooms, click/tap or Tab/LB/RB to follow AI vehicles |
-| 60 | `accounts.js` | Supabase accounts: name + 4-digit PIN via SECURITY DEFINER RPCs; cloud save sync; guest/offline fallback |
-| 61 | `invite.js` | Invite landing: opened via ?join=TRUCK-1234 -> dedicated "You're invited" card (log in / create / guest / remembered), then straight into the host's game |
-| 62 | `server.js` | Public servers over Supabase Realtime (no host needed, cap 15). Presence = player list + cap, Broadcast = poses. Home MULTIPLAYER card: SERVERS modal (list, count/cap, tap to join) + HOST GAME modal (PeerJS invite code, link copy/share, players x/6, start/close) |
-| 63 | `homecard.js` | Home card: one clear "who am I" card. Account remembered -> Welcome back <name> + CONTINUE + Switch account |
+| 59 | `gfx3d.js` | GRAPHICS stage 3: fake-3D buildings (GTA2 parallax): roof lifted from the view centre by height, sun-shaded side walls with window pattern, lit walls at night (high quality, not when zoomed far out) |
+| 60 | `flycam.js` | admin-only fly camera (G / FLY button): truck holds its handbrake, free camera pans/zooms, click/tap or Tab/LB/RB to follow AI vehicles |
+| 61 | `accounts.js` | Supabase accounts: name + 4-digit PIN via SECURITY DEFINER RPCs; cloud save sync; guest/offline fallback |
+| 62 | `invite.js` | Invite landing: opened via ?join=TRUCK-1234 -> dedicated "You're invited" card (log in / create / guest / remembered), then straight into the host's game |
+| 63 | `server.js` | Public servers over Supabase Realtime (no host needed, cap 15). Presence = player list + cap, Broadcast = poses. Home MULTIPLAYER card: SERVERS modal (list, count/cap, tap to join) + HOST GAME modal (PeerJS invite code, link copy/share, players x/6, start/close) |
+| 64 | `homecard.js` | Home card: one clear "who am I" card. Account remembered -> Welcome back <name> + CONTINUE + Switch account |
 
 Notes on ownership:
 - **Roundabouts (v51)**: splitters are narrow raised kerb medians (`rbSplitter(rb, arm)` = `g.spN`, half-width `RB_MED`);
@@ -126,6 +127,13 @@ Notes on ownership:
   changes 8 %, `SUN.k` steps or chunks were baked. `blitV` / `blit` calls with a nonzero shadow offset use
   `gfxShadowArt` (blurred padded silhouette, WeakMap cache) at the sun offset. New shadow casters should just call one
   of the three shadow helpers inside the chunk bake.
+- **3D buildings** (`gfx3d.js`, v51): drawn by a `gfxShadeLayer` wrapper, i.e. after ground vehicles + the shadow layer
+  and before rail / overhead / night, sorted by `o.height` (tallest last). Roof points = view centre + (p - centre) *
+  (1 + k), `k = min(0.6, height / G3_HCAM)`. Roof image = baked chunk pixels under the footprint (`g3Roof`, LRU 220,
+  skipped until every overlapped chunk is in `chunkCache`). Walls whose outward normal faces the view centre are filled
+  with the average roof colour (sun shaded) and `G3.pat`; `G3.walls` are re-lit with `G3.patN` after `drawNight`. The
+  `drawNight` wrapper swaps each lifted building's `l.win` for roof-shifted copies during the call; `gfxBOff(o)` gives
+  the centre shift for gfx.js halos. Map data unchanged.
 - **Lift bridge** (`liftbridge.js`, v51): constants in `LB` (span `XA..XB` x `Y0..Y1` tiles, leaf `L`, `AMAX`).
   `lbState()` derives lights/barriers/leaf angle from `lbOcc(t)` (ship hull over the span) looked ahead/back with
   `portT()`, so it is deterministic and needs no saved state; `LB.force` overrides it for tests/shots. Only ships already
