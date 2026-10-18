@@ -5,9 +5,12 @@
  *   and the wet road reflect magenta / cyan / amber light (city), amber elsewhere.
  *   Stage B rooftops: skylights + vents baked on flat roofs, lit skylights and steam at night (high).
  *   Stage C light + colour: teal night grade under warm lamps, faint haze, stronger headlight cones (gfx.js).
- * Exposes (globals): GC, gcHash, gcPuddle, gcRoadWear, gcWetNight
+ *   Stage D vehicles: clear-coat sheen, rounded flanks and a sky streak baked into every AI vehicle / trailer art.
+ * Exposes (globals): GC, gcHash, gcPuddle, gcRoadWear, gcWetNight, gcRoofBits, gcRoofBake, gcRoofLive, GC_TEAL,
+ *   GC_HAZE, gcVehGloss
  * Depends on: render.js (renderChunk, CHUNK), world.js (G, T, TILE, idx, inb, world.roadH/roadV), daynight.js (DN,
- *   drawNight, dnGlow, slZone, SL, slOn), gfx.js (gfxHi, GFX)
+ *   drawNight, dnGlow, slZone, SL, slOn), gfx.js (gfxHi, GFX, gfxGradeAt), gfx3d.js (G3), traffic.js
+ *   (makeCarArt, makeVanArt, makeBusArt, makeBoxArt, makeTractorArt, makeTrailerArtAI)
  * Load order: after gfx3d.js in build.py (wraps renderChunk outermost, drawNight). Shared global scope.
  */
 const GC = {
@@ -379,4 +382,51 @@ const GC_TEAL = [120, 196, 214],
       aa: Math.max(g.aa, 0.05 * t),
     };
   };
+}
+// ---------------------------------------------------------------- stage D: richer vehicle art (baked once per art canvas)
+// clear-coat sheen, rounded side shading and a faint sky reflection streak, all clipped to the body
+// pixels (source-atop) so every existing car / van / bus / lorry / trailer silhouette keeps its shape
+function gcVehGloss(c) {
+  if (!c || !c.getContext || c.gcG || GFX.off.vgloss) return c;
+  c.gcG = 1;
+  const g = c.getContext("2d"),
+    W = c.width,
+    H = c.height;
+  g.save();
+  g.globalCompositeOperation = "source-atop";
+  // rounded flanks: darker toward both sides
+  let gr = g.createLinearGradient(0, 0, W, 0);
+  gr.addColorStop(0, "rgba(0,0,0,0.28)");
+  gr.addColorStop(0.18, "rgba(0,0,0,0)");
+  gr.addColorStop(0.82, "rgba(0,0,0,0)");
+  gr.addColorStop(1, "rgba(0,0,0,0.28)");
+  g.fillStyle = gr;
+  g.fillRect(0, 0, W, H);
+  // clear-coat: soft highlight down the spine, top-left lit like the rest of the art
+  gr = g.createLinearGradient(0, 0, W, 0);
+  gr.addColorStop(0.25, "rgba(255,255,255,0)");
+  gr.addColorStop(0.42, "rgba(255,255,255,0.16)");
+  gr.addColorStop(0.55, "rgba(255,255,255,0)");
+  g.fillStyle = gr;
+  g.fillRect(0, 0, W, H);
+  // sky reflection streak across the body (diagonal), very faint
+  g.translate(W / 2, H / 2);
+  g.rotate(-0.5);
+  g.fillStyle = "rgba(200,230,255,0.07)";
+  g.fillRect(-W, -H * 0.06, W * 2, H * 0.05);
+  g.fillRect(-W, H * 0.12, W * 2, H * 0.02);
+  g.restore();
+  return c;
+}
+{
+  const w = (f) =>
+    function () {
+      return gcVehGloss(f.apply(this, arguments));
+    };
+  makeCarArt = w(makeCarArt);
+  makeVanArt = w(makeVanArt);
+  makeBusArt = w(makeBusArt);
+  makeBoxArt = w(makeBoxArt);
+  makeTractorArt = w(makeTractorArt);
+  makeTrailerArtAI = w(makeTrailerArtAI);
 }

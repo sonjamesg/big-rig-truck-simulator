@@ -125,6 +125,9 @@ Notes on ownership:
   skylights in `GC.pal` as flat panels + glow (no outlines) and draws drifting steam; `gcRoofPt` follows the 3D lift.
   Stage C light: `gfxGradeAt` wrapper (high, night) blends a teal multiply `GC_TEAL` and a faint haze wash `GC_HAZE` into
   the cached grade sprites (no extra passes by day); headlight cone alpha raised in `gfx.js`. `GFX.off.grade` switch.
+  Stage D vehicles: `makeCarArt` / `makeVanArt` / `makeBusArt` / `makeBoxArt` / `makeTractorArt` / `makeTrailerArtAI`
+  are wrapped by `gcVehGloss` (source-atop flank shading, clear-coat sheen, faint sky streak; baked once, both
+  qualities, `GFX.off.vgloss`). Not built yet: skid-mark decals per crash, rooftop sign text, haze noise texture.
 - **Crash response** (`physics.js` `crashResponse`, v51): impacts are mostly inelastic. The pose reverts to the last free
   one (cab + trailer angle together), velocity along the contact normal is removed with restitution `CRASH_E` (0.06
   solids, 0.1 heavy vehicles; rebound capped at 0.8 m/s), the tangential part slides on with Coulomb friction
