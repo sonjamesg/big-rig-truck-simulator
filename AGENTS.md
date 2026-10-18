@@ -95,13 +95,14 @@ sim. `main.js` owns the loop (update → draw → HUD), the camera, the minimap 
 | 57 | `gfx.js` | GRAPHICS: quality setting (Auto/High/Low, `bigrig.gfx`) + FPS auto-fallback; time-of-day colour grade; coloured half-res light layer (headlight cones, streetlight pools, window halos), brake/indicator glow, vehicles lit by lamps/headlights |
 | 58 | `gfxshade.js` | GRAPHICS stage 2: sun-driven soft shadows (high quality): baked building/tree casters recorded per chunk, cached half-res world-space shadow layer composited after vehicles; blurred, sun-offset vehicle/trailer shadows |
 | 59 | `gfx3d.js` | GRAPHICS stage 3: fake-3D buildings (GTA2 parallax): roof lifted from the view centre by height, sun-shaded side walls with window pattern, lit walls at night (high quality, not when zoomed far out) |
-| 60 | `flycam.js` | admin-only fly camera (G / FLY button): truck holds its handbrake, free camera pans/zooms, click/tap or Tab/LB/RB to follow AI vehicles |
-| 61 | `accounts.js` | Supabase accounts: name + 4-digit PIN via SECURITY DEFINER RPCs; cloud save sync; guest/offline fallback |
-| 62 | `invite.js` | Invite landing: opened via ?join=TRUCK-1234 -> dedicated "You're invited" card (log in / create / guest / remembered), then straight into the host's game |
-| 63 | `server.js` | Public servers over Supabase Realtime (no host needed, cap 15). Presence = player list + cap, Broadcast = poses. Home MULTIPLAYER card: SERVERS modal (list, count/cap, tap to join) + HOST GAME modal (PeerJS invite code, link copy/share, players x/6, start/close) |
-| 64 | `homecard.js` | Home card: one clear "who am I" card. Account remembered -> Welcome back <name> + CONTINUE + Switch account |
-| 65 | `ctrltheme.js` | phone controller theme: midnight-black deck, dark buttons with crisp 2 px neon-blue outline borders (brighter when pressed); colours only, layout stays in `mobile.js` |
-| 66 | `milrig.js` | dealer truck Bastion M6 6x6 (£35k): green military heavy tractor, very high power, sturdy (`dur` crash-damage multiplier), slightly lower top speed; own art (wraps `modelArt` outermost) |
+| 60 | `gfxcity.js` | GRAPHICS overhaul (night city mood, straight top-down, no outlines): baked road wear + puddles, wet-road colour reflections at night; later stages add rooftops, grading/haze and vehicle art |
+| 61 | `flycam.js` | admin-only fly camera (G / FLY button): truck holds its handbrake, free camera pans/zooms, click/tap or Tab/LB/RB to follow AI vehicles |
+| 62 | `accounts.js` | Supabase accounts: name + 4-digit PIN via SECURITY DEFINER RPCs; cloud save sync; guest/offline fallback |
+| 63 | `invite.js` | Invite landing: opened via ?join=TRUCK-1234 -> dedicated "You're invited" card (log in / create / guest / remembered), then straight into the host's game |
+| 64 | `server.js` | Public servers over Supabase Realtime (no host needed, cap 15). Presence = player list + cap, Broadcast = poses. Home MULTIPLAYER card: SERVERS modal (list, count/cap, tap to join) + HOST GAME modal (PeerJS invite code, link copy/share, players x/6, start/close) |
+| 65 | `homecard.js` | Home card: one clear "who am I" card. Account remembered -> Welcome back <name> + CONTINUE + Switch account |
+| 66 | `ctrltheme.js` | phone controller theme: midnight-black deck, dark buttons with crisp 2 px neon-blue outline borders (brighter when pressed); colours only, layout stays in `mobile.js` |
+| 67 | `milrig.js` | dealer truck Bastion M6 6x6 (£35k): green military heavy tractor, very high power, sturdy (`dur` crash-damage multiplier), slightly lower top speed; own art (wraps `modelArt` outermost) |
 
 Notes on ownership:
 - **Roundabouts (v51)**: splitters are narrow raised kerb medians (`rbSplitter(rb, arm)` = `g.spN`, half-width `RB_MED`);
@@ -115,6 +116,10 @@ Notes on ownership:
   `makeJob`/`makeRepeat` skip them). `alJobs()` = one order per cargo from ALD to APT/KHT/AAC (refresh 10 min).
   `alOpenBoard(force)` (modal kind `armyboard`) opens instead of the normal board at ALD; elsewhere the normal board gets
   an "Army Logistics" chip. Starting uses the normal `startMission`/`acceptJob` (tier 3 gate). Map data unchanged.
+- **City overhaul** (`gfxcity.js`, v51): stage A roads. `renderChunk` (outermost wrapper) bakes `gcRoadWear` on every
+  `T.ROAD` tile (tyre tracks from `roadH` / `roadV`, cracks, patches, oil, `gcPuddle` patches; all from `gcHash`, so
+  stable). `gcWetNight` (after `drawNight`, high only) adds puddle + lamp-pool reflections in `GC.pal`
+  (magenta / cyan / amber in city + suburb zones, amber rural). Switches: `GFX.off.wear`, `GFX.off.wet`.
 - **Crash response** (`physics.js` `crashResponse`, v51): impacts are mostly inelastic. The pose reverts to the last free
   one (cab + trailer angle together), velocity along the contact normal is removed with restitution `CRASH_E` (0.06
   solids, 0.1 heavy vehicles; rebound capped at 0.8 m/s), the tangential part slides on with Coulomb friction
