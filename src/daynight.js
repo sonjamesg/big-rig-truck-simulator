@@ -217,7 +217,7 @@ function drawNight(vx0, vy0, vx1, vy1, z) {
     return;
   }
   dnBuild();
-  const q = 0.5,
+  const q = typeof GFX !== "undefined" && GFX.lvl === "low" ? 0.34 : 0.5, // light/darkness layer resolution
     W = Math.ceil(VW * q),
     H = Math.ceil(VH * q);
   if (!DN.lc || DN.lc.width !== W || DN.lc.height !== H) {
