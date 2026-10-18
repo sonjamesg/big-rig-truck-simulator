@@ -93,11 +93,12 @@ sim. `main.js` owns the loop (update → draw → HUD), the camera, the minimap 
 | 55 | `bikes.js` | MOTORBIKES: sport/cruiser/scooter/delivery bikes join AI traffic by road type (never MIX/parked, so map data is unchanged); single lamp at night; lane filtering past slow queues; knock-offs (bike slides, rider tumbles); biker gangs (kinematic followers on the leader trail); biker revenge chase (HUD banner, shooting, escape by distance/LOS/knock-offs, never during jobs/BM/heists) |
 | 56 | `liftbridge.js` | LIFT BRIDGE: double-leaf bascule in the M1 crossing over the bottom-docks channel (replaces the suspension cables there); opens on a timeline from the deterministic ship schedule; pseudo-3D leaves/towers (oblique projection), road signals + half barriers stopping AI and the player; jump off a rising leaf or fall in and get towed |
 | 57 | `gfx.js` | GRAPHICS: quality setting (Auto/High/Low, `bigrig.gfx`) + FPS auto-fallback; time-of-day colour grade; coloured half-res light layer (headlight cones, streetlight pools, window/neon halos), brake/indicator glow, vehicles lit by lamps/headlights |
-| 58 | `flycam.js` | admin-only fly camera (G / FLY button): truck holds its handbrake, free camera pans/zooms, click/tap or Tab/LB/RB to follow AI vehicles |
-| 59 | `accounts.js` | Supabase accounts: name + 4-digit PIN via SECURITY DEFINER RPCs; cloud save sync; guest/offline fallback |
-| 60 | `invite.js` | Invite landing: opened via ?join=TRUCK-1234 -> dedicated "You're invited" card (log in / create / guest / remembered), then straight into the host's game |
-| 61 | `server.js` | Public servers over Supabase Realtime (no host needed, cap 15). Presence = player list + cap, Broadcast = poses. Home MULTIPLAYER card: SERVERS modal (list, count/cap, tap to join) + HOST GAME modal (PeerJS invite code, link copy/share, players x/6, start/close) |
-| 62 | `homecard.js` | Home card: one clear "who am I" card. Account remembered -> Welcome back <name> + CONTINUE + Switch account |
+| 58 | `gfxshade.js` | GRAPHICS stage 2: sun-driven soft shadows (high quality): baked building/tree casters recorded per chunk, cached half-res world-space shadow layer composited after vehicles; blurred, sun-offset vehicle/trailer shadows |
+| 59 | `flycam.js` | admin-only fly camera (G / FLY button): truck holds its handbrake, free camera pans/zooms, click/tap or Tab/LB/RB to follow AI vehicles |
+| 60 | `accounts.js` | Supabase accounts: name + 4-digit PIN via SECURITY DEFINER RPCs; cloud save sync; guest/offline fallback |
+| 61 | `invite.js` | Invite landing: opened via ?join=TRUCK-1234 -> dedicated "You're invited" card (log in / create / guest / remembered), then straight into the host's game |
+| 62 | `server.js` | Public servers over Supabase Realtime (no host needed, cap 15). Presence = player list + cap, Broadcast = poses. Home MULTIPLAYER card: SERVERS modal (list, count/cap, tap to join) + HOST GAME modal (PeerJS invite code, link copy/share, players x/6, start/close) |
+| 63 | `homecard.js` | Home card: one clear "who am I" card. Account remembered -> Welcome back <name> + CONTINUE + Switch account |
 
 Notes on ownership:
 - **Roundabouts (v51)**: splitters are narrow raised kerb medians (`rbSplitter(rb, arm)` = `g.spN`, half-width `RB_MED`);
@@ -117,6 +118,14 @@ Notes on ownership:
   original call), then the original darkness layer (`DN.lc`, resolution 0.5 high / 0.34 low), then `gfxLights()`
   (high: coloured layer `GL.lc` with tinted cones, pools, halos, one additive composite; both: brake/indicator glow;
   high: `gfxVehLit`). `GFX.off.{cones,pools,halos}` switch effects off for profiling. Low quality = baseline night look.
+- **Shadows** (`gfxshade.js`, v51): on high, `renderChunk` is wrapped so `bShadow` / `drawShadowRect` / `treeShadow`
+  record casters into `GS.ch` (per chunk key; world-space footprint via `g.getTransform()`) instead of painting; on low
+  they paint as before. `gfxQualityChanged()` clears `chunkCache` / `chunkLo` / `GS.ch` so chunks re-bake. `gfxSun()`
+  (called from the `drawRail` wrapper each frame) sets `SUN` (direction from `gfxSunDir`, length `L`, alpha `a`);
+  `gfxShadeLayer` rebuilds `GS.lc` (sun-swept hulls minus footprints/crowns) only when the view leaves `GS.R`, zoom
+  changes 8 %, `SUN.k` steps or chunks were baked. `blitV` / `blit` calls with a nonzero shadow offset use
+  `gfxShadowArt` (blurred padded silhouette, WeakMap cache) at the sun offset. New shadow casters should just call one
+  of the three shadow helpers inside the chunk bake.
 - **Lift bridge** (`liftbridge.js`, v51): constants in `LB` (span `XA..XB` x `Y0..Y1` tiles, leaf `L`, `AMAX`).
   `lbState()` derives lights/barriers/leaf angle from `lbOcc(t)` (ship hull over the span) looked ahead/back with
   `portT()`, so it is deterministic and needs no saved state; `LB.force` overrides it for tests/shots. Only ships already
