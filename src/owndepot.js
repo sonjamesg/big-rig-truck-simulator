@@ -323,6 +323,7 @@ function ownDelivered(T) {
     o = ownedYard(yd);
   if (!o) return;
   const pay = ownTier(yd).pay;
+  T.prDone = T.mT0; // dashboard: this job reads 100 % until the next one starts
   truck.money += pay;
   o.delivered = (o.delivered || 0) + 1;
   o.earned = (o.earned || 0) + pay;
@@ -564,7 +565,7 @@ function ownTruckStatus(T) {
       : "Driving empty to " + (T.pick && T.dest ? T.dest.name : port);
   return "Starting up";
 }
-// v50: live job card for a fleet truck: job (cargo, from, to), status, trip progress and 'back in ~mm:ss' from the remaining route
+// v50: live job card for a fleet truck: job (cargo, from, to), status, whole-trip progress ('57% complete', monotonic per job) from the remaining route
 function ownPickupPlace(T) {
   return T.pick && T.dest && T.dest !== T.home
     ? { name: T.dest.name, e: T.dest.entrance }
@@ -614,22 +615,50 @@ function ownTrkInfo(T) {
   const job = loaded
     ? { cargo: "40ft container", from: T.mis || pkName, to: home }
     : { cargo: "Empty \u2014 collecting a 40ft container", from: home, to: pkName };
-  // time left: rest of this leg + (outbound) loading + the leg back
+  // whole-trip progress: four legs (to pickup, loading, delivering, unloading) weighted by their planned time, each leg
+  // measured by time on it vs its live remaining time (road) or dwell; never goes down while the live route estimate wobbles,
+  // 100 % once the container is delivered (ownDelivered), back to 0 when the next job starts (new trip clock)
   const q = typeof ptPoses === "function" ? ptPoses().find((p) => p.T === T) : null,
-    back = pk ? ownRouteM(yd.entrance, pk.e) : 0;
-  let left = null;
-  if (q && T.st === "road") {
+    legT = pk ? ownRouteM(yd.entrance, pk.e) / OWN_SPD : 60,
+    W = [legT, OWN_LOAD, legT, 25],
+    leg =
+      T.st === "road"
+        ? loaded
+          ? 2
+          : 0
+        : T.st === "gate" || (T.st === "depot" && !atHome)
+          ? 1
+          : atHome
+            ? 3
+            : 0;
+  if (T.prJob !== T.mT0) {
+    T.prJob = T.mT0;
+    T.prMax = 0;
+    T.prLeg = -1;
+  }
+  if (T.prLeg !== leg) {
+    T.prLeg = leg;
+    T.prT0 = PTRUCK.t;
+  }
+  let f = 0;
+  if (leg === 0 || leg === 2) {
     const e = loaded ? yd.entrance : pk && pk.e;
-    if (e) left = ownRemM(T, q.x, q.y, e) / OWN_SPD + (loaded ? 20 : OWN_LOAD + back / OWN_SPD);
-  } else if (T.st === "gate" || (T.st === "depot" && !atHome))
-    left = OWN_LOAD * 0.5 + back / OWN_SPD;
-  else if (atHome) left = T.ph === "drop" ? 10 : 25;
-  const el = T.mT0 != null ? Math.max(0, PTRUCK.t - T.mT0) : 0,
-    pr = left != null ? Math.max(0.02, Math.min(0.99, el / (el + left))) : 0.02,
-    mm = left != null ? Math.max(0, Math.round(left)) : null,
-    eta =
-      mm != null ? "back in ~" + Math.floor(mm / 60) + ":" + String(mm % 60).padStart(2, "0") : "";
-  return { st, ph, col, pr, eta, job, to: job.to };
+    if (q && e) {
+      // time on this leg vs time still to drive (the AI route can loop away from the A* estimate, so no distance ratio)
+      const tt = PTRUCK.t - T.prT0,
+        rt = ownRemM(T, q.x, q.y, e) / OWN_SPD;
+      f = tt + rt > 0 ? tt / (tt + rt) : 0;
+    }
+  } else f = (PTRUCK.t - T.prT0) / (leg === 1 ? OWN_LOAD : 25);
+  let done = 0;
+  for (let i = 0; i < leg; i++) done += W[i];
+  const tot = W[0] + W[1] + W[2] + W[3],
+    raw = Math.min(0.99, (done + W[leg] * Math.max(0, Math.min(0.97, f))) / tot);
+  T.prMax = T.prDone === T.mT0 && T.mT0 != null ? 1 : Math.max(T.prMax || 0, raw);
+  const pr = T.prMax,
+    pc = pr >= 1 ? 100 : Math.min(99, Math.floor(pr * 100)),
+    eta = pc + "% complete";
+  return { st, ph, col, pr, pc, eta, job, to: job.to };
 }
 function ownTrkHTML(y, B) {
   const tr = typeof PTRUCK !== "undefined" ? PTRUCK.list.filter((T) => T.home === y) : [];
@@ -638,7 +667,7 @@ function ownTrkHTML(y, B) {
       .map((T, i) => {
         const I = ownTrkInfo(T);
         return `<div class="odt"><div class="odi" style="background:${B.col};color:${B.acc}">\u{1F69A}<small>${i + 1}</small></div><div class="odb"><div class="odr"><b>Truck ${i + 1}</b><span class="pill" style="background:${I.col}">${I.ph}</span>${T.box ? `<span class="box" style="background:${T.box}" title="carrying a container"></span>` : ""}<span style="flex:1"></span><span class="odm">${money(T.earn || 0)}</span></div>
-    <div class="odj"><b>${esc(I.job.cargo)}</b><br>${esc(I.job.from)} \u2192 ${esc(I.job.to)}</div><div class="ods">${esc(I.st)}</div><div class="odp"><i style="width:${Math.round(I.pr * 100)}%;background:${I.col}"></i></div>${I.eta ? `<div class="ode">${esc(I.eta)}</div>` : ""}</div></div>`;
+    <div class="odj"><b>${esc(I.job.cargo)}</b><br>${esc(I.job.from)} \u2192 ${esc(I.job.to)}</div><div class="ods">${esc(I.st)}</div><div class="odp"><i style="width:${I.pc}%;background:${I.col}"></i></div>${I.eta ? `<div class="ode">${esc(I.eta)}</div>` : ""}</div></div>`;
       })
       .join("") || '<div class="ods" style="padding:14px">Trucks are starting up\u2026</div>'
   );

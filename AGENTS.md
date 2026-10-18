@@ -113,6 +113,9 @@ Notes on ownership:
   `makeJob`/`makeRepeat` skip them). `alJobs()` = one order per cargo from ALD to APT/KHT/AAC (refresh 10 min).
   `alOpenBoard(force)` (modal kind `armyboard`) opens instead of the normal board at ALD; elsewhere the normal board gets
   an "Army Logistics" chip. Starting uses the normal `startMission`/`acceptJob` (tier 3 gate). Map data unchanged.
+- **Company dashboard trip progress** (`owndepot.js` `ownTrkInfo`, v51): the bar and the "57% complete" line cover the
+  whole fleet-truck job (to pickup, loading, delivering, unloading). legs weighted by planned time, each measured by its own remaining distance / dwell; `T.prMax` only rises (keyed by the trip clock
+  `T.mT0`, reset when `ownMission` starts the next job); `ownDelivered` sets `T.prDone` so it reads 100 %.
 - **Graphics** (`gfx.js`, v51): `GFX.lvl` is `"high"`/`"low"`; `GFX.q` is the saved choice (`auto` drops to low once
   if the EMA fps stays under `GFX_LOW_FPS` for 6 s). `drawNight` is wrapped: `gfxGrade()` (cached quarter-res multiply +
   sun-side additive sprites from `GFX_GRADE` keyframes; replaces the old dusk multiply, so `DN.dusk` is zeroed during the
