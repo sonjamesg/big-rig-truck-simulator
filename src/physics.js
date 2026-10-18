@@ -1,7 +1,7 @@
 /**
  * @file physics.js — LORRY PHYSICS
  * Exposes (globals): GEARS, MASS, ENG_BASE, torqueAt, truck, fwd, kingpin, solidAtM, bodyHits, hitTest,
- *   surfaceAt, stepTruck
+ *   surfaceAt, stepTruck, HIT_PT, CRASH_E, CRASH_MU, crashNormal, crashResponse
  * Depends on: world.js, lorry.js, traffic.js, depots.js, fx.js, port.js, rail.js, weather.js,
  *   wanted.js, airport.js
  * Load order: #6 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
@@ -60,6 +60,7 @@ function solidAtM(mx, my) {
     bmSolidM(mx, my)
   );
 }
+const HIT_PT = [0, 0];
 function bodyHits(cx, cy, a, yf, yr, w) {
   // local y forward-negative range [yf,yr], width w; returns true on hit
   const f = fwd(a),
@@ -71,7 +72,11 @@ function bodyHits(cx, cy, a, yf, yr, w) {
       if (lx === 0 && i > 0 && i < n) continue;
       const px = cx - f[0] * ly + r[0] * lx,
         py = cy - f[1] * ly + r[1] * lx;
-      if (solidAtM(px, py)) return true;
+      if (solidAtM(px, py)) {
+        HIT_PT[0] = px; // v51: contact point for the collision normal (stepTruck)
+        HIT_PT[1] = py;
+        return true;
+      }
     }
   }
   return false;
@@ -82,6 +87,82 @@ function hitTest(s) {
   if (s.trl && bodyHits(k[0], k[1], s.th, TRL.front + 0.6, TRL.rear - 0.1, TRL.w - 0.2))
     return "trailer";
   return typeof trailerHitTest === "function" ? trailerHitTest(s) : null;
+}
+// v51: mostly inelastic impacts. Velocity along the contact normal is removed with very low restitution, the tangential
+// part slides on with Coulomb friction (glancing hits scrape along the wall), a short crunch kills drive, and damage
+// follows the normal impact speed. hit: "cab" | "trailer" (static solids, contact point in HIT_PT), "veh" (heavy
+// vehicle, normal in s.hitN), "barrier".
+const CRASH_E = { cab: 0.06, trailer: 0.06, barrier: 0.08, veh: 0.1 },
+  CRASH_MU = 0.55;
+function crashNormal(s, prev, hit) {
+  if (hit === "veh" && s.hitN) return s.hitN;
+  if (hit === "cab" || hit === "trailer") {
+    // solidity gradient around the contact point: normal points out of the obstacle
+    let nx = 0,
+      ny = 0;
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * Math.PI * 2,
+        dx = Math.cos(a),
+        dy = Math.sin(a);
+      if (solidAtM(HIT_PT[0] + dx * 0.9, HIT_PT[1] + dy * 0.9)) {
+        nx -= dx;
+        ny -= dy;
+      }
+    }
+    const L = Math.hypot(nx, ny);
+    if (L > 0.3) return [nx / L, ny / L];
+  }
+  const f = fwd(prev.h),
+    d = Math.sign(s.v) || 1;
+  return [-f[0] * d, -f[1] * d]; // unknown: straight against the motion
+}
+function crashResponse(s, prev, hit, dt) {
+  const f0 = fwd(prev.h),
+    ux = f0[0] * s.v,
+    uy = f0[1] * s.v,
+    n = crashNormal(s, prev, hit),
+    vn = ux * n[0] + uy * n[1]; // < 0: moving into the obstacle
+  if (typeof wantProp === "function" && s === truck) wantProp(Math.abs(s.v));
+  Object.assign(s, prev); // back to the last free pose (cab + trailer angle together: no jack-knife snap)
+  s.throttle = 0;
+  if (vn >= -0.05) {
+    // pose-only contact (steering / articulation into a wall): just stop pushing
+    s.v *= 0.5;
+    if (Math.abs(s.v) < 0.3) s.v = 0;
+    s.steer *= 0.5;
+    return;
+  }
+  const e = CRASH_E[hit] || 0.06,
+    tx = ux - vn * n[0],
+    ty = uy - vn * n[1],
+    tl = Math.hypot(tx, ty),
+    keep = tl > 1e-6 ? Math.max(0, tl - CRASH_MU * -vn) / tl : 0, // Coulomb friction on the slide
+    rb = Math.min(0.8, -e * vn), // rebound speed: a small settle back, never a bounce
+    rx = tx * keep + rb * n[0],
+    ry = ty * keep + rb * n[1];
+  let v = rx * f0[0] + ry * f0[1];
+  if (Math.abs(v) < 0.5) v = 0;
+  s.v = v;
+  // glancing hit: scrape along, the cab turns a little toward the wall's tangent and slides one step
+  if (keep > 0 && tl * keep > 1) {
+    const tg = Math.atan2(tx, -ty),
+      dh = Math.atan2(Math.sin(tg - prev.h), Math.cos(tg - prev.h));
+    if (Math.abs(dh) < 0.7 && s.v > 0) s.h += Math.max(-0.05, Math.min(0.05, dh * 0.3));
+    const px = s.x,
+      py = s.y,
+      ph = s.h;
+    s.x += tx * keep * dt;
+    s.y += ty * keep * dt;
+    if (hitTest(s)) Object.assign(s, { x: px, y: py, h: ph });
+  }
+  const imp = -vn;
+  s.crunchT = Math.min(0.45, 0.06 + imp * 0.025);
+  if (imp > 1.2) {
+    s.bump = Math.min(1, imp / 10);
+    s.hitV = imp; // main.js: damage scales with the normal impact speed
+    s.lastHit = hit;
+  }
+  if (hitTest(s)) s.steer *= 0.5; // still touching after the revert (steering into the wall): straighten
 }
 function surfaceAt(s) {
   const f = fwd(s.h);
@@ -160,6 +241,11 @@ function stepTruck(s, inp, dt) {
       s.offroad = rs !== 1 && !s.pave;
     }
   } // roundabout: exact flared outline
+  // v51 crash 'crunch': a short moment of no drive after a solid impact (the rig stops dead instead of pushing on)
+  if (s.crunchT > 0) {
+    s.crunchT -= dt;
+    s.throttle *= 0.15;
+  }
   // ----- gearbox & engine
   const dir = s.mode === "R" ? -1 : 1,
     av = Math.abs(s.v);
@@ -305,24 +391,6 @@ function stepTruck(s, inp, dt) {
     hitTest(s) ||
     (typeof trafficHitTruck === "function" && trafficHitTruck(s) ? "veh" : null) ||
     (typeof railBarrierHit === "function" && railBarrierHit(s, prev) ? "barrier" : null);
-  if (hit) {
-    const imp = Math.abs(s.v);
-    if (typeof wantProp === "function" && s === truck) wantProp(imp);
-    /* v-crash: rigs no longer explode on impact; damage accrues via bump (main.js) */ Object.assign(
-      s,
-      prev,
-    );
-    s.v = -s.v * 0.25;
-    if (Math.abs(s.v) < 0.3) s.v = 0;
-    s.throttle = 0;
-    if (imp > 1.2) {
-      s.bump = Math.min(1, imp / 10);
-      s.lastHit = hit;
-    }
-    if (hitTest(s)) {
-      // still stuck after revert (e.g. steering into wall) -> straighten
-      s.steer *= 0.5;
-    }
-  }
+  if (hit) crashResponse(s, prev, hit, dt);
   if (s.bump > 0) s.bump = Math.max(0, s.bump - dt * 2);
 }

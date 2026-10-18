@@ -115,6 +115,15 @@ Notes on ownership:
   `makeJob`/`makeRepeat` skip them). `alJobs()` = one order per cargo from ALD to APT/KHT/AAC (refresh 10 min).
   `alOpenBoard(force)` (modal kind `armyboard`) opens instead of the normal board at ALD; elsewhere the normal board gets
   an "Army Logistics" chip. Starting uses the normal `startMission`/`acceptJob` (tier 3 gate). Map data unchanged.
+- **Crash response** (`physics.js` `crashResponse`, v51): impacts are mostly inelastic. The pose reverts to the last free
+  one (cab + trailer angle together), velocity along the contact normal is removed with restitution `CRASH_E` (0.06
+  solids, 0.1 heavy vehicles; rebound capped at 0.8 m/s), the tangential part slides on with Coulomb friction
+  `CRASH_MU` (glancing hits scrape along and turn the cab slightly toward the wall), `s.crunchT` cuts drive for a moment.
+  Normal: solidity gradient around `HIT_PT` (set by `bodyHits`) or `s.hitN` from `trafficHitTruck` (heavy AI). Damage
+  (`main.js`) = `0.06 * hitV^1.6` (normal impact speed, m/s), capped 25 per hit, times `dmgM`. Light AI vehicles are
+  shoved by the OBB push-out and the rig loses `mv/(M+mv)` of its head-on speed. Later ideas (not built): proper
+  rigid-body yaw impulse from off-centre hits, trailer swing from side impacts, crumple / part damage, AI-vs-AI
+  momentum, debris and skid on impact.
 - **Company dashboard trip progress** (`owndepot.js` `ownTrkInfo`, v51): the bar and the "57% complete" line cover the
   whole fleet-truck job (to pickup, loading, delivering, unloading). legs weighted by planned time, each measured by its own remaining distance / dwell; `T.prMax` only rises (keyed by the trip clock
   `T.mT0`, reset when `ownMission` starts the next job); `ownDelivered` sets `T.prDone` so it reads 100 %.

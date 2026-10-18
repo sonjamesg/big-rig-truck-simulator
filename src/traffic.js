@@ -1382,6 +1382,7 @@ function trafficHitTruck(s) {
         if (v.heavy) {
           solid = true;
           v.hitT = timeS;
+          s.hitN = [-m[0], -m[1]]; // v51: contact normal for crashResponse (heavy = near-immovable)
           return;
         }
         v.offX += m[0] * (m[2] + 0.05);
@@ -1409,9 +1410,14 @@ function trafficHitTruck(s) {
             try {
               wantHit(v, imp);
             } catch (e) {}
-          s.v *= 0.85;
+          // v51: momentum by mass (light cars get shoved, the rig barely slows), restitution ~0.1
+          const mv = 170 * (v.L || 4.5) * (v.W || 1.8),
+            M = s.mass || 20000,
+            cn = Math.abs(fwd(s.h)[0] * m[0] + fwd(s.h)[1] * m[1]); // head-on share of the hit
+          s.v *= 1 - ((mv * 1.1) / (M + mv)) * cn;
           if (imp > 1.5) {
-            s.bump = Math.min(1, imp / 16);
+            s.bump = Math.min(1, (imp * cn) / 16);
+            s.hitV = imp * cn * Math.min(1, (2 * mv) / (M + mv)) * 2;
           }
         }
         return;

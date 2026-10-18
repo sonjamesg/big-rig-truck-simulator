@@ -496,6 +496,8 @@ function frame(ts) {
     }
     if (truck.bump > 0.01 && !truck._bumped) {
       thump(truck.bump);
+      if (truck.bump > 0.25 && typeof noiseBurst === "function")
+        noiseBurst(0.22, 900, 1.5, 0.5 * truck.bump); // crunch
       cam.shake = truck.bump * 10;
       truck._bumped = true;
     }
@@ -526,7 +528,13 @@ function frame(ts) {
   }
   if (started && !paused) updateNav(dt);
   if (truck.bump > 0.05 && !truck._dmg) {
-    truck.damage = Math.min(100, truck.damage + Math.min(3, truck.bump * 2.4) * (truck.dmgM || 1));
+    // v51: damage from the normal impact speed (m/s): ~2 at 22 mph, ~7 at 45 mph, ~14 at 67 mph; glancing hits less
+    const hv = truck.hitV || truck.bump * 10;
+    truck.hitV = 0;
+    truck.damage = Math.min(
+      100,
+      truck.damage + Math.min(25, 0.06 * Math.pow(hv, 1.6)) * (truck.dmgM || 1),
+    );
     truck._dmg = true;
   }
   if (truck.bump <= 0.01) truck._dmg = false;
