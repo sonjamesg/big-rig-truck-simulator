@@ -101,6 +101,7 @@ sim. `main.js` owns the loop (update → draw → HUD), the camera, the minimap 
 | 63 | `server.js` | Public servers over Supabase Realtime (no host needed, cap 15). Presence = player list + cap, Broadcast = poses. Home MULTIPLAYER card: SERVERS modal (list, count/cap, tap to join) + HOST GAME modal (PeerJS invite code, link copy/share, players x/6, start/close) |
 | 64 | `homecard.js` | Home card: one clear "who am I" card. Account remembered -> Welcome back <name> + CONTINUE + Switch account |
 | 65 | `ctrltheme.js` | phone controller theme: midnight-black deck, dark buttons with crisp 2 px neon-blue outline borders (brighter when pressed); colours only, layout stays in `mobile.js` |
+| 66 | `milrig.js` | dealer truck Bastion M6 6x6 (£35k): green military heavy tractor, very high power, sturdy (`dur` crash-damage multiplier), slightly lower top speed; own art (wraps `modelArt` outermost) |
 
 Notes on ownership:
 - **Roundabouts (v51)**: splitters are narrow raised kerb medians (`rbSplitter(rb, arm)` = `g.spN`, half-width `RB_MED`);
