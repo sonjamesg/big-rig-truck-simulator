@@ -5,7 +5,7 @@
  *   and the roof (sun-shaded, window pattern), then the roof image (cut from the baked chunk, cached per building) is
  *   drawn on top. Drawn after the ground vehicles + shadow layer (so walls hide traffic behind them) and before
  *   rail / overhead / night; tallest last. At night the lit-window pattern is added on the walls and the roof window
- *   dots of daynight.js follow the lifted roof. High quality only, skipped when zoomed far out.
+ *   dots of daynight.js are hidden on lifted buildings. High quality only, skipped when zoomed far out.
  * Exposes (globals): G3, G3_HCAM, gfx3dOn, gfx3dDraw, gfx3dNight, gfxBOff
  * Depends on: gfx.js (GFX, gfxHi), gfxshade.js (SUN, gfxShadeLayer), render.js (chunkCache, CHUNK), world.js
  *   (world.chunkObjs), daynight.js (DN, drawNight)
@@ -223,32 +223,24 @@ function gfx3dNight(vx0, vy0, vx1, vy1, z) {
   };
   const dn = drawNight;
   drawNight = function (vx0, vy0, vx1, vy1, z) {
-    // roof window dots of lifted buildings move with the roof for this frame
+    // lifted buildings: no roof window dots this frame (lit windows are on the walls)
     const sw = [];
     if (G3.vis.length && DN.grid) {
       if (!G3.lt) {
         G3.lt = new Map();
         for (const a of DN.grid.values()) for (const l of a) if (l.k === "b") G3.lt.set(l.o, l);
       }
-      const cx = (vx0 + vx1) / 2,
-        cy = (vy0 + vy1) / 2;
       for (const o of G3.vis) {
         const l = G3.lt.get(o);
         if (!l || !l.win) continue;
-        const k = Math.min(0.6, o.height / G3_HCAM);
-        sw.push([l, l.win]);
-        l.win = l.win.map((w) => [
-          cx + (w[0] - cx) * (1 + k),
-          cy + (w[1] - cy) * (1 + k),
-          w[2],
-          w[3],
-        ]);
+        sw.push(l);
+        l.hideWin = 1; // the walls carry the lit windows; roof dots would read as light strips on the footprint
       }
     }
     try {
       dn.apply(this, arguments);
     } finally {
-      for (const [l, w] of sw) l.win = w;
+      for (const l of sw) l.hideWin = 0;
     }
     gfx3dNight(vx0, vy0, vx1, vy1, z);
   };

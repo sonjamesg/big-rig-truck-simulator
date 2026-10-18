@@ -92,7 +92,7 @@ sim. `main.js` owns the loop (update → draw → HUD), the camera, the minimap 
 | 54 | `fire.js` | FIRES: buildings near the player catch fire; the nearest fire station's engine responds |
 | 55 | `bikes.js` | MOTORBIKES: sport/cruiser/scooter/delivery bikes join AI traffic by road type (never MIX/parked, so map data is unchanged); single lamp at night; lane filtering past slow queues; knock-offs (bike slides, rider tumbles); biker gangs (kinematic followers on the leader trail); biker revenge chase (HUD banner, shooting, escape by distance/LOS/knock-offs, never during jobs/BM/heists) |
 | 56 | `liftbridge.js` | LIFT BRIDGE: double-leaf bascule in the M1 crossing over the bottom-docks channel (replaces the suspension cables there); opens on a timeline from the deterministic ship schedule; pseudo-3D leaves/towers (oblique projection), road signals + half barriers stopping AI and the player; jump off a rising leaf or fall in and get towed |
-| 57 | `gfx.js` | GRAPHICS: quality setting (Auto/High/Low, `bigrig.gfx`) + FPS auto-fallback; time-of-day colour grade; coloured half-res light layer (headlight cones, streetlight pools, window/neon halos), brake/indicator glow, vehicles lit by lamps/headlights |
+| 57 | `gfx.js` | GRAPHICS: quality setting (Auto/High/Low, `bigrig.gfx`) + FPS auto-fallback; time-of-day colour grade; coloured half-res light layer (headlight cones, streetlight pools, window halos), brake/indicator glow, vehicles lit by lamps/headlights |
 | 58 | `gfxshade.js` | GRAPHICS stage 2: sun-driven soft shadows (high quality): baked building/tree casters recorded per chunk, cached half-res world-space shadow layer composited after vehicles; blurred, sun-offset vehicle/trailer shadows |
 | 59 | `gfx3d.js` | GRAPHICS stage 3: fake-3D buildings (GTA2 parallax): roof lifted from the view centre by height, sun-shaded side walls with window pattern, lit walls at night (high quality, not when zoomed far out) |
 | 60 | `flycam.js` | admin-only fly camera (G / FLY button): truck holds its handbrake, free camera pans/zooms, click/tap or Tab/LB/RB to follow AI vehicles |
@@ -127,12 +127,14 @@ Notes on ownership:
   changes 8 %, `SUN.k` steps or chunks were baked. `blitV` / `blit` calls with a nonzero shadow offset use
   `gfxShadowArt` (blurred padded silhouette, WeakMap cache) at the sun offset. New shadow casters should just call one
   of the three shadow helpers inside the chunk bake.
+- **No building neon** (v51, James): shop strips/awning light, neon bars, cyber outlines (night) and the baked cyber
+  neon trim (`bldg2.js` / `render.js`) are removed in every quality mode; `l.neon` stays null. Don't re-add them.
 - **3D buildings** (`gfx3d.js`, v51): drawn by a `gfxShadeLayer` wrapper, i.e. after ground vehicles + the shadow layer
   and before rail / overhead / night, sorted by `o.height` (tallest last). Roof points = view centre + (p - centre) *
   (1 + k), `k = min(0.6, height / G3_HCAM)`. Roof image = baked chunk pixels under the footprint (`g3Roof`, LRU 220,
   skipped until every overlapped chunk is in `chunkCache`). Walls whose outward normal faces the view centre are filled
   with the average roof colour (sun shaded) and `G3.pat`; `G3.walls` are re-lit with `G3.patN` after `drawNight`. The
-  `drawNight` wrapper swaps each lifted building's `l.win` for roof-shifted copies during the call; `gfxBOff(o)` gives
+  `drawNight` wrapper sets `l.hideWin` on each lifted building during the call (no roof dots; walls carry the lights); `gfxBOff(o)` gives
   the centre shift for gfx.js halos. Map data unchanged.
 - **Lift bridge** (`liftbridge.js`, v51): constants in `LB` (span `XA..XB` x `Y0..Y1` tiles, leaf `L`, `AMAX`).
   `lbState()` derives lights/barriers/leaf angle from `lbOcc(t)` (ship hull over the span) looked ahead/back with

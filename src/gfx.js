@@ -1,7 +1,7 @@
 /**
  * @file gfx.js — GRAPHICS UPGRADE (2D, no pixel art): quality level + FPS-based automatic low-quality fallback and a
  *   Graphics setting; stage 1 lighting: sunrise/sunset colour grading (multiply tint + sun-side warmth + vignette),
- *   warm headlight light on the road, streetlight pools, window/neon glow, day + night brake / indicator glow with road
+ *   warm headlight light on the road, streetlight pools, window glow, day + night brake / indicator glow with road
  *   spill, and vehicles lit by nearby lamps and other vehicles' headlights. The darkness itself stays the light/darkness
  *   compositing layer of daynight.js (drawNight: a low-res mask with lights cut out, then additive colour).
  * Exposes (globals): GFX, GFX_LOW_FPS, gfxHi, gfxSet, gfxGradeAt, gfxGrade, gfxLights, gfxVehLit (+ gfx* helpers)
@@ -274,7 +274,7 @@ function gfxLights(vx0, vy0, vx1, vy1, z) {
             }
         }
     }
-    // windows + neon: a soft halo per lit building, brighter where signs are
+    // windows: a soft halo per lit building
     if (hi && DN.grid && !GFX.off.halos) {
       const Cc = DN.cell,
         hh = gameT < 12 ? gameT + 24 : gameT;
@@ -298,11 +298,6 @@ function gfxLights(vx0, vy0, vx1, vy1, z) {
                 bx = l.x + (b ? b[0] : 0),
                 by = l.y + (b ? b[1] : 0);
               if (f > 0.25) gl("rgba(255,196,120,1)", bx, by, R, 0.12 * f * K);
-              if (l.neon) {
-                const fl = Math.sin(timeS * 3 + o.x) > -0.97 ? 1 : 0.3;
-                gl(l.neon, bx, o.y + 10 + (b ? b[1] : 0), Math.min(o.w, 160), 0.22 * K * fl);
-                gl(l.neon, o.x + o.w / 2, o.y + o.h + 24, Math.min(o.w, 140), 0.12 * K * fl); // pavement spill
-              }
             }
         }
     }

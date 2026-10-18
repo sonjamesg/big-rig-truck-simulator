@@ -133,6 +133,7 @@ function dnBuild() {
           o.style === "mall" ||
           o.style === "supermarket" ||
           (zc === 0 && o.style !== "house" && o.style !== "warehouse" && rnd() < 0.45);
+      // neon colour is still drawn from rnd() so later buildings keep their windows, but it is no longer shown
       const neon =
         zc < 2 &&
         o.style !== "house" &&
@@ -144,7 +145,7 @@ function dnBuild() {
         o,
         win,
         shop: shop && zc < 2,
-        neon,
+        neon: neon && null,
         aw: DN_AWN[(rnd() * DN_AWN.length) | 0],
       });
       if (shop && zc < 2) add(o.x + o.w / 2, o.y + o.h + 18, Math.min(150, o.w * 0.7 + 40), "sh");
@@ -362,7 +363,7 @@ function drawNight(vx0, vy0, vx1, vy1, z) {
   L.globalAlpha = 1;
   ctx.globalCompositeOperation = "source-over";
   ctx.drawImage(DN.lc, 0, 0, VW, VH);
-  // additive colour: lamp glows, windows/neon, tail + nav lights
+  // additive colour: lamp glows, windows, tail + nav lights
   ctx.globalCompositeOperation = "lighter";
   const gz = (col, x, y, r, a) => {
     const R = r * z;
@@ -404,10 +405,9 @@ function drawNight(vx0, vy0, vx1, vy1, z) {
     else if (l.k === "b" && nb++ < 500) {
       const o = l.o;
       ctx.globalAlpha = 0.75 * K;
-      const cy = o.cyber;
-      ctx.fillStyle = cy ? "#9ff" : "#ffd27a";
-      for (const w of l.win) {
-        if (!cy && (!w[2] || hh > w[3])) continue;
+      ctx.fillStyle = "#ffd27a"; // v51: cyber towers no longer get always-on cyan strips, just lit windows
+      for (const w of l.hideWin ? [] : l.win) {
+        if (!w[2] || hh > w[3]) continue;
         ctx.fillRect(
           (w[0] - vx0) * z,
           (w[1] - vy0) * z,
@@ -415,39 +415,7 @@ function drawNight(vx0, vy0, vx1, vy1, z) {
           Math.max(1.5, 4 * z),
         );
       }
-      if (l.shop) {
-        const X = (o.x - vx0) * z,
-          Y = (o.y + o.h - vy0) * z,
-          Wd = o.w * z;
-        ctx.globalAlpha = 0.9 * K;
-        ctx.fillStyle = "#ffe2a8";
-        ctx.fillRect(X + 4 * z, Y - 7 * z, Wd - 8 * z, 5 * z);
-        ctx.globalAlpha = 0.75 * K;
-        ctx.fillStyle = l.aw;
-        for (let k = 0; k < Wd - 8 * z; k += 14 * z)
-          ctx.fillRect(X + 4 * z + k, Y - 2 * z, 7 * z, 6 * z);
-      }
-      if (l.neon && !cy) {
-        const nc = l.neon,
-          fl = Math.sin(timeS * 3 + o.x) > -0.97 ? 1 : 0.3;
-        ctx.globalAlpha = 0.85 * K * fl;
-        ctx.strokeStyle = nc;
-        ctx.lineWidth = Math.max(1.5, 2.5 * z);
-        const sw = Math.min(o.w * 0.6, 120);
-        ctx.beginPath();
-        ctx.moveTo((o.x + o.w / 2 - sw / 2 - vx0) * z, (o.y + 10 - vy0) * z);
-        ctx.lineTo((o.x + o.w / 2 + sw / 2 - vx0) * z, (o.y + 10 - vy0) * z);
-        ctx.stroke();
-        gz(nc, o.x + o.w / 2, o.y + 10, sw * 0.7 + 20, 0.35 * fl);
-      }
-      if (cy) {
-        const col = DN_NEON[(o.seed >>> 3) % 4];
-        ctx.globalAlpha = 0.8 * K;
-        ctx.strokeStyle = col;
-        ctx.lineWidth = Math.max(1.5, 3 * z);
-        ctx.strokeRect((o.x - vx0) * z + 2, (o.y - vy0) * z + 2, o.w * z - 4, o.h * z - 4);
-        gz(col, o.x + o.w / 2, o.y + o.h / 2, Math.max(o.w, o.h) * 0.6, 0.25);
-      }
+      // v51: no shop strips, neon bars or cyber outlines on buildings (only windows + halos / pavement pools)
     }
   }
   for (const l of dyn) gz(l.c || DN_COL.fl, l.x, l.y, l.r * 0.5, l.a || 0.6);

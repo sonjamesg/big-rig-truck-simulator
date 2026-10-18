@@ -566,12 +566,7 @@ function roof2(g, o) {
     }
   } // rare helipad
   bFurniture(g, main, o, r, M);
-  if (o.cyber) {
-    const nc = ["#ff2bd6", "#00d8ff", "#b14bff", "#39ff88", "#ffd000"][o.seed % 5];
-    g.fillStyle = nc;
-    g.fillRect(o.x + 1, o.y + 1, o.w - 2, 2);
-    g.fillRect(o.x + 1, o.y + 1, 2, o.h - 2);
-  }
+  // v51: no neon trim on cyber buildings (James: outlines removed)
   if (st === "shop") {
     const f = Math.min(o.h * 0.3, 10),
       aw = ["#c0392b", "#27ae60", "#2e86c1", "#e67e22", "#8e44ad"][(r() * 5) | 0];

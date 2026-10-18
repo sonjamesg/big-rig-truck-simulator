@@ -804,7 +804,7 @@ function roof(g, o) {
       /* signs drawn below */
     }
     if (o.cyber && w > 40 && h > 40) {
-      // v18 Kingsbridge downtown: stepped setbacks, window bands, neon trim, rooftop plant
+      // v18 Kingsbridge downtown: stepped setbacks, window bands, rooftop plant
       const nc = ["#ff2bd6", "#00d8ff", "#b14bff", "#39ff88", "#ffd000"][(r() * 5) | 0],
         tiers = o.height > 110 ? 3 : 2;
       for (let t = 1; t <= tiers; t++) {
@@ -825,9 +825,7 @@ function roof(g, o) {
         g.fillRect(x + 4, y + k, 3, 4);
         g.fillRect(x + w - 7, y + k, 3, 4);
       }
-      g.fillStyle = nc;
-      g.fillRect(x + 2, y + 2, w - 4, 2);
-      g.fillRect(x + 2, y + 2, 2, h - 4);
+      void nc; // v51: neon trim removed (the colour is still drawn from r() so later details stay the same)
       const m = tiers * Math.min(w, h) * 0.12;
       for (let k = 0; k < 3; k++) acUnit(g, x + m + 6 + k * 18, y + m + 6);
     }
