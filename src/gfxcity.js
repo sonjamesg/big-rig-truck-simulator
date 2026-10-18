@@ -187,3 +187,173 @@ function gcWetNight(vx0, vy0, vx1, vy1, z) {
     gcWetNight(vx0, vy0, vx1, vy1, z);
   };
 }
+// ---------------------------------------------------------------- stage B: rooftops (baked details + night skylights + steam)
+// deterministic roof furniture for one building: skylights [x, y, w, h, colour], vents [x, y, r, steams]
+function gcRoofBits(o) {
+  if (o.gcRB !== undefined) return o.gcRB;
+  let rb = null;
+  if (o.kind === "bldg" && o.style !== "house" && o.style !== "stadium" && o.w >= 44 && o.h >= 40) {
+    const H = (k) => gcHash(Math.round(o.x), Math.round(o.y), k),
+      top = o.y + 6,
+      bot = o.y + o.h * 0.58, // stay above the street-side facade strip
+      sk = [],
+      vt = [];
+    const ns = o.w * o.h > 9000 ? 2 : 1;
+    for (let i = 0; i < ns; i++) {
+      const w = 14 + H(1 + i) * 14,
+        h = 9 + H(3 + i) * 8;
+      if (bot - top < h + 4) break;
+      sk.push([
+        o.x + 6 + H(5 + i) * (o.w - w - 12),
+        top + H(7 + i) * (bot - top - h),
+        w,
+        h,
+        H(9 + i) < 0.12 ? -1 : (H(11 + i) * 3) | 0, // -1: dark (unlit) skylight
+      ]);
+    }
+    const nv = 1 + ((H(13) * 3) | 0);
+    for (let i = 0; i < nv; i++)
+      vt.push([
+        o.x + 8 + H(15 + i) * (o.w - 16),
+        top + 2 + H(19 + i) * (bot - top - 4),
+        3 + H(23 + i) * 2.5,
+        H(27 + i) < 0.45,
+      ]);
+    rb = { sk, vt };
+  }
+  o.gcRB = rb;
+  return rb;
+}
+function gcRoofBake(g, o) {
+  const rb = gcRoofBits(o);
+  if (!rb) return;
+  for (const s of rb.sk) {
+    // flat skylight: frame, glazing bars, glass with a soft sheen
+    g.fillStyle = "#3a3f47";
+    g.fillRect(s[0] - 1.5, s[1] - 1.5, s[2] + 3, s[3] + 3);
+    const gr = g.createLinearGradient(s[0], s[1], s[0] + s[2], s[1] + s[3]);
+    gr.addColorStop(0, "#5f7d93");
+    gr.addColorStop(0.5, "#86a6bb");
+    gr.addColorStop(1, "#4d6a80");
+    g.fillStyle = gr;
+    g.fillRect(s[0], s[1], s[2], s[3]);
+    g.fillStyle = "rgba(30,36,44,0.8)";
+    for (let x = s[0] + 5; x < s[0] + s[2] - 2; x += 5) g.fillRect(x, s[1], 1, s[3]);
+  }
+  for (const v of rb.vt) {
+    // round extract vent with a fan
+    g.fillStyle = "#4b5058";
+    g.beginPath();
+    g.arc(v[0], v[1], v[2] + 1.5, 0, 7);
+    g.fill();
+    g.fillStyle = "#23262b";
+    g.beginPath();
+    g.arc(v[0], v[1], v[2], 0, 7);
+    g.fill();
+    g.strokeStyle = "#7c828a";
+    g.lineWidth = 0.8;
+    g.beginPath();
+    g.moveTo(v[0] - v[2], v[1]);
+    g.lineTo(v[0] + v[2], v[1]);
+    g.moveTo(v[0], v[1] - v[2]);
+    g.lineTo(v[0], v[1] + v[2]);
+    g.stroke();
+  }
+}
+{
+  const dob = drawObject;
+  drawObject = function (g, o) {
+    const r = dob.apply(this, arguments);
+    if (o.kind === "bldg" && !GFX.off.roofs) gcRoofBake(g, o);
+    return r;
+  };
+}
+// buildings in view (shared by the skylight glow and steam passes)
+function gcViewBldgs(vx0, vy0, vx1, vy1) {
+  const seen = new Set(),
+    B = [];
+  for (let y = Math.floor(vy0 / CHUNK); y <= Math.floor(vy1 / CHUNK); y++)
+    for (let x = Math.floor(vx0 / CHUNK); x <= Math.floor(vx1 / CHUNK); x++) {
+      const a = world.chunkObjs.get(x + "," + y);
+      if (a)
+        for (const o of a)
+          if (
+            o.kind === "bldg" &&
+            !seen.has(o) &&
+            o.x < vx1 &&
+            o.x + o.w > vx0 &&
+            o.y < vy1 &&
+            o.y + o.h > vy0
+          ) {
+            seen.add(o);
+            if (gcRoofBits(o)) B.push(o);
+          }
+    }
+  return B;
+}
+// roof point -> world point (follows the 3D roof lift of gfx3d.js)
+function gcRoofPt(o, x, y, cx, cy) {
+  if (typeof G3 === "undefined" || !G3.off.has(o)) return [x, y, 1];
+  const k = Math.min(0.6, o.height / G3_HCAM);
+  return [cx + (x - cx) * (1 + k), cy + (y - cy) * (1 + k), 1 + k];
+}
+// high quality: lit skylights (flat colour panels + soft glow, never outlines) at night, steam from vents day and night
+function gcRoofLive(vx0, vy0, vx1, vy1, z) {
+  if (!gfxHi() || GFX.off.roofs || z < 0.4) return;
+  const K = DN.dark,
+    B = gcViewBldgs(vx0, vy0, vx1, vy1),
+    cx = (vx0 + vx1) / 2,
+    cy = (vy0 + vy1) / 2,
+    hh = gameT < 12 ? gameT + 24 : gameT;
+  ctx.save();
+  ctx.setTransform(RSF, 0, 0, RSF, 0, 0);
+  const S = (x, y) => [(x - vx0) * z, (y - vy0) * z];
+  if (K > 0.05) {
+    ctx.globalCompositeOperation = "lighter";
+    for (const o of B)
+      for (const s of o.gcRB.sk) {
+        if (s[4] < 0) continue;
+        // late at night some go dark
+        if (hh > 24.5 + gcHash(Math.round(s[0]), Math.round(s[1]), 3) * 5) continue;
+        const p = gcRoofPt(o, s[0], s[1], cx, cy),
+          a = S(p[0], p[1]),
+          w = s[2] * p[2] * z,
+          h = s[3] * p[2] * z,
+          col = GC.pal[s[4]];
+        ctx.globalAlpha = 0.75 * K;
+        ctx.fillStyle = col;
+        ctx.fillRect(a[0], a[1], w, h);
+        ctx.globalAlpha = 0.35 * K;
+        const R = Math.max(w, h) * 1.6;
+        ctx.drawImage(dnGlow(col), a[0] + w / 2 - R, a[1] + h / 2 - R, R * 2, R * 2);
+      }
+  }
+  // steam: soft puffs drifting with the wind, a little brighter (lit from below) at night
+  ctx.globalCompositeOperation = "source-over";
+  const ws = 1 + (typeof WX !== "undefined" ? +WX.wind || 0 : 0) * 1.5,
+    wd = [0.8 * ws, -0.35 * ws],
+    col = K > 0.3 ? "rgba(170,175,190,1)" : "rgba(235,238,242,1)";
+  let n = 0;
+  for (const o of B)
+    for (const v of o.gcRB.vt) {
+      if (!v[3] || n++ > 40) continue;
+      const p = gcRoofPt(o, v[0], v[1], cx, cy);
+      for (let k = 0; k < 4; k++) {
+        const t = (timeS * 0.22 + k / 4 + gcHash(Math.round(v[0]), Math.round(v[1]), 2)) % 1,
+          x = p[0] + wd[0] * t * 46,
+          y = p[1] + wd[1] * t * 46,
+          r = (4 + t * 16) * z,
+          a = S(x, y);
+        ctx.globalAlpha = 0.22 * (1 - t) * Math.min(1, t * 5);
+        ctx.drawImage(dnGlow(col), a[0] - r, a[1] - r, r * 2, r * 2);
+      }
+    }
+  ctx.restore();
+}
+{
+  const dn = drawNight;
+  drawNight = function (vx0, vy0, vx1, vy1, z) {
+    dn.apply(this, arguments);
+    gcRoofLive(vx0, vy0, vx1, vy1, z);
+  };
+}

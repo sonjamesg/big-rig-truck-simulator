@@ -120,6 +120,9 @@ Notes on ownership:
   `T.ROAD` tile (tyre tracks from `roadH` / `roadV`, cracks, patches, oil, `gcPuddle` patches; all from `gcHash`, so
   stable). `gcWetNight` (after `drawNight`, high only) adds puddle + lamp-pool reflections in `GC.pal`
   (magenta / cyan / amber in city + suburb zones, amber rural). Switches: `GFX.off.wear`, `GFX.off.wet`.
+  Stage B rooftops: `gcRoofBits(o)` (cached on `o.gcRB`) gives skylights + vents in the upper roof (clear of the
+  facade strip); `drawObject` wrapper bakes them (`gcRoofBake`), `gcRoofLive` (after `drawNight`, high) lights
+  skylights in `GC.pal` as flat panels + glow (no outlines) and draws drifting steam; `gcRoofPt` follows the 3D lift.
 - **Crash response** (`physics.js` `crashResponse`, v51): impacts are mostly inelastic. The pose reverts to the last free
   one (cab + trailer angle together), velocity along the contact normal is removed with restitution `CRASH_E` (0.06
   solids, 0.1 heavy vehicles; rebound capped at 0.8 m/s), the tangential part slides on with Coulomb friction
