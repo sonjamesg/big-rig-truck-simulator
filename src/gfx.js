@@ -250,10 +250,10 @@ function gfxLights(vx0, vy0, vx1, vy1, z) {
         const s = zq * (V.big ? 1.55 : 1.1) * (V.bm || 1),
           hk = V.hb || 0;
         Lg.scale(s, s);
-        Lg.globalAlpha = (V.big ? 0.2 : 0.14) * K * (1 - hk);
+        Lg.globalAlpha = (V.big ? 0.3 : 0.22) * K * (1 - hk); // v51 overhaul: stronger cones
         if (Lg.globalAlpha > 0.005) Lg.drawImage(GL.tint, 0, -64);
         if (hk > 0.001) {
-          Lg.globalAlpha = 0.16 * K * hk;
+          Lg.globalAlpha = 0.24 * K * hk;
           Lg.drawImage(GL.tintF, 0, -100);
         }
         Lg.restore();

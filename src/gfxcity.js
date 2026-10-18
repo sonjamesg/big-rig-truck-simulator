@@ -3,6 +3,8 @@
  *   Stage A roads: baked asphalt wear on every road tile (cracks, tar-sealed joints, patches, oil stains, tyre tracks
  *   along the lanes, shallow puddle patches), kept faint so daytime stays clean; at night on high quality the puddles
  *   and the wet road reflect magenta / cyan / amber light (city), amber elsewhere.
+ *   Stage B rooftops: skylights + vents baked on flat roofs, lit skylights and steam at night (high).
+ *   Stage C light + colour: teal night grade under warm lamps, faint haze, stronger headlight cones (gfx.js).
  * Exposes (globals): GC, gcHash, gcPuddle, gcRoadWear, gcWetNight
  * Depends on: render.js (renderChunk, CHUNK), world.js (G, T, TILE, idx, inb, world.roadH/roadV), daynight.js (DN,
  *   drawNight, dnGlow, slZone, SL, slOn), gfx.js (gfxHi, GFX)
@@ -355,5 +357,26 @@ function gcRoofLive(vx0, vy0, vx1, vy1, z) {
   drawNight = function (vx0, vy0, vx1, vy1, z) {
     dn.apply(this, arguments);
     gcRoofLive(vx0, vy0, vx1, vy1, z);
+  };
+}
+// ---------------------------------------------------------------- stage C: light + colour (high quality)
+// night grade: teal shadows (multiply) under warm lamps, plus a faint cool haze wash; day keyframes are untouched
+const GC_TEAL = [120, 196, 214],
+  GC_HAZE = [40, 92, 112];
+{
+  const ga = gfxGradeAt;
+  gfxGradeAt = function (h) {
+    const g = ga.apply(this, arguments),
+      K = DN.dark;
+    if (!gfxHi() || GFX.off.grade || K < 0.02) return g;
+    const t = Math.min(1, K * 1.2),
+      ma = 0.24 * t,
+      w = g.ma + ma > 0 ? ma / (g.ma + ma) : 1;
+    return {
+      mul: g.mul.map((v, i) => Math.round(v + (GC_TEAL[i] - v) * w)),
+      ma: Math.max(g.ma, ma),
+      add: g.aa > 0.005 ? g.add : GC_HAZE,
+      aa: Math.max(g.aa, 0.05 * t),
+    };
   };
 }
