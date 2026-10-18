@@ -100,6 +100,7 @@ sim. `main.js` owns the loop (update → draw → HUD), the camera, the minimap 
 | 62 | `invite.js` | Invite landing: opened via ?join=TRUCK-1234 -> dedicated "You're invited" card (log in / create / guest / remembered), then straight into the host's game |
 | 63 | `server.js` | Public servers over Supabase Realtime (no host needed, cap 15). Presence = player list + cap, Broadcast = poses. Home MULTIPLAYER card: SERVERS modal (list, count/cap, tap to join) + HOST GAME modal (PeerJS invite code, link copy/share, players x/6, start/close) |
 | 64 | `homecard.js` | Home card: one clear "who am I" card. Account remembered -> Welcome back <name> + CONTINUE + Switch account |
+| 65 | `ctrltheme.js` | phone controller theme: midnight-black deck, dark buttons with crisp 2 px neon-blue outline borders (brighter when pressed); colours only, layout stays in `mobile.js` |
 
 Notes on ownership:
 - **Roundabouts (v51)**: splitters are narrow raised kerb medians (`rbSplitter(rb, arm)` = `g.spN`, half-width `RB_MED`);
