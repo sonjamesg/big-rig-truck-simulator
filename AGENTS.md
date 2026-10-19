@@ -203,7 +203,8 @@ Notes on ownership:
   places and benches. Check: `/workspace/thin/pedA3.py` (BUSONLY=1 for the bus test).
   Groups: `pedGroup` adds followers at spawn (`p.lead`, `p.slot`; couples, three abreast, families with `p.pram` +
   `p.kid`, chat rings `p.chat` at shop/pub points); `pedFollow` keeps the slot, hands over `onX` on crossings, and lets
-  go when the leader leaves, is scared or hurt. Check: `/workspace/thin/pedA4.py`.
+  go when the leader leaves, is scared or hurt. A slot over a verge/tree falls back to the leader's track (never off
+  the walkable mask; boxed in >1 s snaps to the leader so nobody parks on a crossing). Check: `/workspace/thin/pedA4.py`.
   Workers: `pedWorkSites` (depots and mall goods yards with bays, `pedWorks()` pavement pits - fenced 1-tile works
   on pavements 2+ tiles wide, blocked in `pedMask`) get crews from `pedWorkers` (added on top of the crowd target,
   `traffic.pedWk`); `p.work` walkers stroll between bay mouths in hi-vis (`p.hat`), builders dig (`p.dig`), all step

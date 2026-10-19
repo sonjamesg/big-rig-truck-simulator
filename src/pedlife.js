@@ -515,9 +515,29 @@ function pedFollow(p, dt) {
       ny = p.y + (dy / d) * st,
       tX = Math.floor(nx / M_T),
       tY = Math.floor(ny / M_T);
-    if (pedOk(tX, tY) || pedXAt(tX, tY) || d > 3) {
+    if (pedOk(tX, tY) || pedXAt(tX, tY)) {
       p.x = nx;
       p.y = ny;
+    } else {
+      // slot is over a verge or tree: fall in on the leader's own (walkable) track instead
+      const lx = L.x - p.x,
+        ly = L.y - p.y,
+        ld = Math.hypot(lx, ly) || 1,
+        ls = Math.min(ld, Math.max(L.sp, 0.6) * 1.4 * dt),
+        mx = p.x + (lx / ld) * ls,
+        my = p.y + (ly / ld) * ls;
+      const mX = Math.floor(mx / M_T),
+        mY = Math.floor(my / M_T);
+      if (pedOk(mX, mY) || pedXAt(mX, mY) || ld < 1.5) {
+        p.x = mx;
+        p.y = my;
+        p.fStk = 0;
+      } else if ((p.fStk = (p.fStk || 0) + dt) > 1 || ld > 6) {
+        // boxed in (never park on a crossing): step onto the leader's spot
+        p.x = L.x;
+        p.y = L.y;
+        p.fStk = 0;
+      }
     }
     p.ph += dt * p.sp * 5;
     p.moving = d > 0.25;
