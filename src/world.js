@@ -2091,7 +2091,7 @@ function* genWorldSteps() {
             }
         if (rbT && (hs.type === "dual" || vs.type === "dual")) continue;
       } // v24: street meeting a dual right at its roundabout is a roundabout arm, not a second junction
-      const kr =
+      let kr =
         hs.type === "res" || vs.type === "res" || hs.type === "lane" || vs.type === "lane"
           ? 2
           : hs.type === "rural" || vs.type === "rural"
@@ -2110,6 +2110,18 @@ function* genWorldSteps() {
             hs.type !== "hwy" &&
             vs.type !== "hwy" &&
             (LT(hs.type) || LT(vs.type))); // v24: every Kingsbridge junction is signalised
+      // v53 (James 19 Oct): UK signalised crossroads inside the city/town street grids: 12 m kerbs, full-width signal-controlled
+      // crossings, stop lines set back, verge poles (see ukjx below). Junctions outside the grids (the links out to the
+      // motorways, depots and port: the lorry routes) and anything touching rural / dual / motorway roads keep their radii.
+      const CT = (t) => t === "city" || t === "town",
+        uk =
+          lights &&
+          CT(hs.type) &&
+          CT(vs.type) &&
+          [...Object.values(world.cities || {}), ...Object.values(world.kbDistricts || {})].some(
+            (c) => jx >= c.xs[0] - 1 && jx <= c.X1 + 1 && jy >= c.ys[0] - 1 && jy <= c.Y1 + 1,
+          );
+      if (uk) kr = 3;
       const J = {
         id: world.junctions.length,
         x: jx,
@@ -2121,6 +2133,7 @@ function* genWorldSteps() {
         phase: hash2(jx, jy) * 16,
         corners: [],
         lights,
+        uk,
         occ: [],
       };
       for (const [px, py, dx, dy] of [
@@ -3707,9 +3720,52 @@ function* genWorldSteps() {
     });
   }
   yield "Installing traffic lights";
+  // v53: UK junction (J.uk) signals: per arm one pole on the inbound near-side verge just behind the stop line carrying the
+  // primary head and, back to back, the secondary for the opposite approach; puffin pedestrian units at both crossing ends.
+  // Geometry in px from the box edge (UKJ_*); an arm shorter than 7 tiles to the previous junction keeps the old layout.
+  for (const J of world.junctions) {
+    if (!J.uk) continue;
+    const C = [(J.x + J.w / 2) * TILE, (J.y + J.h / 2) * TILE],
+      arms = [];
+    for (const f of [
+      [0, -1],
+      [0, 1],
+      [-1, 0],
+      [1, 0],
+    ]) {
+      const sg = world.segs[f[0] ? J.hs : J.vs],
+        d = -(f[0] || f[1]),
+        [js, je] = jRange(sg, J),
+        edge = d > 0 ? js : je;
+      if (!(d > 0 ? sg.b0 < js - 0.5 : sg.b1 + 1 > je + 0.5)) {
+        arms.push(null);
+        continue;
+      }
+      const L = Math.abs(edge - prevEdge(sg, d, edge, J));
+      if (L < 7) {
+        J.uk = false;
+        break;
+      }
+      const t = [-f[0], -f[1]],
+        l = [t[1], -t[0]],
+        HW = (sg.w / 2) * TILE,
+        e = (f[0] ? J.w / 2 : J.h / 2) * TILE,
+        E = [C[0] + f[0] * e, C[1] + f[1] * e],
+        at = (u, v) => [E[0] + f[0] * u + l[0] * v, E[1] + f[1] * u + l[1] * v];
+      arms.push({
+        f,
+        l,
+        key: sg.id + ":" + d,
+        P: at(UKJ_U2 + 13, HW + 13),
+        ped: [at(UKJ_U1 + UKJ_CW / 2, HW + 9), at(UKJ_U1 + UKJ_CW / 2, -HW - 9)],
+      });
+    }
+    if (!J.uk) continue;
+    world.overhead.push({ kind: "ukjx", J, arms, x: C[0], y: C[1] });
+  }
   // v9: American-style mast arms — one per approach, pole on the near-side (left, we drive on the left) pavement, arm spanning the inbound lanes, one head per lane
   for (const J of world.junctions)
-    if (J.lights) {
+    if (J.lights && !J.uk) {
       const C = [J.x + J.w / 2, J.y + J.h / 2];
       const isR = (t) => t === T.ROAD || t === T.BRIDGE;
       for (const f of [

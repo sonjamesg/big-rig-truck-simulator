@@ -913,6 +913,147 @@ function drawSTower(o) {
   }
   ctx.restore();
 }
+// v53: UK junction signals (J.uk, overhead "ukjx"). A head on a black board with a white border, lamps red +7 / amber 0 /
+// green -7 along its facing; a protected turn shows green arrows instead of the full disc. night: redrawn above the dark
+function ukjxHead(x, y, ang, st, night) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(ang);
+  ctx.fillStyle = "#17191c";
+  ctx.fillRect(-12, -6.5, 24, 13);
+  ctx.strokeStyle = night ? "#b8b8b0" : "#f4f4f0";
+  ctx.lineWidth = 1.2;
+  ctx.strokeRect(-11.4, -5.9, 22.8, 11.8);
+  const lamp = (xx, on, col, dim) => {
+    ctx.fillStyle = on ? col : dim;
+    ctx.beginPath();
+    ctx.arc(xx, 0, 3, 0, 7);
+    ctx.fill();
+    if (on && !night) {
+      ctx.fillStyle = col + "55";
+      ctx.beginPath();
+      ctx.arc(xx, 0, 6.5, 0, 7);
+      ctx.fill();
+    }
+  };
+  lamp(7, st.red, "#ff3b30", "#3a1210");
+  lamp(0, st.amb, "#ffb020", "#3a2a10");
+  lamp(-7, st.disc, "#36e05a", "#10240f");
+  if (!st.disc && st.arrows.length) {
+    ctx.strokeStyle = "#5dff7a";
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = "round";
+    for (const mv of st.arrows) {
+      ctx.save();
+      ctx.translate(-7, 0);
+      ctx.rotate(mv === "S" ? 0 : mv === "L" ? -Math.PI / 2 : Math.PI / 2);
+      ctx.beginPath();
+      ctx.moveTo(-2.6, 0);
+      ctx.lineTo(2.6, 0);
+      ctx.moveTo(0.4, -2);
+      ctx.lineTo(2.6, 0);
+      ctx.lineTo(0.4, 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.lineCap = "butt";
+  }
+  ctx.restore();
+}
+// puffin near-side unit: small pole, red / green man facing across the crossing, yellow push-button box
+function ukjxPed(p, ang, pedG) {
+  ctx.save();
+  ctx.translate(p[0], p[1]);
+  ctx.rotate(ang);
+  ctx.fillStyle = "#3a3f46";
+  ctx.beginPath();
+  ctx.arc(0, 0, 3.4, 0, 7);
+  ctx.fill();
+  ctx.fillStyle = "#17191c";
+  ctx.fillRect(2, -5, 7, 10);
+  ctx.fillStyle = pedG ? "#36e05a" : "#ff3b30";
+  ctx.beginPath();
+  ctx.arc(5.5, -2, 1.2, 0, 7);
+  ctx.fill();
+  ctx.fillRect(4.8, -0.8, 1.5, 4);
+  ctx.fillStyle = "#f2c230";
+  ctx.fillRect(-4, 3.2, 5, 4);
+  ctx.restore();
+}
+function ukjxState(J, key) {
+  const ap = J.appr && J.appr[key],
+    mvs = [...new Set(((ap && ap.lanes) || ["S"]).join("").split(""))],
+    st = { red: true, amb: false, disc: false, arrows: [] };
+  let g = false,
+    a = false,
+    ra = false;
+  for (const m of mvs) {
+    const s = sigState(J, key, m);
+    if (s === "g") {
+      g = true;
+      if (sigArrow(J, key, m)) st.arrows.push(m);
+      else st.disc = true;
+    } else if (s === "a") a = true;
+    else if (s === "ra") ra = true;
+  }
+  st.red = !g && !a;
+  st.amb = a || (!g && ra);
+  return st;
+}
+function drawUkjx(o) {
+  const J = o.J,
+    S = o.arms.map((A) => A && ukjxState(J, A.key)),
+    allRed = S.every((s) => !s || (s.red && !s.amb)),
+    night = DN.dark > 0.01 ? DN.sig || (DN.sig = []) : null;
+  // pedestrians cross only while every approach shows red
+  for (const A of o.arms)
+    if (A)
+      for (let k = 0; k < 2; k++) {
+        const p = A.ped[k],
+          s = k ? -1 : 1,
+          ang = Math.atan2(-A.l[1] * s, -A.l[0] * s);
+        ctx.fillStyle = "rgba(0,0,0,0.28)";
+        ctx.beginPath();
+        ctx.arc(p[0] + 4, p[1] + 4, 3.5, 0, 7);
+        ctx.fill();
+        ukjxPed(p, ang, allRed);
+        if (night) night.push({ ped: 1, x: p[0], y: p[1], a: ang, g: allRed });
+      }
+  for (let i = 0; i < 4; i++) {
+    const A = o.arms[i];
+    if (!A) continue;
+    const P = A.P,
+      a = Math.atan2(-A.f[1], -A.f[0]);
+    ctx.fillStyle = "rgba(0,0,0,0.28)";
+    ctx.beginPath();
+    ctx.arc(P[0] + 6, P[1] + 6, 5, 0, 7);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(P[0] + 6, P[1] + 6);
+    ctx.rotate(a);
+    ctx.fillRect(-12, -13, 24, 26);
+    ctx.restore();
+    ctx.fillStyle = "#3a3f46";
+    ctx.beginPath();
+    ctx.arc(P[0], P[1], 5, 0, 7);
+    ctx.fill();
+    ctx.fillStyle = "#6b717a";
+    ctx.beginPath();
+    ctx.arc(P[0] - 1.2, P[1] - 1.2, 2.2, 0, 7);
+    ctx.fill();
+    // back to back: primary (own approach) on the kerb side, secondary (the opposite approach, arm i^1) behind the pole
+    const heads = [[P[0] - A.l[0] * 7, P[1] - A.l[1] * 7, a, S[i]]];
+    if (S[i ^ 1]) heads.push([P[0] + A.l[0] * 7, P[1] + A.l[1] * 7, a + Math.PI, S[i ^ 1]]);
+    for (const [x, y, an, st] of heads) {
+      ukjxHead(x, y, an, st, false);
+      if (night) night.push({ uk: 1, x, y, a: an, f: [Math.cos(an), Math.sin(an)], st });
+    }
+    ctx.fillStyle = "#3a3f46";
+    ctx.beginPath();
+    ctx.arc(P[0], P[1], 3.2, 0, 7);
+    ctx.fill();
+  }
+}
 function drawOverhead(o) {
   if (o.kind === "yrtg") {
     const T_ = TILE,
@@ -983,6 +1124,7 @@ function drawOverhead(o) {
   }
   if (o.kind === "susp") return drawSusp(o);
   if (o.kind === "stower") return drawSTower(o);
+  if (o.kind === "ukjx") return drawUkjx(o);
   if (o.kind === "mast") {
     const l = o.l,
       f = o.f,

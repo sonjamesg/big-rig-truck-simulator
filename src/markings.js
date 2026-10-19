@@ -8,6 +8,13 @@
 "use strict";
 // ===================== UK HIGHWAY CODE ROAD MARKINGS + approach lane rules =====================
 const RANK = { hwy: 5, dual: 4.5, city: 4, town: 3, rural: 2, res: 1, lane: 0.5 };
+// v53 UK signalised crossroads (J.uk, James 19 Oct): px from the junction box edge along an arm. 12 m kerb radius, crossing
+// (two stud lines kerb to kerb, 3.5 m apart) just past the radius, stop line 1.75 m behind it (= 4.5 tiles from the box edge)
+const UKJ_R2 = 3 * TILE,
+  UKJ_U1 = UKJ_R2 + 6,
+  UKJ_CW = 28,
+  UKJ_U2 = UKJ_U1 + UKJ_CW,
+  UKJ_US = UKJ_U2 + 14;
 function jOptions(J, sg, d) {
   const [js, je] = jRange(sg, J),
     stop = d > 0 ? js : je,
@@ -106,7 +113,7 @@ function buildMarkings(objs) {
         const o = jOptions(J, sg, d);
         if (!o.opts.length) continue;
         const cw = sg.type === "city" || sg.type === "town" || sg.type === "res",
-          lineA = o.stop - d * (cw ? 1 : 0);
+          lineA = J.uk ? o.stop - (d * UKJ_US) / TILE : o.stop - d * (cw ? 1 : 0);
         const prev = prevEdge(sg, d, d > 0 ? js : je, J);
         let Lapp = Math.min(10, Math.abs(lineA - prev) - 1.5);
         if (Lapp < 1) Lapp = 0;
@@ -135,11 +142,45 @@ function buildMarkings(objs) {
           mode: J.lights ? "lights" : gw ? "gw" : "major",
           slow: gw && sg.type === "rural" && Lapp >= 9,
         };
+        if (J.uk) {
+          // the UK layout repaints the whole arm (up to 14 tiles) and its verges (dropped kerbs, tactile paving)
+          m.uk = Math.max(0, Math.min(14, Math.abs(o.stop - prev) - 1));
+          const A = Math.min(o.stop, o.stop - d * m.uk),
+            B = Math.max(o.stop, o.stop - d * m.uk);
+          if (sg.dir === "h")
+            Object.assign(m, {
+              x: A * TILE,
+              y: sg.a * TILE - 32,
+              w: (B - A) * TILE,
+              h: sg.w * TILE + 64,
+            });
+          else
+            Object.assign(m, {
+              x: sg.a * TILE - 32,
+              y: A * TILE,
+              w: sg.w * TILE + 64,
+              h: (B - A) * TILE,
+            });
+        }
         if (!J.lights && J.y === 716 && (J.x === 410 || J.x === 346)) m.noArr = true;
-        if (!J.lights && (J.x === 392 || J.x === 431) && J.y === 689) m.noArr = true; // v40: airport access L-bends: plain corners, no turn arrows apprBox(m); objs.push(m); world.marks.push(m);
+        if (!J.lights && (J.x === 392 || J.x === 431) && J.y === 689) m.noArr = true; // v40: airport access L-bends: plain corners, no turn arrows
+        // v53: the push below had been swallowed by the comment above since v40 (no approach marks were baked). Restored for
+        // the UK junctions only; the other junctions' marks stay off until James has reviewed them
+        if (J.uk) {
+          objs.push(m);
+          world.marks.push(m);
+        }
       }
-    if (J.box)
-      objs.push({ kind: "boxj", J, x: J.x * TILE, y: J.y * TILE, w: J.w * TILE, h: J.h * TILE });
+    if (J.box || J.uk)
+      objs.push({
+        kind: "boxj",
+        J,
+        uk: J.uk ? 1 : 0,
+        x: J.x * TILE,
+        y: J.y * TILE,
+        w: J.w * TILE,
+        h: J.h * TILE,
+      });
   }
   for (const W of world.segs)
     for (const s of [1, -1]) {
@@ -215,7 +256,87 @@ function drawLaneArrow(g, kinds) {
       arrowHead(g, s * 10, -13, s, -0.25);
     }
 }
+// v53: one arm of a UK signalised crossroads, baked into the road chunk (approved mock-up, James 19 Oct). Arm space: u px
+// outward from the box edge, v px lateral (+v = the inbound side). Fresh asphalt over the arm, edge lines stopping short of
+// the crossing, hazard centre line, lane lines (solid 5 m off the stop line), stop line, stud crossing kerb to kerb, long lane
+// arrows, dropped kerbs and red blister tactile paving (L-shaped stem) at both crossing ends
+function drawUkApproach(g, o) {
+  const sg = o.sg,
+    d = o.d,
+    f = sg.dir === "h" ? [-d, 0] : [0, -d],
+    l = [-f[1], f[0]],
+    Cb = (sg.a + sg.w / 2) * TILE,
+    E = sg.dir === "h" ? [o.lineA * TILE, Cb] : [Cb, o.lineA * TILE],
+    HW = (sg.w / 2) * TILE,
+    Lc = o.uk * TILE,
+    nl = nLanes(sg),
+    LW = (HW * 2) / (nl * 2);
+  E[sg.dir === "h" ? 0 : 1] += d * UKJ_US; // back to the box edge
+  const q = (u0, u1, v0, v1) => {
+    const P = (u, v) => [E[0] + f[0] * u + l[0] * v, E[1] + f[1] * u + l[1] * v],
+      a = P(u0, v0),
+      b = P(u1, v1);
+    g.fillRect(
+      Math.min(a[0], b[0]),
+      Math.min(a[1], b[1]),
+      Math.abs(b[0] - a[0]),
+      Math.abs(b[1] - a[1]),
+    );
+  };
+  g.fillStyle = g.createPattern(TEX.asph[1], "repeat");
+  q(-1, Lc, -HW, HW);
+  g.fillStyle = "#ececec";
+  for (let u = UKJ_U2 + 10; u < Lc; u += 8) {
+    q(u, Math.min(Lc, u + 8), HW - 5, HW - 3);
+    q(u, Math.min(Lc, u + 8), -HW + 3, -HW + 5);
+  }
+  for (let u = UKJ_US + 4; u < Lc; u += 64) q(u, Math.min(Lc, u + 48), -1.5, 1.5);
+  for (let k = 1; k < nl; k++) {
+    const v = k * LW;
+    q(UKJ_US, Math.min(Lc, UKJ_US + 40), v - 1, v + 1);
+    for (let u = UKJ_US + 48; u < Lc; u += 52) q(u, Math.min(Lc, u + 36), v - 1, v + 1);
+    for (let u = UKJ_U2 + 8; u < Lc; u += 48) q(u, Math.min(Lc, u + 24), -v - 1, -v + 1);
+  }
+  q(UKJ_US, UKJ_US + 4, 2, HW - 2);
+  for (const u of [UKJ_U1, UKJ_U2 - 4])
+    for (let v = -HW + 1; v < HW - 2; v += 8) q(u, u + 4, v, v + 4);
+  const ang = Math.atan2(-f[1], -f[0]) + Math.PI / 2;
+  for (let i = 0; i < nl && o.lanes[i]; i++) {
+    const cr = (laneLat(sg, d, i) + 0.5) * TILE;
+    for (const uu of [UKJ_US + 2.6 * TILE, UKJ_US + 9 * TILE]) {
+      if (uu + 1.2 * TILE > Lc) continue;
+      const along = E[sg.dir === "h" ? 0 : 1] + (sg.dir === "h" ? f[0] : f[1]) * uu;
+      g.save();
+      if (sg.dir === "v") g.translate(cr, along);
+      else g.translate(along, cr);
+      g.rotate(ang);
+      drawLaneArrow(g, o.lanes[i]);
+      g.restore();
+    }
+  }
+  const blister = (u0, u1, a, b) => {
+    g.fillStyle = "#b4545a";
+    q(u0, u1, Math.min(a, b), Math.max(a, b));
+    g.fillStyle = "#cf7a80";
+    for (let u = u0 + 1.5; u < u1 - 1; u += 3)
+      for (let v = Math.min(a, b) + 1.5; v < Math.max(a, b) - 1; v += 3) q(u, u + 1.4, v, v + 1.4);
+  };
+  for (const s of [1, -1]) {
+    const vk = s * HW,
+      v1 = vk + s * 12,
+      lo = (a, b) => [Math.min(a, b), Math.max(a, b)];
+    g.fillStyle = "#c9c5bb";
+    q(UKJ_U1 - 10, UKJ_U2 + 10, ...lo(vk, vk + s * 2));
+    g.fillStyle = "#a9a59b";
+    q(UKJ_U1 - 10, UKJ_U1 - 4, ...lo(vk, vk + s * 2));
+    q(UKJ_U2 + 4, UKJ_U2 + 10, ...lo(vk, vk + s * 2));
+    blister(UKJ_U1 - 2, UKJ_U2 + 2, vk + s * 2, v1);
+    const um = UKJ_U1 + UKJ_CW / 2;
+    blister(um - 4, um + 4, v1, v1 + s * 14);
+  }
+}
 function drawApproach(g, o) {
+  if (o.uk) return drawUkApproach(g, o);
   const sg = o.sg,
     d = o.d,
     P = (al, cr) => (sg.dir === "h" ? [al * TILE, cr * TILE] : [cr * TILE, al * TILE]);
@@ -308,13 +429,14 @@ function drawApproach(g, o) {
 function drawBoxJunction(g, o) {
   g.save();
   g.beginPath();
-  g.rect(o.x, o.y, o.w, o.h);
+  // v53: a UK junction's box fills the junction itself, kerb line to kerb line (finer hatch)
+  const k0 = o.uk ? 3 : 0;
+  g.rect(o.x + k0, o.y + k0, o.w - 2 * k0, o.h - 2 * k0);
   g.clip();
   g.strokeStyle = "#f2c230";
-  g.lineWidth = 3;
-  g.strokeRect(o.x + 3, o.y + 3, o.w - 6, o.h - 6);
-  const n = o.w + o.h;
-  for (let k = -o.h; k < o.w + o.h; k += 26) {
+  g.lineWidth = o.uk ? 2.5 : 3;
+  g.strokeRect(o.x + 3 + k0 / 3, o.y + 3 + k0 / 3, o.w - 6 - (2 * k0) / 3, o.h - 6 - (2 * k0) / 3);
+  for (let k = -o.h; k < o.w + o.h; k += o.uk ? 20 : 26) {
     g.beginPath();
     g.moveTo(o.x + k, o.y);
     g.lineTo(o.x + k + o.h, o.y + o.h);
