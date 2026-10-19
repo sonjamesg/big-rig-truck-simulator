@@ -17,7 +17,7 @@ STATIC=r"""(()=>{ const W=world, S=W.segs, bad=[]; let nJ=0,nT=0,nC=0;
       if(ap&&ap.lanes){ const mv=o.opts.map(q=>q[0]); for(let l=0;l<ap.lanes.length;l++) for(const ch of ap.lanes[l]) if(mv.indexOf(ch)<0) bad.push({J:J.id,why:'arrow-illegal',key:sg.id+':'+d,lane:l,lanes:ap.lanes,mv});
         for(const m of mv) if(!ap.lanes.some(L=>L.indexOf(m)>=0)) bad.push({J:J.id,why:'move-unmarked',key:sg.id+':'+d,m,lanes:ap.lanes});
         if(ap.lanes.length>1){ const iL=ap.lanes.findIndex(L=>L.indexOf('L')>=0), iR=ap.lanes.findIndex(L=>L.indexOf('R')>=0); if(iL>=0&&iR>=0&&iL>iR) bad.push({J:J.id,why:'L-right-of-R',key:sg.id+':'+d}); } }
-      if(J.lights){ const f=sg.dir==='h'?[d,0]:[0,d]; if(!W.overhead.some(o=>o.kind==='mast'&&o.J===J&&o.f[0]===f[0]&&o.f[1]===f[1])) bad.push({J:J.id,why:'no-signal-head',key:sg.id+':'+d}); } } }
+      if(J.lights){ const f=sg.dir==='h'?[d,0]:[0,d]; if(!W.overhead.some(o=>(o.kind==='mast'&&o.J===J&&o.f[0]===f[0]&&o.f[1]===f[1])||(o.kind==='ukjx'&&o.J===J&&o.arms.some(A=>A&&A.key===sg.id+':'+d)))) bad.push({J:J.id,why:'no-signal-head',key:sg.id+':'+d}); } } }
   { const seen=new Map(); for(const J of W.junctions){ const k=J.x+','+J.y; if(seen.has(k)) bad.push({J:J.id,why:'duplicate-junction',with:seen.get(k)}); else seen.set(k,J.id); } }
   for(const sg of S) for(const d of [-1,1]){ const p=lanePt(sg,d,0,(sg.b0+sg.b1)/2), c=(sg.a+sg.w/2)*M_T;
     if(nLanes(sg)>1||sg.w>=2){ if(sg.dir==='h'){ if(Math.sign(p[1]-c)!==-d) bad.push({seg:sg.id,why:'right-hand',d}); } else if(Math.sign(p[0]-c)!==d) bad.push({seg:sg.id,why:'right-hand',d}); } }

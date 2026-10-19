@@ -159,6 +159,18 @@ Notes on ownership:
   a `square()`. `bFurniture` keeps panels/roof gardens to part of a big roof. Homes have `HOME_DEFS[].at` anchors (tried
   first, 48-tile search) so map edits never reshuffle them; a city with a 4-fuel quota finishes it 40 tiles apart.
   Test harness: /workspace/fleet/sim.py (fast-forward, logs legs and deliveries).
+- **UK signalised junctions** (`J.uk`, v53, James 19 Oct): signalised city/town x city/town crossroads inside a city or
+  Kingsbridge district grid rectangle (+1 tile) get 12 m kerbs (`kr = 3`); everything outside the grids or touching
+  rural/dual/hwy keeps its radius (lorry routes). Geometry in px from the box edge: `UKJ_*` in `markings.js` (crossing
+  `UKJ_U1..UKJ_U2`, stop line `UKJ_US` = 4.5 tiles, so `lineA` and the AI stop marker move with it). `world.js` (after
+  the traffic-lights stage) builds the arms (null = no arm) and pushes overhead `ukjx`; an arm under 7 tiles to the
+  previous junction clears `J.uk` (that junction keeps masts, but its 12 m kerbs are already carved). Painted by
+  `drawUkApproach` (approach `m.uk` = repaint length) + `drawBoxJunction` (`o.uk`), signals by `drawUkjx` (main.js:
+  verge pole per arm, primary + back-to-back secondary for arm `i^1`, puffin units green only when all approaches are
+  red), night via `DN.sig` entries `uk` / `ped` in `drawSigNight`. Approach marks for non-UK junctions are still not
+  baked: their push had been swallowed by a comment since v40 and is only restored for `J.uk` pending James's review.
+  Lorry check (`/workspace/thin/lt_ai.py`): AI trailers (chord model) clear the kerbs on 595/596 left turns; a towed
+  trailer from the kerb lane needs the outer exit lane.
 - **Graphics** (`gfx.js`, v51): `GFX.lvl` is `"high"`/`"low"`; `GFX.q` is the saved choice (`auto` drops to low once
   if the EMA fps stays under `GFX_LOW_FPS` for 6 s). `drawNight` is wrapped: `gfxGrade()` (cached quarter-res multiply +
   sun-side additive sprites from `GFX_GRADE` keyframes; replaces the old dusk multiply, so `DN.dusk` is zeroed during the
