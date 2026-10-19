@@ -6,7 +6,7 @@
  *   or by knocking them off; never during a job, Black Market job or heist, and an active gang backs off when one starts)
  * Exposes (globals): BK, BK_T, BK_DMG, makeBikeArt, bkIsBike, bkKnock, bkUpdate, bkDraw, bkHUD, bkSpawnGang, bkRevenge,
  *   bkEnd, bkBlocked
- * Depends on: traffic.js, police.js (emYield / emShift), wanted.js (wantHit), bm.js (bmHitBox / bmGunSound), audio.js,
+ * Depends on: traffic.js, police.js (emYield / emShift), wanted.js (wantHit), bm.js (bmHitBox / bmGunSound), peds.js (pedAlarm), audio.js,
  *   main.js (drawHUD, cam), daynight.js (dnLight; single lamp for bikes)
  * Load order: #55 of 60 in build.py (after fire.js); all files share one global scope (see AGENTS.md, SYMBOLS.md).
  */
@@ -782,6 +782,7 @@ function bkShoot(v, d) {
     life: 0.07,
   });
   if (typeof bmGunSound === "function") bmGunSound(false, d);
+  if (typeof pedAlarm === "function") pedAlarm(v.x, v.y, 45, "gun"); // v53d: walkers run from gunfire
   if (h) {
     const tk = document.body.classList.contains("touch") ? 0.8 : 1,
       dm = BK_DMG * tk * (truck.bulM || 1);

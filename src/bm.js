@@ -4,7 +4,7 @@
  * Exposes (globals): BM, BM_MISSIONS, bmGenYards, bmSolidM, bmMapIcons, bmPOIs, bmAtYard, bmOpenBoard, bmBlockFT, bmUpdate, bmWanted2, bmLoseUpdate, bmBays, bmOnDrop, bmPayout, bmJeepStart, bmExtrasUpdate,
  *   BM_THEFT, BM_OFFER_S, bmTheftOffers, bmBoardList, bmBoardBox, bmInBoardBox,
  *   bmDrawLow, bmDrawHigh, bmHUD (+ bm* helpers)
- * Depends on: depots.js (findSpot/access passed in, makeTrailer, BigRig events), milbase.js (MB, world.milbase, mbSoldier),
+ * Depends on: peds.js (pedAlarm), depots.js (findSpot/access passed in, makeTrailer, BigRig events), milbase.js (MB, world.milbase, mbSoldier),
  *   police.js / wanted.js (WANT, POL), career.js (addXP, career), ui.js (openModal, closeUI, esc, money), satnav.js (setRoute)
  * Load order: after heli.js in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
  * World data: world.bmYards (plain data, saved in src/map/). Missions are local to this client (never sent in MP: solo-safe).
@@ -1075,6 +1075,7 @@ function bmShoot(S, d, R) {
     life: 0.5,
   });
   bmGunSound(S.mg, d);
+  if (typeof pedAlarm === "function") pedAlarm(S.x, S.y, 45, "gun"); // v53d: walkers run from gunfire
   if (h) {
     // phone touch steering is coarser: rounds land a little softer there
     const tk = document.body.classList.contains("touch") ? 0.8 : 1;

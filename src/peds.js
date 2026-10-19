@@ -5,10 +5,13 @@
  *   follows the area (city centre > edge of town > rural); counts are capped harder on Low quality. Each walker has its
  *   own top, bottoms, skin and hair. Casualty fields (down / cas / fix / prog / col) are shared with ambulance.js and
  *   police.js.
+ *   v53d danger: a lorry on the pavement, the horn or gunfire (pedAlarm from bm.js / bikes.js) sends walkers running;
+ *   anyone in front of a lorry on the kerb dives aside and gets up again.
  * Exposes (globals): WALKABLE, PED_SOLID, pedMask, pedOk, PEDX, pedXings, pedXAt, pedOnX, PED_TOPS, PED_BOTS,
- *   PED_SKIN, PED_HAIR, pedLook, pedDensity, pedSpawn, pedPlan, pedLos, updatePeds, PED_SCALE, drawPeds
+ *   PED_SKIN, PED_HAIR, pedLook, pedDensity, pedSpawn, pedPlan, pedLos, PED_ALARM, pedAlarm, pedLorryAlarms, pedScare, pedFlee,
+ *   updatePeds, PED_SCALE, drawPeds
  * Depends on: world.js (G, T, get, idx, inb, world), traffic.js (traffic, tRand, onScreen, playerBoxes, ptBoxDist,
- *   ang), physics.js (fwd), signals.js (sigPedLeft), daynight.js (slZone), gfx.js (GFX), truck (lorry.js)
+ *   ang), physics.js (fwd), signals.js (sigPedLeft), daynight.js (slZone), gfx.js (GFX), main.js (input.horn), truck (lorry.js)
  * Load order: after signals.js in build.py. Shared global scope.
  */
 "use strict";
@@ -320,6 +323,86 @@ function pedPlan(p) {
   p.i = out.length > 1 ? 1 : 0;
   return true;
 }
+// ---- danger (v53d): a lorry on the pavement, the horn or gunfire sends nearby walkers running; anyone right in
+// front of a lorry on the kerb dives aside. Alarms are queued by the source (pedAlarm) and read once per frame.
+const PED_ALARM = [];
+function pedAlarm(x, y, r, k, h) {
+  if (PED_ALARM.length < 16) PED_ALARM.push({ x, y, r, k, h });
+}
+// the lorry's own alarms: horn (throttled) and any box over a walkable tile while moving
+function pedLorryAlarms(P, pb, dt) {
+  traffic.pedHornT = (traffic.pedHornT || 0) - dt;
+  if (typeof input !== "undefined" && input.horn && traffic.pedHornT <= 0) {
+    traffic.pedHornT = 0.4;
+    pedAlarm(P.x, P.y, 24, "horn");
+  }
+  if (Math.abs(P.v) > 1.5)
+    for (const b of pb)
+      if (pedOk(Math.floor(b.x / M_T), Math.floor(b.y / M_T))) {
+        pedAlarm(b.x, b.y, 22, "kerb", P.v > 0 ? P.h : P.h + Math.PI);
+        break;
+      }
+}
+// one walker reacts to the queued alarms: run (s), dive (s), or ignore
+function pedScare(p, al) {
+  for (const a of al) {
+    const dx = p.x - a.x,
+      dy = p.y - a.y,
+      d = Math.hypot(dx, dy);
+    if (d > a.r) continue;
+    if (a.k === "kerb" && !(p.dive > 0)) {
+      // in the lorry's path: dive to the nearer side
+      const f = fwd(a.h),
+        ahead = dx * f[0] + dy * f[1],
+        side = dx * -f[1] + dy * f[0];
+      if (ahead > -1 && ahead < 9 && Math.abs(side) < 3.2) {
+        const sg = side >= 0 ? 1 : -1;
+        p.dive = 0.45;
+        p.prone = 1.1 + tRand() * 0.8;
+        p.dvx = -f[1] * sg * 6.5;
+        p.dvy = f[0] * sg * 6.5;
+        p.h = ang(p.dvx, p.dvy);
+        p.onX = null;
+        p.path = null;
+        continue;
+      }
+    }
+    const t =
+      a.k === "horn"
+        ? d < 10
+          ? 1 + tRand()
+          : 0
+        : a.k === "gun"
+          ? 5 + tRand() * 3
+          : 2.5 + tRand() * 2;
+    if (t > (p.scare || 0)) {
+      p.scare = t;
+      p.sx = a.x;
+      p.sy = a.y;
+      p.path = null;
+    }
+  }
+}
+// running away from (p.sx, p.sy) on walkable ground (crossings allowed), trying wider angles at walls
+function pedFlee(p, dt) {
+  const a0 = ang(p.x - p.sx, p.y - p.sy),
+    sp = 4.4 * dt;
+  for (const da of [0, 0.6, -0.6, 1.2, -1.2, 1.9, -1.9]) {
+    const f = fwd(a0 + da),
+      nx = p.x + f[0] * sp,
+      ny = p.y + f[1] * sp,
+      tx = Math.floor(nx / M_T),
+      ty = Math.floor(ny / M_T);
+    if (pedOk(tx, ty) || pedXAt(tx, ty)) {
+      p.x = nx;
+      p.y = ny;
+      const dh = Math.atan2(Math.sin(a0 + da - p.h), Math.cos(a0 + da - p.h));
+      p.h += dh * Math.min(1, dt * 12);
+      break;
+    }
+  }
+  p.ph += dt * 26;
+}
 function updatePeds(dt) {
   const P = truck,
     ps = traffic.peds,
@@ -337,6 +420,8 @@ function updatePeds(dt) {
   if (ps.length >= want) traffic.pedInit = true;
   let plans = lo ? 2 : 4;
   const pb = playerBoxes();
+  pedLorryAlarms(P, pb, dt);
+  const al = PED_ALARM.splice(0);
   for (let k = ps.length - 1; k >= 0; k--) {
     const p = ps[k];
     const d = Math.hypot(p.x - P.x, p.y - P.y);
@@ -370,21 +455,34 @@ function updatePeds(dt) {
       }
       continue;
     } // v28: knocked down, stays down (no gore) until paramedics arrive
-    if (close < 7 && Math.abs(P.v) > 2 && !p.onX) {
-      // step back from a lorry coming at us, then carry on with a fresh plan
-      const ax = p.x - pb[0].x,
-        ay = p.y - pb[0].y,
-        L = Math.hypot(ax, ay) || 1,
-        nx = p.x + (ax / L) * 4.2 * dt,
-        ny = p.y + (ay / L) * 4.2 * dt;
+    if (close < 7 && Math.abs(P.v) > 2 && !(p.scare > 0)) {
+      // lorry bearing down: get out of the way
+      p.scare = 1.5 + tRand();
+      p.sx = pb[0].x;
+      p.sy = pb[0].y;
+    }
+    if (al.length) pedScare(p, al);
+    if (p.dive > 0) {
+      // the dive itself: a quick lunge, then a moment flat on the ground before getting up
+      p.dive -= dt;
+      const nx = p.x + p.dvx * dt,
+        ny = p.y + p.dvy * dt;
       if (pedOk(Math.floor(nx / M_T), Math.floor(ny / M_T))) {
         p.x = nx;
         p.y = ny;
-        p.h = ang(ax, ay);
       }
-      p.flee = 1;
-      p.path = null;
-      p.ph += dt * 20;
+      continue;
+    }
+    if (p.prone > 0) {
+      p.prone -= dt;
+      if (p.prone <= 0) p.wait = 0.4;
+      continue;
+    }
+    if (p.scare > 0) {
+      p.scare -= dt;
+      p.wait = 0;
+      p.onX = null;
+      pedFlee(p, dt);
       continue;
     }
     if (p.wait > 0) {
@@ -499,7 +597,35 @@ function drawPeds(inV) {
       }
       continue;
     }
-    const moving = !(p.wait > 0) && p.path,
+    if (p.dive > 0 || p.prone > 0) {
+      // diving / flat on the ground: stretched out along the dive, arms forward
+      ctx.save();
+      ctx.translate(X, Y);
+      ctx.rotate(p.h);
+      ctx.scale(PED_SCALE, PED_SCALE);
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.fillRect(-2.6, -4.6, 6.4, 10.4);
+      ctx.fillStyle = p.bot || "#2b2b33";
+      ctx.fillRect(-2.2, 1.2, 1.7, 4);
+      ctx.fillRect(0.5, 1.2, 1.7, 4);
+      ctx.fillStyle = p.top || p.col;
+      ctx.fillRect(-2.6, -2.6, 5.2, 4.2);
+      ctx.fillRect(-2.8, -6.2, 1.3, 3.6);
+      ctx.fillRect(1.5, -6.2, 1.3, 3.6);
+      ctx.fillStyle = p.skin || "#e0b48c";
+      ctx.beginPath();
+      ctx.arc(0, -3.6, 1.8, 0, 7);
+      ctx.fill();
+      if (p.style) {
+        ctx.fillStyle = p.hair;
+        ctx.beginPath();
+        ctx.arc(0, -3.3, 1.65, 0, 7);
+        ctx.fill();
+      }
+      ctx.restore();
+      continue;
+    }
+    const moving = (!(p.wait > 0) && p.path) || p.scare > 0,
       sw = moving ? Math.sin(p.ph) * 2.2 : 0;
     ctx.save();
     ctx.translate(X, Y);

@@ -187,6 +187,10 @@ Notes on ownership:
   until the green man has enough time left, lingers in parks, steps away from a fast lorry. Looks from `pedLook`
   (tops, bottoms, skin, hair style, bags), drawn at `PED_SCALE`. Casualty hooks (`ambPedHit`/`polPedHit`) unchanged.
   Check: `/workspace/thin/pedshots.py` (onRoad must be 0, XMON offPath 0).
+  v53d danger: sources queue `pedAlarm(x, y, r, kind)` (bm.js / bikes.js gunshots; `pedLorryAlarms`: horn via
+  `input.horn`, any lorry box over a walkable tile while moving), `pedScare` turns them into `p.scare` (run away with
+  `pedFlee`, walkable tiles only) or, in front of a lorry on the kerb, `p.dive` + `p.prone` (get up after). Check:
+  `/workspace/thin/pedA1.py`.
 - **Graphics** (`gfx.js`, v51): `GFX.lvl` is `"high"`/`"low"`; `GFX.q` is the saved choice (`auto` drops to low once
   if the EMA fps stays under `GFX_LOW_FPS` for 6 s). `drawNight` is wrapped: `gfxGrade()` (cached quarter-res multiply +
   sun-side additive sprites from `GFX_GRADE` keyframes; replaces the old dusk multiply, so `DN.dusk` is zeroed during the
