@@ -2,7 +2,7 @@
  * @file world.js — WORLD GENERATION: tile grid (MW x MH, TILE px / M_T m per tile), landmasses, road segments + junctions, roundabouts, curves, flyovers, towns
  * Exposes (globals): TILE, PPM, MW, T, PORT_Y0, M_TILE, SOLID, mulberry, hash2, CHUNK, world, G,
  *   idx, inb (+41 more)
- * Depends on: lorry.js, traffic.js, markings.js, depots.js, gamepad.js, rail.js, main.js
+ * Depends on: ltg.js (ltgGen, ltgGate, ltgIn: LGV training ground), lorry.js, traffic.js, markings.js, depots.js, gamepad.js, rail.js, main.js
  * Load order: #2 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
  */
 "use strict";
@@ -3393,7 +3393,10 @@ function* genWorldSteps() {
       }
   } // v37: the Albion airport footprint is off-limits to later depots/shops/services (layout wins)
   mbGen(objs); // v45: Sandvale Military Base (milbase.js) replaces Sandvale Intl
-  airport("Kingsbridge Field", 1195, 1792, 1385, 1905, [[1205, 1860, 175]], [1210, 1812, 40]);
+  // v54: Kingsbridge Field airfield replaced by the LGV training ground (ltg.js). R() is still drawn 4x for the
+  // airfield's old terminal + hangars so everything generated after this keeps its layout.
+  for (let k = 0; k < 4; k++) R();
+  ltgGen(objs);
   if (world.quarry) {
     const { x, y } = world.quarry;
     for (let j = y - 10; j < y + 12; j++)
@@ -3641,6 +3644,7 @@ function* genWorldSteps() {
           });
       }
     }
+  ltgGate(objs); // v54: training ground gate apron (after the forests, see ltg.js)
   (world.tm = world.tm || []).push(["// ---- boats", (performance.now() - t0) | 0]);
   pinR("Launching boats");
   yield "Launching boats";
@@ -3880,6 +3884,7 @@ function* genWorldSteps() {
         if (t === T.WALK) {
           for (const [dx, dy] of D) {
             if (G[idx(x + dx, y + dy)] !== T.ROAD || !URB[G[idx(x - dx, y - dy)]]) continue;
+            if (ltgIn(x - dx, y - dy)) continue; // v54: keep the training-ground gate mouth clear
             const along = dx ? y : x;
             if (along % 4) break;
             const px = dy ? 1 : 0,
@@ -3992,7 +3997,7 @@ function* genWorldSteps() {
     ["River Moor", riverX(1500) + 30, 1500],
     ["Albion Airport", 400, 560],
     ["Sandvale Military Base", 1260, 250],
-    ["Kingsbridge Field", 1290, 1830],
+    ["Kingsbridge LGV Training Ground", 1290, 1838],
     ["Albion Port", 540, PORT_Y0 - 6],
     ["Kingsbridge Harbour", 1600, 1905],
     ["M1", 1000, 94],
@@ -4201,7 +4206,11 @@ function worldChunkIndex(objs) {
     o.z =
       o.kind === "curve"
         ? -1.5
-        : o.kind === "kerb" || o.kind === "rb" || o.kind === "field" || o.kind === "runway"
+        : o.kind === "kerb" ||
+            o.kind === "rb" ||
+            o.kind === "field" ||
+            o.kind === "runway" ||
+            o.kind === "ltg"
           ? -1
           : o.kind === "appr" || o.kind === "boxj" || o.kind === "ldrop"
             ? -0.5
