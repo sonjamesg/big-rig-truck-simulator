@@ -1708,7 +1708,7 @@ function stepVeh(v, dt, pbs) {
         } // v29: blue lights creep through a red, only when the box is clear
         if (!stop && gap < 12 && boxBlocked(v, m)) stop = true; // never enter unless the exit is clear
         if (!stop && gap < 6 && jBusy(v, m.J)) stop = true; // give way to anything still crossing the junction
-        if (!stop && gap < 8 && v.v * v.v < 8 * gap && m.J.uk && pedOnX(m.J)) stop = true; // v53c: hold for people still on the crossings (only if it can stop gently)
+        if (!stop && gap < 8 && v.v * v.v < 4 * (gap - 2.5) && m.J.uk && pedOnX(m.J)) stop = true; // v53c: hold for people still on the crossings (only if it can stop gently)
         if (!stop && gap < 3) {
           m.go = true;
           m.goT = timeS;

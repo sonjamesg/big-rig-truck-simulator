@@ -696,11 +696,11 @@ function updatePeds(dt) {
     let tx = w.x - p.x,
       ty = w.y - p.y,
       L = Math.hypot(tx, ty);
-    // on the kerb before a crossing: wait for a green man long enough to get over (the intergreen covers the tail)
+    // on the kerb before a crossing: go only if the green man lasts long enough to get right over
     const prev = p.path[p.i - 1];
     if (prev && prev.X && !p.onX) {
       const left = sigPedLeft(prev.X.J);
-      if (left < Math.max(1.5, prev.X.len / 1.6 - 6)) {
+      if (left < prev.X.len / (Math.max(1.2, p.sp) * 1.25) + 0.5) {
         p.h = ang(tx, ty);
         continue;
       }

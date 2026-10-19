@@ -505,8 +505,9 @@ function pedFollow(p, dt) {
     s = Math.sin(L.h),
     tx = p.chat ? L.x + p.slot[0] : L.x + p.slot[0] * c - p.slot[1] * s,
     ty = p.chat ? L.y + p.slot[1] : L.y + p.slot[0] * s + p.slot[1] * c,
-    dx = tx - p.x,
-    dy = ty - p.y,
+    xs = !L.onX && pedXAt(Math.floor(tx / M_T), Math.floor(ty / M_T)),
+    dx = (xs ? L.x : tx) - p.x,
+    dy = (xs ? L.y : ty) - p.y,
     d = Math.hypot(dx, dy);
   if (d > 0.08) {
     const st = Math.min(d, Math.max(L.sp, 0.6) * 1.4 * dt);
@@ -521,7 +522,13 @@ function pedFollow(p, dt) {
     p.ph += dt * p.sp * 5;
     p.moving = d > 0.25;
   } else p.moving = false;
-  p.onX = pedXAt(Math.floor(p.x / M_T), Math.floor(p.y / M_T)); // cars wait for us on the crossing too
+  // on the crossing only while the leader is crossing (cars wait for us too); otherwise tuck in on the kerb behind
+  const X = pedXAt(Math.floor(p.x / M_T), Math.floor(p.y / M_T));
+  p.onX = X && L.onX ? X : null;
+  if (X && !L.onX) {
+    p.x += (L.x - p.x) * Math.min(1, dt * 4);
+    p.y += (L.y - p.y) * Math.min(1, dt * 4);
+  }
   // chatting: face the one in the middle; walking: same way as the leader
   p.h = p.chat ? Math.atan2(L.x - p.x, -(L.y - p.y)) : p.moving ? Math.atan2(dx, -dy) : L.h;
   p.wait = 0;
