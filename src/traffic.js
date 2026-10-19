@@ -1646,7 +1646,7 @@ function stepVeh(v, dt, pbs) {
   if (v.heavy) v0 = Math.min(v0, v.kind === "bus" ? 14 : 22);
   if (v.emResp) v0 *= 1.3; // v50: blue lights drive ~30% over the road's normal speed
   const front = v.s + v.L / 2;
-  let acc = 1e9,
+  let acc = v.kind === "bus" && !v.emResp ? busStopAcc(v, v0, dt) : 1e9, // v53d: buses call at stops (pedlife.js)
     sig = 0;
   v.ring = null;
   v.layer = 0;

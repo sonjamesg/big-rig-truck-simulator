@@ -217,12 +217,19 @@ function pedHotspots() {
           PED_HOT.push({ x: tx * M_T, y: ty * M_T, k: "stadium", r: 9 });
       }
   }
+  for (const S of pedStops()) PED_HOT.push({ x: S.wx, y: S.wy, k: "bus", r: 1, S });
+  for (const m of world.malls || []) {
+    const by = m.ty + m.h - (m.kind === "mall" ? 9 : 8);
+    PED_HOT.push({ x: (m.tx + m.w / 2) * M_T, y: (by - 1.5) * M_T, k: "mall", r: 4, m });
+  }
   return PED_HOT;
 }
 // how strongly a gathering point pulls people at hour h
 function pedHotW(k, h) {
   if (k === "pub") return h >= 17 && h < 23.5 ? 1 : h >= 12 && h < 17 ? 0.35 : 0;
   if (k === "stadium") return h >= 13 && h < 22 ? 1.6 : 0.15;
+  if (k === "bus") return h >= 6 && h < 23.5 ? 0.45 : 0;
+  if (k === "mall") return h >= 8 && h < 21 ? 1.2 : 0;
   return h >= 8 && h < 19 ? 0.3 : 0;
 }
 function pedSpawnHot(P, any) {
@@ -237,6 +244,11 @@ function pedSpawnHot(P, any) {
       h = q;
       break;
     }
+  if (h.k === "bus" || h.k === "mall") {
+    // queue / forecourt placement is done by pedLifeSpawn
+    if ((h.k === "bus" && h.S.q.length >= 7) || (!any && onScreen(h.x, h.y, 6))) return null;
+    return [Math.floor(h.x / M_T), Math.floor(h.y / M_T), h];
+  }
   for (let t = 0; t < 6; t++) {
     const a = r() * 6.283,
       d = r() * h.r * M_T,
@@ -280,6 +292,7 @@ function pedSpawn(P, any) {
       hot: hs ? hs[2] : null, // a gathering point this walker hangs around
       wait: hs ? tRand() * 20 : 0,
     });
+    pedLifeSpawn(p, hs, r, tx, ty);
     p.dx = Math.sin(p.h);
     p.dy = -Math.cos(p.h);
     return p;
@@ -509,7 +522,7 @@ function updatePeds(dt) {
     for (const q of pedHotspots()) {
       const w = pedHotW(q.k, h);
       if (w > 0 && Math.abs(q.x - P.x) < 140 && Math.abs(q.y - P.y) < 140) {
-        traffic.pedHot.push({ x: q.x, y: q.y, k: q.k, r: q.r, w });
+        traffic.pedHot.push(Object.assign({}, q, { w }));
         hw += w;
       }
     }
@@ -537,12 +550,14 @@ function updatePeds(dt) {
     const p = ps[k];
     const d = Math.hypot(p.x - P.x, p.y - P.y);
     if (
+      p.gone ||
       (d > 160 && !(p.cas && d < 1500)) ||
       (ps.length > want + 6 &&
         d > (ps.length > want * 1.3 + 6 ? 45 : 90) &&
         !p.cas &&
         !onScreen(p.x, p.y, 8))
     ) {
+      pedRelease(p);
       ps.splice(k, 1);
       continue;
     } // v28: casualties stay where they fell until treated
@@ -592,17 +607,31 @@ function updatePeds(dt) {
       if (p.prone <= 0) p.wait = 0.4;
       continue;
     }
+    if (p.dog) pedDogTick(p, dt);
     if (p.scare > 0) {
+      if (p.stop || p.sit || p.sitB) pedRelease(p);
       p.scare -= dt;
       p.wait = 0;
       p.onX = null;
       pedFlee(p, dt);
       continue;
     }
+    if (p.stop) {
+      pedStopWalk(p, dt);
+      continue;
+    }
     if (p.wait > 0) {
       p.wait -= dt;
       continue;
     } // lingering in a park / square, or at the end of a trip
+    if (p.sit) {
+      p.sit.who = null; // up off the bench
+      p.sit = null;
+    }
+    if (p.mall) {
+      pedMallWalk(p, dt);
+      continue;
+    }
     if (!p.path) {
       if (plans > 0) {
         plans--;
@@ -613,6 +642,34 @@ function updatePeds(dt) {
     const w = p.path[p.i];
     if (!w) {
       const t = get(Math.floor(p.x / M_T), Math.floor(p.y / M_T));
+      if (p.sitB) {
+        // sit down on the bench we walked to
+        p.sit = p.sitB;
+        p.sitB = null;
+        p.x = p.sit.x;
+        p.y = p.sit.y;
+        p.h =
+          p.sit.h +
+          (gcHash(Math.round(p.sit.x), Math.round(p.sit.y), 9) < 0.5 ? Math.PI / 2 : -Math.PI / 2);
+        p.wait = 15 + tRand() * 25;
+        p.path = null;
+        continue;
+      }
+      if (!p.jog && !p.bike && !p.dog && (t === T.PARK || t === T.PLAZA) && tRand() < 0.45) {
+        const b = pedBenchNear(p.x, p.y, 10);
+        if (b) {
+          b.who = p;
+          p.sitB = b;
+          p.path = [{ x: b.x, y: b.y }];
+          p.i = 0;
+          continue;
+        }
+      }
+      if (p.jog || p.bike) {
+        p.wait = 0.2;
+        p.path = null;
+        continue;
+      }
       const nearHot = p.hot && Math.hypot(p.x - p.hot.x, p.y - p.hot.y) < p.hot.r * M_T + 2;
       p.wait = nearHot
         ? 8 + tRand() * 25
@@ -680,7 +737,16 @@ function updatePeds(dt) {
 // drawn a touch larger than life so clothing reads at driving zoom
 const PED_SCALE = 1.35;
 function drawPeds(inV) {
-  const umb = typeof WX !== "undefined" && WX.rain > 0.25;
+  const umb = typeof WX !== "undefined" && WX.rain > 0.25,
+    hw = VW / 2 / cam.z,
+    hh = VH / 2 / cam.z;
+  traffic.pedVB = [
+    Math.floor((cam.x - hw) / TILE / 16),
+    Math.floor((cam.y - hh) / TILE / 16),
+    Math.floor((cam.x + hw) / TILE / 16),
+    Math.floor((cam.y + hh) / TILE / 16),
+  ];
+  drawPedLife(inV);
   for (const p of traffic.peds) {
     if (!inV(p.x, p.y)) continue;
     const X = p.x * PPM,
@@ -745,8 +811,9 @@ function drawPeds(inV) {
       ctx.restore();
       continue;
     }
-    const moving = (!(p.wait > 0) && p.path) || p.scare > 0,
-      sw = moving ? Math.sin(p.ph) * 2.2 : 0;
+    if (p.dog) drawPedExtra(p, X, Y);
+    const moving = (!(p.wait > 0) && (p.path || p.mall)) || p.scare > 0 || (p.stop && p.moving),
+      sw = moving && !p.sit && !p.bike ? Math.sin(p.ph) * (p.jog ? 3 : 2.2) : 0;
     ctx.save();
     ctx.translate(X, Y);
     ctx.rotate(p.h); // +y = backwards, -y = the way we face
@@ -755,10 +822,29 @@ function drawPeds(inV) {
     ctx.beginPath();
     ctx.ellipse(2, 2, 3.6, 2.6, 0, 0, 7);
     ctx.fill();
-    // legs (bottoms colour) stride fore and aft, then arms swing opposite
+    if (p.bike) {
+      // bicycle under the rider: wheels fore and aft, frame, bars
+      ctx.fillStyle = "#1b1b1b";
+      ctx.fillRect(-0.6, -7.2, 1.2, 3.6);
+      ctx.fillRect(-0.6, 3.4, 1.2, 3.6);
+      ctx.fillStyle = p.bike;
+      ctx.fillRect(-0.45, -4, 0.9, 7.6);
+      ctx.fillStyle = "#333";
+      ctx.fillRect(-2.6, -4.4, 5.2, 0.8);
+    }
+    // legs (bottoms colour) stride fore and aft, then arms swing opposite; seated: knees forward
     ctx.fillStyle = p.bot || "#2b2b33";
-    ctx.fillRect(-2.1, -1.4 + sw, 1.7, 3.4);
-    ctx.fillRect(0.4, -1.4 - sw, 1.7, 3.4);
+    if (p.sit) {
+      ctx.fillRect(-2.1, -3.6, 1.7, 3);
+      ctx.fillRect(0.4, -3.6, 1.7, 3);
+    } else if (p.bike) {
+      const pd = Math.sin(p.ph) * 1.2;
+      ctx.fillRect(-2.1, -1.4 + pd, 1.5, 2.6);
+      ctx.fillRect(0.6, -1.4 - pd, 1.5, 2.6);
+    } else {
+      ctx.fillRect(-2.1, -1.4 + sw, 1.7, 3.4);
+      ctx.fillRect(0.4, -1.4 - sw, 1.7, 3.4);
+    }
     ctx.fillStyle = p.top || p.col;
     ctx.fillRect(-4.1, -0.9 - sw * 0.6, 1.3, 2.6);
     ctx.fillRect(2.8, -0.9 + sw * 0.6, 1.3, 2.6);
@@ -769,7 +855,13 @@ function drawPeds(inV) {
     ctx.beginPath();
     ctx.ellipse(0, 0, 3.4, 2.1, 0, 0, 7);
     ctx.fill();
-    if (p.bag) {
+    if (p.bag2) {
+      // shopping bags in both hands
+      ctx.fillStyle = p.bag;
+      ctx.fillRect(-5.3, 0.6 - sw * 0.6, 1.8, 2.6);
+      ctx.fillStyle = p.bag2;
+      ctx.fillRect(3.5, 0.6 + sw * 0.6, 1.8, 2.6);
+    } else if (p.bag) {
       ctx.fillStyle = p.bag;
       ctx.fillRect(-2, 1.4, 4, 1.8);
     }
