@@ -2,7 +2,7 @@
  * @file fuel.js — FUEL, CASH, DAMAGE (stub)
  * Exposes (globals): DIESEL_RATE, refuel, fuelWhy, fuelStationAt, updateFuel, stopRefuel,
  *   toggleRefuel, drawFuelHUD, drawPOIs
- * Depends on: world.js, lorry.js, physics.js, depots.js, services.js, career.js, ui.js,
+ * Depends on: world.js, ltg.js (ltgMapDraw, ltgMapIcon), lorry.js, physics.js, depots.js, services.js, career.js, ui.js,
  *   owndepot.js, homes.js, nightmap.js, main.js
  * Load order: #12 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
  */
@@ -181,6 +181,7 @@ function drawFuelHUD() {
 // minimap / big-map icons for depots, petrol stations and repair garages
 function drawPOIs(px, py, big, R) {
   const rr = R || (big ? 7 : 5.5);
+  ltgMapDraw(px, py);
   const icon = (X, Y, col, ch) => {
     if (typeof nmIconRing === "function") nmIconRing(X, Y, rr);
     ctx.fillStyle = col;
@@ -209,6 +210,7 @@ function drawPOIs(px, py, big, R) {
   for (const d of world.dealers || []) icon(px(d.entrance.x), py(d.entrance.y), "#8e44ad", "$");
   if (typeof svcMapIcons === "function") svcMapIcons(icon, px, py);
   if (typeof mbMapIcon === "function") mbMapIcon(icon, px, py);
+  ltgMapIcon(px, py, rr, R);
   if (typeof homeMapIcons === "function") homeMapIcons(icon, px, py);
   for (const y of world.forSale || [])
     icon(

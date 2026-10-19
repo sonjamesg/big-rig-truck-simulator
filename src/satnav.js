@@ -5,7 +5,7 @@
  *   navSnapTruck, navAStar, navBuild, setRoute, clearRoute, navIsMission, userCancelRoute, mapPOIList,
  *   ftJobBlock (+36
  *   more)
- * Depends on: world.js, lorry.js, physics.js, audio.js, traffic.js, depots.js, career.js, ui.js,
+ * Depends on: world.js, ltg.js (ltgPOI), lorry.js, physics.js, audio.js, traffic.js, depots.js, career.js, ui.js,
  *   mp.js, breakdown.js, owndepot.js, homes.js, rail.js, nightmap.js, main.js, police.js
  * Load order: #18 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
  */
@@ -869,6 +869,10 @@ function mapPOIList(cb) {
   if (typeof homePOIs === "function") homePOIs(cb);
   if (typeof bmPOIs === "function") bmPOIs(cb);
   if (typeof hlMapPOIs === "function") hlMapPOIs(cb);
+  {
+    const p = ltgPOI();
+    cb(p, p.x, p.y, "Training ground");
+  }
   if (typeof mbMapPOI === "function") {
     const b = mbMapPOI();
     if (b) cb(b, b.x, b.y, "Military base");

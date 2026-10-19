@@ -2,7 +2,7 @@
  * @file daynight.js — day / night cycle (game clock)
  * Exposes (globals): DAY_LEN, gameT, DN, dnSmooth, updateDayNight, dnClock, dnSprite, dnRGBA,
  *   dnGlow, dnBuild, DN_COL, DN_AWN, DN_NEON, drawNight (+14 more)
- * Depends on: world.js, bldg2.js, lorry.js, physics.js, traffic.js, services.js, career.js,
+ * Depends on: world.js, ltg.js (ltgLights), bldg2.js, lorry.js, physics.js, traffic.js, services.js, career.js,
  *   ambient.js, gamepad.js, mp.js, indicators.js, beams.js, port.js, repair.js, rail.js,
  *   weather.js, main.js
  * Load order: #38 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
@@ -172,6 +172,7 @@ function dnBuild() {
     if (o.kind === "canopy") add(o.x + o.w / 2, o.y + o.h / 2, Math.max(o.w, o.h) * 1.1, "fl");
   if (typeof svcLights === "function") svcLights(add);
   if (typeof siteLights === "function") siteLights(add);
+  ltgLights(add);
   for (const d of world.depots || []) {
     add(d.entrance.x * PPM, d.entrance.y * PPM, 160, "fl");
     for (const b of d.bays || []) add(b.kx * PPM, b.ky * PPM, 90, "fl");

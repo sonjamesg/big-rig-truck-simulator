@@ -2,7 +2,7 @@
  * @file main.js — MAIN: staged world generation + loading bar, game loop (update/draw), camera, HUD, minimap + full map (M), input, window.__bigrig debug hook
  * Exposes (globals): PORTRAIT_SQ, VW, VW0, cv, input, cam, started, CABART, LOADMS, bootYield,
  *   boot, KEYMAP, welcomeCard, startGame, ukjxPed, drawUkjx (+44 more)
- * Depends on: world.js, render.js, lorry.js, physics.js, traffic.js, depots.js, fuel.js,
+ * Depends on: world.js, ltg.js (ltgUpdate, ltgDraw, ltgHUD, ltgPlate), render.js, lorry.js, physics.js, traffic.js, depots.js, fuel.js,
  *   sites.js, career.js, ui.js, satnav.js, gamepad.js, mp.js, mobile.js, breakdown.js, rail.js,
  *   police.js, server.js
  * Load order: #42 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
@@ -1999,6 +1999,7 @@ function drawBigMap() {
       ["#f39c12", "Y", "Haulage yard"],
       ["#d63b2f", "H", "Haulage truck"],
       ["#1b1022", "\u2620", "Black Market"],
+      ["#ffffff", "~L", "Training ground"],
     ];
     const lx0 = 28,
       w = bigmap.leg ? 232 : 92,
@@ -2022,6 +2023,15 @@ function drawBigMap() {
         const dark = c === "#ffdd33" || c === "#ffffff";
         const x = lx0 + 10 + (i % 2) * 110,
           y = ly0 + 32 + ((i / 2) | 0) * 17;
+        if (l === "~L") {
+          ltgPlate(ctx, x + 6, y, 12);
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+          ctx.font = "11px system-ui,sans-serif";
+          ctx.fillStyle = "#e8eef5";
+          ctx.fillText(n, x + 16, y);
+          return;
+        }
         if (l[0] === "~") {
           ctx.fillStyle = c;
           ctx.strokeStyle = l === "~P" ? "#0a3358" : "#2a1a08";
