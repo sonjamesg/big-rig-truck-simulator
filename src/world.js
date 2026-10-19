@@ -3764,8 +3764,10 @@ function* genWorldSteps() {
     world.overhead.push({ kind: "ukjx", J, arms, x: C[0], y: C[1] });
   }
   // v9: American-style mast arms — one per approach, pole on the near-side (left, we drive on the left) pavement, arm spanning the inbound lanes, one head per lane
+  // v53b (James 19 Oct): UK junctions keep their masts too, arm over the inbound lanes just past the set-back stop line
+  // (verge poles stay as well)
   for (const J of world.junctions)
-    if (J.lights && !J.uk) {
+    if (J.lights) {
       const C = [J.x + J.w / 2, J.y + J.h / 2];
       const isR = (t) => t === T.ROAD || t === T.BRIDGE;
       for (const f of [
@@ -3787,14 +3789,14 @@ function* genWorldSteps() {
           )
         )
           continue; // no arm on this side
-        const off = 0.55,
+        const off = J.uk ? UKJ_US / TILE - 0.45 : 0.55,
           kc = [E[0] + l[0] * hw, E[1] + l[1] * hw];
         const c = J.corners.find(
           (c) => Math.abs(c.px - kc[0]) < 0.01 && Math.abs(c.py - kc[1]) < 0.01,
         );
         // pole on the pavement corner (inside the kerb radius, at the diagonal), arm straight from pole to the centre line just past the stop line
         const pLat = hw + 0.9,
-          pLon = off; // v13: straight arm, perpendicular to traffic, pole on the near-side pavement just before the stop line
+          pLon = 0.55; // v13: straight arm, perpendicular to traffic, pole on the near-side pavement just before the stop line (drawOverhead measures from A + f*0.55, so the arm sits at A)
         const n = Math.max(1, Math.round((hw * M_T) / 3.6)),
           A = [E[0] - f[0] * off, E[1] - f[1] * off];
         world.overhead.push({

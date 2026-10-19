@@ -1003,9 +1003,9 @@ function ukjxState(J, key) {
 function drawUkjx(o) {
   const J = o.J,
     S = o.arms.map((A) => A && ukjxState(J, A.key)),
-    allRed = S.every((s) => !s || (s.red && !s.amb)),
+    // the plan has no pedestrian stage, so the man stays red (an all-red intergreen is only 1 s: no green-man flicker)
+    allRed = false,
     night = DN.dark > 0.01 ? DN.sig || (DN.sig = []) : null;
-  // pedestrians cross only while every approach shows red
   for (const A of o.arms)
     if (A)
       for (let k = 0; k < 2; k++) {

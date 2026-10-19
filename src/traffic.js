@@ -716,6 +716,7 @@ function planPiece(v, r) {
     const dStop = pathEnd(v);
     p = lanePt(sg, d, P.lane, stop);
     pathLine(v, p[0], p[1]);
+    const dBox = pathEnd(v); // the junction box edge (UK junctions: 4.5 tiles past the stop line)
     if (traffic.log)
       traffic.log.push({
         J: J.id,
@@ -754,7 +755,8 @@ function planPiece(v, r) {
     mk.turn = ch[0];
     v.mk.push(mk);
     if (J.lights && ch[0] === "R") {
-      const dS = mk.d,
+      // filtering right-turners wait inside the box (UK junctions: measured from the box edge, not the set-back stop line)
+      const dS = J.uk ? dBox : mk.d,
         L0 = mk.dEnd - dS;
       v.mk.push({
         kind: "filter",

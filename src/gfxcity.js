@@ -2,15 +2,15 @@
  * @file gfxcity.js — GRAPHICS overhaul (v51, straight top-down, no outlines): city mood after the night concept.
  *   Stage A roads: baked asphalt wear on every road tile (cracks, tar-sealed joints, patches, oil stains, tyre tracks
  *   along the lanes, shallow puddle patches), kept faint so daytime stays clean; at night on high quality the puddles
- *   and the wet road reflect magenta / cyan / amber light (city), amber elsewhere.
+ *   and the wet road reflect the real lights (warm street lamps, signal heads in their current colour).
  *   Stage B rooftops: skylights + vents baked on flat roofs, lit skylights and steam at night (high).
  *   Stage C light + colour: teal night grade under warm lamps, faint haze, stronger headlight cones (gfx.js).
  *   Stage D vehicles: clear-coat sheen, rounded flanks and a sky streak baked into every AI vehicle / trailer art.
- * Exposes (globals): GC, gcHash, gcPuddle, gcRoadWear, gcWetNight, gcRoofBits, gcRoofBake, gcRoofLive, GC_TEAL,
+ * Exposes (globals): GC, gcHash, gcPuddle, gcRoadWear, gcWetNight, gcNearLamp, gcSigLamps, GC_LAMP, GC_SIGC, gcRoofBits, gcRoofBake, gcRoofLive, GC_TEAL,
  *   GC_HAZE, gcVehGloss
  * Depends on: render.js (renderChunk, CHUNK), world.js (G, T, TILE, idx, inb, world.roadH/roadV), daynight.js (DN,
  *   drawNight, dnGlow, slZone, SL, slOn), gfx.js (gfxHi, GFX, gfxGradeAt), gfx3d.js (G3), traffic.js
- *   (makeCarArt, makeVanArt, makeBusArt, makeBoxArt, makeTractorArt, makeTrailerArtAI)
+ *   (makeCarArt, makeVanArt, makeBusArt, makeBoxArt, makeTractorArt, makeTrailerArtAI), weather.js (WX)
  * Load order: after gfx3d.js in build.py (wraps renderChunk outermost, drawNight). Shared global scope.
  */
 const GC = {
@@ -129,10 +129,49 @@ function gcZone(tx, ty) {
   if (z === undefined) GC.zc.set(k, (z = slZone(tx, ty)));
   return z;
 }
-// night, high quality: wet asphalt picks up colour - puddles mirror the street light, lamp pools smear along the road
+// night, high quality: the wet road reflects the lights that are really there (v53b, James 19 Oct: no random magenta /
+// green pools). Puddles mirror the nearest street lamp (warm) or else only a faint sky sheen; lamp pools are warm smears
+// under the lamp heads; every signal head lights the road under it in its current colour (DN.sig, filled by drawOverhead
+// this frame). Wetness (WX.wet) scales the reflections; dry roads keep a faint trace.
+const GC_LAMP = "rgba(255,212,150,1)",
+  GC_SIGC = { r: "rgba(255,40,30,1)", a: "rgba(255,170,30,1)", g: "rgba(60,255,110,1)" };
+function gcNearLamp(x, y, R) {
+  if (!SL.grid) return null;
+  const C = SL.cell;
+  let best = null,
+    bd = R;
+  for (let cy = Math.floor((y - R) / C); cy <= Math.floor((y + R) / C); cy++)
+    for (let cx = Math.floor((x - R) / C); cx <= Math.floor((x + R) / C); cx++) {
+      const a = SL.grid.get(cx + "," + cy);
+      if (a)
+        for (const l of a) {
+          const d = Math.hypot(l.hx - x, l.hy - y);
+          if (d < bd) {
+            bd = d;
+            best = l;
+          }
+        }
+    }
+  return best ? [best, bd] : null;
+}
+// lit lamps of one DN.sig entry: [[x, y, colour key]]
+function gcSigLamps(s) {
+  const c = Math.cos(s.a),
+    n = Math.sin(s.a),
+    at = (k, col) => [s.x + c * k, s.y + n * k, col];
+  if (s.ped) return [[s.x, s.y, s.g ? "g" : "r"]];
+  const st = s.uk ? s.st : s,
+    k = s.uk ? 7 : 8,
+    out = [];
+  if (st.red) out.push(at(k, "r"));
+  if (st.amb) out.push(at(0, "a"));
+  if (st.disc || st.arrows.length) out.push(at(-k, "g"));
+  return out;
+}
 function gcWetNight(vx0, vy0, vx1, vy1, z) {
   const K = DN.dark;
   if (K < 0.08 || !gfxHi() || GFX.off.wet) return;
+  const wet = 0.3 + 0.7 * Math.min(1, WX.wet || 0);
   ctx.save();
   ctx.setTransform(RSF, 0, 0, RSF, 0, 0);
   ctx.globalCompositeOperation = "lighter";
@@ -150,20 +189,18 @@ function gcWetNight(vx0, vy0, vx1, vy1, z) {
       for (let tx = t0x; tx <= t1x; tx++) {
         const p = gcPuddle(tx, ty);
         if (!p) continue;
-        const zc = gcZone(tx, ty),
-          col = zc < 2 ? GC.pal[(gcHash(tx, ty, 3) * 3) | 0] : GC.pal[2],
-          a = (zc === 0 ? 0.62 : zc === 1 ? 0.5 : 0.2) * K;
-        gz(col, p[0], p[1], p[2] * 2.2, p[3] * 2.2, a);
+        const nl = gcNearLamp(p[0], p[1], 150),
+          so = nl ? slOn(nl[0]) * (1 - nl[1] / 150) : 0;
+        gz(GC_LAMP, p[0], p[1], p[2] * 2, p[3] * 2, 0.55 * so * K * wet);
         gz(
-          "rgba(235,245,255,1)",
+          "rgba(200,215,235,1)",
           p[0] - p[2] * 0.25,
           p[1] - p[3] * 0.25,
           p[2] * 0.5,
           p[3] * 0.4,
-          a * 0.4,
+          0.18 * K * wet,
         );
       }
-  // lamp pools: a coloured smear on the wet road under city lamps
   if (SL.grid) {
     const C = SL.cell;
     for (let cy = Math.floor((vy0 - 200) / C); cy <= Math.floor((vy1 + 200) / C); cy++)
@@ -175,13 +212,15 @@ function gcWetNight(vx0, vy0, vx1, vy1, z) {
             continue;
           const so = slOn(l);
           if (so < 0.05) continue;
-          const tx = Math.floor(l.hx / TILE),
-            ty = Math.floor(l.hy / TILE),
-            zc = gcZone(tx, ty),
-            col = zc < 2 ? GC.pal[(gcHash(tx, ty, 5) * 3) | 0] : GC.pal[2];
-          gz(col, l.hx, l.hy, 70, 70, (zc === 0 ? 0.26 : zc === 1 ? 0.2 : 0.1) * so * K);
+          const zc = gcZone(Math.floor(l.hx / TILE), Math.floor(l.hy / TILE));
+          gz(GC_LAMP, l.hx, l.hy, 60, 60, (zc === 0 ? 0.2 : zc === 1 ? 0.16 : 0.1) * so * K * wet);
         }
       }
+  }
+  for (const s of DN.sig || []) {
+    if (s.x < vx0 - 60 || s.x > vx1 + 60 || s.y < vy0 - 60 || s.y > vy1 + 60) continue;
+    for (const [x, y, c] of gcSigLamps(s))
+      gz(GC_SIGC[c], x, y, s.ped ? 9 : 16, s.ped ? 9 : 16, (s.ped ? 0.25 : 0.4) * K * wet);
   }
   ctx.restore();
 }
