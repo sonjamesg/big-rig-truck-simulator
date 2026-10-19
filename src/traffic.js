@@ -1862,6 +1862,26 @@ function stepVeh(v, dt, pbs) {
       }
       if (lgap < 1e8) break;
     }
+    // v53b: a car physically right ahead of our nose is a leader even when our path is already easing into the next lane
+    // (queued lane changes before a set-back stop line used to miss it). Only while driving roughly straight, never in turns
+    if (lgap > 6) {
+      const q0 = pathAt(v, front + 3),
+        q1 = pathAt(v, front + 1),
+        dh = Math.abs(mod2pi(ang(q0[0] - q1[0], q0[1] - q1[1]) - v.h));
+      if (dh < 0.35 || dh > 6.28 - 0.35) {
+        const f = fwd(v.h);
+        for (const sd of [0.4, 2.4, 4.4])
+          for (const b of cands) {
+            if (sd >= lgap || Math.cos(b.h - v.h) < 0.7) continue;
+            if (ptBoxDist(v.x + f[0] * (v.L / 2 + sd), v.y + f[1] * (v.L / 2 + sd), b) < half) {
+              lgap = sd;
+              lvel = Math.max(0, (b.vel || 0) * Math.cos(b.h - v.h));
+              lplayer = !!b.player;
+              lveh = b.veh || null;
+            }
+          }
+      }
+    }
   }
   if (sig && cands.length && lgap > 0.5) {
     // v25: mid lane change — never slide sideways into a car alongside in the target lane (exact body sweep, next 4 m)
