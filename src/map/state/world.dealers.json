@@ -1,5 +1,5 @@
 [
  {"id":"T1","name":"Big Rig Trucks Albion","x":1352,"y":1784,"entrance":{"x":1352,"y":1744},"pad":{"x0":1328,"y0":1754,"x1":1360,"y1":1776},"region":"Westmere"},
  {"id":"T2","name":"Sandreach Truck Centre","x":6012,"y":2084,"entrance":{"x":6012,"y":2016},"pad":{"x0":5988,"y0":2054,"x1":6020,"y1":2076},"region":"The Sandreach"},
- {"id":"T3","name":"Highmoor Commercials","x":5936,"y":6076,"entrance":{"x":5936,"y":6032},"pad":{"x0":5912,"y0":6046,"x1":5944,"y1":6068},"region":"Highmoor"}
+ {"id":"T3","name":"Highmoor Commercials","x":5704,"y":6076,"entrance":{"x":5704,"y":6032},"pad":{"x0":5680,"y0":6046,"x1":5712,"y1":6068},"region":"Highmoor"}
 ]
