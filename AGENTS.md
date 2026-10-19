@@ -195,6 +195,12 @@ Notes on ownership:
   nights) x rain 0.8 + gathering points; `pedHotspots()` (shop fronts, `PUB`, stadium sides) weighted by `pedHotW`
   feed `traffic.pedHot` / `pedHotP`, `pedSpawnHot` puts walkers there and `pedPlan` keeps them nearby (`p.hot`).
   Umbrellas (`p.umb`, 75%) open while `WX.rain > 0.25`. Check: `/workspace/thin/pedA2.py`.
+- **Street life** (`pedlife.js`, v53d): runtime bus stops `pedStops()` (kerb lane of city/town roads, 50 tiles apart,
+  clear of junctions; shelter + flag + BUS STOP box) are `bus` gathering points; queued walkers (`p.stop`) board AI buses
+  that call via `busStopAcc` (hooked in `stepVeh`; dwell 4-14 s, skip empty stops, 0-2 get off). Roles from `pedRole`:
+  joggers (`p.jog`), dog walkers (`p.dog`, `pedDogTick`), cyclists (`p.bike`); mall shoppers (`p.mall`, two bags) wander
+  the forecourt (`pedMallWalk`); benches `pedBenches` in parks/squares are sat on (`p.sit`). `pedRelease` frees queue
+  places and benches. Check: `/workspace/thin/pedA3.py` (BUSONLY=1 for the bus test).
 - **Graphics** (`gfx.js`, v51): `GFX.lvl` is `"high"`/`"low"`; `GFX.q` is the saved choice (`auto` drops to low once
   if the EMA fps stays under `GFX_LOW_FPS` for 6 s). `drawNight` is wrapped: `gfxGrade()` (cached quarter-res multiply +
   sun-side additive sprites from `GFX_GRADE` keyframes; replaces the old dusk multiply, so `DN.dusk` is zeroed during the

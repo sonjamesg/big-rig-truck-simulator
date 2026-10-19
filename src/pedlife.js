@@ -103,7 +103,7 @@ function busStopAcc(v, v0, dt) {
       v.busSkip = S;
     }
     const gap = ahead - v.L / 2;
-    if (gap < 0.8 && v.v < 0.5) {
+    if (gap < 1.5 && v.v < 0.6) {
       v.busT = Math.min(14, 4 + S.q.length * 1.3);
       v.busS = S;
       S.bus = v;
@@ -114,7 +114,7 @@ function busStopAcc(v, v0, dt) {
       }
       return -6;
     }
-    acc = Math.min(acc, idmAcc(v, v0, Math.max(0.1, gap), 0));
+    acc = Math.min(acc, idmAcc(v, v0, Math.max(0.1, gap + 2), 0)); // +2: IDM keeps its 2.2 m standstill gap
   }
   return acc;
 }
