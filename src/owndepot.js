@@ -242,10 +242,10 @@ function updateOwnDepots(dt) {
       if (!P) continue;
       const T = { P, st: "new", box: null, t: 0, id: "own" + yd.id + have, home: yd };
       ownMission(T);
-      for (const dir of [1, -1])
-        if (
-          ptToRoad(T, g.sg, dir, g.along + dir * 7, T.tgt === "port" ? ptGateGoal(T.P) : T.dest)
-        ) {
+      const gl = T.tgt === "port" ? ptGateGoal(T.P) : T.dest,
+        d0 = ptExitDir(g, gl) || 1; // v52: leave the yard facing the pickup
+      for (const dir of [d0, -d0])
+        if (ptToRoad(T, g.sg, dir, g.along + dir * 7, gl)) {
           PTRUCK.list.push(T);
           break;
         }
@@ -301,7 +301,13 @@ function ownMission(T) {
   if (okD.length && (!okP.length || Math.random() < 0.55))
     pick = okD[(Math.random() * okD.length) | 0];
   else if (okP.length) pick = okP[(Math.random() * okP.length) | 0];
-  else pick = D.concat(Pp).sort((a, b) => a.rt - b.rt)[0] || null; // nothing within 10 min: the quickest one
+  else
+    pick =
+      D.filter((q) => !busy.has(q.d))
+        .concat(Pp)
+        .sort((a, b) => a.rt - b.rt)[0] ||
+      D.sort((a, b) => a.rt - b.rt)[0] ||
+      null; // nothing within 10 min: the quickest free one
   if (pick && pick.d) {
     T.dest = pick.d;
     T.pick = 1;

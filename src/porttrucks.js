@@ -1,7 +1,8 @@
 /**
  * @file porttrucks.js — port hauliers: persistent AI container trucks on the real road network
  * Exposes (globals): PTRUCK, ptArt, ptSetArt, ptVisible, ptGateGoal, ptDest, ptDepotGeo, ptPoly,
- *   ptBay, ptDepotPath, ptPose, ptToRoad, ptSegAt, updatePortTrucks (+9 more)
+ *   ptBay, ptDepotPath, ptPose, ptToRoad, ptSegAt, ptRouteCost, ptPickExit, ptExitDir, ptExitOK,
+ *   updatePortTrucks (+9 more)
  * Depends on: world.js, physics.js, traffic.js, satnav.js, port.js, owndepot.js, tune.js,
  *   daynight.js, main.js
  * Load order: #28 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
@@ -185,6 +186,9 @@ function ptDepotPath(T, v, g, bay) {
     if (cr < 0 || !best) best = { dir };
     if (cr < 0) break;
   }
+  // v52: a company truck collecting a box pulls out towards home (left or right), not always left
+  const nx = T.home && T.pick ? ptExitDir(g, T.home) : 0;
+  if (nx && ptExitOK(g.sg, g.along + nx * 5, nx)) best = { dir: nx };
   const dir = best.dir,
     dv = dirVec(g.sg, dir),
     exitA = g.along + dir * 5,
@@ -211,7 +215,14 @@ function ptToRoad(T, sg, dir, along, goal) {
   for (const off of [0, 1.5, 3, 4.5, 6]) {
     const a = along + dir * off;
     if (a < sg.b0 + 2.5 || a > sg.b1 - 2) continue;
-    const v = spawnVehicle(0, 0, true, { kind: "lorry", dir, along: a, seg: sg.id });
+    const v = spawnVehicle(0, 0, true, {
+      kind: "lorry",
+      dir,
+      along: a,
+      seg: sg.id,
+      // v52: goal set before the first turns are planned (they used to be random -> fleet trucks set off the wrong way)
+      pre: goal ? (nv) => ((nv.ptruck = T), aiGoal(nv, goal)) : null,
+    });
     if (v) {
       if (T.body) v.art.body = T.body;
       else T.body = v.art.body;
@@ -238,6 +249,72 @@ function ptSegAt(x, y) {
     b = world.roadV[i];
   const k = a >= 0 ? a : b;
   return k >= 0 ? world.segs[k] : null;
+}
+// v52: goal-directed turns. Route cost (satnav A* units) from a lane point to a goal depot, cached per (tile, goal tile).
+function ptRouteCost(x, y, dp) {
+  const s = navSnap(x / M_T, y / M_T, 6),
+    g = navSnap(dp.entrance.x / M_T, dp.entrance.y / M_T, 14);
+  if (!s || !g) return 1e9;
+  const gi = idx(g[0], g[1]),
+    k = idx(s[0], s[1]) + ":" + gi,
+    C = PTRUCK.rc || (PTRUCK.rc = new Map());
+  if (C.has(k)) return C.get(k);
+  if (C.size > 6000) C.clear();
+  const c = navAStar(s[0], s[1], g[0], g[1]) ? navG[gi] : 1e9;
+  C.set(k, c);
+  return c;
+}
+// can ptToRoad spawn a lorry around along (inside the segment, clear of junction boxes)?
+function ptExitOK(sg, along, dir) {
+  for (const off of [0, 1.5, 3, 4.5, 6]) {
+    const a = along + dir * off;
+    if (a < sg.b0 + 2.5 || a > sg.b1 - 2) continue;
+    if (
+      sg.js.every((J) => {
+        const r = jRange(sg, J);
+        return !(a > r[0] - 3 && a < r[1] + 3);
+      })
+    )
+      return true;
+  }
+  return false;
+}
+// which way (+1 / -1 along the segment) to leave a depot at g so the route to dp is shortest; 0 = no opinion
+function ptExitDir(g, dp) {
+  if (!dp || !dp.entrance) return 0;
+  const sg = g.sg,
+    c = [1, -1].map((dir) => {
+      const a = Math.max(sg.b0 + 1, Math.min(sg.b1 - 1, g.along + dir * 15)),
+        p = lanePt(sg, dir, 0, a);
+      return ptRouteCost(p[0], p[1], dp);
+    });
+  return Math.abs(c[0] - c[1]) < 0.5 ? 0 : c[0] < c[1] ? 1 : -1;
+}
+// index of the exit point (junction move / roundabout arm) with the cheapest route on to v.goal; -1 = no opinion.
+// Fleet and port lorries only: it looks at the options ahead, so (unlike the old A*-tile match) a truck pointing away
+// from its goal turns back towards it at the next junction instead of wandering at random until a path tile shows up.
+function ptPickExit(v, pts) {
+  if (!v.ptruck || !v.goal || !v.goal.entrance || pts.length < 2) return -1;
+  let bi = -1,
+    bc = 1e9;
+  // cheap first: the probe points ~24 m down each exit against the planned A* corridor (v.gk: tile -> path index)
+  if (v.gk) {
+    let bk = -1;
+    pts.forEach((p, i) => {
+      const k = v.gk.get(idx(Math.floor(p[0] / M_T), Math.floor(p[1] / M_T)));
+      if (k !== undefined && k > bk) ((bk = k), (bi = i));
+    });
+    if (bi >= 0) return bi;
+  }
+  // off the corridor (e.g. pulled out the wrong way): exact route cost from each exit (A*, cached)
+  pts.forEach((p, i) => {
+    const c = ptRouteCost(p[0], p[1], v.goal);
+    if (c < bc - 0.01) {
+      bc = c;
+      bi = i;
+    }
+  });
+  return bi;
 }
 // ---- per-frame
 function updatePortTrucks(dt) {
@@ -363,13 +440,28 @@ function updatePortTrucks(dt) {
           v.pinT = 1e12;
         }
       } else if (T.dest) {
-        const g = ptDepotGeo(T.dest);
+        const g = ptDepotGeo(T.dest),
+          near = g && Math.hypot(v.x - g.S[0], v.y - g.S[1]) < 11,
+          oth = near
+            ? PTRUCK.list.filter((o) => o !== T && o.st === "depot" && o.dest === T.dest)
+            : [];
+        // v52: a company truck may turn in while another one is parked in a different bay (rev / drop); while the
+        // entrance is busy (someone pulling in or out) it waits at the gate up to 15 s instead of driving past
         const bay =
-          g &&
-          Math.hypot(v.x - g.S[0], v.y - g.S[1]) < 11 &&
-          !PTRUCK.list.some((o) => o !== T && o.st === "depot" && o.dest === T.dest) &&
+          near &&
+          (T.home ? oth.every((o) => o.ph === "rev" || o.ph === "drop") : !oth.length) &&
           ptBay(T.dest);
+        if (!near) ((T.hold = 0), (T.holdS = null));
+        else if (!bay && T.home && oth.length && (T.hold || 0) < 15) {
+          T.hold = (T.hold || 0) + dt;
+          if (T.holdS == null) T.holdS = v.s;
+          v.s = T.holdS;
+          v.v = 0;
+          placeVeh(v);
+        }
         if (bay) {
+          T.hold = 0;
+          T.holdS = null;
           const dp = ptDepotPath(T, v, g, bay);
           T.bay = bay;
           const f = fwd(v.h);
@@ -557,11 +649,15 @@ function updatePortTrucks(dt) {
           end = D.outP.len;
         if (T.s + mv >= end - 0.05) {
           T.s = end - 0.05;
-          const g = ptDepotGeo(T.dest);
+          // v52: the next leg is decided once and the depot geometry kept: a failed road spawn (lorry in the way)
+          // used to re-roll the mission every frame, flip the depot and crash on a null port destination
+          const g = T.outG || (T.outG = ptDepotGeo(T.dest));
           if (T.wl) {
             if (!ptLaneOK(T.P)) continue;
             T.wl = 0;
-          } else {
+          } else if (!T.nxt) {
+            T.nxt = 1;
+            T.outW = 0;
             if (T.home && typeof ownMission === "function") {
               if (T.pick && T.box) {
                 T.pick = 0;
@@ -577,10 +673,15 @@ function updatePortTrucks(dt) {
               continue;
             }
           }
+          const gl = T.tgt === "port" ? ptGateGoal(T.P) : T.dest;
+          T.outW = (T.outW || 0) + dt;
           if (
-            ptToRoad(T, g.sg, D.exit.dir, D.exit.along, T.tgt === "port" ? ptGateGoal(T.P) : T.dest)
+            ptToRoad(T, g.sg, D.exit.dir, D.exit.along, gl) ||
+            (T.outW > 8 && ptToRoad(T, g.sg, -D.exit.dir, g.along - D.exit.dir * 5, gl)) // last resort
           ) {
             if (T.tgt === "port") T.dest = null;
+            T.outG = null;
+            T.nxt = 0;
             continue;
           }
         } else T.s += mv;
@@ -604,13 +705,11 @@ function updatePortTrucks(dt) {
           T.pick = 0;
           T.dest = T.home;
           T.tgt = "depot";
-        } else if (typeof ownMission === "function") ownMission(T);
+        } else if (!(T.pick && T.dest) && typeof ownMission === "function") ownMission(T); // keeps its pickup job
+        const gl = T.tgt === "port" ? ptGateGoal(T.P) : T.dest,
+          d0 = (g && ptExitDir(g, gl)) || 1; // tries the goal side first, then the other
         if (g)
-          for (const dir of [1, -1])
-            if (
-              ptToRoad(T, g.sg, dir, g.along + dir * 7, T.tgt === "port" ? ptGateGoal(T.P) : T.dest)
-            )
-              break;
+          for (const dir of [d0, -d0]) if (ptToRoad(T, g.sg, dir, g.along + dir * 7, gl)) break;
         continue;
       }
       if (T.lt > 6) {

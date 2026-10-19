@@ -140,6 +140,15 @@ Notes on ownership:
 - **Company dashboard trip progress** (`owndepot.js` `ownTrkInfo`, v51): the bar and the "57% complete" line cover the
   whole fleet-truck job (to pickup, loading, delivering, unloading). legs weighted by planned time, each measured by its own remaining distance / dwell; `T.prMax` only rises (keyed by the trip clock
   `T.mT0`, reset when `ownMission` starts the next job); `ownDelivered` sets `T.prDone` so it reads 100 %.
+- **Fleet / port lorry routing** (`porttrucks.js`, v52): goal-directed turns via `ptPickExit` (called from `planPiece`
+  junction choice and roundabout arm choice in `traffic.js`, `v.ptruck` vehicles only): probe points ~24 m down each exit
+  (`tProbeA`) are matched against the A* corridor `v.gk`; off the corridor the exit with the lowest `ptRouteCost`
+  (cached A*) wins, and a goal truck may still swap lanes for its turn. `ptToRoad` sets the goal through
+  `spawnVehicle(opt.pre)` before the first 90 m are planned (they used to be random). Depot exits: `ptExitDir` /
+  `ptExitOK` pull a loaded company truck out towards home; the depot out-phase decides the next leg once (`T.nxt`,
+  `T.outG`) and falls back to the other direction after 8 s. Company trucks wait at a busy gate up to 15 s and may
+  enter while another truck stands in a different bay. Pinned `v.ptruck` lorries are only culled after 150 s stopped.
+  Test harness: /workspace/fleet/sim.py (fast-forward, logs legs and deliveries).
 - **Graphics** (`gfx.js`, v51): `GFX.lvl` is `"high"`/`"low"`; `GFX.q` is the saved choice (`auto` drops to low once
   if the EMA fps stays under `GFX_LOW_FPS` for 6 s). `drawNight` is wrapped: `gfxGrade()` (cached quarter-res multiply +
   sun-side additive sprites from `GFX_GRADE` keyframes; replaces the old dusk multiply, so `DN.dusk` is zeroed during the

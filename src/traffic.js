@@ -1,7 +1,7 @@
 /**
  * @file traffic.js — AI TRAFFIC (GTA2-style ring spawning, lane graph, IDM following)
  * Exposes (globals): VTYPES, CAR_COLS, MIX, SPEED, AREAW, traffic, pickW, ang, wrapA, mod2pi, VS,
- *   vCanvas, grad, glass (+66 more)
+ *   vCanvas, grad, glass, tProbeA (+66 more)
  * Depends on: world.js, render.js, lorry.js, physics.js, audio.js, markings.js, signals.js,
  *   depots.js, indicators.js, beams.js, rail.js, main.js, police.js, wanted.js, rbx.js,
  *   ambulance.js
@@ -618,6 +618,10 @@ function pathEnd(v) {
   return v.pd[v.pd.length - 1];
 }
 
+// v52: a probe point ~24 m down an exit road (clamped to the segment) for goal-directed turn choice
+function tProbeA(sg, a) {
+  return Math.max(sg.b0 + 0.5, Math.min(sg.b1 + 0.5, a));
+}
 // plan one more piece of route from v.plan; returns false if impossible
 function planPiece(v, r) {
   const P = v.plan,
@@ -650,7 +654,8 @@ function planPiece(v, r) {
       const f = opts.filter((q) => !(q[1] && q[1].mil)); // v45: civilians never turn into the military base
       if (f.length) opts = f;
     }
-    const distT = Math.abs(lineA - P.pos);
+    const distT = Math.abs(lineA - P.pos),
+      allOpts = opts;
     if (lanes && distT < 5) {
       const f = opts.filter((op) => lanes[P.lane] && lanes[P.lane].indexOf(op[0]) >= 0);
       if (f.length) opts = f;
@@ -666,7 +671,20 @@ function planPiece(v, r) {
         break;
       }
     }
-    if (v.gk) {
+    const pk =
+      v.gk && typeof ptPickExit === "function"
+        ? ptPickExit(
+            v,
+            allOpts.map((q) =>
+              q[0] === "S"
+                ? lanePt(sg, d, P.lane, tProbeA(sg, exitA + d * 6))
+                : lanePt(q[1], q[2], 0, tProbeA(q[1], (q[2] > 0 ? o.ce : o.cs) + q[2] * 6)),
+            ),
+          )
+        : -1;
+    if (pk >= 0)
+      ch = allOpts[pk]; // v52: a goal truck may still swap lanes for its turn (short notice)
+    else if (v.gk) {
       let bk = -1;
       for (const q of opts) {
         const e =
@@ -826,7 +844,19 @@ function planPiece(v, r) {
     const myArm = rb.arms.find((a) => a.seg === sg.id && a.side === d);
     let arms = rb.arms.filter((a) => a !== myArm);
     if (!arms.length) arms = rb.arms;
-    const arm = arms[(r() * arms.length) | 0];
+    let arm = arms[(r() * arms.length) | 0];
+    if (v.gk && typeof ptPickExit === "function") {
+      // v52: goal-directed company / port lorries take the roundabout exit with the shortest route on (was random)
+      const k = ptPickExit(
+        v,
+        arms.map((a) => {
+          const Q = world.segs[a.seg],
+            qd = a.side < 0 ? 1 : -1;
+          return lanePt(Q, qd, 0, tProbeA(Q, (a.side < 0 ? Q.b0 : Q.b1 + 1) + qd * 6));
+        }),
+      );
+      if (k >= 0) arm = arms[k];
+    }
     const del = mod2pi(arm.ang - (myArm ? myArm.ang : 0));
     const mv = del < 2.0 ? "L" : del < 3.9 ? "S" : "R";
     const ap = rb.appr && rb.appr[sg.id + ":" + d];
@@ -1161,6 +1191,7 @@ function spawnVehicle(x, y, force, opt) {
   pathPush(v, back[0], back[1]);
   pathLine(v, p[0], p[1]);
   v.s = pathEnd(v);
+  if (opt && opt.pre) opt.pre(v); // v52: e.g. set a goal before the first 90 m of turns are planned
   while (pathEnd(v) - v.s < 90) if (!planPiece(v, v.r)) break;
   v.v = Math.min(SPEED[sg.type] || 12, v.heavy ? 20 : 30) * 0.6;
   if (sg.mil) mbDress(v); // v45: anything spawned on a base road is a military vehicle
@@ -1591,7 +1622,9 @@ function updateTraffic(dt) {
     const v = traffic.vs[k];
     const d = Math.hypot(v.x - P.x, v.y - P.y);
     if (d < 70) v.pinT = timeS + 60;
-    if (((d > 300 && v.pinT < timeS) || (v.stopT > 40 && d > 60)) && !onScreen(v.x, v.y, 30)) {
+    // v52: port / company lorries sit out long reds and right-turn filters (were culled at 40 s -> fleet truck "lost")
+    const stuck = v.stopT > (v.ptruck ? 150 : 40);
+    if (((d > 300 && v.pinT < timeS) || (stuck && d > 60)) && !onScreen(v.x, v.y, 30)) {
       releaseJ(v);
       traffic.vs.splice(k, 1);
       traffic.despawned++;
