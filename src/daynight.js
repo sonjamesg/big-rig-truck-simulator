@@ -1103,10 +1103,9 @@ function drawSigNight() {
   const K = DN.dark;
   if (!A || !A.length || K < 0.01) return;
   ctx.save();
-  // v53: UK junction heads (uk) and puffin units (ped) from drawUkjx: own glow + lamp layout
-  const U = A.filter((s) => s.uk),
-    Pd = A.filter((s) => s.ped);
-  A = A.filter((s) => !s.uk && !s.ped);
+  // v53: puffin units (ped) from drawUkjx: own glow
+  const Pd = A.filter((s) => s.ped);
+  A = A.filter((s) => !s.ped);
   const gl = (col, x, y, r, a) => {
     ctx.globalAlpha = a;
     ctx.drawImage(dnGlow(col), x - r, y - r, r * 2, r * 2);
@@ -1168,23 +1167,10 @@ function drawSigNight() {
       gl("rgba(60,255,110,1)", p[0], p[1], 20, 0.95);
     }
   }
-  const ukCol = (st) =>
-    st.disc || st.arrows.length
-      ? "rgba(60,255,110,1)"
-      : st.amb
-        ? "rgba(255,170,30,1)"
-        : "rgba(255,40,30,1)";
-  for (const s of U) gl(ukCol(s.st), s.x - s.f[0] * 30, s.y - s.f[1] * 30, 26, 0.4 * K);
   ctx.globalCompositeOperation = "source-over";
   ctx.globalAlpha = 1;
-  for (const s of U) ukjxHead(s.x, s.y, s.a, s.st, true);
   for (const s of Pd) ukjxPed([s.x, s.y], s.a, s.g);
   ctx.globalCompositeOperation = "lighter";
-  for (const s of U) {
-    const k = s.st.disc || s.st.arrows.length ? -7 : s.st.amb ? 0 : 7;
-    gl(ukCol(s.st), s.x + s.f[0] * k, s.y + s.f[1] * k, 16, 0.9);
-    if (s.st.amb && s.st.red) gl("rgba(255,40,30,1)", s.x + s.f[0] * 7, s.y + s.f[1] * 7, 16, 0.9);
-  }
   for (const s of Pd) gl(s.g ? "rgba(60,255,110,1)" : "rgba(255,40,30,1)", s.x, s.y, 9, 0.7);
   ctx.restore();
 }

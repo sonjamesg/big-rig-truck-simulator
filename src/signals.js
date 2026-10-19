@@ -1,6 +1,6 @@
 /**
  * @file signals.js — SIGNAL PHASING (UK, drive on the left)
- * Exposes (globals): SIG_CLEAR, sigMovePaths, sigConflict, SIG_RA2, sigOpp, sigAllowedPair,
+ * Exposes (globals): SIG_CLEAR, sigMovePaths, sigConflict, SIG_RA2, sigOpp, sigAllowedPair, SIG_PED, sigPedLeft,
  *   buildSig, sigOf, sigCur, sigState, sigFilter, sigArrow, lightState, sigOncoming (+1 more)
  * Depends on: world.js, physics.js, traffic.js, markings.js, indicators.js
  * Load order: #10 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
@@ -155,8 +155,11 @@ function buildSig(J) {
         stages.push({ kind: "eco", ax, mv: keep });
       }
     }
+  // v53c: UK junctions end every cycle with an all-red pedestrian stage (green man on every crossing, James 19 Oct)
+  if (J.uk && stages.length) stages.push({ kind: "ped", ax: null, mv: [] });
   // left filter arrows alongside any non-conflicting stage
   for (const s of stages) {
+    if (s.kind === "ped") continue;
     for (const m of mvs) {
       if (m.mv !== "L" || s.mv.some((x) => x.m === m)) continue;
       if (s.mv.every((x) => !sigConflict(J, x.m, m))) s.mv.push({ m, filter: false, extra: true });
@@ -164,7 +167,16 @@ function buildSig(J) {
   }
   // timings: cycle ~60-90 s
   for (const s of stages)
-    s.g = s.kind === "split" ? 13 : s.kind === "main" ? (stages.length > 2 ? 22 : 27) : 7;
+    s.g =
+      s.kind === "split"
+        ? 13
+        : s.kind === "main"
+          ? stages.length > 2
+            ? 22
+            : 27
+          : s.kind === "ped"
+            ? SIG_PED
+            : 7;
   let t = 0;
   const of = new Map();
   stages.forEach((s, i) => {
@@ -177,6 +189,14 @@ function buildSig(J) {
     }
   });
   return { stages, T: t, of, mvs };
+}
+const SIG_PED = 9; // green-man seconds; the vehicle intergreen after it (amber + all-red + red/amber, 6 s) clears the crossing
+// seconds of green man left on a UK junction's crossings (0 = red man)
+function sigPedLeft(J) {
+  if (!J.uk) return 0;
+  const [S, cur, u] = sigCur(J),
+    st = S.stages[cur];
+  return st.kind === "ped" && u < st.g ? st.g - u : 0;
 }
 function sigOf(J) {
   return J.sig || (J.sig = buildSig(J));

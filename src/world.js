@@ -2111,7 +2111,7 @@ function* genWorldSteps() {
             vs.type !== "hwy" &&
             (LT(hs.type) || LT(vs.type))); // v24: every Kingsbridge junction is signalised
       // v53 (James 19 Oct): UK signalised crossroads inside the city/town street grids: 12 m kerbs, full-width signal-controlled
-      // crossings, stop lines set back, verge poles (see ukjx below). Junctions outside the grids (the links out to the
+      // crossings, stop lines set back, puffin units (see ukjx below). Junctions outside the grids (the links out to the
       // motorways, depots and port: the lorry routes) and anything touching rural / dual / motorway roads keep their radii.
       const CT = (t) => t === "city" || t === "town",
         uk =
@@ -3756,7 +3756,6 @@ function* genWorldSteps() {
         f,
         l,
         key: sg.id + ":" + d,
-        P: at(UKJ_U2 + 13, HW + 13),
         ped: [at(UKJ_U1 + UKJ_CW / 2, HW + 9), at(UKJ_U1 + UKJ_CW / 2, -HW - 9)],
       });
     }
@@ -3765,7 +3764,7 @@ function* genWorldSteps() {
   }
   // v9: American-style mast arms — one per approach, pole on the near-side (left, we drive on the left) pavement, arm spanning the inbound lanes, one head per lane
   // v53b (James 19 Oct): UK junctions keep their masts too, arm over the inbound lanes just past the set-back stop line
-  // (verge poles stay as well)
+  // (the verge vehicle poles were dropped in v53c: one set of vehicle signals)
   for (const J of world.junctions)
     if (J.lights) {
       const C = [J.x + J.w / 2, J.y + J.h / 2];

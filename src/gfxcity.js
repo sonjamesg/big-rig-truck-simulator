@@ -160,12 +160,10 @@ function gcSigLamps(s) {
     n = Math.sin(s.a),
     at = (k, col) => [s.x + c * k, s.y + n * k, col];
   if (s.ped) return [[s.x, s.y, s.g ? "g" : "r"]];
-  const st = s.uk ? s.st : s,
-    k = s.uk ? 7 : 8,
-    out = [];
-  if (st.red) out.push(at(k, "r"));
-  if (st.amb) out.push(at(0, "a"));
-  if (st.disc || st.arrows.length) out.push(at(-k, "g"));
+  const out = [];
+  if (s.red) out.push(at(8, "r"));
+  if (s.amb) out.push(at(0, "a"));
+  if (s.disc || s.arrows.length) out.push(at(-8, "g"));
   return out;
 }
 function gcWetNight(vx0, vy0, vx1, vy1, z) {
