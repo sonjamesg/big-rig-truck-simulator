@@ -538,7 +538,10 @@ function updatePeds(dt) {
   const want = traffic.pedW || 0;
   for (let t = 0; t < 4 && ps.length < want; t++) {
     const p = pedSpawn(P, !traffic.pedInit);
-    if (p) ps.push(p);
+    if (p) {
+      ps.push(p);
+      for (const f of pedGroup(p, tRand)) ps.push(f); // couples, friends, families (pedlife.js)
+    }
   }
   if (ps.length >= want) traffic.pedInit = true;
   let plans = lo ? 2 : 4;
@@ -620,6 +623,7 @@ function updatePeds(dt) {
       pedStopWalk(p, dt);
       continue;
     }
+    if (p.lead && pedFollow(p, dt)) continue;
     if (p.wait > 0) {
       p.wait -= dt;
       continue;
@@ -812,12 +816,14 @@ function drawPeds(inV) {
       continue;
     }
     if (p.dog) drawPedExtra(p, X, Y);
-    const moving = (!(p.wait > 0) && (p.path || p.mall)) || p.scare > 0 || (p.stop && p.moving),
+    const moving =
+        (!(p.wait > 0) && (p.path || p.mall)) || p.scare > 0 || ((p.stop || p.lead) && p.moving),
       sw = moving && !p.sit && !p.bike ? Math.sin(p.ph) * (p.jog ? 3 : 2.2) : 0;
     ctx.save();
     ctx.translate(X, Y);
     ctx.rotate(p.h); // +y = backwards, -y = the way we face
-    ctx.scale(PED_SCALE, PED_SCALE);
+    ctx.scale(PED_SCALE * (p.kid || 1), PED_SCALE * (p.kid || 1));
+    if (p.pram) pedDrawPram(p);
     ctx.fillStyle = "rgba(0,0,0,0.28)";
     ctx.beginPath();
     ctx.ellipse(2, 2, 3.6, 2.6, 0, 0, 7);

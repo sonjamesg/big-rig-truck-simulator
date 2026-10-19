@@ -201,6 +201,9 @@ Notes on ownership:
   joggers (`p.jog`), dog walkers (`p.dog`, `pedDogTick`), cyclists (`p.bike`); mall shoppers (`p.mall`, two bags) wander
   the forecourt (`pedMallWalk`); benches `pedBenches` in parks/squares are sat on (`p.sit`). `pedRelease` frees queue
   places and benches. Check: `/workspace/thin/pedA3.py` (BUSONLY=1 for the bus test).
+  Groups: `pedGroup` adds followers at spawn (`p.lead`, `p.slot`; couples, three abreast, families with `p.pram` +
+  `p.kid`, chat rings `p.chat` at shop/pub points); `pedFollow` keeps the slot, hands over `onX` on crossings, and lets
+  go when the leader leaves, is scared or hurt. Check: `/workspace/thin/pedA4.py`.
 - **Graphics** (`gfx.js`, v51): `GFX.lvl` is `"high"`/`"low"`; `GFX.q` is the saved choice (`auto` drops to low once
   if the EMA fps stays under `GFX_LOW_FPS` for 6 s). `drawNight` is wrapped: `gfxGrade()` (cached quarter-res multiply +
   sun-side additive sprites from `GFX_GRADE` keyframes; replaces the old dusk multiply, so `DN.dusk` is zeroed during the

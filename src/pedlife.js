@@ -1,11 +1,11 @@
 /**
  * @file pedlife.js — EVERYDAY STREET LIFE for the walkers in peds.js (v53d, James 19 Oct): bus stops (shelter, flag,
  *   yellow BUS STOP box) with queues that board the AI buses which pull in, dog walkers, joggers, cyclists on the
- *   footpaths, shoppers with bags milling outside the malls, and benches in parks and squares that people sit on.
+ *   footpaths, groups (couples, friends, families with pushchairs, chats outside shops), shoppers with bags milling outside the malls, and benches in parks and squares that people sit on.
  *   Stops and benches are derived from the map at runtime (no map data change).
  * Exposes (globals): PED_STOPS, pedStops, pedStopsNear, busStopAcc, PED_BENCH, pedBenches, pedBenchNear, pedRole,
  *   pedLifeSpawn, pedSpawnAt, pedStopWalk, pedRelease, pedMallWalk, pedDogTick, PED_SPORT, PED_DOGC, PED_BIKEC,
- *   drawPedLife, drawPedExtra
+ *   drawPedLife, drawPedExtra, pedGroup, pedFollow, pedDrawPram
  * Depends on: peds.js (pedOk, pedLook, traffic.peds, PED_SCALE), traffic.js (laneLat, jRange, nLanes, idmAcc, tRand,
  *   traffic), world.js (world, G, T, get, idx, inb, TILE, M_T), gfxcity.js (gcHash), physics.js (fwd)
  * Load order: after peds.js in build.py. Shared global scope.
@@ -195,6 +195,7 @@ function pedRelease(p) {
     p.stop = null;
     p.wait = 0;
   }
+  p.left = true; // followers go their own way
   for (const b of [p.sit, p.sitB]) if (b && b.who === p) b.who = null;
   p.sit = p.sitB = null;
 }
@@ -439,4 +440,99 @@ function drawPedExtra(p, X, Y) {
     ctx.fillRect(-0.3, 3, 0.6, 1.8 + w);
     ctx.restore();
   }
+}
+// ---- groups (v53d): couples and friends side by side, families with a pushchair and children, chats outside shops
+function pedGroup(p, r) {
+  if (p.stop || p.mall || p.jog || p.bike || p.lead) return [];
+  const shop = p.hot && (p.hot.k === "shop" || p.hot.k === "pub"),
+    u = r();
+  let slots = null;
+  if (shop && u < 0.55) {
+    // a little crowd chatting in a ring
+    const n = 1 + ((r() * 3) | 0);
+    slots = [];
+    for (let k = 0; k < n; k++) {
+      const a = ((k + 1) / (n + 1)) * Math.PI * 2;
+      slots.push([Math.cos(a) * 1.1, Math.sin(a) * 1.1, 0, 1]);
+    }
+  } else if (u < 0.1)
+    slots = [[1, 0, 0]]; // couple / pair of friends
+  else if (u < 0.15)
+    slots = [
+      [-1, 0, 0],
+      [1, 0, 0],
+    ]; // three friends abreast
+  else if (u < 0.2) {
+    // family: pushchair in front of a parent, the other parent and a child alongside
+    p.pram = ["#263238", "#5d4037", "#1565c0", "#ad1457"][(r() * 4) | 0];
+    p.sp = Math.min(p.sp, 1.15);
+    slots = [
+      [1.1, 0.2, 0],
+      [-1, 0.5, 0.65],
+    ];
+  }
+  if (!slots) return [];
+  return slots
+    .map(([sx, sy, kid, chat]) => {
+      const f = pedSpawnAt(p.x + sx, p.y + sy) || pedSpawnAt(p.x, p.y);
+      if (!f) return null;
+      f.lead = p;
+      f.slot = [sx, sy];
+      f.chat = chat || 0;
+      f.sp = p.sp;
+      f.umb = p.umb && r() < 0.5 ? null : f.umb;
+      if (kid) {
+        f.kid = kid;
+        f.bag = null;
+      }
+      return f;
+    })
+    .filter(Boolean);
+}
+// a follower keeps its slot beside the leader (rotated with the leader's heading); false = on its own now
+function pedFollow(p, dt) {
+  const L = p.lead;
+  if (L.left || L.cas || L.scare > 0 || L.stop || Math.hypot(L.x - p.x, L.y - p.y) > 12) {
+    p.lead = null;
+    p.path = null;
+    p.kid = p.kid ? p.kid : 0;
+    return false;
+  }
+  const c = Math.cos(L.h),
+    s = Math.sin(L.h),
+    tx = p.chat ? L.x + p.slot[0] : L.x + p.slot[0] * c - p.slot[1] * s,
+    ty = p.chat ? L.y + p.slot[1] : L.y + p.slot[0] * s + p.slot[1] * c,
+    dx = tx - p.x,
+    dy = ty - p.y,
+    d = Math.hypot(dx, dy);
+  if (d > 0.08) {
+    const st = Math.min(d, Math.max(L.sp, 0.6) * 1.4 * dt);
+    const nx = p.x + (dx / d) * st,
+      ny = p.y + (dy / d) * st,
+      tX = Math.floor(nx / M_T),
+      tY = Math.floor(ny / M_T);
+    if (pedOk(tX, tY) || pedXAt(tX, tY) || d > 3) {
+      p.x = nx;
+      p.y = ny;
+    }
+    p.ph += dt * p.sp * 5;
+    p.moving = d > 0.25;
+  } else p.moving = false;
+  p.onX = pedXAt(Math.floor(p.x / M_T), Math.floor(p.y / M_T)); // cars wait for us on the crossing too
+  // chatting: face the one in the middle; walking: same way as the leader
+  p.h = p.chat ? Math.atan2(L.x - p.x, -(L.y - p.y)) : p.moving ? Math.atan2(dx, -dy) : L.h;
+  p.wait = 0;
+  return true;
+}
+function pedDrawPram(p) {
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.fillRect(-1.6, -9.6, 3.6, 5);
+  ctx.fillStyle = p.pram;
+  ctx.fillRect(-1.8, -10, 3.6, 5);
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.beginPath();
+  ctx.arc(0, -9.4, 1.8, Math.PI, 0);
+  ctx.fill();
+  ctx.fillStyle = "#222";
+  ctx.fillRect(-2.2, -5.4, 4.4, 0.7);
 }
