@@ -1100,7 +1100,9 @@ function* genWorldSteps() {
     KB = grid(1560, 1560, 6, 5, 22); // v17 Kingsbridge downtown core (inside the loop)
   // v51: about five through-streets each way in the cities (edges + arterials + outside links); the towns lose columns only,
   // their east-west streets stay as the frontage the services, garages and estate agents are laid out along
+  thinGrid(C1, [0, 2, 4, 5, 8, 10], [0, 3, 5, 7, 10]);
   thinGrid(SV, [0, 3, 6, 9, 12], [0, 2, 6, 10, 11]);
+  thinGrid(KB, [0, 1, 4, 5], [0, 1, 3, 4]);
   gridRoads(C1, "city", true);
   gridRoads(SV, "city", true);
   gridRoads(KB, "city", true);
@@ -1109,6 +1111,11 @@ function* genWorldSteps() {
     CM = grid(1600, 600, 4, 3, 22),
     RH = grid(980, 1150, 5, 5, 22),
     FW = grid(1500, 1120, 4, 4, 22);
+  thinGrid(MF, [0, 1, 4], [0, 1, 2, 3, 4]);
+  thinGrid(DW, [0, 1, 3], [0, 1, 2, 3]);
+  thinGrid(CM, [0, 1, 3], [0, 1, 2]);
+  thinGrid(RH, [0, 2, 4], [0, 1, 2, 3, 4]);
+  thinGrid(FW, [0, 1, 3], [0, 1, 2, 3]);
   for (const g of [MF, DW, CM, RH, FW]) gridRoads(g, "town", true);
   const AB = grid(240, 1100, 4, 4, 18); // Ashby (village, 54 tiles) keeps its four streets
   gridRoads(AB, "res", false);
@@ -1183,7 +1190,7 @@ function* genWorldSteps() {
   road("v", 470, Math.min(...c1E), 459, RW, "city"); // docks (v48: starts at the first cross street, no dead stub north of it)
   {
     // v14 port aisles: the city streets carry straight through the gate, two extra aisles tee off the boundary road, a quay road links them
-    const Y = C1.oys || C1.ys, // v51: the aisles keep the original street lines
+    const Y = C1.oys, // v51: the aisles keep the original street lines
       A = [Y[5], Math.round((Y[5] + Y[7]) / 2), Y[7], Math.round((Y[7] + Y[9]) / 2), Y[9]];
     for (const a of A) road("h", a, 474, 583, RW, "city");
     road("v", 584, A[0], A[4] + RW - 1, RW, "city");
@@ -1345,6 +1352,53 @@ function* genWorldSteps() {
       g.Y1 = Math.max(g.ys[g.ys.length - 1] + RW - 1, keep.ys || 0);
     }
   }
+  // v51: thin the districts after snapping/edge drops (indices are into those arrays): edges + streets lined up with the core radials
+  {
+    const TK = {
+      NG: [
+        [0, 2, 4],
+        [0, 2, 4],
+      ],
+      CH: [
+        [0, 2, 4, 6],
+        [0, 2, 3],
+      ],
+      RM: [
+        [0, 1, 3, 4],
+        [0, 1, 2],
+      ],
+      RS: [
+        [0, 2, 4],
+        [0, 2, 3],
+      ],
+      WM: [
+        [0, 1, 3],
+        [0, 1, 3],
+      ],
+      OH: [
+        [0, 2, 3],
+        [0, 2, 3],
+      ],
+      MK: [
+        [0, 2, 3, 5],
+        [0, 1, 3],
+      ],
+    };
+    for (const k in KD) {
+      const g = KD[k],
+        [kx, ky] = TK[k];
+      thinGrid(
+        g,
+        kx.filter((i) => i < g.xs.length),
+        ky.filter((i) => i < g.ys.length),
+      );
+      for (const ax of ["xs", "ys"]) {
+        const o = ax === "xs" ? g.oxs : g.oys; // the edge streets always stay
+        if (!g[ax].includes(o[0])) g[ax].unshift(o[0]);
+        if (!g[ax].includes(o[o.length - 1])) g[ax].push(o[o.length - 1]);
+      }
+    }
+  }
   for (const g of Object.values(KD)) gridRoads(g, "city", true);
   // stitch each district grid to its neighbours: extend edge streets outward to the first straight road (bridging the channel where needed)
   {
@@ -1393,7 +1447,7 @@ function* genWorldSteps() {
     0,
     thinCol(KD.RM, 3),
     0,
-    [[(KD.RM.oxs || KD.RM.xs)[2] + 2, 1384]],
+    [[KD.RM.oxs[2] + 2, 1384]],
     8,
     "Royal Crescent",
   );
@@ -1404,7 +1458,7 @@ function* genWorldSteps() {
     1,
     thinCol(KD.OH, 2),
     1,
-    [[(KD.OH.oxs || KD.OH.xs)[1] + 2, KD.OH.Y1 + 22]],
+    [[KD.OH.oxs[1] + 2, KD.OH.Y1 + 22]],
     8,
     "Harbour Crescent",
   );
@@ -1443,7 +1497,7 @@ function* genWorldSteps() {
   wind("v", thinAt(RH, "x", 2), 1063, RH.ys[0] - 1, RW, "town", 10, "Redhill Road");
   wind("v", thinAt(RH, "x", 2), RH.Y1 + 1, 1376, RW, "town", 26, "Redhill South Road");
   // winding country roads
-  const wwA = road("h", (MF.oys || MF.ys)[1] + 1, MF.X1 + 1, MF.X1 + 8, 2, "lane"),
+  const wwA = road("h", MF.oys[1] + 1, MF.X1 + 1, MF.X1 + 8, 2, "lane"),
     wwB = road("h", 900, 500, 540, 2, "lane");
   link(
     "lane",
