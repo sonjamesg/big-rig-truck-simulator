@@ -148,6 +148,15 @@ Notes on ownership:
   `ptExitOK` pull a loaded company truck out towards home; the depot out-phase decides the next leg once (`T.nxt`,
   `T.outG`) and falls back to the other direction after 8 s. Company trucks wait at a busy gate up to 15 s and may
   enter while another truck stands in a different bay. Pinned `v.ptruck` lorries are only culled after 150 s stopped.
+- **City grid thinning** (`world.js`, v51, James 19 Oct): `thinGrid(g, keepX, keepY)` runs right after `grid()` (jitter
+  draws unchanged) and keeps the edge streets + arterials/outside links. Stage 1 = Sandvale 13x12 -> 5x5 (other cities
+  follow; an unthinned grid has no `oxs` and its fills/R() draws are unchanged). `g.oxs/g.oys` keep the original lines: outside roads use
+  `thinAt/thinSet` (original line if kept, else nearest kept interior street), crescents use `thinCol`, the port aisles
+  use `C1.oys`. Block fills walk the ORIGINAL cells via `gridCells(g, fixed)` (memoised per grid, so landmarks keep their
+  cells): a dropped street's strip is split 2+2 between the neighbours with a 2-tile footpath, and ~35% of pairs across
+  it merge into one plot (`m`) that gets `splitBuildings(..., big)` (larger lots, 0.6-1.7x heights, no giant shops) or
+  a `square()`. `bFurniture` keeps panels/roof gardens to part of a big roof. Homes have `HOME_DEFS[].at` anchors (tried
+  first, 48-tile search) so map edits never reshuffle them; a city with a 4-fuel quota finishes it 40 tiles apart.
   Test harness: /workspace/fleet/sim.py (fast-forward, logs legs and deliveries).
 - **Graphics** (`gfx.js`, v51): `GFX.lvl` is `"high"`/`"low"`; `GFX.q` is the saved choice (`auto` drops to low once
   if the EMA fps stays under `GFX_LOW_FPS` for 6 s). `drawNight` is wrapped: `gfxGrade()` (cached quarter-res multiply +

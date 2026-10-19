@@ -240,28 +240,36 @@ function bFurniture(g, R, o, r, M) {
   const { x, y, w, h } = R;
   if (w < 30 || h < 24) return;
   const k = r();
+  // v51: a big (merged-block) roof only gives part of itself to panels or a garden, plant covers the rest (no field-sized roofs)
+  const big = w * h > 300 * 220,
+    part = (fw, fh) => {
+      const qw = Math.max(30, w * fw),
+        qh = Math.max(24, h * fh);
+      return { x: r() < 0.5 ? x : x + w - qw, y: r() < 0.5 ? y : y + h - qh, w: qw, h: qh };
+    };
   if (o.style === "solar" || k < 0.18) {
-    for (let yy = y + 8; yy < y + h - 18; yy += 14)
-      for (let xx = x + 8; xx < x + w - 22; xx += 20) {
+    const Q = big ? part(0.5, 0.45) : R;
+    for (let yy = Q.y + 8; yy < Q.y + Q.h - 18; yy += 14)
+      for (let xx = Q.x + 8; xx < Q.x + Q.w - 22; xx += 20) {
         g.fillStyle = "#1f3b73";
         g.fillRect(xx, yy, 18, 11);
         g.strokeStyle = "#8fa8d8";
         g.strokeRect(xx + 0.5, yy + 0.5, 17, 10);
       }
-    return;
-  }
-  if (o.style === "green" || k < 0.32) {
+    if (!big) return;
+  } else if (o.style === "green" || k < 0.32) {
+    const { x: gx, y: gy, w: gw, h: gh } = big ? part(0.4, 0.4) : R;
     g.fillStyle = "#5f8f4a";
-    g.fillRect(x + 7, y + 7, w - 14, h - 14);
-    for (let i = 0; i < (w * h) / 220; i++) {
+    g.fillRect(gx + 7, gy + 7, gw - 14, gh - 14);
+    for (let i = 0; i < (gw * gh) / 220; i++) {
       g.fillStyle = ["#7fae67", "#4d7a3b", "#93c178"][(r() * 3) | 0];
       g.beginPath();
-      g.arc(x + 10 + r() * (w - 20), y + 10 + r() * (h - 20), 2 + r() * 4, 0, 7);
+      g.arc(gx + 10 + r() * (gw - 20), gy + 10 + r() * (gh - 20), 2 + r() * 4, 0, 7);
       g.fill();
     }
     g.fillStyle = "#c9b48a";
-    g.fillRect(x + w / 2 - 2, y + 7, 4, h - 14);
-    return;
+    g.fillRect(gx + gw / 2 - 2, gy + 7, 4, gh - 14);
+    if (!big) return;
   }
   const n = 1 + (((w * h) / 2500) | 0);
   for (let i = 0; i < n; i++) {

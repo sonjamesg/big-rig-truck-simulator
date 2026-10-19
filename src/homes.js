@@ -14,6 +14,7 @@ const HOME_DEFS = [
     id: "H1",
     kind: "mansion",
     name: "Ashcombe Park",
+    at: [1850, 1672],
     set: "country",
     price: 2500000,
     bed: 7,
@@ -26,6 +27,7 @@ const HOME_DEFS = [
     id: "H2",
     kind: "cabin",
     name: "Ravensholt Cabin",
+    at: [1380, 1594],
     set: "forest",
     price: 85000,
     bed: 2,
@@ -38,6 +40,7 @@ const HOME_DEFS = [
     id: "H3",
     kind: "villa",
     name: "Saltglass House",
+    at: [1916, 246],
     set: "coast",
     price: 1450000,
     bed: 5,
@@ -50,6 +53,7 @@ const HOME_DEFS = [
     id: "H4",
     kind: "farm",
     name: "Hollins Farm",
+    at: [1246, 478],
     set: "farm",
     price: 420000,
     bed: 4,
@@ -62,6 +66,7 @@ const HOME_DEFS = [
     id: "H5",
     kind: "cottage",
     name: "Pentreath Cottage",
+    at: [1886, 478],
     set: "cottage",
     price: 40000,
     bed: 2,
@@ -74,6 +79,7 @@ const HOME_DEFS = [
     id: "H6",
     kind: "town",
     name: "No. 9 Wharf Row",
+    at: [1702, 412],
     set: "city",
     price: 310000,
     bed: 3,
@@ -86,6 +92,7 @@ const HOME_DEFS = [
     id: "H7",
     kind: "chapel",
     name: "Old Bethel Chapel",
+    at: [138, 438],
     set: "village",
     price: 265000,
     bed: 3,
@@ -98,6 +105,7 @@ const HOME_DEFS = [
     id: "H8",
     kind: "lodge",
     name: "Mirewater Lodge",
+    at: [490, 910],
     set: "lake",
     price: 690000,
     bed: 4,
@@ -110,6 +118,7 @@ const HOME_DEFS = [
     id: "H9",
     kind: "bungalow",
     name: "Brackenrise",
+    at: [492, 290],
     set: "hill",
     price: 175000,
     bed: 3,
@@ -122,6 +131,7 @@ const HOME_DEFS = [
     id: "H10",
     kind: "ranch",
     name: "Longhaul Ranch",
+    at: [1102, 358],
     set: "ranch",
     price: 980000,
     bed: 4,
@@ -227,18 +237,27 @@ function homesGen(H) {
       }
     cells.sort((a, b) => b[0] - a[0]);
     let placed = false;
-    for (const [pass, [, cx, cy]] of cells
-      .slice(0, 120)
-      .map((c) => [0, c])
-      .concat(cells.slice(0, 300).map((c) => [1, c]))) {
+    // v51 (James 19 Oct): a home first tries its established plot (D.at, the top-left corner it has always had), so map edits
+    // elsewhere (the city grid thinning) never reshuffle the homes; only if that plot lost its road does the land-cover search run
+    const anchor = D.at ? [[2, [0, Math.floor(D.at[0] / C), Math.floor(D.at[1] / C)]]] : [];
+    for (const [pass, [, cx, cy]] of anchor.concat(
+      cells
+        .slice(0, 120)
+        .map((c) => [0, c])
+        .concat(cells.slice(0, 300).map((c) => [1, c])),
+    )) {
       if (placed) break;
       const tx = cx * C + C / 2,
         ty = cy * C + C / 2;
-      if (taken.some((p) => Math.hypot(p[0] - tx, p[1] - ty) < (pass ? 150 : 260))) continue;
+      if (pass < 2 && taken.some((p) => Math.hypot(p[0] - tx, p[1] - ty) < (pass ? 150 : 260)))
+        continue;
       const rej = (x, y) =>
         HOMES.list.some((o) => Math.abs(o.x0 - x) < 90 && Math.abs(o.y0 - y) < 90) ||
         (world.forSale || []).some((o) => Math.abs(o.x0 - x) < 40 && Math.abs(o.y0 - y) < 40);
-      const s = findSpot(tx, ty, D.w, D.h, 10, rej, D.set === "city", pass ? 110 : 70);
+      const s =
+        pass === 2
+          ? findSpot(D.at[0], D.at[1], D.w, D.h, 10, rej, D.set === "city", 48)
+          : findSpot(tx, ty, D.w, D.h, 10, rej, D.set === "city", pass ? 110 : 70);
       if (!s) continue;
       const [x, y, gap] = s;
       placed = true;

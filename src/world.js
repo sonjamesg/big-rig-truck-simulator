@@ -1059,6 +1059,25 @@ function* genWorldSteps() {
     for (let k = 0; k < ny; k++) ys.push(y0 + k * p + jy[k]);
     return { xs, ys, X1: xs[nx - 1] + RW - 1, Y1: ys[ny - 1] + RW - 1 };
   };
+  // v51 (James 19 Oct): grid thinning. Keep the edge streets plus the listed through-streets (arterials, outside links) and drop the
+  // rest; g.oxs/g.oys keep every original line so the block stages still lay out the old cells (gridCells) and POIs stay put
+  const thinGrid = (g, kx, ky) => {
+    g.oxs = g.xs.slice();
+    g.oys = g.ys.slice();
+    g.xs = g.oxs.filter((_, k) => kx.includes(k));
+    g.ys = g.oys.filter((_, k) => ky.includes(k));
+    return g;
+  };
+  // original line k if it was kept (or is an edge), else the nearest kept interior street (outside links move onto it)
+  const thinAt = (g, ax, k) => {
+    const o = ax === "x" ? g.oxs || g.xs : g.oys || g.ys,
+      v = ax === "x" ? g.xs : g.ys,
+      c = v.length > 2 ? v.slice(1, -1) : v;
+    if (k === 0 || k === o.length - 1 || v.includes(o[k])) return o[k];
+    return c.reduce((b, x) => (Math.abs(x - o[k]) < Math.abs(b - o[k]) ? x : b), c[0]);
+  };
+  const thinSet = (g, ax, ks) => [...new Set(ks.map((k) => thinAt(g, ax, k)))];
+  const thinCol = (g, k) => g.cols[g.xs.indexOf((g.oxs || g.xs)[k])];
   function gridRoads(g, type, walk) {
     if (walk) {
       for (let y = g.ys[0] - 1; y <= g.Y1 + 1; y++)
@@ -1079,6 +1098,9 @@ function* genWorldSteps() {
   const C1 = grid(150, 140, 11, 11, 28),
     SV = grid(1460, 170, 13, 12, 30),
     KB = grid(1560, 1560, 6, 5, 22); // v17 Kingsbridge downtown core (inside the loop)
+  // v51: about five through-streets each way in the cities (edges + arterials + outside links); the towns lose columns only,
+  // their east-west streets stay as the frontage the services, garages and estate agents are laid out along
+  thinGrid(SV, [0, 3, 6, 9, 12], [0, 2, 6, 10, 11]);
   gridRoads(C1, "city", true);
   gridRoads(SV, "city", true);
   gridRoads(KB, "city", true);
@@ -1088,7 +1110,7 @@ function* genWorldSteps() {
     RH = grid(980, 1150, 5, 5, 22),
     FW = grid(1500, 1120, 4, 4, 22);
   for (const g of [MF, DW, CM, RH, FW]) gridRoads(g, "town", true);
-  const AB = grid(240, 1100, 4, 4, 18);
+  const AB = grid(240, 1100, 4, 4, 18); // Ashby (village, 54 tiles) keeps its four streets
   gridRoads(AB, "res", false);
   // --- motorways: the M1 orbital loops round the coast; M2 and M3 cut through the middle over long bridges
   mway(
@@ -1130,9 +1152,12 @@ function* genWorldSteps() {
   );
   yield "Connecting towns";
   // --- city & town connections
-  for (const k of [3, 7]) road("h", C1.ys[k], 103, C1.xs[0] - 1, RW, "city");
-  for (const k of [2, 8]) road("v", C1.xs[k], 103, C1.ys[0] - 1, RW, "city");
-  for (const k of [2, 6]) road("v", C1.xs[k], C1.Y1 + 1, 459, RW, "city");
+  const c1W = thinSet(C1, "y", [3, 7]),
+    c1N = thinSet(C1, "x", [2, 8]),
+    c1S = thinSet(C1, "x", [2, 6]);
+  for (const y of c1W) road("h", y, 103, C1.xs[0] - 1, RW, "city");
+  for (const x of c1N) road("v", x, 103, C1.ys[0] - 1, RW, "city");
+  for (const x of c1S) road("v", x, C1.Y1 + 1, 459, RW, "city");
   road("h", 460, 103, 600, RW, "city"); // Albion Airport road
   {
     const o = 12,
@@ -1144,22 +1169,22 @@ function* genWorldSteps() {
     road("h", Y1, X0, X1 + RW - 1, RW, "city");
     road("v", X0, Y0, Y1 + RW - 1, RW, "city");
     road("v", X1, Y0, Y1 + RW - 1, RW, "city");
-    for (const k of [1, 5, 9]) road("v", C1.xs[k], Y0 + RW, C1.ys[0] - 1, RW, "city");
-    for (const k of [1, 4, 9]) road("h", C1.ys[k], X0 + RW, C1.xs[0] - 1, RW, "city");
-    for (const k of [3, 8]) road("v", C1.xs[k], C1.Y1 + 1, Y1 - 1, RW, "city"); // extra radials to the ring
+    // radials to the ring (v51: on the kept streets; a street that already carries an outside link through the ring is skipped)
+    for (const x of thinSet(C1, "x", [1, 5, 9]))
+      if (!c1N.includes(x)) road("v", x, Y0 + RW, C1.ys[0] - 1, RW, "city");
+    for (const y of thinSet(C1, "y", [1, 4, 9]))
+      if (!c1W.includes(y)) road("h", y, X0 + RW, C1.xs[0] - 1, RW, "city");
+    for (const x of thinSet(C1, "x", [3, 8]))
+      if (!c1S.includes(x)) road("v", x, C1.Y1 + 1, Y1 - 1, RW, "city");
     world.abRing = { X0, Y0, X1, Y1 };
   }
-  for (const k of [1, 5, 9]) road("h", C1.ys[k], C1.X1 + 1, 469, RW, "city");
-  road("v", 470, C1.ys[1], 459, RW, "city"); // docks (v48: starts at the first cross street, no dead stub north of it)
+  const c1E = thinSet(C1, "y", [1, 5, 9]);
+  for (const y of c1E) road("h", y, C1.X1 + 1, 469, RW, "city");
+  road("v", 470, Math.min(...c1E), 459, RW, "city"); // docks (v48: starts at the first cross street, no dead stub north of it)
   {
     // v14 port aisles: the city streets carry straight through the gate, two extra aisles tee off the boundary road, a quay road links them
-    const A = [
-      C1.ys[5],
-      Math.round((C1.ys[5] + C1.ys[7]) / 2),
-      C1.ys[7],
-      Math.round((C1.ys[7] + C1.ys[9]) / 2),
-      C1.ys[9],
-    ];
+    const Y = C1.oys || C1.ys, // v51: the aisles keep the original street lines
+      A = [Y[5], Math.round((Y[5] + Y[7]) / 2), Y[7], Math.round((Y[7] + Y[9]) / 2), Y[9]];
     for (const a of A) road("h", a, 474, 583, RW, "city");
     road("v", 584, A[0], A[4] + RW - 1, RW, "city");
     world.port = {
@@ -1173,10 +1198,10 @@ function* genWorldSteps() {
       hole: { x: 477, y: A[3] + RW + 3, w: 22, h: 17 },
     };
   }
-  for (const k of [2, 6, 10]) road("h", SV.ys[k], SV.X1 + 1, 1941, RW, "city");
-  for (const k of [3, 9]) road("v", SV.xs[k], 103, SV.ys[0] - 1, RW, "city");
-  for (const k of [2, 8]) road("v", SV.xs[k], SV.Y1 + 1, 716, RW, "city");
-  const apRoad = road("h", SV.ys[6], 1060, SV.xs[0] - 1, RW, "city"); // Sandvale Airport road
+  for (const y of thinSet(SV, "y", [2, 6, 10])) road("h", y, SV.X1 + 1, 1941, RW, "city");
+  for (const x of thinSet(SV, "x", [3, 9])) road("v", x, 103, SV.ys[0] - 1, RW, "city");
+  for (const x of thinSet(SV, "x", [2, 8])) road("v", x, SV.Y1 + 1, 716, RW, "city");
+  const apRoad = road("h", thinAt(SV, "y", 6), 1060, SV.xs[0] - 1, RW, "city"); // Sandvale Airport road
   // v17 Kingsbridge: elevated-style dual loop round a compact downtown, roundabout interchanges at its corners, five radials, district grids of differing pitch, channel bridges
   mway(
     [
@@ -1235,13 +1260,13 @@ function* genWorldSteps() {
   // v50 (James 17 Oct): the x1400 spine (butted onto the Northgate x1404 column = an 8-lane double road with twin junctions) and the
   // y1589 Dam Road feed (2 tiles under the y1583 street = stacked half-junctions, offset yellow boxes, doubled signals) are gone:
   // Westway, Airport Way and Dam Road now meet the x1404 column / y1583 street directly as single clean junctions
-  for (const k of [1, 3]) {
-    road("h", KB.ys[k], 1533, KB.xs[0] - 1, RW, "city");
-    road("h", KB.ys[k], KB.X1 + 1, 1701, RW, "city");
+  for (const y of thinSet(KB, "y", [1, 3])) {
+    road("h", y, 1533, KB.xs[0] - 1, RW, "city");
+    road("h", y, KB.X1 + 1, 1701, RW, "city");
   }
-  for (const k of [1, 4]) {
-    road("v", KB.xs[k], 1533, KB.ys[0] - 1, RW, "city");
-    road("v", KB.xs[k], KB.Y1 + 1, 1676, RW, "city");
+  for (const x of thinSet(KB, "x", [1, 4])) {
+    road("v", x, 1533, KB.ys[0] - 1, RW, "city");
+    road("v", x, KB.Y1 + 1, 1676, RW, "city");
   }
   const KD = {
     NG: grid(1404, 1400, 5, 5, 26),
@@ -1258,8 +1283,8 @@ function* genWorldSteps() {
     // to 12 tiles (the 9-10 tile Northgate/Westmead and Old Harbour/Market doglegs), anything else keeps the old 8
     const kbS = { xs: [KB.xs[0], KB.X1], ys: [KB.ys[0], KB.Y1] },
       anc = {
-        xs: [KB.xs[1], KB.xs[4]].map((v) => [v, ...kbS.xs, ...kbS.ys]),
-        ys: [KB.ys[1], KB.ys[3]].map((v) => [v, ...kbS.ys, ...kbS.xs]),
+        xs: thinSet(KB, "x", [1, 4]).map((v) => [v, ...kbS.xs, ...kbS.ys]),
+        ys: thinSet(KB, "y", [1, 3]).map((v) => [v, ...kbS.ys, ...kbS.xs]),
       };
     for (const g of Object.values(KD)) {
       for (const ax of ["xs", "ys"]) {
@@ -1364,22 +1389,22 @@ function* genWorldSteps() {
   link(
     "city",
     RW,
-    KD.RM.cols[1],
+    thinCol(KD.RM, 1),
     0,
-    KD.RM.cols[3],
+    thinCol(KD.RM, 3),
     0,
-    [[KD.RM.xs[2] + 2, 1384]],
+    [[(KD.RM.oxs || KD.RM.xs)[2] + 2, 1384]],
     8,
     "Royal Crescent",
   );
   link(
     "city",
     RW,
-    KD.OH.cols[0],
+    thinCol(KD.OH, 0),
     1,
-    KD.OH.cols[2],
+    thinCol(KD.OH, 2),
     1,
-    [[KD.OH.xs[1] + 2, KD.OH.Y1 + 22]],
+    [[(KD.OH.oxs || KD.OH.xs)[1] + 2, KD.OH.Y1 + 22]],
     8,
     "Harbour Crescent",
   );
@@ -1410,15 +1435,15 @@ function* genWorldSteps() {
   world.kbDiag = []; // v27: Northgate Diagonal removed — its staircase of mid-block stubs cut the NW Kingsbridge blocks into back-to-back double crossroads that gridlocked (James 14 Oct)
   const rbN = road("v", 1359, 1300, 1380 - RBT - 1, 2, "rural");
   wind("h", 1784, 903, 1403, RW, "city", 30, "Airport Way"); // curved bridge over the River Moor                                             // Kingsbridge Airport road (over the River Moor)
-  wind("h", MF.ys[2], 103, MF.xs[0] - 1, RW, "town", 14, "Millford Road");
-  wind("v", MF.xs[1], MF.Y1 + 1, 976, RW, "town", 10, "Millford South Road");
-  road("v", AB.xs[2], 983, AB.ys[0] - 1, 2, "rural");
-  wind("h", DW.ys[2], DW.X1 + 1, 1261, RW, "town", 22, "Dustwater Road"); // v48: meets Sandreach Road (T), was a dead end
-  wind("v", CM.xs[1], CM.Y1 + 1, 716, RW, "town", 8, "Coppermine Road");
-  wind("v", RH.xs[2], 1063, RH.ys[0] - 1, RW, "town", 10, "Redhill Road");
-  wind("v", RH.xs[2], RH.Y1 + 1, 1376, RW, "town", 26, "Redhill South Road");
+  wind("h", thinAt(MF, "y", 2), 103, MF.xs[0] - 1, RW, "town", 14, "Millford Road");
+  wind("v", thinAt(MF, "x", 1), MF.Y1 + 1, 976, RW, "town", 10, "Millford South Road");
+  road("v", thinAt(AB, "x", 2), 983, AB.ys[0] - 1, 2, "rural");
+  wind("h", thinAt(DW, "y", 2), DW.X1 + 1, 1261, RW, "town", 22, "Dustwater Road"); // v48: meets Sandreach Road (T), was a dead end
+  wind("v", thinAt(CM, "x", 1), CM.Y1 + 1, 716, RW, "town", 8, "Coppermine Road");
+  wind("v", thinAt(RH, "x", 2), 1063, RH.ys[0] - 1, RW, "town", 10, "Redhill Road");
+  wind("v", thinAt(RH, "x", 2), RH.Y1 + 1, 1376, RW, "town", 26, "Redhill South Road");
   // winding country roads
-  const wwA = road("h", MF.ys[1] + 1, MF.X1 + 1, MF.X1 + 8, 2, "lane"),
+  const wwA = road("h", (MF.oys || MF.ys)[1] + 1, MF.X1 + 1, MF.X1 + 8, 2, "lane"),
     wwB = road("h", 900, 500, 540, 2, "lane");
   link(
     "lane",
@@ -1452,7 +1477,7 @@ function* genWorldSteps() {
     "Greyfell Summit Road",
   );
   const dwN = road("v", 900, 103, 300, 2, "rural"),
-    dwW = road("h", DW.ys[1], DW.xs[0] - 8, DW.xs[0] - 1, RW, "town"); // v48: west arm, so the road joins a crossroads not a box edge
+    dwW = road("h", thinAt(DW, "y", 1), DW.xs[0] - 8, DW.xs[0] - 1, RW, "town"); // v48: west arm, so the road joins a crossroads not a box edge
   link(
     "rural",
     2,
@@ -1469,10 +1494,10 @@ function* genWorldSteps() {
   );
   {
     // v48: Dustwater north road leaves through a short straight arm (crossroads), not off the top of the junction box
-    const dwArm = road("v", DW.xs[1], DW.ys[0] - 8, DW.ys[0] - 1, RW, "town");
+    const dwArm = road("v", thinAt(DW, "x", 1), DW.ys[0] - 8, DW.ys[0] - 1, RW, "town");
     link("town", RW, dwArm, 0, apRoad, 0, [], 10);
   }
-  const fwS = road("v", FW.xs[1] + 1, FW.Y1 + 1, FW.Y1 + 18, 2, "rural");
+  const fwS = road("v", thinAt(FW, "x", 1) + 1, FW.Y1 + 1, FW.Y1 + 18, 2, "rural");
   link(
     "rural",
     2,
@@ -1487,8 +1512,8 @@ function* genWorldSteps() {
     10,
     "Fenwick Road",
   );
-  const rhE = road("h", RH.ys[2] + 1, RH.X1 + 1, RH.X1 + 8, 2, "rural"),
-    fwW = road("h", FW.ys[2] + 1, FW.xs[0] - 10, FW.xs[0] - 1, 2, "rural");
+  const rhE = road("h", thinAt(RH, "y", 2) + 1, RH.X1 + 1, RH.X1 + 8, 2, "rural"),
+    fwW = road("h", thinAt(FW, "y", 2) + 1, FW.xs[0] - 10, FW.xs[0] - 1, 2, "rural");
   link(
     "rural",
     2,
@@ -1552,7 +1577,7 @@ function* genWorldSteps() {
   }
   // v12: dirt tracks — desert quarry off Dustwater, forest track in Highmoor
   {
-    const q0 = road("v", DW.xs[3], DW.Y1 + 1, DW.Y1 + 6, 2, "dirt"),
+    const q0 = road("v", thinAt(DW, "x", 3), DW.Y1 + 1, DW.Y1 + 6, 2, "dirt"),
       q1 = road("h", 600, 1150, 1157, 2, "dirt");
     q0.name = q1.name = "Quarry Track";
     world.quarry = { x: 1158, y: 600 };
@@ -1564,13 +1589,13 @@ function* genWorldSteps() {
       q1,
       0,
       [
-        [DW.xs[3] + 40, 560],
+        [thinAt(DW, "x", 3) + 40, 560],
         [1110, 585],
       ],
       0,
       "Quarry Track",
     );
-    const f0 = road("h", FW.ys[3] + 1, FW.X1 + 1, FW.X1 + 6, 2, "dirt"),
+    const f0 = road("h", thinAt(FW, "y", 3) + 1, FW.X1 + 1, FW.X1 + 6, 2, "dirt"),
       f1 = road("v", 1790, 1290, 1297, 2, "dirt");
     f0.name = f1.name = "Fen Forest Track";
     windLink(
@@ -1581,7 +1606,7 @@ function* genWorldSteps() {
       f1,
       0,
       [
-        [1700, FW.ys[3] + 30],
+        [1700, thinAt(FW, "y", 3) + 30],
         [1760, 1230],
       ],
       0,
@@ -1883,7 +1908,7 @@ function* genWorldSteps() {
     road("v", 392, 692, 702, 3, "town");
     road("v", 431, 692, 709, 3, "town"); // v41: arrivals/drop-off frontage loop (real road)
     mbRoads(road); // v45: Sandvale Military Base internal roads + gate avenue
-    road("v", MB.av + 14, 357, DW.ys[2] + RW - 1, RW, "town").name = "Sandreach Road"; // v48: links the base road (y353) south to Dustwater Road (was a dead end); offset from the gate T so the junctions stay distinct
+    road("v", MB.av + 14, 357, thinAt(DW, "y", 2) + RW - 1, RW, "town").name = "Sandreach Road"; // v48: links the base road (y353) south to Dustwater Road (was a dead end); offset from the gate T so the junctions stay distinct
     // v39: car park access roads (MSCP ramp, surface parks)
     const tg = world.segs.find((q) => q.dir === "v" && q.a === 346 && q.b0 === 780);
     if (tg) {
@@ -2230,10 +2255,12 @@ function* genWorldSteps() {
     if (get(x + w, y + (h >> 1)) === T.WALK) return "e";
     return null;
   }
-  function splitBuildings(x0, y0, w, h, styles, hmin, hvar, shopChance) {
-    const out = [];
+  // big (v51 merged plots): stop splitting at larger lots and vary the heights more, so a merged block reads as a few big buildings
+  function splitBuildings(x0, y0, w, h, styles, hmin, hvar, shopChance, big) {
+    const out = [],
+      lim = big ? 12 : 7;
     (function sp(x, y, w, h, d) {
-      if (d > 3 || (w < 7 && h < 7) || (d > 1 && R() < 0.25)) {
+      if (d > 3 || (w < lim && h < lim) || (d > 1 && R() < 0.25)) {
         out.push([x, y, w, h]);
         return;
       }
@@ -2259,15 +2286,16 @@ function* genWorldSteps() {
       fill(x, y, bw, bh, T.PLAZA);
       if (bw >= 3 && bh >= 3) {
         const st = styles[(R() * styles.length) | 0];
+        const hk = big ? 0.6 + R() * 1.1 : 1;
         const fs = frontSide(x, y, bw, bh);
-        const shop = fs && R() < shopChance;
+        const shop = fs && R() < shopChance && !(big && (bw > 14 || bh > 14)); // big lots: no warehouse-sized shops
         const o = building(
           x + (shop && fs === "n" ? 1 : 0),
           y + (shop && fs === "w" ? 1 : 0),
           bw - (shop && (fs === "e" || fs === "w") ? 1 : 0),
           bh - (shop && (fs === "n" || fs === "s") ? 1 : 0),
           shop ? "shop" : st,
-          hmin + R() * hvar,
+          (hmin + R() * hvar) * (shop ? 1 : hk),
         );
         if (o && shop) {
           o.front = fs;
@@ -2285,143 +2313,231 @@ function* genWorldSteps() {
       } else if (R() < 0.5) tree((x + bw / 2) * TILE, (y + bh / 2) * TILE, 9 + R() * 4);
     }
   }
+  // v51 (James 19 Oct): the block stages walk a grid's ORIGINAL cells (g.oxs/g.oys), so landmarks keep their cells after thinning.
+  // A dropped street's 6-tile strip is shared: the cells either side grow 2 tiles into it and a 2-tile footpath stays between them.
+  // Some neighbour pairs across a dropped street merge into one plot (m: 1), which the fills give larger, taller buildings or a square.
+  const cellMemo = new Map(); // one layout per grid: the fills, dense() and greenUp() must agree on the merges
+  function gridCells(g, fixed) {
+    if (cellMemo.has(g)) return cellMemo.get(g);
+    const ox = g.oxs || g.xs,
+      oy = g.oys || g.ys,
+      span = (o, v, k) => [
+        v.includes(o[k]) ? o[k] + RW + 1 : o[k] + 3,
+        v.includes(o[k + 1]) ? o[k + 1] - 2 : o[k + 1],
+      ],
+      used = new Set(),
+      out = [],
+      fx = (i, j) => fixed && fixed.includes(i + "," + j);
+    for (let i = 0; i < ox.length - 1; i++)
+      for (let j = 0; j < oy.length - 1; j++) {
+        if (used.has(i + "," + j)) continue;
+        let [x0, x1] = span(ox, g.xs, i),
+          [y0, y1] = span(oy, g.ys, j),
+          m = 0;
+        const canX = i + 2 < ox.length && !g.xs.includes(ox[i + 1]) && !used.has(i + 1 + "," + j),
+          canY = j + 2 < oy.length && !g.ys.includes(oy[j + 1]) && !used.has(i + "," + (j + 1));
+        if (!fx(i, j) && (canX || canY) && R() < 0.35) {
+          if (canX && !fx(i + 1, j) && (!canY || R() < 0.5)) {
+            x1 = span(ox, g.xs, i + 1)[1];
+            used.add(i + 1 + "," + j);
+            m = 1;
+          } else if (canY && !fx(i, j + 1)) {
+            y1 = span(oy, g.ys, j + 1)[1];
+            used.add(i + "," + (j + 1));
+            m = 1;
+          }
+        }
+        out.push({ i, j, x0, y0, w: x1 - x0 + 1, h: y1 - y0 + 1, m });
+      }
+    cellMemo.set(g, out);
+    return out;
+  }
+  // v51: a merged plot can become a city square: plaza, central fountain, tree-lined edges and benches of planters
+  function square(x0, y0, w, h) {
+    fillNR(x0, y0, w, h, T.PLAZA);
+    const lw = Math.max(5, (w * 0.45) | 0),
+      lh = Math.max(5, (h * 0.45) | 0),
+      lx = x0 + ((w - lw) >> 1),
+      ly = y0 + ((h - lh) >> 1);
+    fillNR(lx, ly, lw, lh, T.PGRASS); // central lawn, crossed by paths to a fountain
+    fillNR(lx, ly + (lh >> 1), lw, 1, T.PLAZA);
+    fillNR(lx + (lw >> 1), ly, 1, lh, T.PLAZA);
+    objs.push({
+      kind: "fountain",
+      x: (lx + (lw >> 1) + 0.5) * TILE,
+      y: (ly + (lh >> 1) + 0.5) * TILE,
+    });
+    for (let k = 0; k < lw * lh * 0.12; k++) {
+      const tx = lx + ((R() * lw) | 0),
+        ty = ly + ((R() * lh) | 0);
+      if (G[idx(tx, ty)] === T.PGRASS) tree((tx + 0.5) * TILE, (ty + 0.5) * TILE, 10 + R() * 6);
+    }
+    for (let x = x0 + 2; x < x0 + w - 1; x += 4) {
+      // tree-lined edges
+      tree((x + 0.5) * TILE, (y0 + 1.5) * TILE, 9 + R() * 4);
+      tree((x + 0.5) * TILE, (y0 + h - 1.5) * TILE, 9 + R() * 4);
+    }
+    for (let y = y0 + 6; y < y0 + h - 5; y += 4) {
+      tree((x0 + 1.5) * TILE, (y + 0.5) * TILE, 9 + R() * 4);
+      tree((x0 + w - 1.5) * TILE, (y + 0.5) * TILE, 9 + R() * 4);
+    }
+  }
   // ---- Port Albion blocks (start depot, fuel, stadium, hospital, downtown towers)
-  const cxs = C1.xs,
-    cys = C1.ys;
   const downtown = (bx, by) => Math.hypot(bx - 300, by - 290) < 90;
-  for (let i = 0; i < cxs.length - 1; i++)
-    for (let j = 0; j < cys.length - 1; j++) {
-      const x0 = cxs[i] + RW + 1,
-        y0 = cys[j] + RW + 1,
-        w = cxs[i + 1] - x0 - 1,
-        h = cys[j + 1] - y0 - 1;
-      const dt = downtown(x0 + 11, y0 + 11);
-      const r = R();
-      if (i === 1 && j === 1) {
-        fill(x0, y0, w, h, T.CONC);
-        building(x0 + 5, y0, w - 10, 6, "depot", 34);
-        world.startDepot = { x0, y0, w, h };
-        world.flags.push({ x: (x0 + 3) * TILE, y: (y0 + 1) * TILE, col: "#f5b82e" });
-        objs.push({ kind: "paint", x: (x0 + 7) * TILE, y: (y0 + 10) * TILE, text: "DEPOT" });
-        world.start = { x: (x0 + 9) * TILE, y: (y0 + 15) * TILE, h: Math.PI / 2 };
-        continue;
+  for (const { i, j, x0, y0, w, h, m } of gridCells(C1, [
+    "1,1",
+    "4,2",
+    "7,7",
+    "0,4",
+    "3,0",
+    "5,7",
+  ])) {
+    const dt = downtown(x0 + 11, y0 + 11);
+    const r = R();
+    if (i === 1 && j === 1) {
+      fill(x0, y0, w, h, T.CONC);
+      building(x0 + 5, y0, w - 10, 6, "depot", 34);
+      world.startDepot = { x0, y0, w, h };
+      world.flags.push({ x: (x0 + 3) * TILE, y: (y0 + 1) * TILE, col: "#f5b82e" });
+      objs.push({ kind: "paint", x: (x0 + 7) * TILE, y: (y0 + 10) * TILE, text: "DEPOT" });
+      world.start = { x: (x0 + 9) * TILE, y: (y0 + 15) * TILE, h: Math.PI / 2 };
+      continue;
+    }
+    if (i === 4 && j === 2) {
+      fill(x0, y0, w, h, T.CONC);
+      building(x0 + 11, y0 + 6, 6, 5, "shop", 18, { sign: "FUEL & SHOP" });
+      world.cityFuel = { x0, y0, w, h };
+      for (let k = 0; k < 3; k++) {
+        set(x0 + 6 + k * 2, y0 + 10, T.PUMP);
+        objs.push({ kind: "pump", x: (x0 + 6 + k * 2) * TILE, y: (y0 + 10) * TILE });
       }
-      if (i === 4 && j === 2) {
-        fill(x0, y0, w, h, T.CONC);
-        building(x0 + 11, y0 + 6, 6, 5, "shop", 18, { sign: "FUEL & SHOP" });
-        world.cityFuel = { x0, y0, w, h };
-        for (let k = 0; k < 3; k++) {
-          set(x0 + 6 + k * 2, y0 + 10, T.PUMP);
-          objs.push({ kind: "pump", x: (x0 + 6 + k * 2) * TILE, y: (y0 + 10) * TILE });
-        }
-        world.overhead.push({
-          kind: "canopy",
-          x: (x0 + 4.5) * TILE,
-          y: (y0 + 8.5) * TILE,
-          w: 7 * TILE,
-          h: 4 * TILE,
-        });
-        lot(x0 + 6, y0 + 14, 10, 4);
-        // v42: drive-through HGV diesel lane along the north edge, west street in -> east street out, tall pumps + high canopy
-        for (let j = y0 + 1; j < y0 + 5; j++) {
-          for (const xx of [x0 - 1, x0 - 2, x0 + w, x0 + w + 1])
-            if (get(xx, j) !== T.ROAD) set(xx, j, T.CONC);
-        }
-        for (let i2 = x0 + 9; i2 < x0 + 20; i2++) set(i2, y0 + 5, T.PUMP);
-        objs.push({
-          kind: "hgvisland",
-          x: (x0 + 9) * TILE,
-          y: (y0 + 5) * TILE,
-          w: 11 * TILE,
-          h: TILE,
-        });
-        world.overhead.push({
-          kind: "canopy",
-          x: (x0 + 7) * TILE,
-          y: (y0 + 0.6) * TILE,
-          w: 15 * TILE,
-          h: 5.2 * TILE,
-          brand: "HGV DIESEL",
-          hgv: 1,
-        });
-        world.cityFuel.hgv = [
-          {
-            x0: (x0 + 6) * M_T,
-            x1: (x0 + 23) * M_T,
-            y0: (y0 + 0.8) * M_T,
-            y1: (y0 + 5) * M_T,
-            id: 1,
-          },
-        ];
-        objs.push({
-          kind: "hgvbay",
-          x: (x0 + 6) * TILE,
-          y: (y0 + 0.8) * TILE,
-          w: 17 * TILE,
-          h: 4.2 * TILE,
-          n: 1,
-        });
-        continue;
+      world.overhead.push({
+        kind: "canopy",
+        x: (x0 + 4.5) * TILE,
+        y: (y0 + 8.5) * TILE,
+        w: 7 * TILE,
+        h: 4 * TILE,
+      });
+      lot(x0 + 6, y0 + 14, 10, 4);
+      // v42: drive-through HGV diesel lane along the north edge, west street in -> east street out, tall pumps + high canopy
+      for (let j = y0 + 1; j < y0 + 5; j++) {
+        for (const xx of [x0 - 1, x0 - 2, x0 + w, x0 + w + 1])
+          if (get(xx, j) !== T.ROAD) set(xx, j, T.CONC);
       }
-      if (i === 7 && j === 7) {
-        stadium(x0, y0, w, h);
-        continue;
-      }
-      if (i === 0 && j === 4) {
-        fill(x0, y0, w, h, T.PLAZA);
-        building(x0 + 4, y0 + 4, w - 8, h - 8, "hospital", 45);
-        lot(x0 + 5, y0 + h - 4, w - 10, 3);
-        continue;
-      }
-      if (i === 3 && j === 0) {
-        fill(x0, y0, w, h, T.PLAZA);
-        building(x0 + 4, y0 + 3, w - 8, h - 6, "carpark", 26);
-        continue;
-      }
-      if ((!dt && r < 0.14) || (i === 5 && j === 7)) {
-        park(x0, y0, w, h);
-        continue;
-      }
-      if (r < 0.24) {
-        lot(x0 + 5, y0, w - 10, h >> 1);
+      for (let i2 = x0 + 9; i2 < x0 + 20; i2++) set(i2, y0 + 5, T.PUMP);
+      objs.push({
+        kind: "hgvisland",
+        x: (x0 + 9) * TILE,
+        y: (y0 + 5) * TILE,
+        w: 11 * TILE,
+        h: TILE,
+      });
+      world.overhead.push({
+        kind: "canopy",
+        x: (x0 + 7) * TILE,
+        y: (y0 + 0.6) * TILE,
+        w: 15 * TILE,
+        h: 5.2 * TILE,
+        brand: "HGV DIESEL",
+        hgv: 1,
+      });
+      world.cityFuel.hgv = [
+        {
+          x0: (x0 + 6) * M_T,
+          x1: (x0 + 23) * M_T,
+          y0: (y0 + 0.8) * M_T,
+          y1: (y0 + 5) * M_T,
+          id: 1,
+        },
+      ];
+      objs.push({
+        kind: "hgvbay",
+        x: (x0 + 6) * TILE,
+        y: (y0 + 0.8) * TILE,
+        w: 17 * TILE,
+        h: 4.2 * TILE,
+        n: 1,
+      });
+      continue;
+    }
+    if (i === 7 && j === 7) {
+      stadium(x0, y0, w, h);
+      continue;
+    }
+    if (i === 0 && j === 4) {
+      fill(x0, y0, w, h, T.PLAZA);
+      building(x0 + 4, y0 + 4, w - 8, h - 8, "hospital", 45);
+      lot(x0 + 5, y0 + h - 4, w - 10, 3);
+      continue;
+    }
+    if (i === 3 && j === 0) {
+      fill(x0, y0, w, h, T.PLAZA);
+      building(x0 + 4, y0 + 3, w - 8, h - 6, "carpark", 26);
+      continue;
+    }
+    if ((!dt && r < 0.14) || (i === 5 && j === 7)) {
+      park(x0, y0, w, h);
+      continue;
+    }
+    if (m) {
+      // v51 merged plot: a square now and then, otherwise larger, taller lots
+      if (r < 0.24) square(x0, y0, w, h);
+      else
         splitBuildings(
           x0,
-          y0 + (h >> 1),
+          y0,
           w,
-          h - (h >> 1),
-          ["office", "brick", "gravel"],
-          18,
-          30,
-          0.5,
+          h,
+          dt
+            ? ["office", "glass", "tower", "glass", "solar"]
+            : ["office", "brick", "flat", "glass", "gravel"],
+          dt ? 50 : 22,
+          dt ? 110 : 45,
+          dt ? 0.3 : 0.5,
+          1,
         );
-        continue;
-      }
-      if (dt && r < 0.45) {
-        fill(x0, y0, w, h, T.PLAZA);
-        const b = building(x0 + 4, y0 + 4, w - 8, h - 8, "tower", 100 + R() * 60);
-        if (b) world.beacons.push({ x: b.x + 12, y: b.y + 12, col: "#ff3030", ph: R() * 6 });
-        for (const [tx, ty] of [
-          [x0 + 6, y0 + 1],
-          [x0 + w - 7, y0 + 1],
-          [x0 + 6, y0 + h - 2],
-          [x0 + w - 7, y0 + h - 2],
-        ])
-          tree((tx + 0.5) * TILE, (ty + 0.5) * TILE, 11);
-        continue;
-      }
+      continue;
+    }
+    if (r < 0.24) {
+      lot(x0 + 5, y0, w - 10, h >> 1);
       splitBuildings(
         x0,
-        y0,
+        y0 + (h >> 1),
         w,
-        h,
-        dt
-          ? ["office", "glass", "gravel", "tower", "office", "solar"]
-          : ["gravel", "brick", "office", "flat", "brick", "green"],
-        dt ? 40 : 16,
-        dt ? 70 : 26,
-        dt ? 0.35 : 0.55,
+        h - (h >> 1),
+        ["office", "brick", "gravel"],
+        18,
+        30,
+        0.5,
       );
+      continue;
     }
+    if (dt && r < 0.45) {
+      fill(x0, y0, w, h, T.PLAZA);
+      const b = building(x0 + 4, y0 + 4, w - 8, h - 8, "tower", 100 + R() * 60);
+      if (b) world.beacons.push({ x: b.x + 12, y: b.y + 12, col: "#ff3030", ph: R() * 6 });
+      for (const [tx, ty] of [
+        [x0 + 6, y0 + 1],
+        [x0 + w - 7, y0 + 1],
+        [x0 + 6, y0 + h - 2],
+        [x0 + w - 7, y0 + h - 2],
+      ])
+        tree((tx + 0.5) * TILE, (ty + 0.5) * TILE, 11);
+      continue;
+    }
+    splitBuildings(
+      x0,
+      y0,
+      w,
+      h,
+      dt
+        ? ["office", "glass", "gravel", "tower", "office", "solar"]
+        : ["gravel", "brick", "office", "flat", "brick", "green"],
+      dt ? 40 : 16,
+      dt ? 70 : 26,
+      dt ? 0.35 : 0.55,
+    );
+  }
   function stadium(x0, y0, w, h) {
     fill(x0, y0, w, h, T.PLAZA);
     const b = building(x0 + 2, y0 + 2, w - 4, h - 4, "stadium", 30);
@@ -2439,163 +2555,175 @@ function* genWorldSteps() {
         });
     }
   }
-  function townBlocks(xs, ys, mode, skip) {
+  function townBlocks(g, mode, skip) {
     const dtm0 = mode === "dt";
     if (dtm0) mode = "city";
-    for (let i = 0; i < xs.length - 1; i++)
-      for (let j = 0; j < ys.length - 1; j++) {
-        if (skip === i + "," + j) continue;
-        const x0 = xs[i] + RW + 1,
-          y0 = ys[j] + RW + 1,
-          w = xs[i + 1] - x0 - 1,
-          h = ys[j + 1] - y0 - 1;
-        if (w < 4 || h < 4) continue;
-        const r = R();
-        if (mode === "res") {
-          fillNR(x0, y0, w, h, T.PGRASS);
-          for (let hx = x0; hx + 4 <= x0 + w; hx += 5)
-            for (const top of [true, false]) {
-              const hh = 3 + (R() < 0.5 ? 1 : 0),
-                yy = top ? y0 : y0 + h - hh;
-              if (R() < 0.85) {
-                const b = building(hx, yy, 4, hh, "house", 12 + R() * 6);
-                if (b) {
-                  const gy = top ? yy + hh + 1.2 : yy - 1.2;
-                  if (R() < 0.6)
-                    objs.push({
-                      kind: "tree",
-                      x: (hx + 1 + R() * 2) * TILE,
-                      y: gy * TILE,
-                      r: 8 + R() * 5,
-                      sp: (R() * 3) | 0,
-                      seed: (R() * 1e9) | 0,
-                    });
-                  if (R() < 0.5)
-                    objs.push({
-                      kind: "hedge",
-                      x: (hx + 3.6) * TILE,
-                      y: (top ? yy + hh + 0.5 : yy - 0.5) * TILE,
-                      seed: (R() * 1e9) | 0,
-                    });
-                }
-                if (b && R() < 0.9)
+    for (const { i, j, x0, y0, w, h, m } of gridCells(g, skip ? [skip] : null)) {
+      if (skip === i + "," + j) continue;
+      if (w < 4 || h < 4) continue;
+      const r = R();
+      if (mode === "res") {
+        fillNR(x0, y0, w, h, T.PGRASS);
+        for (let hx = x0; hx + 4 <= x0 + w; hx += 5)
+          for (const top of [true, false]) {
+            const hh = 3 + (R() < 0.5 ? 1 : 0),
+              yy = top ? y0 : y0 + h - hh;
+            if (R() < 0.85) {
+              const b = building(hx, yy, 4, hh, "house", 12 + R() * 6);
+              if (b) {
+                const gy = top ? yy + hh + 1.2 : yy - 1.2;
+                if (R() < 0.6)
                   objs.push({
-                    kind: "drive",
-                    x: (hx + 0.3) * TILE,
-                    y: (top ? yy + hh : yy - 1) * TILE,
+                    kind: "tree",
+                    x: (hx + 1 + R() * 2) * TILE,
+                    y: gy * TILE,
+                    r: 8 + R() * 5,
+                    sp: (R() * 3) | 0,
                     seed: (R() * 1e9) | 0,
-                    top,
+                  });
+                if (R() < 0.5)
+                  objs.push({
+                    kind: "hedge",
+                    x: (hx + 3.6) * TILE,
+                    y: (top ? yy + hh + 0.5 : yy - 0.5) * TILE,
+                    seed: (R() * 1e9) | 0,
                   });
               }
+              if (b && R() < 0.9)
+                objs.push({
+                  kind: "drive",
+                  x: (hx + 0.3) * TILE,
+                  y: (top ? yy + hh : yy - 1) * TILE,
+                  seed: (R() * 1e9) | 0,
+                  top,
+                });
             }
-          continue;
-        }
-        const dtm = dtm0;
-        const centre = dtm || (mode === "city" && i >= 2 && i <= 3 && j >= 1 && j <= 3);
-        if (r < (dtm ? 0.05 : 0.1)) {
-          park(x0, y0, w, h);
-          continue;
-        }
-        if (r < 0.18) {
-          lot(x0 + 3, y0 + 2, w - 6, h >> 1);
+          }
+        continue;
+      }
+      const dtm = dtm0;
+      const centre = dtm || (mode === "city" && i >= 2 && i <= 3 && j >= 1 && j <= 3);
+      if (r < (dtm ? 0.05 : 0.1)) {
+        park(x0, y0, w, h);
+        continue;
+      }
+      if (m) {
+        // v51 merged plot: a square now and then, otherwise larger lots with varied (taller in the city) heights
+        if (r < 0.2) square(x0, y0, w, h);
+        else
           splitBuildings(
             x0,
-            y0 + (h >> 1) + 2,
+            y0,
             w,
-            h - (h >> 1) - 2,
-            ["brick", "office"],
-            14,
-            24,
-            0.6,
+            h,
+            mode === "city"
+              ? centre
+                ? ["office", "glass", "tower", "glass", "solar"]
+                : ["office", "brick", "flat", "glass", "gravel"]
+              : ["brick", "flat", "gravel", "office", "brick"],
+            mode === "city" ? (centre ? 45 : 30) : 14,
+            mode === "city" ? (centre ? 110 : 70) : 30,
+            0.5,
+            1,
           );
-          continue;
-        }
-        if (centre && r < 0.5) {
-          fill(x0, y0, w, h, T.PLAZA);
-          building(x0 + 3, y0 + 3, w - 6, h - 6, r < 0.3 ? "tower" : "glass", 80 + R() * 60);
-          continue;
-        }
+        continue;
+      }
+      if (r < 0.18) {
+        lot(x0 + 3, y0 + 2, w - 6, h >> 1);
         splitBuildings(
           x0,
-          y0,
+          y0 + (h >> 1) + 2,
           w,
-          h,
-          mode === "city"
-            ? centre
-              ? ["office", "glass", "tower", "solar"]
-              : ["office", "brick", "gravel", "flat"]
-            : ["brick", "house", "gravel", "flat", "brick"],
-          mode === "city" ? 30 : 12,
-          mode === "city" ? 60 : 22,
+          h - (h >> 1) - 2,
+          ["brick", "office"],
+          14,
+          24,
           0.6,
         );
+        continue;
       }
+      if (centre && r < 0.5) {
+        fill(x0, y0, w, h, T.PLAZA);
+        building(x0 + 3, y0 + 3, w - 6, h - 6, r < 0.3 ? "tower" : "glass", 80 + R() * 60);
+        continue;
+      }
+      splitBuildings(
+        x0,
+        y0,
+        w,
+        h,
+        mode === "city"
+          ? centre
+            ? ["office", "glass", "tower", "solar"]
+            : ["office", "brick", "gravel", "flat"]
+          : ["brick", "house", "gravel", "flat", "brick"],
+        mode === "city" ? 30 : 12,
+        mode === "city" ? 60 : 22,
+        0.6,
+      );
+    }
   }
   // other cities: stadium + downtown towers via townBlocks; mark a stadium block first
   function cityFill(g, si, sj) {
-    const x0 = g.xs[si] + RW + 1,
-      y0 = g.ys[sj] + RW + 1,
-      w = g.xs[si + 1] - x0 - 1,
-      h = g.ys[sj + 1] - y0 - 1;
-    stadium(x0, y0, w, h);
-    g.skip = si + "," + sj;
-    townBlocks(g.xs, g.ys, "city", g.skip);
+    const key = si + "," + sj,
+      c = gridCells(g, [key]).find((q) => q.i === si && q.j === sj);
+    stadium(c.x0, c.y0, c.w, c.h);
+    townBlocks(g, "city", key);
   }
   cityFill(SV, 9, 8);
-  townBlocks(KB.xs, KB.ys, "dt");
-  const dense = (xs, ys, st, h0, h1) => {
-    for (let i = 0; i < xs.length - 1; i++)
-      for (let j = 0; j < ys.length - 1; j++) {
-        const x0 = xs[i] + RW + 1,
-          y0 = ys[j] + RW + 1,
-          x1 = xs[i + 1] - 1,
-          y1 = ys[j + 1] - 1;
-        for (let y = y0; y + 4 <= y1; y += 5)
-          for (let x = x0; x + 4 <= x1; x += 5) {
-            const w = Math.min(4 + (R() < 0.4 ? 1 : 0), x1 - x),
-              h = Math.min(4 + (R() < 0.4 ? 1 : 0), y1 - y);
-            let ok = true;
-            for (let q = -1; q <= h && ok; q++)
-              for (let k = -1; k <= w; k++) {
-                if (!inb(x + k, y + q)) {
-                  ok = false;
-                  break;
-                }
-                const t = G[idx(x + k, y + q)];
-                const edge = q < 0 || k < 0 || q === h || k === w;
-                if (
-                  (t === T.BLDG && !edge) ||
-                  (t === T.ROAD && !edge) ||
-                  t === T.WATER ||
-                  t === T.BRIDGE ||
-                  t === T.BLDG
-                ) {
-                  ok = false;
-                  break;
-                }
+  townBlocks(KB, "dt");
+  const dense = (g, st, h0, h1) => {
+    for (const c of gridCells(g)) {
+      const x0 = c.x0,
+        y0 = c.y0,
+        x1 = c.x0 + c.w,
+        y1 = c.y0 + c.h;
+      for (let y = y0; y + 4 <= y1; y += 5)
+        for (let x = x0; x + 4 <= x1; x += 5) {
+          const w = Math.min(4 + (R() < 0.4 ? 1 : 0), x1 - x),
+            h = Math.min(4 + (R() < 0.4 ? 1 : 0), y1 - y);
+          let ok = true;
+          for (let q = -1; q <= h && ok; q++)
+            for (let k = -1; k <= w; k++) {
+              if (!inb(x + k, y + q)) {
+                ok = false;
+                break;
               }
-            if (ok) {
-              fill(x, y, w, h, T.BLDG);
-              objs.push({
-                kind: "bldg",
-                x: x * TILE,
-                y: y * TILE,
-                w: w * TILE,
-                h: h * TILE,
-                style: st[(R() * st.length) | 0],
-                height: h0 + R() * (h1 - h0),
-                seed: (R() * 1e9) | 0,
-              });
-            } else if (R() < 0.55) {
-              const t = get(x + 2, y + 2);
-              if (t === T.PLAZA || t === T.SAND || t === T.CONC)
-                tree((x + 2.5) * TILE, (y + 2.5) * TILE, 10 + R() * 4);
+              const t = G[idx(x + k, y + q)];
+              const edge = q < 0 || k < 0 || q === h || k === w;
+              if (
+                (t === T.BLDG && !edge) ||
+                (t === T.ROAD && !edge) ||
+                t === T.WATER ||
+                t === T.BRIDGE ||
+                t === T.BLDG
+              ) {
+                ok = false;
+                break;
+              }
             }
+          if (ok) {
+            fill(x, y, w, h, T.BLDG);
+            objs.push({
+              kind: "bldg",
+              x: x * TILE,
+              y: y * TILE,
+              w: w * TILE,
+              h: h * TILE,
+              style: st[(R() * st.length) | 0],
+              height: h0 + R() * (h1 - h0),
+              seed: (R() * 1e9) | 0,
+            });
+          } else if (R() < 0.55) {
+            const t = get(x + 2, y + 2);
+            if (t === T.PLAZA || t === T.SAND || t === T.CONC)
+              tree((x + 2.5) * TILE, (y + 2.5) * TILE, 10 + R() * 4);
           }
-      }
+        }
+    }
   };
-  dense(KB.xs, KB.ys, ["office", "glass", "tower", "solar", "office", "glass"], 45, 140);
-  const greenUp = (xs, ys) => {
+  dense(KB, ["office", "glass", "tower", "solar", "office", "glass"], 45, 140);
+  const greenUp = (g) => {
     const free = (x, y, w, h) => {
       for (let j = y; j < y + h; j++)
         for (let i = x; i < x + w; i++) {
@@ -2605,41 +2733,40 @@ function* genWorldSteps() {
         }
       return true;
     };
-    for (let i = 0; i < xs.length - 1; i++)
-      for (let j = 0; j < ys.length - 1; j++) {
-        const x0 = xs[i] + RW + 1,
-          y0 = ys[j] + RW + 1,
-          x1 = xs[i + 1] - 1,
-          y1 = ys[j + 1] - 1;
-        for (let y = y0; y + 4 <= y1; y += 4)
-          for (let x = x0; x + 4 <= x1; x += 4) {
-            if (!free(x, y, 4, 4)) continue;
-            fillNR(x, y, 4, 4, T.PGRASS);
-            const k = R();
-            if (k < 0.3) {
-              fill(x, y + 1, 4, 1, T.PLAZA);
-              fill(x + 1, y, 1, 4, T.PLAZA);
-              objs.push({ kind: "fountain", x: (x + 1.5) * TILE, y: (y + 1.5) * TILE });
-            }
-            for (const [a, b] of [
-              [0.6, 0.6],
-              [3.4, 0.6],
-              [0.6, 3.4],
-              [3.4, 3.4],
-            ])
-              if (R() < 0.85)
-                objs.push({
-                  kind: "tree",
-                  x: (x + a) * TILE,
-                  y: (y + b) * TILE,
-                  r: 9 + R() * 5,
-                  sp: (R() * 3) | 0,
-                  seed: (R() * 1e9) | 0,
-                });
+    for (const c of gridCells(g)) {
+      const x0 = c.x0,
+        y0 = c.y0,
+        x1 = c.x0 + c.w,
+        y1 = c.y0 + c.h;
+      for (let y = y0; y + 4 <= y1; y += 4)
+        for (let x = x0; x + 4 <= x1; x += 4) {
+          if (!free(x, y, 4, 4)) continue;
+          fillNR(x, y, 4, 4, T.PGRASS);
+          const k = R();
+          if (k < 0.3) {
+            fill(x, y + 1, 4, 1, T.PLAZA);
+            fill(x + 1, y, 1, 4, T.PLAZA);
+            objs.push({ kind: "fountain", x: (x + 1.5) * TILE, y: (y + 1.5) * TILE });
           }
-      }
+          for (const [a, b] of [
+            [0.6, 0.6],
+            [3.4, 0.6],
+            [0.6, 3.4],
+            [3.4, 3.4],
+          ])
+            if (R() < 0.85)
+              objs.push({
+                kind: "tree",
+                x: (x + a) * TILE,
+                y: (y + b) * TILE,
+                r: 9 + R() * 5,
+                sp: (R() * 3) | 0,
+                seed: (R() * 1e9) | 0,
+              });
+        }
+    }
   };
-  greenUp(KB.xs, KB.ys);
+  greenUp(KB);
   const denseRect = (X0, Y0, X1, Y1, st, h0, h1) => {
     const placed = [];
     const OK = { [T.GRASS]: 1, [T.PLAZA]: 1, [T.SAND]: 1, [T.PGRASS]: 1, [T.TREE]: 1 };
@@ -2689,7 +2816,7 @@ function* genWorldSteps() {
   };
   if (world.abRing) {
     const A = world.abRing;
-    greenUp(C1.xs, C1.ys);
+    greenUp(C1);
     denseRect(
       A.X0 + RW + 1,
       A.Y0 + RW + 1,
@@ -2739,13 +2866,13 @@ function* genWorldSteps() {
   {
     const K = world.kbDistricts;
     cityFill(K.MK, 2, 1);
-    for (const k of ["NG", "CH", "RS"]) townBlocks(K[k].xs, K[k].ys, "city");
+    for (const k of ["NG", "CH", "RS"]) townBlocks(K[k], "city");
     for (const k of ["NG", "CH", "RS"])
-      dense(K[k].xs, K[k].ys, ["office", "brick", "flat", "glass", "gravel"], 22, 60);
-    for (const k of ["NG", "CH", "RS"]) greenUp(K[k].xs, K[k].ys);
-    townBlocks(K.RM.xs, K.RM.ys, "town");
-    townBlocks(K.WM.xs, K.WM.ys, "res");
-    townBlocks(K.OH.xs, K.OH.ys, "town");
+      dense(K[k], ["office", "brick", "flat", "glass", "gravel"], 22, 60);
+    for (const k of ["NG", "CH", "RS"]) greenUp(K[k]);
+    townBlocks(K.RM, "town");
+    townBlocks(K.WM, "res");
+    townBlocks(K.OH, "town");
     for (let k = 0; k < 3; k++) ind(1772 + k * 18, 1736, 15, 22);
     for (let k = 0; k < 3; k++) ind(1772 + k * 18, 1764, 15, 22);
   }
@@ -2805,8 +2932,8 @@ function* genWorldSteps() {
       }
   }
   pinR("bld:towns"); // the towns' blocks never depend on the Kingsbridge districts above
-  for (const g of [MF, DW, CM, RH, FW]) townBlocks(g.xs, g.ys, "town");
-  townBlocks(AB.xs, AB.ys, "res");
+  for (const g of [MF, DW, CM, RH, FW]) townBlocks(g, "town");
+  townBlocks(AB, "res");
   for (let k = 0; k < 6; k++) building(505 + k * 6, 906, 4, 4, "house", 12);
   building(490, 906, 6, 4, "church", 22); // Wendwood hamlet
   for (let k = 0; k < 4; k++) building(MTN.x - 12 + k * 6, 1592, 4, 3, "house", 10); // summit cafe & viewpoint

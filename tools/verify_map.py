@@ -60,7 +60,7 @@ CHECK_JS = """(scratch) => {
 
 
 # globals that describe how the world was obtained, not the world itself
-IGNORE = {"MAPLOAD"}
+IGNORE = {"MAPLOAD", "GFX"}  # GFX: the quality governor's frame timer (GFX.last), runtime state not map data
 
 
 async def page(p, gen):

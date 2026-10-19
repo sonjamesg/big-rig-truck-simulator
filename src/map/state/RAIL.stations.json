@@ -1,4 +1,4 @@
-{"$tab":["fixed","name","kind","s","s0","res","len","dwell","_ok"],"ids":[0,0,0,0,0,0,0,0,0,0,0,5485,0,0],"rows":[
+{"$tab":["fixed","name","kind","s","s0","res","len","dwell","_ok"],"ids":[0,0,0,0,0,0,0,0,0,0,0,4765,0,0],"rows":[
   [false,"Ashby","rural",504,504,false,120,23,1],
   [false,"Wendwood","rural",2112,2279,false,120,27,1],
   [false,"Millford","town",3356,6320,false,160,27,1],
@@ -6,11 +6,11 @@
   [true,"Albion Airport","city",6700,6700,false,200,30,1],
   [false,"Dustwater","desert",9788,9865,false,120,22,1],
   [false,"Sound Coast","coast",10124,9318,false,120,27,1],
-  [false,"Coppermine","rural",12352,13143,true,120,21,1],
-  [false,"Sandvale Parkway","city",12884,12248,false,200,30,1],
-  [false,"Fenwick Forest","forest",14809,14809,false,120,28,1],
-  [false,"Kingsbridge North","city",15989,15997,false,200,30,1],
-  [false,"Redhill Central","hub",17782,17782,false,300,40,1],
-  [false,"Greyfell Pass","hills",20368,20418,false,120,27,1],
-  [false,"Greyfell Sands","coast",21922,21922,true,120,27,1]
+  [false,"Sandvale Parkway","city",12520,12373,false,200,30,1],
+  [false,"Coppermine","rural",13185,13185,true,120,22,1],
+  [false,"Fenwick Forest","forest",14851,14851,false,120,21,1],
+  [false,"Kingsbridge North","city",16031,16039,false,200,30,1],
+  [false,"Redhill Central","hub",17824,17824,false,300,40,1],
+  [false,"Greyfell Pass","hills",20412,20460,false,120,20,1],
+  [false,"Greyfell Sands","coast",21964,21964,true,120,28,1]
  ]}

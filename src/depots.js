@@ -1101,14 +1101,14 @@ function* buildDepotsSteps(objs, R) {
         gs = () => world.garages.filter(inC),
         MR = Math.round(Math.max(hw, hh) + mg),
         pr = () => +(1.49 + R() * 0.25).toFixed(2);
-      const tryF = (nm, tx, ty, sep) => {
+      const tryF = (nm, tx, ty, sep, mn = 56) => {
         for (const [w, h, b, f] of [
           [26, 20, 0, 1],
           [18, 12, 0, 0.6],
           [26, 20, 1, 0.6],
           [18, 12, 1, 0.4],
         ]) {
-          const sp = findSpot(tx, ty, w, h, 16, far(world.fuel, sep * f, 56), !!b, MR);
+          const sp = findSpot(tx, ty, w, h, 16, far(world.fuel, sep * f, mn), !!b, MR);
           if (sp) {
             if (b) clrB(sp[0] - 1, sp[1] - sp[2], w + 2, h + sp[2]);
             (w === 26 ? forecourt : fuelStation)(nm, sp[0], sp[1], sp[2], pr());
@@ -1148,6 +1148,12 @@ function* buildDepotsSteps(objs, R) {
       ) {
         const [tx, ty] = tg[t];
         if (tryF(CN[k] + " " + Q[t % 8] + (t >= 8 ? " Road" : "") + " Fuel", tx, ty, sep)) fMade++;
+      }
+      // v51: a town whose streets were thinned can run out of plots 56 tiles apart; finish its quota 40 apart rather than drop one
+      for (let t = 0; fWant > 1 && fs().length < fWant && t < 10; t++) {
+        const [tx, ty] = tg[t],
+          nm = CN[k] + " " + Q[t % 8] + (t >= 8 ? " Road" : "") + " Fuel";
+        if (!world.fuel.some((f) => f.name === nm)) tryF(nm, tx, ty, sep, 40);
       }
       // ag: small towns (half-size < 40 tiles) get ONE repair garage of their own (Central first), none if a named one already exists; cities keep 4
       const small = Math.max(hw, hh) < 40,
