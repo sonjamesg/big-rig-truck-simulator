@@ -6,12 +6,14 @@
  *   own top, bottoms, skin and hair. Casualty fields (down / cas / fix / prog / col) are shared with ambulance.js and
  *   police.js.
  *   v53d danger: a lorry on the pavement, the horn or gunfire (pedAlarm from bm.js / bikes.js) sends walkers running;
- *   anyone in front of a lorry on the kerb dives aside and gets up again.
+ *   anyone in front of a lorry on the kerb dives aside and gets up again. Time of day and weather set the crowd size
+ *   (rush hours, quiet nights, fewer in the rain, umbrellas up); pubs, shops and the stadium draw small crowds.
  * Exposes (globals): WALKABLE, PED_SOLID, pedMask, pedOk, PEDX, pedXings, pedXAt, pedOnX, PED_TOPS, PED_BOTS,
- *   PED_SKIN, PED_HAIR, pedLook, pedDensity, pedSpawn, pedPlan, pedLos, PED_ALARM, pedAlarm, pedLorryAlarms, pedScare, pedFlee,
+ *   PED_SKIN, PED_HAIR, PED_UMB, pedLook, pedDensity, pedTimeK, PED_HOT,
+ *   pedHotspots, pedHotW, pedSpawnHot, pedSpawn, pedPlan, pedLos, PED_ALARM, pedAlarm, pedLorryAlarms, pedScare, pedFlee,
  *   updatePeds, PED_SCALE, drawPeds
  * Depends on: world.js (G, T, get, idx, inb, world), traffic.js (traffic, tRand, onScreen, playerBoxes, ptBoxDist,
- *   ang), physics.js (fwd), signals.js (sigPedLeft), daynight.js (slZone), gfx.js (GFX), main.js (input.horn), truck (lorry.js)
+ *   ang), physics.js (fwd), signals.js (sigPedLeft), daynight.js (slZone, gameT), weather.js (WX), gfx.js (GFX), main.js (input.horn), truck (lorry.js)
  * Load order: after signals.js in build.py. Shared global scope.
  */
 "use strict";
@@ -138,6 +140,16 @@ const PED_HAIR = [
   "#c8c8c8",
   "#7a2e1c",
 ];
+const PED_UMB = [
+  "#1c1c22",
+  "#1c1c22",
+  "#2c3e66",
+  "#b03a2e",
+  "#2e7d32",
+  "#6a1b9a",
+  "#f2c12e",
+  "#e0e0e0",
+];
 function pedLook(r) {
   const pick = (a) => a[(r() * a.length) | 0];
   const top = pick(PED_TOPS);
@@ -149,35 +161,110 @@ function pedLook(r) {
     hair: pick(PED_HAIR),
     style: r() < 0.12 ? 0 : r() < 0.6 ? 1 : 2, // 0 bald/shaved, 1 short, 2 long
     bag: r() < 0.25 ? pick(["#5a3a22", "#1c1c22", "#b03a2e", "#2c3e66"]) : null,
+    umb: r() < 0.75 ? pick(PED_UMB) : null, // opened when it rains (v53d)
   };
 }
 // ---- density: walkable share of the area round the player, weighted by how central it is
 function pedDensity(x, y) {
+  // fixed sunflower pattern (golden angle) so the target does not jitter between samples
   let w = 0;
-  const r = tRand;
-  for (let k = 0; k < 48; k++) {
-    const a = r() * 6.283,
-      d = 10 + r() * 120,
+  for (let k = 0; k < 64; k++) {
+    const a = k * 2.39996,
+      d = 10 + 120 * Math.sqrt((k + 0.5) / 64),
       tx = Math.floor((x + Math.cos(a) * d) / M_T),
       ty = Math.floor((y + Math.sin(a) * d) / M_T);
     if (!inb(tx, ty) || !pedOk(tx, ty)) continue;
     const z = typeof slZone === "function" ? slZone(tx, ty) : 2;
     w += z === 0 ? 1 : z === 1 ? 0.45 : get(tx, ty) === T.WALK ? 0.18 : 0.06;
   }
-  return Math.min(1, (w / 48) * 4);
+  return Math.min(1, (w / 64) * 4);
+}
+// ---- time of day and weather (v53d): rush-hour crowds, quiet nights, fewer out in the rain
+function pedTimeK(h) {
+  const k = [
+    0.2, 0.15, 0.12, 0.12, 0.15, 0.3, 0.6, 1.1, 1.5, 1.3, 1, 1, 1.15, 1.15, 1, 1, 1.15, 1.5, 1.45,
+    1.1, 0.85, 0.7, 0.5, 0.32,
+  ];
+  const i = Math.floor(h) % 24,
+    f = h - Math.floor(h);
+  return k[i] + (k[(i + 1) % 24] - k[i]) * f;
+}
+// gathering points: shop fronts (pubs busiest in the evening) and the stadium; [x, y] in m on the pavement
+let PED_HOT = null;
+function pedHotspots() {
+  if (PED_HOT) return PED_HOT;
+  PED_HOT = [];
+  for (const o of world.objects || []) {
+    if (o.kind !== "bldg") continue;
+    const cx = (o.x + o.w / 2) / TILE,
+      cy = (o.y + o.h / 2) / TILE;
+    const out = (f, d) =>
+      f === "n"
+        ? [cx, o.y / TILE - d]
+        : f === "s"
+          ? [cx, (o.y + o.h) / TILE + d]
+          : f === "w"
+            ? [o.x / TILE - d, cy]
+            : [(o.x + o.w) / TILE + d, cy];
+    if (o.sign && o.front) {
+      const [tx, ty] = out(o.front, 1.5);
+      if (pedOk(Math.floor(tx), Math.floor(ty)))
+        PED_HOT.push({ x: tx * M_T, y: ty * M_T, k: o.sign === "PUB" ? "pub" : "shop", r: 3 });
+    } else if (o.style === "stadium")
+      for (const f of "nswe") {
+        const [tx, ty] = out(f, 3);
+        if (pedOk(Math.floor(tx), Math.floor(ty)))
+          PED_HOT.push({ x: tx * M_T, y: ty * M_T, k: "stadium", r: 9 });
+      }
+  }
+  return PED_HOT;
+}
+// how strongly a gathering point pulls people at hour h
+function pedHotW(k, h) {
+  if (k === "pub") return h >= 17 && h < 23.5 ? 1 : h >= 12 && h < 17 ? 0.35 : 0;
+  if (k === "stadium") return h >= 13 && h < 22 ? 1.6 : 0.15;
+  return h >= 8 && h < 19 ? 0.3 : 0;
+}
+function pedSpawnHot(P, any) {
+  const L = traffic.pedHot,
+    r = tRand;
+  let tot = 0;
+  for (const h of L) tot += h.w;
+  let u = r() * tot,
+    h = L[0];
+  for (const q of L)
+    if ((u -= q.w) <= 0) {
+      h = q;
+      break;
+    }
+  for (let t = 0; t < 6; t++) {
+    const a = r() * 6.283,
+      d = r() * h.r * M_T,
+      x = h.x + Math.cos(a) * d,
+      y = h.y + Math.sin(a) * d,
+      tx = Math.floor(x / M_T),
+      ty = Math.floor(y / M_T);
+    if (!pedOk(tx, ty) || (!any && onScreen(x, y, 6))) continue;
+    return [tx, ty, h];
+  }
+  return null;
 }
 function pedSpawn(P, any) {
   const r = tRand;
+  const hs =
+    traffic.pedHot && traffic.pedHot.length && r() < traffic.pedHotP ? pedSpawnHot(P, any) : null;
   for (let t = 0; t < 10; t++) {
     const a = r() * 6.283,
       d = 30 + r() * 100,
       x = P.x + Math.cos(a) * d,
       y = P.y + Math.sin(a) * d,
-      tx = Math.floor(x / M_T),
-      ty = Math.floor(y / M_T);
-    if (!pedOk(tx, ty) || (!any && onScreen(x, y, 6))) continue;
-    const z = typeof slZone === "function" ? slZone(tx, ty) : 2;
-    if (r() > (z === 0 ? 1 : z === 1 ? 0.6 : 0.3)) continue; // quieter streets get fewer of the walkers
+      tx = hs ? hs[0] : Math.floor(x / M_T),
+      ty = hs ? hs[1] : Math.floor(y / M_T);
+    if (!hs) {
+      if (!pedOk(tx, ty) || (!any && onScreen(x, y, 6))) continue;
+      const z = typeof slZone === "function" ? slZone(tx, ty) : 2;
+      if (r() > (z === 0 ? 1 : z === 1 ? 0.6 : 0.3)) continue; // quieter streets get fewer of the walkers
+    }
     const p = Object.assign(pedLook(r), {
       x: (tx + 0.5) * M_T,
       y: (ty + 0.5) * M_T,
@@ -189,8 +276,9 @@ function pedSpawn(P, any) {
       down: 0,
       path: null,
       i: 0,
-      wait: 0,
       onX: null,
+      hot: hs ? hs[2] : null, // a gathering point this walker hangs around
+      wait: hs ? tRand() * 20 : 0,
     });
     p.dx = Math.sin(p.h);
     p.dy = -Math.cos(p.h);
@@ -235,12 +323,17 @@ function pedPlan(p) {
   PED_D[q[0]] = 0;
   PED_PAR[q[0]] = -1;
   const far = [],
-    green = [];
+    green = [],
+    hot = [],
+    H = p.hot,
+    hx = H ? H.x / M_T : 0,
+    hy = H ? H.y / M_T : 0;
   for (let h = 0; h < q.length; h++) {
     const c = q[h],
       cx = (c % W) + sx - PED_R,
       cy = ((c / W) | 0) + sy - PED_R,
       dc = PED_D[c];
+    if (H && Math.abs(cx + 0.5 - hx) < H.r && Math.abs(cy + 0.5 - hy) < H.r) hot.push(c);
     if (dc >= 10) {
       far.push(c);
       const t = get(cx, cy);
@@ -265,7 +358,7 @@ function pedPlan(p) {
       q.push(n);
     }
   }
-  const pool = green.length && tRand() < 0.35 ? green : far;
+  const pool = hot.length > 1 && tRand() < 0.8 ? hot : green.length && tRand() < 0.35 ? green : far;
   if (!pool.length) return false;
   let c = pool[(tRand() * pool.length) | 0];
   const tiles = [];
@@ -409,7 +502,24 @@ function updatePeds(dt) {
     lo = typeof GFX !== "undefined" && GFX.lvl === "low";
   if (!(traffic.pedT > 0)) {
     traffic.pedT = 2;
-    traffic.pedW = Math.round((lo ? 30 : 90) * pedDensity(P.x, P.y));
+    const h = gameT % 24,
+      rain = typeof WX !== "undefined" && WX.rain > 0.25;
+    traffic.pedHot = [];
+    let hw = 0;
+    for (const q of pedHotspots()) {
+      const w = pedHotW(q.k, h);
+      if (w > 0 && Math.abs(q.x - P.x) < 140 && Math.abs(q.y - P.y) < 140) {
+        traffic.pedHot.push({ x: q.x, y: q.y, k: q.k, r: q.r, w });
+        hw += w;
+      }
+    }
+    traffic.pedHotP = Math.min(0.5, hw * 0.12);
+    traffic.pedW = Math.min(
+      lo ? 36 : 120,
+      Math.round(
+        (lo ? 30 : 90) * pedDensity(P.x, P.y) * pedTimeK(h) * (rain ? 0.8 : 1) + hw * (lo ? 1 : 3),
+      ),
+    );
   }
   traffic.pedT -= dt;
   const want = traffic.pedW || 0;
@@ -421,13 +531,17 @@ function updatePeds(dt) {
   let plans = lo ? 2 : 4;
   const pb = playerBoxes();
   pedLorryAlarms(P, pb, dt);
+  const wetK = typeof WX !== "undefined" && WX.rain > 0.25;
   const al = PED_ALARM.splice(0);
   for (let k = ps.length - 1; k >= 0; k--) {
     const p = ps[k];
     const d = Math.hypot(p.x - P.x, p.y - P.y);
     if (
       (d > 160 && !(p.cas && d < 1500)) ||
-      (ps.length > want + 6 && d > 90 && !p.cas && !onScreen(p.x, p.y, 8))
+      (ps.length > want + 6 &&
+        d > (ps.length > want * 1.3 + 6 ? 45 : 90) &&
+        !p.cas &&
+        !onScreen(p.x, p.y, 8))
     ) {
       ps.splice(k, 1);
       continue;
@@ -436,7 +550,7 @@ function updatePeds(dt) {
       p.down -= dt;
       continue;
     }
-    let sp = p.sp;
+    let sp = p.sp * (wetK ? 1.12 : 1); // hurrying in the rain
     const close = Math.min(...pb.map((b) => ptBoxDist(p.x, p.y, b)));
     if (close < 0.3 && Math.abs(P.v) > 1 && !p.cas) {
       p.down = 1e9;
@@ -499,7 +613,12 @@ function updatePeds(dt) {
     const w = p.path[p.i];
     if (!w) {
       const t = get(Math.floor(p.x / M_T), Math.floor(p.y / M_T));
-      p.wait = t === T.PARK || t === T.PLAZA ? 4 + tRand() * 14 : tRand() * 2.5;
+      const nearHot = p.hot && Math.hypot(p.x - p.hot.x, p.y - p.hot.y) < p.hot.r * M_T + 2;
+      p.wait = nearHot
+        ? 8 + tRand() * 25
+        : t === T.PARK || t === T.PLAZA
+          ? 4 + tRand() * 14
+          : tRand() * 2.5;
       p.path = null;
       continue;
     }
@@ -561,6 +680,7 @@ function updatePeds(dt) {
 // drawn a touch larger than life so clothing reads at driving zoom
 const PED_SCALE = 1.35;
 function drawPeds(inV) {
+  const umb = typeof WX !== "undefined" && WX.rain > 0.25;
   for (const p of traffic.peds) {
     if (!inV(p.x, p.y)) continue;
     const X = p.x * PPM,
@@ -662,6 +782,25 @@ function drawPeds(inV) {
       ctx.beginPath();
       if (p.style === 2) ctx.ellipse(0, 0.5, 1.9, 2.3, 0, 0, 7);
       else ctx.arc(0, 0.25, 1.65, 0, 7);
+      ctx.fill();
+    }
+    if (umb && p.umb) {
+      // open umbrella over the head: canopy, ribs, a lighter crown
+      ctx.fillStyle = p.umb;
+      ctx.beginPath();
+      ctx.arc(0, -0.6, 4.6, 0, 7);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.3)";
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      for (let k = 0; k < 6; k++) {
+        ctx.moveTo(0, -0.6);
+        ctx.lineTo(Math.cos(k * 1.047) * 4.6, -0.6 + Math.sin(k * 1.047) * 4.6);
+      }
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,255,255,0.18)";
+      ctx.beginPath();
+      ctx.arc(-1, -1.6, 2.2, 0, 7);
       ctx.fill();
     }
     ctx.restore();

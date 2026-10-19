@@ -191,6 +191,10 @@ Notes on ownership:
   `input.horn`, any lorry box over a walkable tile while moving), `pedScare` turns them into `p.scare` (run away with
   `pedFlee`, walkable tiles only) or, in front of a lorry on the kerb, `p.dive` + `p.prone` (get up after). Check:
   `/workspace/thin/pedA1.py`.
+  v53d time/weather: target = cap x `pedDensity` (fixed sunflower samples) x `pedTimeK(hour)` (rush peaks, quiet
+  nights) x rain 0.8 + gathering points; `pedHotspots()` (shop fronts, `PUB`, stadium sides) weighted by `pedHotW`
+  feed `traffic.pedHot` / `pedHotP`, `pedSpawnHot` puts walkers there and `pedPlan` keeps them nearby (`p.hot`).
+  Umbrellas (`p.umb`, 75%) open while `WX.rain > 0.25`. Check: `/workspace/thin/pedA2.py`.
 - **Graphics** (`gfx.js`, v51): `GFX.lvl` is `"high"`/`"low"`; `GFX.q` is the saved choice (`auto` drops to low once
   if the EMA fps stays under `GFX_LOW_FPS` for 6 s). `drawNight` is wrapped: `gfxGrade()` (cached quarter-res multiply +
   sun-side additive sprites from `GFX_GRADE` keyframes; replaces the old dusk multiply, so `DN.dusk` is zeroed during the
