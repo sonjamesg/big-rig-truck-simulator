@@ -171,6 +171,12 @@ Notes on ownership:
   baked: their push had been swallowed by a comment since v40 and is only restored for `J.uk` pending James's review.
   Lorry check (`/workspace/thin/lt_ai.py`): AI trailers (chord model) clear the kerbs on 595/596 left turns; a towed
   trailer from the kerb lane needs the outer exit lane.
+  v53b (James feedback): UK junctions keep their mast arms too (`off` = just past the set-back stop line) next to the
+  verge poles; a head whose only greens are arrows keeps its red disc lit (red + green filter arrow); puffin units stay
+  red (the plan has no pedestrian stage); filtering right-turners wait inside the box (`dBox`); the AI also takes a car
+  straight ahead of its nose as leader while easing into another lane; wet-road night colours come only from real
+  lights (`gcWetNight`: warm lamps, signal heads in their current colour, no random palette). Signal soak harness:
+  `/workspace/thin/sigsim.py` (red entries, box near misses, opposing right-turn conflicts, stuck, collisions).
 - **Graphics** (`gfx.js`, v51): `GFX.lvl` is `"high"`/`"low"`; `GFX.q` is the saved choice (`auto` drops to low once
   if the EMA fps stays under `GFX_LOW_FPS` for 6 s). `drawNight` is wrapped: `gfxGrade()` (cached quarter-res multiply +
   sun-side additive sprites from `GFX_GRADE` keyframes; replaces the old dusk multiply, so `DN.dusk` is zeroed during the

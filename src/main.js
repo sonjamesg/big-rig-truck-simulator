@@ -996,7 +996,7 @@ function ukjxState(J, key) {
     } else if (s === "a") a = true;
     else if (s === "ra") ra = true;
   }
-  st.red = !g && !a;
+  st.red = !st.disc && !a; // only arrows green: red disc stays lit beside them
   st.amb = a || (!g && ra);
   return st;
 }
@@ -1204,7 +1204,16 @@ function drawOverhead(o) {
         else if (s === "a") anyA = true;
         else if (s === "ra") anyRA = true;
       }
-      const red = !anyG && !anyA,
+      // full green disc for ahead/left and filtering rights; green arrows only for protected (arrow / early cut-off / left
+      // filter) movements. v53b: a head whose only greens are arrows keeps its red disc lit (UK red + green filter arrow)
+      let disc = false;
+      const arrows = [];
+      for (const mv of mvs) {
+        if (ss[mv] !== "g") continue;
+        if (sigArrow(o.J, key, mv)) arrows.push(mv);
+        else disc = true;
+      }
+      const red = !disc && !anyA,
         amb = anyA || (!anyG && anyRA);
       ctx.save();
       ctx.translate(hx, hy);
@@ -1227,14 +1236,6 @@ function drawOverhead(o) {
       };
       lamp(8, red, "#ff3b30", "#3a1210");
       lamp(0, amb, "#ffb020", "#3a2a10");
-      // full green disc for ahead/left and filtering rights; green arrows only for protected (arrow / early cut-off / left filter) movements
-      let disc = false;
-      const arrows = [];
-      for (const mv of mvs) {
-        if (ss[mv] !== "g") continue;
-        if (sigArrow(o.J, key, mv)) arrows.push(mv);
-        else disc = true;
-      }
       if (disc) lamp(-8, true, "#36e05a", "#10240f");
       else {
         ctx.fillStyle = "#10240f";
