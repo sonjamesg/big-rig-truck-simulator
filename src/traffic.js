@@ -1,8 +1,8 @@
 /**
  * @file traffic.js — AI TRAFFIC (GTA2-style ring spawning, lane graph, IDM following)
  * Exposes (globals): VTYPES, CAR_COLS, MIX, SPEED, AREAW, traffic, pickW, ang, wrapA, mod2pi, VS,
- *   vCanvas, grad, glass, tProbeA (+66 more)
- * Depends on: world.js, render.js, lorry.js, physics.js, audio.js, markings.js, signals.js,
+ *   vCanvas, grad, glass, tProbeA (+60 more)
+ * Depends on: world.js, render.js, lorry.js, physics.js, audio.js, markings.js, signals.js, peds.js,
  *   depots.js, indicators.js, beams.js, rail.js, main.js, police.js, wanted.js, rbx.js,
  *   ambulance.js
  * Load order: #8 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
@@ -1708,6 +1708,7 @@ function stepVeh(v, dt, pbs) {
         } // v29: blue lights creep through a red, only when the box is clear
         if (!stop && gap < 12 && boxBlocked(v, m)) stop = true; // never enter unless the exit is clear
         if (!stop && gap < 6 && jBusy(v, m.J)) stop = true; // give way to anything still crossing the junction
+        if (!stop && gap < 8 && v.v * v.v < 8 * gap && m.J.uk && pedOnX(m.J)) stop = true; // v53c: hold for people still on the crossings (only if it can stop gently)
         if (!stop && gap < 3) {
           m.go = true;
           m.goT = timeS;
@@ -2194,178 +2195,7 @@ function initParked() {
     }
   }
 }
-// ---------------- pedestrians ----------------
-const WALKABLE = new Uint8Array(32);
-[T.WALK, T.PLAZA, T.PARK].forEach((t) => (WALKABLE[t] = 1));
-// v15: footprints of solid objects (containers, buildings, cranes...) and the port yard are never walkable, whatever tile lies beneath
-const PED_SOLID = {
-  cont: 1,
-  bldg: 1,
-  tank: 1,
-  silo: 1,
-  canopy: 1,
-  pump: 1,
-  stower: 1,
-  mast: 1,
-  turbine: 1,
-  pallets: 1,
-  tree: 1,
-  rock: 1,
-  hedge: 1,
-  susp: 1,
-  fountain: 1,
-  pond: 1,
-  runway: 1,
-};
-let pedBlk = null;
-function pedMask() {
-  if (pedBlk) return pedBlk;
-  const blk = new Set();
-  const mark = (x0, y0, x1, y1) => {
-    for (let y = Math.floor(y0); y < Math.ceil(y1); y++)
-      for (let x = Math.floor(x0); x < Math.ceil(x1); x++) blk.add(x * 65536 + y);
-  };
-  for (const o of world.objects) {
-    if (o.kind === "tree" && o.r) {
-      mark(o.x / TILE - 0.3, o.y / TILE - 0.3, o.x / TILE + 0.3, o.y / TILE + 0.3);
-      continue;
-    }
-    if (!PED_SOLID[o.kind] || o.w == null || o.h == null) continue;
-    mark(o.x / TILE - 0.3, o.y / TILE - 0.3, (o.x + o.w) / TILE + 0.3, (o.y + o.h) / TILE + 0.3);
-  }
-  const P = world.port;
-  if (P) mark(P.x0 + 4, P.y0 - 1, P.edge + 3, P.y1 + 1);
-  if (world.kbPort) mark(1538, 1844, 1756, 1885 + DOCK_W + 2); // dg: no pedestrians in either dock // whole yard/quay/crane rails except the gate strip
-  return (pedBlk = blk);
-}
-function pedOk(tx, ty) {
-  return WALKABLE[get(tx, ty)] && !pedMask().has(tx * 65536 + ty);
-}
-const PED_COLS = [
-  "#c0392b",
-  "#2980b9",
-  "#27ae60",
-  "#f1c40f",
-  "#8e44ad",
-  "#ecf0f1",
-  "#2c3e50",
-  "#e67e22",
-  "#16a085",
-  "#7f8c8d",
-];
-function updatePeds(dt) {
-  const P = truck,
-    ps = traffic.peds;
-  const want = traffic.target > 20 ? 34 : traffic.target > 10 ? 18 : 6;
-  for (let t = 0; t < 12 && ps.length < want; t++) {
-    const a = tRand() * 6.283,
-      d = 30 + tRand() * 90;
-    const x = P.x + Math.cos(a) * d,
-      y = P.y + Math.sin(a) * d;
-    const tx = Math.floor(x / M_T),
-      ty = Math.floor(y / M_T);
-    if (!pedOk(tx, ty) || onScreen(x, y, 6)) continue;
-    const dirs = [
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1],
-    ];
-    const dd = dirs[(tRand() * 4) | 0];
-    ps.push({
-      x: (tx + 0.2 + tRand() * 0.6) * M_T,
-      y: (ty + 0.2 + tRand() * 0.6) * M_T,
-      dx: dd[0],
-      dy: dd[1],
-      sp: 1.1 + tRand() * 0.6,
-      col: PED_COLS[(tRand() * PED_COLS.length) | 0],
-      hair: ["#2b1d0e", "#000", "#8a5a2b", "#d9c27a", "#777"][(tRand() * 5) | 0],
-      ph: tRand() * 6,
-      flee: 0,
-      down: 0,
-    });
-  }
-  const pb = playerBoxes();
-  for (let k = ps.length - 1; k >= 0; k--) {
-    const p = ps[k];
-    const d = Math.hypot(p.x - P.x, p.y - P.y);
-    if (d > 140 && !(p.cas && d < 1500)) {
-      ps.splice(k, 1);
-      continue;
-    } // v28: casualties stay where they fell until treated
-    if (p.down > 0) {
-      p.down -= dt;
-      continue;
-    }
-    let sp = p.sp;
-    const close = Math.min(...pb.map((b) => ptBoxDist(p.x, p.y, b)));
-    if (close < 0.3 && Math.abs(P.v) > 1 && !p.cas) {
-      p.down = 1e9;
-      p.cas = true;
-      p.fix = 0;
-      p.prog = 0;
-      const f = fwd(P.h);
-      p.x += f[0] * 1.5;
-      p.y += f[1] * 1.5;
-      try {
-        if (typeof ambPedHit === "function") ambPedHit(p);
-        if (typeof polPedHit === "function") polPedHit(p);
-      } catch (e) {}
-      continue;
-    } // v28: knocked down, stays down (no gore) until paramedics arrive
-    if (close < 7 && Math.abs(P.v) > 2) {
-      p.flee = 1.5;
-      const ax = p.x - pb[0].x,
-        ay = p.y - pb[0].y;
-      if (Math.abs(ax) > Math.abs(ay)) {
-        p.dx = Math.sign(ax);
-        p.dy = 0;
-      } else {
-        p.dx = 0;
-        p.dy = Math.sign(ay);
-      }
-    }
-    if (p.flee > 0) {
-      p.flee -= dt;
-      sp = 4.2;
-    }
-    const nx = p.x + p.dx * sp * dt,
-      ny = p.y + p.dy * sp * dt;
-    const t = get(Math.floor((nx + p.dx * 0.6) / M_T), Math.floor((ny + p.dy * 0.6) / M_T));
-    if (pedOk(Math.floor((nx + p.dx * 0.6) / M_T), Math.floor((ny + p.dy * 0.6) / M_T))) {
-      p.x = nx;
-      p.y = ny;
-      if (tRand() < dt * 0.05) {
-        const o = [
-          [p.dy, p.dx],
-          [-p.dy, -p.dx],
-        ][(tRand() * 2) | 0];
-        p.dx = o[0];
-        p.dy = o[1];
-      }
-    } else {
-      const dirs = [
-        [1, 0],
-        [-1, 0],
-        [0, 1],
-        [0, -1],
-      ].filter(
-        (q) =>
-          pedOk(Math.floor((p.x + q[0] * 1.2) / M_T), Math.floor((p.y + q[1] * 1.2) / M_T)) &&
-          !(q[0] === p.dx && q[1] === p.dy),
-      );
-      if (dirs.length) {
-        const q = dirs[(tRand() * dirs.length) | 0];
-        p.dx = q[0];
-        p.dy = q[1];
-      } else {
-        p.dx = -p.dx;
-        p.dy = -p.dy;
-      }
-    }
-    p.ph += dt * sp * 5;
-  }
-}
+// ---------------- pedestrians: peds.js (updatePeds, drawPeds, pedOk) ----------------
 // ---------------- drawing ----------------
 function blitV(a, x, y, h, L, W, dx, dy) {
   ctx.save();
@@ -2415,63 +2245,7 @@ function drawTraffic(vx0, vy0, vx1, vy1) {
       if (a) for (const v of a) list.push(v);
     }
   for (const v of traffic.vs) if (inV(v.x, v.y)) list.push(v);
-  // pedestrians
-  for (const p of traffic.peds) {
-    if (!inV(p.x, p.y)) continue;
-    const X = p.x * PPM,
-      Y = p.y * PPM;
-    if (p.down > 0) {
-      ctx.fillStyle = "rgba(0,0,0,0.3)";
-      ctx.fillRect(X - 6, Y - 1, 13, 5);
-      ctx.fillStyle = p.col;
-      ctx.fillRect(X - 7, Y - 3, 10, 5);
-      ctx.fillStyle = "#e0b48c";
-      ctx.beginPath();
-      ctx.arc(X + 5, Y - 1, 2.2, 0, 7);
-      ctx.fill();
-      if (p.cas) {
-        const pu = 0.5 + 0.5 * Math.sin(timeS * 4);
-        ctx.save();
-        ctx.strokeStyle = "rgba(255,190,40," + (0.25 + 0.2 * pu) + ")";
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.arc(X, Y, 10, 0, 7);
-        ctx.stroke();
-        if (!(p.prog > 0)) {
-          ctx.fillStyle = "rgba(255,255,255,0.75)";
-          ctx.beginPath();
-          ctx.arc(X, Y - 15, 3.6, 0, 7);
-          ctx.fill();
-          ctx.fillStyle = "rgba(214,40,40,0.85)";
-          ctx.fillRect(X - 0.7, Y - 17.4, 1.4, 4.8);
-          ctx.fillRect(X - 2.4, Y - 15.7, 4.8, 1.4);
-        }
-        ctx.restore();
-      }
-      continue;
-    }
-    const h = ang(p.dx, p.dy);
-    ctx.save();
-    ctx.translate(X, Y);
-    ctx.rotate(h);
-    const sw = Math.sin(p.ph) * 2.2;
-    ctx.fillStyle = "rgba(0,0,0,0.28)";
-    ctx.beginPath();
-    ctx.ellipse(2, 2, 3.6, 2.6, 0, 0, 7);
-    ctx.fill();
-    ctx.fillStyle = "#2b2b33";
-    ctx.fillRect(-2.2, -1 + sw, 1.6, 3.2);
-    ctx.fillRect(0.6, -1 - sw, 1.6, 3.2);
-    ctx.fillStyle = p.col;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, 3.4, 2.1, 0, 0, 7);
-    ctx.fill();
-    ctx.fillStyle = p.hair;
-    ctx.beginPath();
-    ctx.arc(0, 0.2, 1.7, 0, 7);
-    ctx.fill();
-    ctx.restore();
-  }
+  drawPeds(inV); // pedestrians (peds.js), under the vehicles
   const lo = list.filter((v) => !v.layer),
     hi = list.filter((v) => v.layer);
   const drawL = (list) => {

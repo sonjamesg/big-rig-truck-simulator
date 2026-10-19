@@ -46,6 +46,7 @@ sim. `main.js` owns the loop (update → draw → HUD), the camera, the minimap 
 | 8 | `traffic.js` | AI TRAFFIC (GTA2-style ring spawning, lane graph, IDM following) |
 | 9 | `markings.js` | UK HIGHWAY CODE ROAD MARKINGS + approach lane rules |
 | 10 | `signals.js` | SIGNAL PHASING (UK, drive on the left) |
+| 10a | `peds.js` | PEDESTRIANS: walk mask, crossing map, area density, route planner, looks, drawing |
 | 11 | `depots.js` | DEPOTS, TRAILERS, COUPLING & EVENT HOOKS |
 | 12 | `fuel.js` | FUEL, CASH, DAMAGE (stub) |
 | 13 | `sites.js` | SITES: shopping malls / supermarkets (delivery docks), truck dealerships, forecourt art + visitor cars |
@@ -166,17 +167,26 @@ Notes on ownership:
   the traffic-lights stage) builds the arms (null = no arm) and pushes overhead `ukjx`; an arm under 7 tiles to the
   previous junction clears `J.uk` (that junction keeps masts, but its 12 m kerbs are already carved). Painted by
   `drawUkApproach` (approach `m.uk` = repaint length) + `drawBoxJunction` (`o.uk`), signals by `drawUkjx` (main.js:
-  verge pole per arm, primary + back-to-back secondary for arm `i^1`, puffin units green only when all approaches are
-  red), night via `DN.sig` entries `uk` / `ped` in `drawSigNight`. Approach marks for non-UK junctions are still not
+  puffin units; see v53c), night via `DN.sig` `ped` entries in `drawSigNight`. Approach marks for non-UK junctions are still not
   baked: their push had been swallowed by a comment since v40 and is only restored for `J.uk` pending James's review.
   Lorry check (`/workspace/thin/lt_ai.py`): AI trailers (chord model) clear the kerbs on 595/596 left turns; a towed
   trailer from the kerb lane needs the outer exit lane.
   v53b (James feedback): UK junctions keep their mast arms too (`off` = just past the set-back stop line) next to the
-  verge poles; a head whose only greens are arrows keeps its red disc lit (red + green filter arrow); puffin units stay
-  red (the plan has no pedestrian stage); filtering right-turners wait inside the box (`dBox`); the AI also takes a car
+  verge poles; a head whose only greens are arrows keeps its red disc lit (red + green filter arrow); puffin units stayed
+  red until v53c; filtering right-turners wait inside the box (`dBox`); the AI also takes a car
   straight ahead of its nose as leader while easing into another lane; wet-road night colours come only from real
   lights (`gcWetNight`: warm lamps, signal heads in their current colour, no random palette). Signal soak harness:
   `/workspace/thin/sigsim.py` (red entries, box near misses, opposing right-turn conflicts, stuck, collisions).
+  v53c (James 13:24): the verge vehicle poles are gone again (masts only; `ukjx` arms have no `P`), puffins stay. Each
+  `J.uk` plan ends with an all-red `ped` stage (`SIG_PED` s, `sigPedLeft(J)` = green-man seconds left); `drawUkjx`
+  draws the puffin units only (green while `sigPedLeft > 0`), AI vehicles also hold at the line while `pedOnX(J)`.
+- **Pedestrians** (`peds.js`, v53c): `WALKABLE`/`pedOk` mask, crossing map `pedXings()` (row 3 tiles out from each UK
+  box edge, needs pavement at both ends; peds cross nowhere else), area density `pedDensity` (zone weights; target
+  `traffic.pedW` = 90 high / 30 low x density), off-screen spawning 30-130 m out, BFS route planner `pedPlan` (radius
+  `PED_R`, 35% heads for parks/plazas, string-pulled pavement runs, lateral pavement offset `lat`), waits at the kerb
+  until the green man has enough time left, lingers in parks, steps away from a fast lorry. Looks from `pedLook`
+  (tops, bottoms, skin, hair style, bags), drawn at `PED_SCALE`. Casualty hooks (`ambPedHit`/`polPedHit`) unchanged.
+  Check: `/workspace/thin/pedshots.py` (onRoad must be 0, XMON offPath 0).
 - **Graphics** (`gfx.js`, v51): `GFX.lvl` is `"high"`/`"low"`; `GFX.q` is the saved choice (`auto` drops to low once
   if the EMA fps stays under `GFX_LOW_FPS` for 6 s). `drawNight` is wrapped: `gfxGrade()` (cached quarter-res multiply +
   sun-side additive sprites from `GFX_GRADE` keyframes; replaces the old dusk multiply, so `DN.dusk` is zeroed during the
