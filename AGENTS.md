@@ -204,6 +204,10 @@ Notes on ownership:
   Groups: `pedGroup` adds followers at spawn (`p.lead`, `p.slot`; couples, three abreast, families with `p.pram` +
   `p.kid`, chat rings `p.chat` at shop/pub points); `pedFollow` keeps the slot, hands over `onX` on crossings, and lets
   go when the leader leaves, is scared or hurt. Check: `/workspace/thin/pedA4.py`.
+  Workers: `pedWorkSites` (depots and mall goods yards with bays, `pedWorks()` pavement pits - fenced 1-tile works
+  on pavements 2+ tiles wide, blocked in `pedMask`) get crews from `pedWorkers` (added on top of the crowd target,
+  `traffic.pedWk`); `p.work` walkers stroll between bay mouths in hi-vis (`p.hat`), builders dig (`p.dig`), all step
+  clear of a moving lorry inside their site (`pedWorkWalk`). Check: `/workspace/thin/pedA5.py`.
 - **Graphics** (`gfx.js`, v51): `GFX.lvl` is `"high"`/`"low"`; `GFX.q` is the saved choice (`auto` drops to low once
   if the EMA fps stays under `GFX_LOW_FPS` for 6 s). `drawNight` is wrapped: `gfxGrade()` (cached quarter-res multiply +
   sun-side additive sprites from `GFX_GRADE` keyframes; replaces the old dusk multiply, so `DN.dusk` is zeroed during the

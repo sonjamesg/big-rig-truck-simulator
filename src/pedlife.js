@@ -1,11 +1,13 @@
 /**
  * @file pedlife.js — EVERYDAY STREET LIFE for the walkers in peds.js (v53d, James 19 Oct): bus stops (shelter, flag,
  *   yellow BUS STOP box) with queues that board the AI buses which pull in, dog walkers, joggers, cyclists on the
- *   footpaths, groups (couples, friends, families with pushchairs, chats outside shops), shoppers with bags milling outside the malls, and benches in parks and squares that people sit on.
+ *   footpaths, groups (couples, friends, families with pushchairs, chats outside shops), workers in
+ *   hi-vis at depots and mall goods yards, builders at fenced pavement works, shoppers with bags milling outside the malls, and benches in parks and squares that people sit on.
  *   Stops and benches are derived from the map at runtime (no map data change).
  * Exposes (globals): PED_STOPS, pedStops, pedStopsNear, busStopAcc, PED_BENCH, pedBenches, pedBenchNear, pedRole,
  *   pedLifeSpawn, pedSpawnAt, pedStopWalk, pedRelease, pedMallWalk, pedDogTick, PED_SPORT, PED_DOGC, PED_BIKEC,
- *   drawPedLife, drawPedExtra, pedGroup, pedFollow, pedDrawPram
+ *   drawPedLife, drawPedExtra, pedGroup, pedFollow, pedDrawPram, PED_WORKS,
+ *   pedWorks, pedWorkSites, pedWorkers, pedWorkWalk, drawPedWorks
  * Depends on: peds.js (pedOk, pedLook, traffic.peds, PED_SCALE), traffic.js (laneLat, jRange, nLanes, idmAcc, tRand,
  *   traffic), world.js (world, G, T, get, idx, inb, TILE, M_T), gfxcity.js (gcHash), physics.js (fwd)
  * Load order: after peds.js in build.py. Shared global scope.
@@ -340,6 +342,7 @@ function pedDogTick(p, dt) {
 }
 // ---- drawing (world px, under the vehicles): stop boxes, shelters, benches
 function drawPedLife(inV) {
+  drawPedWorks(inV);
   for (const S of PED_STOPS || []) {
     if (!inV(S.wx, S.wy)) continue;
     const X = S.bx * PPM,
@@ -535,4 +538,174 @@ function pedDrawPram(p) {
   ctx.fill();
   ctx.fillStyle = "#222";
   ctx.fillRect(-2.2, -5.4, 4.4, 0.7);
+}
+// ---- workers (v53d): staff in hi-vis at depots and mall goods yards, builders at fenced pavement works
+let PED_WORKS = null;
+// deterministic pavement works: a 1-tile pit on a pavement at least two tiles wide (walkers pass on the inner tile)
+function pedWorks(blk) {
+  if (PED_WORKS) return PED_WORKS;
+  PED_WORKS = [];
+  for (let ty = 2; ty < MH - 2; ty++)
+    for (let tx = 2; tx < MW - 2; tx++) {
+      if (G[idx(tx, ty)] !== T.WALK || gcHash(tx, ty, 41) > 0.005) continue;
+      for (const [ox, oy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        if (G[idx(tx + ox, ty + oy)] !== T.ROAD || G[idx(tx - ox, ty - oy)] !== T.WALK) continue;
+        const z = typeof slZone === "function" ? slZone(tx, ty) : 2;
+        if (z > 1) break;
+        PED_WORKS.push({ tx, ty, x: (tx + 0.5) * M_T, y: (ty + 0.5) * M_T });
+        if (blk) blk.add(tx * 65536 + ty);
+        break;
+      }
+    }
+  return PED_WORKS;
+}
+// workplaces near the lorry: [{key, n, spots:[[x, y]...], box:[x0, y0, x1, y1], build}]
+function pedWorkSites(P) {
+  const out = [],
+    near = (x, y, R) => Math.abs(x - P.x) < R && Math.abs(y - P.y) < R;
+  for (const d of world.depots || []) {
+    const cx = (d.x + d.w / 2) * M_T,
+      cy = (d.y + d.h / 2) * M_T;
+    if (!near(cx, cy, 150) || !d.bays || !d.bays.length) continue;
+    const spots = d.bays.map((b) => [b.cx + b.w * 0.6, b.dock - 1.2]);
+    spots.push([(d.x + 4) * M_T, (d.y + 5.6) * M_T]);
+    out.push({
+      key: d,
+      n: 2 + (d.bays.length > 4 ? 2 : 1),
+      spots,
+      box: [d.x * M_T, d.y * M_T, (d.x + d.w) * M_T, (d.y + d.h) * M_T],
+    });
+  }
+  for (const m of world.malls || []) {
+    if (!m.bays || !m.bays.length || !near(m.x, m.y, 150)) continue;
+    const spots = m.bays.map((b) => [b.cx + b.w * 0.6, b.dock - 1.2]);
+    const xs = spots.map((q) => q[0]);
+    out.push({
+      key: m,
+      n: 2,
+      spots,
+      box: [Math.min(...xs) - 4, m.bays[0].dock - 12, Math.max(...xs) + 4, m.bays[0].dock],
+    });
+  }
+  for (const w of pedWorks(null))
+    if (near(w.x, w.y, 120))
+      out.push({
+        key: w,
+        n: 2,
+        spots: [
+          [w.x - 0.9, w.y],
+          [w.x + 0.9, w.y + 0.4],
+        ],
+        box: [w.x - 2, w.y - 2, w.x + 2, w.y + 2],
+        build: 1,
+      });
+  return out;
+}
+// top up each nearby workplace to its crew size; returns how many workers are out
+function pedWorkers(P, ps) {
+  const sites = pedWorkSites(P),
+    have = new Map();
+  let n = 0;
+  for (const p of ps)
+    if (p.work) {
+      have.set(p.work.key, (have.get(p.work.key) || 0) + 1);
+      n++;
+    }
+  const r = tRand;
+  for (const S of sites)
+    for (let k = have.get(S.key) || 0; k < S.n; k++) {
+      const sp = S.spots[(r() * S.spots.length) | 0];
+      const p = Object.assign(pedLook(r), {
+        x: sp[0],
+        y: sp[1],
+        h: r() * 6.283,
+        sp: 1 + r() * 0.3,
+        ph: r() * 6,
+        down: 0,
+        wait: r() * 4,
+        i: 0,
+        path: null,
+        onX: null,
+        lat: 0,
+      });
+      p.work = S;
+      p.top = p.col = r() < 0.6 ? "#ff8f00" : "#d4e000";
+      p.bot = S.build ? "#3e3e3e" : "#1f2a44";
+      p.hat = S.build ? (r() < 0.7 ? "#ffd600" : "#fafafa") : r() < 0.5 ? "#fafafa" : null;
+      if (!p.hat) p.hat = null;
+      p.bag = p.umb = null;
+      p.dig = S.build && k === 0 ? 1 : 0;
+      ps.push(p);
+      n++;
+    }
+  return n;
+}
+// workers stroll between bays and the warehouse door (builders stay at their pit), keeping inside their site
+function pedWorkWalk(p, dt, close, pb) {
+  const S = p.work,
+    b = S.box;
+  if (close < 6 && Math.abs(truck.v) > 1.5) {
+    // step clear of a reversing / passing lorry
+    const ax = p.x - pb[0].x,
+      ay = p.y - pb[0].y,
+      L = Math.hypot(ax, ay) || 1;
+    p.x = Math.max(b[0], Math.min(b[2], p.x + (ax / L) * 3.5 * dt));
+    p.y = Math.max(b[1], Math.min(b[3], p.y + (ay / L) * 3.5 * dt));
+    p.h = Math.atan2(ax, -ay);
+    p.moving = true;
+    p.ph += dt * 20;
+    return;
+  }
+  if (p.dig) {
+    p.ph += dt * 4;
+    p.moving = false;
+    return;
+  }
+  if (p.wait > 0) {
+    p.wait -= dt;
+    p.moving = false;
+    return;
+  }
+  if (!p.wt) p.wt = S.spots[(tRand() * S.spots.length) | 0];
+  const dx = p.wt[0] - p.x,
+    dy = p.wt[1] - p.y,
+    L = Math.hypot(dx, dy);
+  if (L < 0.3) {
+    p.wt = null;
+    p.wait = 3 + tRand() * 10;
+    p.moving = false;
+    return;
+  }
+  const st = Math.min(L, p.sp * dt);
+  p.x += (dx / L) * st;
+  p.y += (dy / L) * st;
+  p.h = Math.atan2(dx, -dy);
+  p.ph += dt * p.sp * 5;
+  p.moving = true;
+}
+// fenced pit for pavement works (red / white barriers round a dug patch)
+function drawPedWorks(inV) {
+  for (const w of PED_WORKS || []) {
+    if (!inV(w.x, w.y)) continue;
+    const X = (w.x - 2) * PPM,
+      Y = (w.y - 2) * PPM,
+      S = 4 * PPM;
+    ctx.fillStyle = "#6d5a45";
+    ctx.fillRect(X + 4, Y + 4, S - 8, S - 8);
+    ctx.fillStyle = "#4e3f30";
+    ctx.fillRect(X + 9, Y + 9, S - 18, S - 18);
+    for (let k = 0; k < 8; k++) {
+      ctx.fillStyle = k % 2 ? "#e53935" : "#fafafa";
+      const t = k * (S / 8);
+      ctx.fillRect(X + t, Y, S / 8, 2);
+      ctx.fillRect(X + t, Y + S - 2, S / 8, 2);
+      ctx.fillRect(X, Y + t, 2, S / 8);
+      ctx.fillRect(X + S - 2, Y + t, 2, S / 8);
+    }
+  }
 }

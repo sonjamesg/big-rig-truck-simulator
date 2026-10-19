@@ -58,6 +58,7 @@ function pedMask() {
   const P = world.port;
   if (P) mark(P.x0 + 4, P.y0 - 1, P.edge + 3, P.y1 + 1);
   if (world.kbPort) mark(1538, 1844, 1756, 1885 + DOCK_W + 2); // dg: no pedestrians in either dock // whole yard/quay/crane rails except the gate strip
+  pedWorks(blk); // pavement works sites are fenced off (pedlife.js)
   return (pedBlk = blk);
 }
 function pedOk(tx, ty) {
@@ -535,7 +536,12 @@ function updatePeds(dt) {
     );
   }
   traffic.pedT -= dt;
-  const want = traffic.pedW || 0;
+  if (!(traffic.pedWkT > 0)) {
+    traffic.pedWkT = 2;
+    traffic.pedWk = pedWorkers(P, ps); // depot / loading-bay staff and builders on top of the crowd target
+  }
+  traffic.pedWkT -= dt;
+  const want = (traffic.pedW || 0) + (traffic.pedWk || 0);
   for (let t = 0; t < 4 && ps.length < want; t++) {
     const p = pedSpawn(P, !traffic.pedInit);
     if (p) {
@@ -611,6 +617,10 @@ function updatePeds(dt) {
       continue;
     }
     if (p.dog) pedDogTick(p, dt);
+    if (p.work) {
+      pedWorkWalk(p, dt, close, pb);
+      continue;
+    }
     if (p.scare > 0) {
       if (p.stop || p.sit || p.sitB) pedRelease(p);
       p.scare -= dt;
@@ -817,7 +827,9 @@ function drawPeds(inV) {
     }
     if (p.dog) drawPedExtra(p, X, Y);
     const moving =
-        (!(p.wait > 0) && (p.path || p.mall)) || p.scare > 0 || ((p.stop || p.lead) && p.moving),
+        (!(p.wait > 0) && (p.path || p.mall)) ||
+        p.scare > 0 ||
+        ((p.stop || p.lead || p.work) && p.moving),
       sw = moving && !p.sit && !p.bike ? Math.sin(p.ph) * (p.jog ? 3 : 2.2) : 0;
     ctx.save();
     ctx.translate(X, Y);
@@ -875,14 +887,37 @@ function drawPeds(inV) {
     ctx.beginPath();
     ctx.arc(0, -0.2, 1.8, 0, 7);
     ctx.fill();
-    if (p.style) {
+    if (p.hat) {
+      // hi-vis: reflective bands across the vest, hard hat with a brim
+      ctx.fillStyle = "rgba(235,235,235,0.9)";
+      ctx.fillRect(-3.2, -0.9, 6.4, 0.5);
+      ctx.fillRect(-3.2, 0.7, 6.4, 0.5);
+      ctx.fillStyle = p.hat;
+      ctx.beginPath();
+      ctx.ellipse(0, -0.1, 2.1, 2.3, 0, 0, 7);
+      ctx.fill();
+      ctx.fillStyle = "rgba(0,0,0,0.18)";
+      ctx.fillRect(-0.3, -1.9, 0.6, 3.6);
+      if (p.dig) {
+        // spade / pick in both hands, swinging
+        const sw2 = Math.sin(p.ph) * 1.5;
+        ctx.strokeStyle = "#6d4c41";
+        ctx.lineWidth = 0.7;
+        ctx.beginPath();
+        ctx.moveTo(-1.5, -2);
+        ctx.lineTo(0, -6.5 - sw2);
+        ctx.stroke();
+        ctx.fillStyle = "#9e9e9e";
+        ctx.fillRect(-1, -7.6 - sw2, 2, 1.4);
+      }
+    } else if (p.style) {
       ctx.fillStyle = p.hair;
       ctx.beginPath();
       if (p.style === 2) ctx.ellipse(0, 0.5, 1.9, 2.3, 0, 0, 7);
       else ctx.arc(0, 0.25, 1.65, 0, 7);
       ctx.fill();
     }
-    if (umb && p.umb) {
+    if (umb && p.umb && !p.work) {
       // open umbrella over the head: canopy, ribs, a lighter crown
       ctx.fillStyle = p.umb;
       ctx.beginPath();
