@@ -50,6 +50,7 @@ sim. `main.js` owns the loop (update → draw → HUD), the camera, the minimap 
 | 11 | `depots.js` | DEPOTS, TRAILERS, COUPLING & EVENT HOOKS |
 | 12 | `fuel.js` | FUEL, CASH, DAMAGE (stub) |
 | 13 | `sites.js` | SITES: shopping malls / supermarkets (delivery docks), truck dealerships, forecourt art + visitor cars |
+| 13a | `ltg.js` | LGV TRAINING GROUND (v54, ex Kingsbridge Field airfield): world gen + chunk-baked zone paint, physical cones, timed cone loop, e-stop light, wet skid pan grip, map icon/POI, floodlights |
 | 14 | `services.js` | emergency services: fire stations, police stations, hospitals |
 | 15 | `career.js` | CAREER: missions to malls, XP / tiers, truck dealership, save game |
 | 16 | `ui.js` | UI: job board, dealership, results, tier unlock (DOM overlay inside #frame so it works in fullscreen) |
@@ -209,6 +210,20 @@ Notes on ownership:
   on pavements 2+ tiles wide, blocked in `pedMask`) get crews from `pedWorkers` (added on top of the crowd target,
   `traffic.pedWk`); `p.work` walkers stroll between bay mouths in hi-vis (`p.hat`), builders dig (`p.dig`), all step
   clear of a moving lorry inside their site (`pedWorkWalk`). Check: `/workspace/thin/pedA5.py`.
+- **LGV training ground** (`ltg.js`, v54): replaces the Kingsbridge Field airfield (tiles 1195-1384 x 1792-1904; the
+  airfield's 4 building `R()` draws are still made in world.js so later generation is unchanged). `ltgGen` lays LOT
+  tarmac (Airport Way kept), the training dock / blind-side dock / mini-town buildings and kind `ltg` paint objects
+  (`LTG_PAINT[o.part]`, baked into chunks, o.z -1); `ltgGate` (after the forest pass, so tree seeds don't drift) opens
+  the apron to Field Road on the spine rows. Street trees skip the gate mouth (`ltgIn`). Runtime only: ~740 cones
+  (`ltgConeInit`, metres, 16 m grid) knocked by `playerBoxes()` (slide, spin, reset 12 s after the last touch once the
+  rig is 25 m clear; loop cones reset on a new run). Timed loop: START (u 62) starts the clock driving east along the
+  bottom straight, checkpoints top straight (u 68) + left bend, chequered FINISH (u 57) stops it; leaving the site
+  surface (`ltgOnTarmac`), Esc/Backspace, hold pad B 1 s or the `#ltgX` button cancel; any cone touched fails; best in
+  `localStorage["bigrig.ltgBest"]`. E-stop light (`LTG.es`), skid pan grip `ltgGrip` (physics.js `panG`), map zones
+  only when zoomed out (`ltgMapDraw`), learner-plate icon `ltgMapIcon` + legend `~L`, POI "Training ground" (fast
+  travel lands on the spine via `zones`). Hooks: main.js (`ltgUpdate`, `ltgDraw`, `ltgHUD`), fuel.js drawPOIs,
+  satnav.js mapPOIList, daynight.js `ltgLights`. Check: `tests/ltg_test.py`. No Kingsbridge planes any more (it was the
+  only non-Albion runway).
 - **Graphics** (`gfx.js`, v51): `GFX.lvl` is `"high"`/`"low"`; `GFX.q` is the saved choice (`auto` drops to low once
   if the EMA fps stays under `GFX_LOW_FPS` for 6 s). `drawNight` is wrapped: `gfxGrade()` (cached quarter-res multiply +
   sun-side additive sprites from `GFX_GRADE` keyframes; replaces the old dusk multiply, so `DN.dusk` is zeroed during the

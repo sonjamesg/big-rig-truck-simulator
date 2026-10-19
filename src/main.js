@@ -539,6 +539,7 @@ function frame(ts) {
   }
   if (truck.bump <= 0.01) truck._dmg = false;
   updateBreakdown(dt);
+  ltgUpdate(dt);
   if (typeof czTick === "function") czTick();
   updateDayNight(dt, started && !paused);
   updateWeather(dt, started && !paused);
@@ -617,6 +618,7 @@ function draw() {
   drawAmbientLow(VR);
   drawNavWorld();
   drawCareerWorld(vx0, vy0, vx1, vy1);
+  ltgDraw(vx0, vy0, vx1, vy1);
   drawParkedTrailers(vx0, vy0, vx1, vy1);
   hlDrawPads(vx0, vy0, vx1, vy1);
   drawTraffic(vx0, vy0, vx1, vy1);
@@ -653,6 +655,7 @@ function draw() {
   ctx.setTransform(RSF, 0, 0, RSF, 0, 0);
   drawHUD();
   bmHUD();
+  ltgHUD();
   if (bigmap.open) {
     drawBigMap();
     drawPadMapCursor();

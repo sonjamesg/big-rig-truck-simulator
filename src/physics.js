@@ -2,7 +2,7 @@
  * @file physics.js — LORRY PHYSICS
  * Exposes (globals): GEARS, MASS, ENG_BASE, torqueAt, truck, fwd, kingpin, solidAtM, bodyHits, hitTest,
  *   surfaceAt, stepTruck, HIT_PT, CRASH_E, CRASH_MU, crashNormal, crashResponse
- * Depends on: world.js, lorry.js, traffic.js, depots.js, fx.js, port.js, rail.js, weather.js,
+ * Depends on: world.js, ltg.js (ltgGrip: wet skid pan), lorry.js, traffic.js, depots.js, fx.js, port.js, rail.js, weather.js,
  *   wanted.js, airport.js
  * Load order: #6 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
  */
@@ -214,13 +214,15 @@ function stepTruck(s, inp, dt) {
   if (inp.hand) brk = Math.max(brk, 1.4);
   s.throttle += (thr - s.throttle) * Math.min(1, dt * 3);
   s.brake = brk;
+  const panG = ltgGrip(s); // v54: wet skid pan at the LGV training ground (ltg.js)
   // v14 wheel lock: a hard stamp on the brakes at speed locks the wheels -> long skid, little steering, trailer sway
   if (
     s.mode === "D" &&
     brk >
       Math.min(
         0.99,
-        (typeof WX !== "undefined" && WX.wet > 0.5 ? 0.8 : 0.92) + ((s.grip || 1) - 1) * 0.4,
+        ((typeof WX !== "undefined" && WX.wet > 0.5) || panG < 1 ? 0.8 : 0.92) +
+          ((s.grip || 1) - 1) * 0.4,
       ) &&
     Math.abs(s.v) > 15
   )
@@ -283,7 +285,8 @@ function stepTruck(s, inp, dt) {
     (s.skid ? (solo ? 0.42 : 0.36) * (s.grip || 1) : s.brake * (solo ? 0.6 : 0.5) * (s.brk || 1)) *
     M *
     9.81 *
-    (typeof WX !== "undefined" ? WX.grip : 1);
+    (typeof WX !== "undefined" ? WX.grip : 1) *
+    panG;
   let a = F / M;
   let nv = s.v + a * dt;
   if (s.brake > 0) {
@@ -307,7 +310,7 @@ function stepTruck(s, inp, dt) {
   s.v = nv;
   // ----- steering with inertia and self-centring
   const vabs = Math.abs(s.v),
-    hg = (s.grip || 1) * (s.hand || 1),
+    hg = (s.grip || 1) * (s.hand || 1) * panG,
     maxSteer = (solo ? 0.7 : 0.62) / (1 + (vabs * vabs) / ((solo ? 140 : 90) * hg));
   const SR = (solo ? 1.6 : 1) * (s.hand || 1);
   let target = (inp.left ? -1 : 0) + (inp.right ? 1 : 0);
