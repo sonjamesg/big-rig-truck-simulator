@@ -679,7 +679,7 @@ function drawPortLow(vx0, vy0, vx1, vy1) {
         b[1] * TILE < vy1 + 200
       ) {
         ctx.save();
-        if (P === world.kbPort && typeof lbGapClip === "function") lbGapClip(2.4); // v51 lift bridge: nothing across the open span
+        if (typeof lbOfPort === "function" && lbOfPort(P)) lbGapClip(2.4, lbOfPort(P)); // lift bridges: nothing across the open span
         ctx.save();
         ctx.beginPath();
         ctx.rect(-1e5, -1e5, 2e5, 2e5);
@@ -1585,12 +1585,14 @@ function portCfg(P) {
           [20, 378],
         ],
         outT: [
+          // v56: out through the north lift bridge's opening (world x 780, 8 tiles west of the inbound lane)
           [33, 236],
           [44, 200],
-          [70, 150],
-          [110, 100],
-          [132, 40],
-          [136, -40],
+          [100, 160],
+          [160, 128],
+          [177, 112],
+          [177, 40],
+          [177, -40],
         ],
         lor: [293, 388],
         appr: [

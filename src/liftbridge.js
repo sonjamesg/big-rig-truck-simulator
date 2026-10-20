@@ -1,12 +1,14 @@
 /**
- * @file liftbridge.js — KINGSBRIDGE LIFT BRIDGE: the M1 crossing of the Kingsbridge ship channel (bottom docks) becomes a
- *   double-leaf bascule bridge. It opens on a cycle whenever a ship is due (lights, barriers, then the leaves rise), drawn in
+ * @file liftbridge.js — LIFT BRIDGES: the M1 crossing of the Kingsbridge ship channel (bottom docks) and, v56, the long
+ *   north-coast crossing (where the cargo liners of world.boats pass) are double-leaf bascule bridges (LB.all, lbUse picks
+ *   the active one). It opens on a cycle whenever a ship is due (lights, barriers, then the leaves rise), drawn in
  *   pseudo-3D (foreshortening, perspective scale toward the camera, shadows on the water, visible underside, open water and
  *   the ship beneath). Red road signals + half barriers stop AI traffic; the player is blocked by the barriers. A fast rig on
  *   a rising leaf launches off the tip (jump arc, shadow, landing); too slow and it drops into the channel (splash, then a tow
  *   out with the respawn fee). Road layout and tiles are unchanged (draw + behaviour only).
- * Exposes (globals): LB, lbState, lbOcc, lbGapPx, lbGapClip, lbDraw, lbStopAcc, lbBarrierHit, lbTruckStep
- * Depends on: port.js (world.kbPort, portShips, PL, portT, portRectL, portClipBridges, drawPortLow), traffic.js, rail.js
+ * Exposes (globals): LB, LB_KEYS, LB_N_XC, lbMake, lbUse, lbBridges, lbKb, lbOfPort, lbTruckBridge, lbOccPort, lbOccBoats, lbBoatsInGap, lbEach,
+ *   lbState, lbOcc, lbGapPx, lbGapClip, lbDraw, lbStopAcc, lbBarrierHit, lbTruckStep
+ * Depends on: ambient.js (BOAT, boatPos, drawBoat), port.js (world.kbPort, portShips, PL, portT, portRectL, portClipBridges, drawPortLow), traffic.js, rail.js
  *   (railStopAcc / railBarrierHit / railBodyPts), physics.js (stepTruck), main.js (drawLorry, cam), breakdown.js
  * Load order: after bikes.js in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
  */
@@ -14,11 +16,12 @@
 // ===================== v51 Kingsbridge bascule bridge (James 17 Oct) =====================
 // geometry in tiles: M1 deck rows Y0..Y1 (6 rows, eastbound lanes on the north half), hinges XA (west leaf, opens +x) and XB
 const LB = {
+  // the active bridge's geometry / state (lbUse copies them in): deck rows Y0..Y1, hinges XA (west leaf, opens +x) and XB
   Y0: 1942,
   Y1: 1948,
   XA: 1743,
   XB: 1761,
-  L: 9, // leaf length (tiles); the two leaves meet at XA + L = 1752, the ship channel centre
+  L: 9, // leaf length (tiles); the two leaves meet at XA + L, the ship channel centre
   TH: 0.6, // leaf thickness (tiles)
   DECK: 2.6, // deck height above the water (tiles)
   AMAX: (78 * Math.PI) / 180,
@@ -29,34 +32,192 @@ const LB = {
   RISE: 11,
   st: { t: -1, lit: 0, bar: 0, th: 0, amber: 0 },
   force: null, // debug / screenshots: fixed {th, bar, lit}
-  pl: { mode: null, z: 0, vz: 0, vh: 0, t: 0 },
+  pl: { mode: null, z: 0, vz: 0, vh: 0, t: 0, b: null },
   wr: [], // splash particles
   stats: { opens: 0, minClear: 1e9, jumps: 0, landed: 0, falls: 0 },
+  all: [], // every bascule (lbBridges)
+  cur: null,
 };
+const LB_N_XC = 784; // north crossing: channel centre (port inbound lane x 788, outbound 780, liners ~783)
+const LB_KEYS = ["Y0", "Y1", "XA", "XB", "L", "st", "stats", "bar", "sig", "S", "force"];
+// a bascule over a horizontal (east-west) deck: rows y0..y0+6, leaves of length L either side of the channel centre xc
+function lbMake(id, y0, xc, L, occ, now, ok) {
+  const XA = xc - L,
+    XB = xc + L,
+    Y0 = y0,
+    Y1 = y0 + 6;
+  return {
+    id,
+    Y0,
+    Y1,
+    XA,
+    XB,
+    L,
+    occ,
+    now,
+    ok,
+    S: undefined,
+    force: null,
+    st: { t: -1, lit: 0, bar: 0, th: 0, amber: 0 },
+    stats: { opens: 0, minClear: 1e9, jumps: 0, landed: 0, falls: 0 },
+    // half barriers (entry lanes only): west for eastbound (north half), east for westbound (south half)
+    bar: [
+      { x: XA - 3.8, y0: Y0, y1: Y0 + 3, piv: Y0 - 0.3, dir: 1 },
+      { x: XB + 3.8, y0: Y0 + 3, y1: Y1, piv: Y1 + 0.3, dir: -1 },
+    ],
+    sig: [
+      [XA - 5.4, Y0 - 0.5],
+      [XA - 5.4, Y0 + 3],
+      [XB + 5.4, Y1 + 0.5],
+      [XB + 5.4, Y0 + 3],
+    ],
+  };
+}
+function lbUse(b) {
+  LB.cur = b;
+  for (const k of LB_KEYS) LB[k] = b[k];
+  return b;
+}
+// the bridges: Kingsbridge docks (port ships) and, v56, the long north-coast crossing (the cargo liners of world.boats)
+function lbBridges() {
+  // built once the ports have their ship timelines and bridge boxes (portInit), so both channels are known
+  if (LB.all.length || !world.ready || (world.port && !(world.port.ph && world.port.brgW)))
+    return LB.all;
+  if (world.kbPort)
+    LB.all.push(
+      lbMake(
+        "kb",
+        1942,
+        1752,
+        9,
+        lbOccPort,
+        () => (typeof portT === "function" ? portT() : timeS),
+        () => !!(world.kbPort && world.kbPort.ph),
+      ),
+    );
+  const N = (world.susp || []).find((S) => S.dir === "h" && S.a < 200 && S.r1 - S.r0 > 60);
+  if (N) {
+    // ships whose route crosses the deck: the opening goes where they cross (mean crossing x)
+    const yc = N.a + N.w / 2,
+      xs = [],
+      boats = [];
+    for (const o of world.boats) {
+      if (BOAT[o.kind][1] > 14) continue;
+      let hit = 0;
+      for (let k = 1; k < o.pts.length; k++) {
+        const a = o.pts[k - 1],
+          c = o.pts[k],
+          ay = a[1] / TILE,
+          cy = c[1] / TILE;
+        if ((ay - yc) * (cy - yc) > 0 || ay === cy) continue;
+        const x = (a[0] + ((c[0] - a[0]) * (yc - ay)) / (cy - ay)) / TILE;
+        if (x > N.r0 + 12 && x < N.r1 - 12) {
+          xs.push(x);
+          hit = 1;
+        }
+      }
+      if (hit) boats.push(o);
+    }
+    // the main port's container ships use the same channel (port.js portCfg routes both lanes through the opening)
+    const P = world.port && world.port.brgW && world.port.brgW.box,
+      port = P && P[1] <= N.a + 1 && P[3] >= N.a + N.w - 1 ? world.port : null;
+    if (boats.length || port) {
+      // opening centred between the liners' line and the port lanes (LB_N_XC), leaves 10 tiles each
+      const xc = port ? LB_N_XC : Math.round(xs.reduce((t, x) => t + x, 0) / xs.length),
+        B = lbMake(
+          "north",
+          N.a,
+          xc,
+          10,
+          null,
+          () => timeS,
+          () => true,
+        );
+      B.boats = boats;
+      B.port = port;
+      B.occ = (t, m) =>
+        lbOccBoats(B, t, m) || (!!port && lbOccPort(port, portT() + (t - timeS), m, B.L - 1));
+      B.S = N;
+      LB.all.push(B);
+    }
+  }
+  for (const b of LB.all) if (b.id === "kb") b.port = world.kbPort;
+  if (LB.all[0]) lbUse(LB.all[0]);
+  return LB.all;
+}
+// the docks bridge (port.js clips its fixed deck art round the open span)
+function lbKb() {
+  return lbBridges().find((q) => q.id === "kb");
+}
+// the bridge over a port's channel (its fixed deck art is clipped round the open span)
+function lbOfPort(P) {
+  return lbBridges().find((q) => q.port === P);
+}
+// the bridge the rig is on / nearest to (for the leaf ride, jump and drawing the raised rig)
+function lbTruckBridge() {
+  if (LB.pl.mode && LB.pl.b) return LB.pl.b;
+  let best = null,
+    bd = 1e9;
+  for (const b of lbBridges()) {
+    const d = Math.hypot(truck.x / M_T - (b.XA + b.XB) / 2, truck.y / M_T - (b.Y0 + b.Y1) / 2);
+    if (d < bd) {
+      bd = d;
+      best = b;
+    }
+  }
+  return best;
+}
 const lbSm = (x) => {
   x = Math.max(0, Math.min(1, x));
   return x * x * (3 - 2 * x);
 };
-// is any ship hull over / about to be over the span at time t
+// is any ship hull over / about to be over the active span at time t
 function lbOcc(t, m) {
-  const P = world.kbPort;
+  return LB.cur && LB.cur.occ ? LB.cur.occ(t, m) : false;
+}
+// port ships (world.kbPort or world.port) over the active span at port time t; side = allowed offset of the hull
+// centre from the channel centre (tiles)
+function lbOccPort(P, t, m, side) {
   if (!P || !P.ph || typeof portShips !== "function") return false;
   for (const o of portShips(P, t)) {
     if (!o.pose || o.anch) continue;
     const w = PL(P, o.pose.u, o.pose.v),
       along = Math.abs(w[1] - (LB.Y0 + LB.Y1) / 2),
-      side = Math.abs(w[0] - (LB.XA + LB.L));
-    if (along < SHIP.L / 2 + 3 + (m || 0) && side < SHIP.W / 2 + 4) return true;
+      sd = Math.abs(w[0] - (LB.XA + LB.L));
+    if (along < SHIP.L / 2 + 3 + (m || 0) && sd < side) return true;
+  }
+  return false;
+}
+// world.boats run at a constant speed, so their future position is known: s + v * (t - now)
+function lbOccBoats(B, t, m) {
+  const dt = t - timeS,
+    yc = (B.Y0 + B.Y1) / 2,
+    xc = B.XA + B.L;
+  for (const o of B.boats) {
+    const s0 = o.s;
+    o.s = s0 + o.v * dt;
+    const p = boatPos(o);
+    o.s = s0;
+    const [Lm, Wm] = BOAT[o.kind],
+      half = Lm / 2 / M_T,
+      ax = Math.abs(Math.sin(p[2])),
+      ay = Math.abs(Math.cos(p[2])),
+      ext = half * ay + (Wm / 2 / M_T) * ax; // hull extent along y
+    if (
+      Math.abs(p[1] / TILE - yc) < ext + 3 + (m || 0) &&
+      Math.abs(p[0] / TILE - xc) < half * ax + Wm / 2 / M_T + 4
+    )
+      return true;
   }
   return false;
 }
 function lbState() {
   const S = LB.st,
-    t = typeof portT === "function" ? portT() : timeS;
+    t = LB.cur ? LB.cur.now() : timeS;
   if (LB.force) return Object.assign(S, { lit: 1, bar: 1, amber: 0 }, LB.force);
   if (Math.abs(t - S.t) < 0.05) return S;
   S.t = t;
-  if (!world.kbPort || !world.kbPort.ph) {
+  if (!LB.cur || !LB.cur.ok()) {
     S.lit = S.bar = S.th = 0;
     return S;
   }
@@ -100,7 +261,8 @@ function lbGapPx() {
   return [LB.XA + r, LB.XB - r];
 }
 // clip out the open span (world coords) so the fixed deck's shadows / edge lines don't cross the water
-function lbGapClip(sh) {
+function lbGapClip(sh, b) {
+  if (b) lbUse(b);
   if (lbAng() < 0.004) return;
   // the open span, swept by the deck-shadow offset (sh tiles) so the shadow of the missing deck goes too
   const o = sh || 0,
@@ -330,20 +492,9 @@ function lbTower(x, y, dark) {
     dnLight(x * TILE, y * TILE, 90, "rgba(255,225,170,1)", 0.5);
   }
 }
-// road signals + half barriers (entry lanes only): west for eastbound (north half), east for westbound (south half)
-const LB_BAR = [
-  { x: 1739.2, y0: 1942, y1: 1945, piv: 1941.7, dir: 1 },
-  { x: 1764.8, y0: 1945, y1: 1948, piv: 1948.3, dir: -1 },
-];
-const LB_SIG = [
-  [1737.6, 1941.5],
-  [1737.6, 1945.0],
-  [1766.4, 1948.5],
-  [1766.4, 1945.0],
-];
 function lbFurniture(S, dark) {
   const blink = Math.floor(timeS * 2.2) % 2;
-  for (const [x, y] of LB_SIG) {
+  for (const [x, y] of LB.sig) {
     ctx.save();
     ctx.translate(x * TILE, y * TILE);
     ctx.fillStyle = "rgba(0,0,0,0.35)";
@@ -372,7 +523,7 @@ function lbFurniture(S, dark) {
     if (S.lit)
       dnLight(x * TILE, y * TILE, 34, S.amber ? "rgba(255,176,0,1)" : "rgba(255,40,30,1)", 0.9);
   }
-  for (const B of LB_BAR) {
+  for (const B of LB.bar) {
     // arm pivots at the deck edge and swings up (top-down: it foreshortens toward the post)
     const len = (B.y1 - B.y0) * TILE * (0.08 + 0.92 * S.bar),
       px = B.x * TILE,
@@ -433,11 +584,12 @@ function lbWater() {
   if (a < 0.004) return;
   ctx.save();
   ctx.fillStyle = TEX && TEX.water ? ctx.createPattern(TEX.water[0], "repeat") : "#2f6f9c";
+  const m = LB.cur.boats ? 0.7 : 0.25; // the north deck's baked edge lines sit just outside its rows
   ctx.fillRect(
     LB.XA * TILE,
-    (LB.Y0 - 0.25) * TILE,
+    (LB.Y0 - m) * TILE,
     (LB.XB - LB.XA) * TILE,
-    (LB.Y1 - LB.Y0 + 0.5) * TILE,
+    (LB.Y1 - LB.Y0 + 2 * m) * TILE,
   );
   // the pier walls under the hinges + a darker band where the deck shades the water
   ctx.fillStyle = "rgba(10,30,50,0.08)";
@@ -461,7 +613,7 @@ function lbWater() {
 // cables/towers are skipped) and draw plain parapets + lamp posts on the fixed approach decks instead
 function lbSusp() {
   if (LB.S === undefined)
-    LB.S =
+    LB.cur.S = LB.S =
       (world.susp || []).find(
         (S) =>
           S.dir === "h" &&
@@ -499,7 +651,7 @@ function lbRails(dark) {
   ctx.restore();
 }
 function lbDraw(vx0, vy0, vx1, vy1) {
-  if (!world.kbPort || !lbNear(vx0, vy0, vx1, vy1)) return;
+  if (!LB.cur || !LB.cur.ok() || !lbNear(vx0, vy0, vx1, vy1)) return;
   const S = lbState(),
     a = S.th * LB.AMAX,
     dark = typeof DN !== "undefined" && DN.dark > 0.05;
@@ -550,7 +702,7 @@ function lbStopAcc(v, v0) {
   if (ty < LB.Y0 - 0.5 || ty > LB.Y1 + 0.5 || tx < LB.XA - 60 || tx > LB.XB + 60) return 1e9;
   const hx = fwd(v.h)[0];
   if (Math.abs(hx) < 0.7) return 1e9;
-  const stopX = hx > 0 ? LB_BAR[0].x - 0.8 : LB_BAR[1].x + 0.8,
+  const stopX = hx > 0 ? LB.bar[0].x - 0.8 : LB.bar[1].x + 0.8,
     gap = (hx > 0 ? stopX - tx : tx - stopX) * M_T - v.L / 2;
   if (gap < -0.5) return 1e9; // already past the line: clear the span
   return idmAcc(v, v0, Math.max(0.1, gap), 0);
@@ -578,7 +730,7 @@ function lbBarrierHit(s, prev) {
     return false;
   const A = railBodyPts(s),
     B = railBodyPts(Object.assign({}, s, prev));
-  for (const bar of LB_BAR) {
+  for (const bar of LB.bar) {
     const xb = bar.x * M_T,
       outside = (q) => (bar.dir > 0 ? q[0] < xb : q[0] > xb);
     const inLane = (q) => q[1] / M_T >= bar.y0 - 0.1 && q[1] / M_T <= bar.y1 + 0.1;
@@ -678,25 +830,61 @@ function lbTruckStep(s, inp, dt, base) {
     up = tx < LB.XA + LB.L ? 1 : -1;
   s.v -= LB_G * Math.sin(a) * hx * up * Math.sign(s.mode === "R" ? -1 : 1) * dt * 0.9;
 }
+// ships of the north crossing swing through the open span: drawn over the water fill, under the leaves
+function lbBoatsInGap() {
+  const B = LB.cur;
+  if (!B.boats || lbAng() < 0.004) return;
+  for (const o of B.boats) {
+    const [x, y, h] = boatPos(o);
+    if (
+      Math.abs(y / TILE - (B.Y0 + B.Y1) / 2) < BOAT[o.kind][0] / M_T &&
+      x / TILE > B.XA - 2 &&
+      x / TILE < B.XB + 2
+    )
+      drawBoat(o, x, y, h);
+  }
+}
+// run f for every bridge (as the active one); returns the list of results
+function lbEach(f) {
+  const out = [];
+  for (const b of lbBridges()) {
+    lbUse(b);
+    out.push(f(b));
+  }
+  return out;
+}
 // ---------- wiring
 {
   const rs = railStopAcc;
   railStopAcc = function (v, v0) {
-    return Math.min(rs(v, v0), lbStopAcc(v, v0));
+    let a = rs(v, v0);
+    for (const b of lbBridges()) {
+      lbUse(b);
+      a = Math.min(a, lbStopAcc(v, v0));
+    }
+    return a;
   };
   const rb = railBarrierHit;
   railBarrierHit = function (s, prev) {
-    return rb(s, prev) || (s === truck && lbBarrierHit(s, prev));
+    if (rb(s, prev)) return true;
+    if (s !== truck) return false;
+    return lbEach(() => lbBarrierHit(s, prev)).some(Boolean);
   };
   const st = stepTruck;
   stepTruck = function (s, inp, dt) {
-    if (s !== truck || !world.kbPort) return st(s, inp, dt);
-    return lbTruckStep(s, inp, dt, st);
+    const b = s === truck && lbTruckBridge();
+    if (!b) return st(s, inp, dt);
+    lbUse(b);
+    const r = lbTruckStep(s, inp, dt, st);
+    LB.pl.b = LB.pl.mode ? b : null;
+    return r;
   };
   const cl = portClipBridges;
   portClipBridges = function (P) {
     cl(P);
-    if (P !== world.kbPort) return;
+    const b = lbBridges().find((q) => q.port === P);
+    if (!b) return;
+    lbUse(b);
     const g = lbGapPx();
     if (!g) return;
     // let ships show through the open span (re-include it in the even-odd clip)
@@ -710,7 +898,11 @@ function lbTruckStep(s, inp, dt, base) {
   drawTraffic = function (vx0, vy0, vx1, vy1) {
     const r = dtf.apply(this, arguments);
     try {
-      if (world.kbPort && lbNear(vx0, vy0, vx1, vy1)) lbWater();
+      lbEach((b) => {
+        if (!b.ok() || !lbNear(vx0, vy0, vx1, vy1)) return;
+        lbWater();
+        if (b.boats) lbBoatsInGap(); // liners in the opening: over the water, under the leaves (drawPortLow)
+      });
     } catch (e) {
       if (!LB.err) console.warn("liftbridge water", e);
       LB.err = e;
@@ -721,7 +913,7 @@ function lbTruckStep(s, inp, dt, base) {
   drawPortLow = function (vx0, vy0, vx1, vy1) {
     const r = dpl.apply(this, arguments);
     try {
-      lbDraw(vx0, vy0, vx1, vy1);
+      lbEach(() => lbDraw(vx0, vy0, vx1, vy1));
     } catch (e) {
       if (!LB.err) console.warn("liftbridge", e);
       LB.err = e;
@@ -738,6 +930,7 @@ function lbTruckStep(s, inp, dt, base) {
         dl();
         ctx.restore();
         // it went down between the leaves: they stand in front of it
+        lbUse(Q.b || lbTruckBridge());
         const a = lbAng(),
           dark = typeof DN !== "undefined" && DN.dark > 0.05;
         if (a >= 0.004) {
@@ -748,6 +941,7 @@ function lbTruckStep(s, inp, dt, base) {
       }
       return dl();
     }
+    lbUse(Q.b || lbTruckBridge());
     // raised: ground shadow, then the rig scaled toward the camera about its own position
     const zt = Q.z / M_T,
       s = 1 + 0.035 * zt,
@@ -774,7 +968,7 @@ function lbTruckStep(s, inp, dt, base) {
   const dsl = drawStreetLamps;
   drawStreetLamps = function () {
     ctx.save();
-    lbGapClip();
+    lbEach(() => lbGapClip());
     dsl.apply(this, arguments);
     ctx.restore();
   };
@@ -783,45 +977,49 @@ function lbTruckStep(s, inp, dt, base) {
   slOn = function (l) {
     if (
       l &&
-      l.px > LB.XA * TILE &&
-      l.px < LB.XB * TILE &&
-      l.py > (LB.Y0 - 1) * TILE &&
-      l.py < (LB.Y1 + 1) * TILE &&
-      lbAng() >= 0.004
+      lbBridges().some(
+        (b) =>
+          l.px > b.XA * TILE &&
+          l.px < b.XB * TILE &&
+          l.py > (b.Y0 - 1) * TILE &&
+          l.py < (b.Y1 + 1) * TILE &&
+          b.st.th >= 0.004 / LB.AMAX,
+      )
     )
       return 0;
     return slo.apply(this, arguments);
   };
+  // a bascule replaces the generated suspension cables / towers of its crossing
   const dov = drawOverhead;
   drawOverhead = function (o) {
-    if (
-      (o.kind === "susp" || o.kind === "stower") &&
-      o.S &&
-      lbSusp() &&
-      o.S.a === LB.S.a &&
-      o.S.r0 === LB.S.r0
-    )
-      return;
+    if ((o.kind === "susp" || o.kind === "stower") && o.S)
+      for (const b of lbBridges()) {
+        lbUse(b);
+        const S = lbSusp();
+        if (S && o.S.a === S.a && o.S.r0 === S.r0) return;
+      }
     return dov.apply(this, arguments);
   };
+  // the deck of a north-crossing bridge hides ships beneath it; while open they show in the gap (lbBoatsInGap)
   const ut = updateTraffic;
   updateTraffic = function (dt) {
     try {
-      if (world.kbPort) {
+      lbEach((b) => {
+        if (!b.ok()) return;
         lbClearSpan();
-        for (let i = LB.wr.length - 1; i >= 0; i--) {
-          const w = LB.wr[i];
-          w.t += dt;
-          if (!w.ring) {
-            w.x += w.vx * dt;
-            w.y += w.vy * dt;
-            w.vx *= 0.96;
-            w.vy *= 0.96;
-          }
-          if (w.t > w.life) LB.wr.splice(i, 1);
-        }
         // safety audit: a ship over the span must always see it fully open
-        if (lbOcc(portT(), -2)) LB.stats.minClear = Math.min(LB.stats.minClear, lbState().th);
+        if (lbOcc(b.now(), -2)) LB.stats.minClear = Math.min(LB.stats.minClear, lbState().th);
+      });
+      for (let i = LB.wr.length - 1; i >= 0; i--) {
+        const w = LB.wr[i];
+        w.t += dt;
+        if (!w.ring) {
+          w.x += w.vx * dt;
+          w.y += w.vy * dt;
+          w.vx *= 0.96;
+          w.vy *= 0.96;
+        }
+        if (w.t > w.life) LB.wr.splice(i, 1);
       }
     } catch (e) {
       if (!LB.err) console.warn("liftbridge step", e);
