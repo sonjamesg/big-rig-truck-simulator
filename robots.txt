@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /dist/
+Disallow: /supabase/
+Disallow: /tests/
+Disallow: /tools/
+Disallow: /src/
+
+Sitemap: https://trucksim.co.uk/sitemap.xml

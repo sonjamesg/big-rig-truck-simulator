@@ -1,7 +1,10 @@
 {
  "name": "Big Rig Truck Simulator",
  "short_name": "BigRig",
- "start_url": "./",
+ "start_url": "/",
+ "id": "/",
+ "description": "Free UK lorry driving game in your browser",
+ "lang": "en-GB",
  "display": "fullscreen",
  "background_color": "#0d0f14",
  "theme_color": "#e8a317",

@@ -23,6 +23,7 @@
 #setPanel{margin:16px auto 6px;padding:10px 18px;border-radius:14px;background:rgba(14,20,32,.78);border:1px solid rgba(245,184,46,.35);box-shadow:0 8px 24px rgba(0,0,0,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;flex-direction:column;gap:8px;align-items:stretch;min-width:min(300px,86vw)}
 #setPanel .sph{font-size:11px;letter-spacing:3px;font-weight:800;color:#f5b82e;opacity:.85;text-align:left}
 #setPanel>*:not(.sph){margin:0!important;justify-content:space-between!important}
+#homeAbout{color:#7dd3fc;text-decoration:underline;pointer-events:auto}
 #homeVer{position:relative;margin-top:14px;padding-bottom:4px;font-size:10px;letter-spacing:1px;opacity:.45;color:#cfd6e0}
 body.touch #overlay #loadBox{width:min(380px,90vw)}
 @media (orientation:landscape) and (max-height:500px){ body.touch #overlay #logo{max-height:30vh!important} body.touch #overlay #loadBox{margin-top:10px} body.touch #setPanel{margin-top:10px;padding:8px 14px} }
@@ -286,6 +287,16 @@ body:not(.touch) #overlay>#homeVer{grid-column:1/span 2;grid-row:7;margin:0!impo
       const v = document.createElement("div");
       v.id = "homeVer";
       v.textContent = (window.BIGRIG_VERSION || "") + " \u2022 web preview";
+      // the /about/ page only exists on the hosted site (trucksim.co.uk), not in BigRig.html opened from disk
+      if (/^https?:/.test(location.protocol)) {
+        const a = document.createElement("a");
+        a.id = "homeAbout";
+        a.href = "/about/";
+        a.textContent = "About the game";
+        for (const ev of ["pointerdown", "click", "touchstart"])
+          a.addEventListener(ev, (e) => e.stopPropagation());
+        v.append(" \u2022 ", a);
+      }
       ov.appendChild(v);
     }
   });

@@ -4,7 +4,7 @@
   with the concatenated src/*.js bundle and the BUILD_ID placeholder with a UTC build stamp -> index.html / BigRig.html / dist.
   Exposes: DOM ids used by the scripts (e.g. #game, #overlay, #frame). Depends on: nothing (scripts are inlined at build).
 -->
-<html lang="en">
+<html lang="en-GB">
   <head>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
@@ -66,8 +66,30 @@
         font-size: max(16px, 1em) !important;
       }
     </style>
-    <title>Big Rig Truck Simulator</title>
+    <title>Big Rig Truck Simulator – free UK lorry driving game in your browser</title>
+    <meta name="description" content="Free UK lorry driving game in your browser. Haul curtain-siders, fridges, tankers and containers on the left across three landmasses, cities and motorways, by day and night. No download, plays on phones." />
+    <link rel="canonical" href="https://trucksim.co.uk/" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Big Rig Truck Simulator" />
+    <meta property="og:locale" content="en_GB" />
+    <meta property="og:url" content="https://trucksim.co.uk/" />
+    <meta property="og:title" content="Big Rig Truck Simulator – free UK lorry driving game" />
+    <meta property="og:description" content="Free UK lorry driving game in your browser. Haul curtain-siders, fridges, tankers and containers on the left across three landmasses, cities and motorways, by day and night. No download, plays on phones." />
+    <meta property="og:image" content="https://trucksim.co.uk/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="A lorry at a lit city junction at night in Big Rig Truck Simulator" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Big Rig Truck Simulator – free UK lorry driving game" />
+    <meta name="twitter:description" content="Free UK lorry driving game in your browser. Haul curtain-siders, fridges, tankers and containers on the left across three landmasses, cities and motorways, by day and night. No download, plays on phones." />
+    <meta name="twitter:image" content="https://trucksim.co.uk/og-image.jpg" />
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"VideoGame","name":"Big Rig Truck Simulator","url":"https://trucksim.co.uk/","image":"https://trucksim.co.uk/og-image.jpg","description":"Free UK lorry driving game in your browser. Haul curtain-siders, fridges, tankers and containers on the left across three landmasses, cities and motorways, by day and night. No download, plays on phones.","genre":["Simulation","Driving"],"gamePlatform":["Web browser","Desktop","Mobile"],"applicationCategory":"Game","operatingSystem":"Any (modern web browser)","inLanguage":"en-GB","playMode":["SinglePlayer","MultiPlayer"],"numberOfPlayers":{"@type":"QuantitativeValue","minValue":1},"offers":{"@type":"Offer","price":"0","priceCurrency":"GBP","availability":"https://schema.org/InStock"},"sameAs":["https://trucksim.co.uk/about/"]}
+    </script>
     <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
     <link
       rel="icon"
       type="image/png"
@@ -387,6 +409,15 @@
     </script>
   </head>
   <body>
+    <noscript>
+      <h1>Big Rig Truck Simulator</h1>
+      <p>A free UK lorry driving game that runs in your web browser. Drive on the left in mph across three landmasses with the
+        cities of Albion, Sandvale and Kingsbridge, linked by the M1, M2 and M3 motorways. Take delivery jobs from the job board,
+        couple curtain-siders, fridge boxes, tankers, flatbeds and container trailers, refuel, repair, and practise at the LGV
+        training ground. Traffic lights, roundabouts, pedestrians, AI traffic, police, ambulances and fire engines, lift bridges
+        with ships, day and night and rain and fog. Multiplayer with invite codes. Keyboard, Xbox controller and phone controls.</p>
+      <p>This game needs JavaScript. <a href="/about/">Read about the game</a>.</p>
+    </noscript>
     <div id="wrap">
       <div id="stage">
         <div id="scaler">
