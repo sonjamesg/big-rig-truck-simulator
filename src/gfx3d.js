@@ -6,7 +6,7 @@
  *   drawn on top. Drawn after the ground vehicles + shadow layer (so walls hide traffic behind them) and before
  *   rail / overhead / night; tallest last. At night the lit-window pattern is added on the walls and the roof window
  *   dots of daynight.js are hidden on lifted buildings. High quality only, skipped when zoomed far out.
- * Exposes (globals): G3, G3_HCAM, gfx3dOn, gfx3dDraw, gfx3dNight, gfxBOff
+ * Exposes (globals): G3, G3_HCAM, gfx3dOn, g3H, g3LitShare, G3_WINC, g3WinPaths, gfx3dDraw, gfx3dNight, gfxBOff
  * Depends on: gfx.js (GFX, gfxHi), gfxshade.js (SUN, gfxShadeLayer), render.js (chunkCache, CHUNK), world.js
  *   (world.chunkObjs), daynight.js (DN, drawNight)
  * Load order: after gfxshade.js in build.py. All files share one global scope (see AGENTS.md).
@@ -18,8 +18,7 @@ const G3 = {
   vis: [],
   walls: [],
   off: new Map(),
-  pat: null,
-  patN: null,
+  wc: new WeakMap(), // per-building cached window paths (g3WinPaths)
 };
 function gfx3dOn() {
   return gfxHi() && !GFX.off.b3d && cam.z > 0.45;
@@ -39,7 +38,9 @@ function g3Roof(o) {
   const ch = [];
   for (let cy = Math.floor(y0 / CHUNK); cy <= Math.floor((y0 + h - 1) / CHUNK); cy++)
     for (let cx = Math.floor(x0 / CHUNK); cx <= Math.floor((x0 + w - 1) / CHUNK); cx++) {
-      const k = chunkCache.get(cx + "," + cy);
+      // a chunk not baked yet (the building reaches past the view's baked ring): bake it now rather than skip
+      // the building, which made it pop in at the screen edge
+      const k = chunkCache.get(cx + "," + cy) || getChunk(cx, cy, true);
       if (!k) return null;
       ch.push([k, cx * CHUNK, cy * CHUNK]);
     }
@@ -58,31 +59,29 @@ function g3Roof(o) {
   c.x0 = x0;
   c.y0 = y0;
   G3.roofs.set(o, c);
-  while (G3.roofs.size > 220) G3.roofs.delete(G3.roofs.keys().next().value);
+  while (G3.roofs.size > 900) G3.roofs.delete(G3.roofs.keys().next().value);
   return c;
 }
-// window patterns: day glass, night lit windows (one 16 x 12 cell per window per floor)
-function g3Pats() {
-  if (G3.pat) return;
-  const mk = (night) => {
-    const c = document.createElement("canvas");
-    c.width = 64;
-    c.height = 48;
-    const g = c.getContext("2d");
-    let s = 11;
-    const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
-    for (let j = 0; j < 4; j++)
-      for (let i = 0; i < 4; i++) {
-        if (night) {
-          if (r() < 0.45) continue;
-          g.fillStyle = r() < 0.8 ? "rgba(255,206,120,1)" : "rgba(190,220,255,1)";
-        } else g.fillStyle = "rgba(18,28,44,0.5)";
-        g.fillRect(i * 16 + 4, j * 12 + 3, 8, 6);
-      }
-    return c;
-  };
-  G3.pat = ctx.createPattern(mk(false), "repeat");
-  G3.patN = ctx.createPattern(mk(true), "repeat");
+// stable per-window hash in [0,1): building world position, wall, column, floor (never the camera)
+function g3H(a, b, c, d) {
+  let h = Math.imul((a | 0) ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul((b | 0) + 0x7f4a7c15, 0xc2b2ae35);
+  h = Math.imul(h ^ (h >>> 15) ^ Math.imul(c + 1, 0x27d4eb2f), 0x165667b1);
+  h = Math.imul(h ^ (h >>> 13) ^ Math.imul(d + 7, 0x9e3779b1), 0x85ebca6b);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+// share of a building's windows lit at this hour (changes slowly with the clock only; cached per 5 game minutes)
+function g3LitShare(l) {
+  if (!l || !l.win) return 0.5;
+  if (!l.win.length) return 0;
+  const hh = gameT < 12 ? gameT + 24 : gameT,
+    k = (hh * 12) | 0;
+  if (l.gfxT !== k) {
+    let lit = 0;
+    for (const w of l.win) if (w[2] && hh <= w[3]) lit++;
+    l.gfxT = k;
+    l.gfxF = lit / l.win.length;
+  }
+  return l.gfxF;
 }
 // roof offset for night lights / halos (centre shift)
 function gfxBOff(o) {
@@ -93,7 +92,6 @@ function gfx3dDraw(vx0, vy0, vx1, vy1) {
   G3.walls.length = 0;
   G3.off.clear();
   if (!gfx3dOn()) return;
-  g3Pats();
   const cx = (vx0 + vx1) / 2,
     cy = (vy0 + vy1) / 2,
     M = 200,
@@ -135,8 +133,10 @@ function gfx3dDraw(vx0, vy0, vx1, vy1) {
       oy = o.y + o.h / 2,
       off = [(ox - cx) * k, (oy - cy) * k];
     // roof off screen and footprint off screen -> nothing to draw
-    if (Math.max(o.x, Q[0][0]) > vx1 || Math.min(o.x + o.w, Q[2][0]) < vx0) continue;
-    if (Math.max(o.y, Q[0][1]) > vy1 || Math.min(o.y + o.h, Q[2][1]) < vy0) continue;
+    // (both must be off the same side: the old max/min test culled edge buildings whose roof leans past the edge
+    // while their footprint and walls were still on screen, so they popped in late)
+    if (Math.min(o.x, Q[0][0]) > vx1 || Math.max(o.x + o.w, Q[2][0]) < vx0) continue;
+    if (Math.min(o.y, Q[0][1]) > vy1 || Math.max(o.y + o.h, Q[2][1]) < vy0) continue;
     G3.off.set(o, off);
     const c = G3.col.get(o) || [120, 120, 120];
     for (let i = 0; i < 4; i++) {
@@ -174,7 +174,8 @@ function gfx3dDraw(vx0, vy0, vx1, vy1) {
         o,
       };
       G3.walls.push(w);
-      g3WallFill(w, G3.pat, 1);
+      w.i = i;
+      g3WallFill(w, false, 1);
     }
     ctx.drawImage(
       r,
@@ -186,17 +187,66 @@ function gfx3dDraw(vx0, vy0, vx1, vy1) {
     G3.vis.push(o);
   }
 }
-function g3WallFill(w, pat, a) {
+// windows on a wall, in wall space (u along the edge, v up the wall), one 8 x 6 window per 16 x 12 cell. Which windows
+// exist / are lit and how bright depends only on the building's world position (g3H), so they stay put while the camera
+// moves; when a floor is squeezed under ~2 screen px the wall gets an even tint instead (no shimmering minified grid).
+// The lit windows are grouped into 4 colour / brightness paths per wall, cached until the lit share changes.
+const G3_WINC = ["rgb(255,206,120)", "rgb(190,220,255)"];
+function g3WinPaths(w, f) {
+  const o = w.o,
+    cols = Math.floor((w.L - 4) / 16),
+    rows = Math.floor((w.H - 8) / 12),
+    fk = Math.round(f * 40),
+    key = w.i + ":" + Math.round(w.L) + ":" + rows + ":" + fk;
+  let C = G3.wc.get(o);
+  if (!C) G3.wc.set(o, (C = {}));
+  const hit = C[w.i];
+  if (hit && hit.key === key) return hit;
+  const x0 = (w.L - cols * 16) / 2,
+    ox = Math.round(o.x),
+    oy = Math.round(o.y),
+    day = new Path2D(),
+    lit = [new Path2D(), new Path2D(), new Path2D(), new Path2D()]; // [colour][dim|bright]
+  for (let j = 0; j < rows; j++)
+    for (let i = 0; i < cols; i++) {
+      const X = x0 + i * 16 + 4,
+        Y = 4 + j * 12 + 3;
+      day.rect(X, Y, 8, 6);
+      if (g3H(ox, oy, w.i * 97 + i, j) >= fk / 40) continue;
+      const bq = g3H(oy, ox, w.i * 97 + i, j + 31);
+      lit[(bq < 0.8 ? 0 : 2) + (g3H(ox + 7, oy, w.i, i * 131 + j) < 0.5 ? 0 : 1)].rect(X, Y, 8, 6);
+    }
+  return (C[w.i] = { key, cols, rows, x0, day, lit });
+}
+function g3WallFill(w, night, a, f) {
+  const cols = Math.floor((w.L - 4) / 16),
+    rows = Math.floor((w.H - 8) / 12);
+  if (cols < 1 || rows < 1) return;
+  const fl = Math.hypot(w.m[2], w.m[3]) * 12 * cam.z * RSF; // screen px per floor
+  // wall space [0,L] x [0,H] maps exactly onto the wall quad, so no clip is needed
   ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(w.q[0][0], w.q[0][1]);
-  for (let i = 1; i < 4; i++) ctx.lineTo(w.q[i][0], w.q[i][1]);
-  ctx.closePath();
-  ctx.clip();
   ctx.transform(...w.m);
-  ctx.globalAlpha *= a;
-  ctx.fillStyle = pat;
-  ctx.fillRect(0, 3, w.L, w.H - 5); // keep a plinth and parapet free of windows
+  if (fl < 2) {
+    // too thin for single windows: even tint with the same average
+    const x0 = (w.L - cols * 16) / 2;
+    ctx.globalAlpha *= a * (night ? 0.55 * f : 0.5) * Math.min(1, fl / 2 + 0.3);
+    ctx.fillStyle = night ? "rgb(255,200,120)" : "rgba(18,28,44,0.5)";
+    ctx.fillRect(x0, 4, cols * 16, rows * 12);
+    ctx.restore();
+    return;
+  }
+  const P = g3WinPaths(w, night ? f : 1),
+    ga = ctx.globalAlpha * a * Math.min(1, (fl - 1.5) / 2);
+  if (!night) {
+    ctx.globalAlpha = ga;
+    ctx.fillStyle = "rgba(18,28,44,0.5)";
+    ctx.fill(P.day);
+  } else
+    for (let k = 0; k < 4; k++) {
+      ctx.globalAlpha = ga * (k & 1 ? 1 : 0.75);
+      ctx.fillStyle = G3_WINC[k >> 1];
+      ctx.fill(P.lit[k]);
+    }
   ctx.restore();
 }
 // after the darkness layer: lit windows on the walls (lit share from the building's own window list)
@@ -208,9 +258,8 @@ function gfx3dNight(vx0, vy0, vx1, vy1, z) {
   ctx.setTransform(RSF * z, 0, 0, RSF * z, -vx0 * z * RSF, -vy0 * z * RSF);
   ctx.globalCompositeOperation = "lighter";
   for (const w of G3.walls) {
-    const l = G3.lt && G3.lt.get(w.o),
-      f = l && l.gfxF !== undefined ? l.gfxF : 0.5;
-    if (f > 0.02) g3WallFill(w, G3.patN, Math.min(1, 0.35 + f) * 0.8 * K);
+    const f = g3LitShare(G3.lt && G3.lt.get(w.o));
+    if (f > 0.02) g3WallFill(w, true, 0.8 * K, Math.min(1, 0.2 + f));
   }
   ctx.restore();
 }

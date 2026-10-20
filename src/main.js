@@ -603,13 +603,9 @@ function draw() {
       }
       if (c) ctx.drawImage(c, cx * CHUNK, cy * CHUNK, CHUNK + 0.5, CHUNK + 0.5);
     }
-  // prefetch one chunk ahead in travel direction
-  if (budget > 0) {
-    const f = fwd(truck.h);
-    const px = cam.x + f[0] * Math.sign(truck.v || 1) * 900,
-      py = cam.y + f[1] * Math.sign(truck.v || 1) * 900;
-    getChunk(Math.floor(px / CHUNK), Math.floor(py / CHUNK), true);
-  }
+  // pre-bake a ring of chunks round the view (leftover budget, travel side first) so buildings, whose 3D roofs and
+  // walls need every chunk under their footprint, are ready before they reach the screen edge (they used to pop in)
+  if (budget > 0 && z >= 0.34) chunkRing(c0x, c1x, c0y, c1y, budget);
   try {
     drawPuddles(vx0, vy0, vx1, vy1, z);
   } catch (e) {}
@@ -2432,4 +2428,27 @@ cv.addEventListener(
   };
   cv.addEventListener("pointerup", up);
   cv.addEventListener("pointercancel", up);
+}
+
+// bake missing chunks in a 1-chunk ring round the visible ones (2 ahead in the travel direction), nearest first;
+// never more than `budget` per frame and never more than the LRU can keep alongside the visible set
+function chunkRing(c0x, c1x, c0y, c1y, budget) {
+  const f = fwd(truck.h),
+    sg = Math.sign(truck.v || 1),
+    dx = f[0] * sg,
+    dy = f[1] * sg,
+    X0 = c0x - 1 - (dx < -0.3 ? 1 : 0),
+    X1 = c1x + 1 + (dx > 0.3 ? 1 : 0),
+    Y0 = c0y - 1 - (dy < -0.3 ? 1 : 0),
+    Y1 = c1y + 1 + (dy > 0.3 ? 1 : 0);
+  if ((X1 - X0 + 1) * (Y1 - Y0 + 1) > 84) return;
+  const mx = (c0x + c1x) / 2,
+    my = (c0y + c1y) / 2,
+    miss = [];
+  for (let cy = Y0; cy <= Y1; cy++)
+    for (let cx = X0; cx <= X1; cx++)
+      if (!chunkCache.has(cx + "," + cy))
+        miss.push([cx, cy, Math.hypot(cx - mx, cy - my) - ((cx - mx) * dx + (cy - my) * dy) * 0.8]);
+  miss.sort((a, b) => a[2] - b[2]);
+  for (let i = 0; i < miss.length && i < budget; i++) getChunk(miss[i][0], miss[i][1], true);
 }

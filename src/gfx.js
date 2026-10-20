@@ -276,23 +276,17 @@ function gfxLights(vx0, vy0, vx1, vy1, z) {
     }
     // windows: a soft halo per lit building
     if (hi && DN.grid && !GFX.off.halos) {
-      const Cc = DN.cell,
-        hh = gameT < 12 ? gameT + 24 : gameT;
+      const Cc = DN.cell;
       let nb = 0;
       for (let cy = Math.floor((vy0 - 300) / Cc); cy <= Math.floor((vy1 + 300) / Cc); cy++)
         for (let cx = Math.floor((vx0 - 300) / Cc); cx <= Math.floor((vx1 + 300) / Cc); cx++) {
           const a = DN.grid.get(cx + "," + cy);
           if (a)
             for (const l of a) {
-              if (l.k !== "b" || !on(l.x, l.y, 250) || nb++ > 300) continue;
+              // on-screen test first, then a generous cap (was 300 in grid order: halos came and went with the camera)
+              if (l.k !== "b" || !on(l.x, l.y, 250) || nb++ > 2500) continue;
               const o = l.o;
-              if (l.gfxT !== ((hh * 12) | 0)) {
-                let lit = 0;
-                for (const w of l.win) if (w[2] && hh <= w[3]) lit++;
-                l.gfxT = (hh * 12) | 0;
-                l.gfxF = l.win.length ? lit / l.win.length : 0;
-              }
-              const f = l.gfxF,
+              const f = typeof g3LitShare === "function" ? g3LitShare(l) : 0,
                 R = Math.min(170, Math.max(o.w, o.h) * 0.55);
               const b = typeof gfxBOff === "function" ? gfxBOff(o) : null,
                 bx = l.x + (b ? b[0] : 0),

@@ -403,17 +403,27 @@ function drawNight(vx0, vy0, vx1, vy1, z) {
       gz(l.col, l.x, l.y, l.r * 3, 0.9 * f);
     } else if (l.k === "fl")
       gz(l.pz ? "rgba(255,225,170,0.6)" : DN_COL.fl, l.x, l.y, l.r * 0.5, 0.45);
-    else if (l.k === "b" && nb++ < 500) {
+    else if (
+      l.k === "b" &&
+      // on-screen buildings only, then a generous cap (was 500 in grid order incl. the 300 px pad, so which roofs
+      // got their window dots changed as the camera moved)
+      l.o.x + l.o.w > vx0 &&
+      l.o.x < vx1 &&
+      l.o.y + l.o.h > vy0 &&
+      l.o.y < vy1 &&
+      nb++ < 4000
+    ) {
       const o = l.o;
       ctx.globalAlpha = 0.75 * K;
       ctx.fillStyle = "#ffd27a"; // v51: cyber towers no longer get always-on cyan strips, just lit windows
       for (const w of l.hideWin ? [] : l.win) {
         if (!w[2] || hh > w[3]) continue;
+        // whole screen pixels: no sub-pixel shimmer while the camera pans
         ctx.fillRect(
-          (w[0] - vx0) * z,
-          (w[1] - vy0) * z,
-          Math.max(1.5, 5 * z),
-          Math.max(1.5, 4 * z),
+          Math.round((w[0] - vx0) * z),
+          Math.round((w[1] - vy0) * z),
+          Math.max(2, Math.round(5 * z)),
+          Math.max(2, Math.round(4 * z)),
         );
       }
       // v51: no shop strips, neon bars or cyber outlines on buildings (only windows + halos / pavement pools)
