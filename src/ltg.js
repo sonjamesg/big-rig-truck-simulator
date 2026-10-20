@@ -769,27 +769,14 @@ function ltgConeInit() {
     line = (u0, v0, u1, v1, step) => {
       const n = Math.max(1, Math.round(Math.hypot(u1 - u0, v1 - v0) / step));
       for (let i = 0; i <= n; i++) add(u0 + ((u1 - u0) * i) / n, v0 + ((v1 - v0) * i) / n);
-    },
-    r = mulberry(91);
-  for (let u = 4; u < 186; u += 6) {
-    add(u, LTG_SPINE[0] - 0.7);
-    add(u, LTG_SPINE[1] + 0.7);
-  }
-  for (let u = 6; u < 46; u += 3) add(u, 37);
-  line(47, 21, 47, 45, 3);
-  line(64, 16, 64, 45, 3);
-  line(104, 16, 104, 45, 3);
-  for (let u = 67; u < 104; u += 3) add(u, 45);
-  for (const [u, v] of [
-    [126.2, 28],
-    [127.3, 28],
-    [126.2, 30.5],
-    [127.3, 30.5],
-    [168.2, 28],
-    [167.3, 30.5],
-  ])
-    add(u, v);
-  for (let u = 14; u <= 86; u += 6) add(u, 63);
+    };
+  // v54b layout rules: cones only on lane edges / zone sides in even rows, never across an entrance, in a driving
+  // line (except the slalom line and the width-gate posts, which ARE the exercise), on roads, markings, bays, the gate
+  // apron or the town streets. Loop cones sit exactly on the painted edge lines, evenly spaced.
+  line(47, 21, 47, 44, 3); // bays | blind-side dock divider (behind the side wall)
+  line(64, 16, 64, 44, 3); // coupling stands: sides only, open to the spine
+  line(104, 16, 104, 44, 3);
+  for (let u = 14; u <= 86; u += 6) add(u, 63); // slalom line
   line(6, 56, 96, 56, 3);
   line(6, 70, 96, 70, 3);
   for (const [u, wm] of [
@@ -803,18 +790,14 @@ function ltgConeInit() {
   }
   line(100, 56, 130, 56, 3);
   line(100, 70, 130, 70, 3);
-  for (let u = 6; u <= 130; u += 4) {
-    add(u, 72.6);
-    add(u, 81.4);
-  }
-  line(130.6, 74.5, 130.6, 79.5, 1.5);
+  line(6, 73.5, 130, 73.5, 4); // e-stop lane edges, just outside the painted lines
+  line(6, 80.5, 130, 80.5, 4);
+  line(130.6, 74.5, 130.6, 79.5, 1.25); // end of the stop lane
   const [ox, oy, ow, oh, orr] = LTG_LOOP.o,
     [ix, iy, iw, ih, ir] = LTG_LOOP.i;
-  for (const [u, v] of ltgRing(ox + 0.8, oy + 0.8, ow - 1.6, oh - 1.6, orr - 0.8, 2.2))
+  for (const [u, v] of ltgRing(ox + 0.3, oy + 0.3, ow - 0.6, oh - 0.6, orr - 0.2, 2.2))
     add(u, v, 1);
-  for (const [u, v] of ltgRing(ix - 0.8, iy - 0.8, iw + 1.6, ih + 1.6, ir + 0.8, 2.2)) add(u, v, 1);
-  // chicane on the top straight: cones alternate either side of the lane centre (weave through)
-  [40, 52, 64, 76, 88].forEach((u, i) => add(u, i % 2 ? 91.1 : 89.9, 1));
+  for (const [u, v] of ltgRing(ix - 0.3, iy - 0.3, iw + 0.6, ih + 0.6, ir + 0.2, 2.2)) add(u, v, 1);
   {
     const [u, v, R] = LTG_PAN;
     for (let k = 0; k < 44; k++) {
@@ -822,12 +805,11 @@ function ltgConeInit() {
       add(u + Math.cos(a) * (R + 0.7), v + Math.sin(a) * (R + 0.7));
     }
   }
-  for (let u = 1; u < LTG.W; u += 3) add(u, LTG.H - 0.8);
-  for (let v = 17; v < LTG.H; v += 3) {
-    add(0.8, v);
-    if (v < LTG_SPINE[0] - 1 || v > LTG_SPINE[1] + 1) add(LTG.W - 0.8, v);
-  }
-  for (let i = 0; i < 40; i++) add(132 + r() * 4, 57 + r() * 50);
+  // perimeter (bottom + sides), gate opening on the spine rows kept clear
+  line(1, LTG.H - 0.8, LTG.W - 1, LTG.H - 0.8, 3);
+  line(0.8, 17, 0.8, LTG.H - 2, 3);
+  line(LTG.W - 0.8, 17, LTG.W - 0.8, LTG_SPINE[0] - 2, 3);
+  line(LTG.W - 0.8, LTG_SPINE[1] + 2, LTG.W - 0.8, LTG.H - 2, 3);
   const grid = new Map();
   for (const c of C) {
     c.x = c.hx;

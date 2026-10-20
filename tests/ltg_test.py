@@ -11,9 +11,28 @@ JS = r"""async()=>{ const out={}, fr=()=>new Promise(r=>requestAnimationFrame(r)
   const wait=async(n)=>{ for(let i=0;i<n;i++) await fr(); };
   FIRE.t=1e9; BK.nextGang=1e9; localStorage.removeItem('bigrig.ltgBest'); LTG.best=0;
   // lane centre of the loop (between the two cone rings), driven clockwise on screen: east along the bottom
-  const P=ltgRing(10.5,90.5,115,17,7.5,0.6).reverse().map(([u,v])=>Math.abs(v-90.5)<0.01&&u>34&&u<94?[u,90.5+0.8*Math.cos(Math.PI*(u-40)/12)]:[u,v]); let k0=0,bd=1e9; P.forEach((p,i)=>{const d=Math.hypot(p[0]-45,p[1]-107.5); if(d<bd){bd=d;k0=i}});
+  const P=ltgRing(10.5,90.5,115,17,7.5,0.6).reverse(); let k0=0,bd=1e9; P.forEach((p,i)=>{const d=Math.hypot(p[0]-45,p[1]-107.5); if(d<bd){bd=d;k0=i}});
   const lap=async(n,stopAt)=>{ for(let s=0;s<n;s++){ const a=P[(k0+s)%P.length], b=P[(k0+s+1)%P.length]; place(a[0],a[1],Math.atan2(b[0]-a[0],-(b[1]-a[1]))); await fr(); if(stopAt&&stopAt()) return s; } return n; };
   ltgCones(); out.cones=LTG.cones.length;
+  // 0) placement audit (home positions, local tiles): nothing on roads/buildings/pavements, the spine, the gate apron,
+  //    the town, the bays, the coupling stands or in the loop lane; loop cones exactly on the painted edge lines
+  { const rrD=(u,v,x,y,w,h,r)=>{ const cx=Math.min(Math.max(u,x+r),x+w-r), cy=Math.min(Math.max(v,y+r),y+h-r), inside=u>x&&u<x+w&&v>y&&v<y+h&&(Math.hypot(u-cx,v-cy)<=r||(u>x+r&&u<x+w-r)||(v>y+r&&v<y+h-r));
+      const d=(u>=x+r&&u<=x+w-r)?Math.min(Math.abs(v-y),Math.abs(v-y-h)):(v>=y+r&&v<=y+h-r)?Math.min(Math.abs(u-x),Math.abs(u-x-w)):Math.abs(Math.hypot(u-cx,v-cy)-r); return inside?-d:d; };
+    const bad={}, B=(k,c)=>{ (bad[k]=bad[k]||[]).push([+c[0].toFixed(1),+c[1].toFixed(1)]); };
+    const box=(u,v,a,b,c,d)=>u>a&&u<b&&v>c&&v<d;
+    for(const c of LTG.cones){ const u=c.hx/M_T-LTG.X0, v=c.hy/M_T-LTG.Y0, t=G[idx(Math.floor(c.hx/M_T),Math.floor(c.hy/M_T))], P=[u,v];
+      if(t!==T.LOT) B('tile'+t,P);
+      if(box(u,v,2,199,46.6,53.4)) B('spine',P);
+      if(box(u,v,106.5,187,13,47)) B('town',P);
+      if(box(u,v,6.5,46,19.5,38)) B('bays',P);
+      if(box(u,v,49.5,60,18,32)) B('blindBays',P);
+      if(box(u,v,64.5,103.5,15,46.5)) B('couple',P);
+      const dO=rrD(u,v,8.3,88.3,119.4,21.4,9.8), dI=rrD(u,v,12.7,92.7,110.6,12.6,5.2);
+      if(dO<-0.3&&dI>0.3) B('loopLane',P);
+      if(c.loop&&Math.min(Math.abs(dO),Math.abs(dI))>0.05) B('loopOffLine',P); }
+    const sp=(arr)=>{ const d=[]; for(let i=0;i<arr.length;i++){ const a=arr[i],b=arr[(i+1)%arr.length]; d.push(Math.hypot(a.hx-b.hx,a.hy-b.hy)); } return [+Math.min(...d).toFixed(2),+Math.max(...d).toFixed(2)]; };
+    const lp=(c)=>[c.hx/M_T-LTG.X0,c.hy/M_T-LTG.Y0], Lo=LTG.cones.filter(c=>c.loop&&Math.abs(rrD(...lp(c),8.3,88.3,119.4,21.4,9.8))<0.05), Li=LTG.cones.filter(c=>c.loop&&Math.abs(rrD(...lp(c),12.7,92.7,110.6,12.6,5.2))<0.05); out.loopSpacing={outer:[Lo.length,...sp(Lo)],inner:[Li.length,...sp(Li)]}; if(sp(Lo)[1]-sp(Lo)[0]>0.6||sp(Li)[1]-sp(Li)[0]>0.6) bad.spacing=[sp(Lo),sp(Li)];
+    out.audit=bad; }
   // 1) full lap: run starts at START, finishes at FINISH with both checkpoints, best saved
   place(45,107.5,Math.PI/2); await wait(3);
   await lap(40); out.started=!!LTG.run;
@@ -29,8 +48,8 @@ JS = r"""async()=>{ const out={}, fr=()=>new Promise(r=>requestAnimationFrame(r)
   if(await startRun()){ res.btn=!!document.getElementById('ltgX'); document.getElementById('ltgX').click(); await wait(2); res.btnRes=LTG.res&&LTG.res.kind; res.btnGone=!document.getElementById('ltgX'); }
   if(await startRun()){ place(66,120,Math.PI/2); await wait(3); res.offTarmac=LTG.res&&LTG.res.kind; res.offMsg=LTG.res&&LTG.res.msg; }
   // 3) cone hit fails the run; the cone is knocked over, slides, then resets when the rig is clear
-  if(await startRun()){ const c=LTG.cones.find(c=>c.loop&&!c.dn&&Math.abs(c.hy/M_T-LTG.Y0-109.2)<0.2&&c.hx/M_T-LTG.X0>80);
-    place(c.hx/M_T-LTG.X0-3,109.2,Math.PI/2); truck.v=4; for(let i=0;i<12;i++){ place(c.hx/M_T-LTG.X0-3+i*0.25,109.2,Math.PI/2); truck.v=4; await fr(); }
+  if(await startRun()){ const c=LTG.cones.find(c=>c.loop&&!c.dn&&Math.abs(c.hy/M_T-LTG.Y0-109.7)<0.2&&c.hx/M_T-LTG.X0>80);
+    place(c.hx/M_T-LTG.X0-3,109.7,Math.PI/2); truck.v=4; for(let i=0;i<12;i++){ place(c.hx/M_T-LTG.X0-3+i*0.25,109.7,Math.PI/2); truck.v=4; await fr(); }
     res.coneFail=LTG.res&&LTG.res.kind; res.coneDown=c.dn; const x1=c.x; await wait(10); res.coneSlid=+Math.hypot(c.x-c.hx,c.y-c.hy).toFixed(2);
     place(45,60,Math.PI/2); c.t=timeS-13; await wait(3); res.coneReset=!c.dn&&c.x===c.hx; }
   out.res=res;
@@ -51,9 +70,13 @@ async def main():
         await pg.wait_for_function("window.__bigrig&&__bigrig.world.ready", timeout=300000)
         await pg.keyboard.press("Enter"); await pg.wait_for_timeout(1500)
         r = await pg.evaluate(JS)
+        # reload: knocked-over cones are runtime only, every cone is back upright at home
+        await pg.evaluate("()=>{ltgCones();for(const c of LTG.cones.slice(0,30)){c.dn=1;c.x+=5;}}")
+        await pg.reload(); await pg.wait_for_function("window.__bigrig&&__bigrig.world.ready", timeout=300000)
+        r["reload"] = await pg.evaluate("()=>{ltgCones();return LTG.cones.every(c=>!c.dn&&c.x===c.hx&&c.y===c.hy)}")
         print(json.dumps(r))
         R = r["res"]
-        ok = (r["started"] and r["lap"] and r["lap"]["kind"] == "done" and r["best"] and r["knockedOnLap"] == 0
+        ok = (not r["audit"] and r["reload"] and r["started"] and r["lap"] and r["lap"]["kind"] == "done" and r["best"] and r["knockedOnLap"] == 0
               and R.get("esc") == "cancel" and R.get("bksp") == "cancel" and R.get("holdB") == "cancel" and R.get("btn") and R.get("btnRes") == "cancel"
               and R.get("btnGone") and R.get("offTarmac") == "cancel" and R.get("coneFail") == "fail" and R.get("coneDown") and R.get("coneSlid", 0) > 0.2
               and R.get("coneReset") and r["esRed"] and r["es"] and r["gripPan"] < 1 and r["gripOff"] == 1 and r["poi"] == 1 and r["tarmacGate"] and r["tarmacSite"])

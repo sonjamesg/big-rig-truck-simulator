@@ -211,6 +211,7 @@ Notes on ownership:
   `traffic.pedWk`); `p.work` walkers stroll between bay mouths in hi-vis (`p.hat`), builders dig (`p.dig`), all step
   clear of a moving lorry inside their site (`pedWorkWalk`). Check: `/workspace/thin/pedA5.py`.
 - **LGV training ground** (`ltg.js`, v54): replaces the Kingsbridge Field airfield (tiles 1195-1384 x 1792-1904; the
+  - Cone layout rules (ltgConeInit; audited by tests/ltg_test.py): loop cones sit exactly on the painted edge lines, about 8.8 m apart, never in the lane. No cones on roads, pavements, buildings, the spine, the gate apron, the town streets, the bays, the blind bays or the coupling stands; only tidy edge rows elsewhere. Cones are runtime only and rebuilt at home on every load (the test checks this after a reload).
   airfield's 4 building `R()` draws are still made in world.js so later generation is unchanged). `ltgGen` lays LOT
   tarmac (Airport Way kept), the training dock / blind-side dock / mini-town buildings and kind `ltg` paint objects
   (`LTG_PAINT[o.part]`, baked into chunks, o.z -1); `ltgGate` (after the forest pass, so tree seeds don't drift) opens
