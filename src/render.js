@@ -2524,15 +2524,68 @@ function hexRGB(h) {
   const n = parseInt(h.slice(1), 16);
   return [n >> 16, (n >> 8) & 255, n & 255];
 }
-function mixC(c, f) {
-  return (
-    "rgb(" +
-    c
-      .map((v) => Math.max(0, Math.min(255, Math.round(f > 1 ? v + (255 - v) * (f - 1) : v * f))))
-      .join(",") +
-    ")"
-  );
-}
+// Aerial-photo trees (v54, James 20 Oct): each species/variant is pre-rendered ONCE into a sprite (leaf-clump canopy lit
+// from the upper-left, self-shadowed clumps, darker rim, then every tree,
+// hedge and shrub is a single scaled drawImage into the chunk bake (cheap on phones); the ground shadow goes through treeShadow so high quality keeps
+// sun-following shadows. Night darkening is the usual
+// daynight overlay. Visual size is TREE_VIS x the generator radius; collision tiles are unchanged.
+const TREE_S = 64, // sprite canopy radius in px
+  TREE_VAR = 6,
+  TREE_VIS = 1.75,
+  TREE_SPR = {},
+  TREE_SP = {
+    oak: {
+      pal: ["#4a7e33", "#548638", "#437430", "#5c8d3c"],
+      clumps: [9, 13],
+      cr: [0.3, 0.42],
+      leaf: 2.6,
+      gap: 0,
+    },
+    beech: {
+      pal: ["#5b8e39", "#66953f", "#4f8434"],
+      clumps: [7, 10],
+      cr: [0.34, 0.46],
+      leaf: 2.2,
+      gap: 0,
+    },
+    birch: {
+      pal: ["#8db252", "#97ba59", "#80a84c"],
+      clumps: [10, 15],
+      cr: [0.18, 0.3],
+      leaf: 1.5,
+      gap: 0.35,
+    },
+    autumn: {
+      pal: ["#c97a36", "#d9a040", "#b45a30", "#d4b248", "#a06a34"],
+      clumps: [8, 12],
+      cr: [0.3, 0.42],
+      leaf: 2.4,
+      gap: 0,
+    },
+    pine: {
+      pal: ["#3e6640", "#466d48", "#385e3b"],
+      clumps: [5, 8],
+      cr: [0.24, 0.36],
+      leaf: 1.7,
+      gap: 0.45,
+    },
+    conifer: { pal: ["#3a6c40", "#417244", "#36633b"] },
+    hedge: {
+      pal: ["#417634", "#498038", "#3c6d31"],
+      clumps: [7, 9],
+      cr: [0.32, 0.42],
+      leaf: 1.8,
+      gap: 0,
+    },
+    shrub: {
+      pal: ["#5f9340", "#6b9f47", "#558939"],
+      clumps: [5, 7],
+      cr: [0.36, 0.48],
+      leaf: 1.8,
+      gap: 0,
+    },
+  };
+// soft ground shadow under a crown; on high quality gfxshade.js records it as a sun-following caster instead
 function treeShadow(g, x, y, R, dx, dy, a) {
   const gr = g.createRadialGradient(x + dx, y + dy, R * 0.2, x + dx, y + dy, R * 1.15);
   gr.addColorStop(0, "rgba(8,18,8," + a + ")");
@@ -2543,160 +2596,153 @@ function treeShadow(g, x, y, R, dx, dy, a) {
   g.arc(x + dx, y + dy, R * 1.15, 0, 7);
   g.fill();
 }
-// light comes from the upper-left (matches building shadows falling down-right)
-function lumpy(g, r, x, y, R, col, n, lj) {
-  g.fillStyle = col;
-  g.beginPath();
-  for (let k = 0; k < n; k++) {
-    const a = (k / n) * 6.283 + r() * 0.4,
-      d = R * (0.45 + r() * 0.2),
-      rr = R * (0.42 + r() * lj);
-    g.moveTo(x + Math.cos(a) * d + rr, y + Math.sin(a) * d);
-    g.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, rr, 0, 7);
-  }
-  g.moveTo(x + R * 0.6, y);
-  g.arc(x, y, R * 0.6, 0, 7);
-  g.fill();
+function treeShade(c, f, a = 1) {
+  const v = c.map((x) =>
+    Math.max(0, Math.min(255, Math.round(f > 1 ? x + (255 - x) * (f - 1) : x * f))),
+  );
+  return "rgba(" + v.join(",") + "," + a + ")";
 }
+// one clump: soft gradient body + small leaf dabs, each lit by where it sits on the clump (upper-left bright)
+function treeLeafClump(g, r, cx, cy, rr, base, leaf, top) {
+  const gr = g.createRadialGradient(cx - rr * 0.35, cy - rr * 0.35, rr * 0.1, cx, cy, rr * 1.05);
+  gr.addColorStop(0, treeShade(base, 1.08 + top * 0.15));
+  gr.addColorStop(0.7, treeShade(base, 0.92));
+  gr.addColorStop(1, treeShade(base, 0.55));
+  g.fillStyle = gr;
+  g.beginPath();
+  g.arc(cx, cy, rr, 0, 7);
+  g.fill();
+  const n = Math.round(((rr * rr) / (leaf * leaf)) * 0.9);
+  for (let i = 0; i < n; i++) {
+    const a = r() * 6.283,
+      d = Math.sqrt(r()) * rr * 0.98,
+      x = cx + Math.cos(a) * d,
+      y = cy + Math.sin(a) * d,
+      lit = -(x - cx + (y - cy)) / (rr * 1.414),
+      f = 0.92 + lit * 0.34 + top * 0.12 + (r() - 0.5) * 0.22;
+    g.fillStyle = treeShade(base, Math.max(0.4, f + (lit > 0.55 ? 0.22 : 0)), 0.85);
+    g.beginPath();
+    g.arc(x, y, leaf * (0.6 + r() * 0.7), 0, 7);
+    g.fill();
+  }
+}
+function treeSprite(kind, v) {
+  const key = kind + v;
+  if (TREE_SPR[key]) return TREE_SPR[key];
+  const S = TREE_S,
+    sp = TREE_SP[kind],
+    r = mulberry(9001 + v * 131 + kind.length * 7919),
+    W = S * 2.5,
+    C = W / 2,
+    base = hexRGB(sp.pal[v % sp.pal.length]),
+    c = document.createElement("canvas"),
+    can = document.createElement("canvas");
+  c.width = c.height = can.width = can.height = W;
+  const g = c.getContext("2d"),
+    k = can.getContext("2d");
+  if (kind === "conifer") {
+    // spruce/fir from above: rings of needle tufts round a bright leader tip
+    const rot = r() * 6.283;
+    for (let ring = 0; ring < 5; ring++) {
+      const R0 = S * (1 - ring * 0.19),
+        n = 9 + ((r() * 4) | 0);
+      for (let i = 0; i < n; i++) {
+        const a = rot + ring * 0.4 + (i / n) * 6.283 + (r() - 0.5) * 0.3,
+          d = R0 * (0.55 + r() * 0.2);
+        treeLeafClump(
+          k,
+          r,
+          C + Math.cos(a) * d,
+          C + Math.sin(a) * d,
+          R0 * (0.3 + r() * 0.16),
+          base,
+          1.3,
+          ring / 5,
+        );
+      }
+    }
+    treeLeafClump(k, r, C - 2, C - 2, S * 0.2, base, 1.1, 1);
+  } else {
+    // broadleaf / pine / hedge: overlapping clumps, low ones first, each shading the ones below
+    const n = sp.clumps[0] + ((r() * (sp.clumps[1] - sp.clumps[0] + 1)) | 0),
+      L = [],
+      ex = kind === "hedge" ? 1.25 : 1,
+      ey = kind === "hedge" ? 0.8 : 1;
+    for (let i = 0; i < n; i++) {
+      const a = r() * 6.283,
+        d = Math.sqrt(r()) * S * (0.62 - sp.gap * 0.1),
+        rr = S * (sp.cr[0] + r() * (sp.cr[1] - sp.cr[0]));
+      L.push({
+        x: C + Math.cos(a) * d * ex,
+        y: C + Math.sin(a) * d * ey,
+        rr,
+        h: 1 - d / S + r() * 0.3,
+      });
+    }
+    L.push({ x: C - S * 0.05, y: C - S * 0.05, rr: S * sp.cr[1], h: 1.2 });
+    L.sort((a, b) => a.h - b.h);
+    for (const q of L) {
+      if (sp.gap && r() < sp.gap * 0.5) q.rr *= 0.7;
+      k.fillStyle = "rgba(10,22,8,0.24)";
+      k.beginPath();
+      k.arc(q.x + q.rr * 0.3, q.y + q.rr * 0.3, q.rr * 1.02, 0, 7);
+      k.fill();
+      treeLeafClump(k, r, q.x, q.y, q.rr, base, sp.leaf, Math.min(1, q.h));
+    }
+    if (kind === "pine") {
+      // Scots pine: orange limbs showing between the clumps
+      k.globalCompositeOperation = "destination-over";
+      k.strokeStyle = "rgba(140,84,50,0.75)";
+      k.lineWidth = 3;
+      for (let i = 0; i < 5; i++) {
+        const a = r() * 6.283;
+        k.beginPath();
+        k.moveTo(C, C);
+        k.lineTo(C + Math.cos(a) * S * 0.48, C + Math.sin(a) * S * 0.48);
+        k.stroke();
+      }
+      k.globalCompositeOperation = "source-over";
+    }
+  }
+  g.drawImage(can, 0, 0);
+  g.globalCompositeOperation = "source-atop"; // rim falls away from the sun
+  const rim = g.createRadialGradient(C - S * 0.3, C - S * 0.3, S * 0.4, C, C, S * 1.15);
+  rim.addColorStop(0, "rgba(0,0,0,0)");
+  rim.addColorStop(1, "rgba(0,12,0,0.18)");
+  g.fillStyle = rim;
+  g.fillRect(0, 0, W, W);
+  g.globalCompositeOperation = "source-over";
+  return (TREE_SPR[key] = { c, C });
+}
+function treePut(g, kind, seed, x, y, R) {
+  const s = treeSprite(kind, (seed >>> 3) % TREE_VAR),
+    Rv = R * TREE_VIS,
+    f = Rv / TREE_S;
+  treeShadow(g, x, y, Rv * 0.9, Rv * 0.4, Rv * 0.4, 0.38);
+  g.drawImage(s.c, x - s.C * f, y - s.C * f, s.c.width * f, s.c.height * f);
+}
+// sp 0 broadleaf (oak/beech/autumn), 1 conifer (pine/spruce), 2 birch, 3 columnar (beech sprite)
 function drawTree(g, o) {
   const r = mulberry(o.seed),
     sp = o.sp || 0,
-    R = o.r * (0.9 + r() * 0.25),
-    x = o.x,
-    y = o.y,
-    rot = r() * 6.283;
-  if (sp === 1) {
-    // conifer: layered star whorls, sunlit upper-left
-    treeShadow(g, x, y, R * 0.95, R * 0.5, R * 0.5, 0.42);
-    const pal = [
-      ["#1a3a16", "#26511f", "#356a2a", "#4f8a3a"],
-      ["#1e3c1c", "#2b5626", "#3b7033", "#5a9246"],
-      ["#24401a", "#335a22", "#46742e", "#68984a"],
-    ][(r() * 3) | 0];
-    const Rc = R * 1.15;
-    for (let l = 0; l < 4; l++) {
-      const rr = Rc * (1 - l * 0.22),
-        pts = 8 + ((r() * 4) | 0),
-        off = -l * R * 0.09;
-      const gr = g.createLinearGradient(x - rr, y - rr, x + rr, y + rr);
-      gr.addColorStop(0, mixC(hexRGB(pal[l]), 1.2));
-      gr.addColorStop(0.5, mixC(hexRGB(pal[l]), 1));
-      gr.addColorStop(1, mixC(hexRGB(pal[l]), 0.6));
-      g.fillStyle = gr;
-      g.beginPath();
-      for (let k = 0; k < pts * 2; k++) {
-        const a = rot + l * 0.35 + (k / (pts * 2)) * 6.283,
-          q = k % 2 ? rr * (0.55 + r() * 0.1) : rr * (0.9 + r() * 0.15);
-        const X = x + off + Math.cos(a) * q,
-          Y = y + off + Math.sin(a) * q;
-        k ? g.lineTo(X, Y) : g.moveTo(X, Y);
-      }
-      g.closePath();
-      g.fill();
-    }
-    g.fillStyle = "rgba(220,255,200,0.18)";
-    g.beginPath();
-    g.arc(x - R * 0.3, y - R * 0.3, R * 0.18, 0, 7);
-    g.fill();
-    return;
-  }
-  if (sp === 3) {
-    // columnar poplar / cypress: tall thin crown, long shadow
-    g.save();
-    g.translate(x, y);
-    g.rotate(0.785);
-    const gs = g.createLinearGradient(0, 0, 0, R * 3);
-    gs.addColorStop(0, "rgba(8,18,8,0.35)");
-    gs.addColorStop(1, "rgba(8,18,8,0)");
-    g.fillStyle = gs;
-    g.beginPath();
-    g.ellipse(0, R * 1.5, R * 0.45, R * 1.6, 0, 0, 7);
-    g.fill();
-    g.restore();
-    const base = hexRGB(["#3e6e2c", "#4a7a34", "#356428"][(r() * 3) | 0]);
-    lumpy(g, r, x, y, R * 0.62, mixC(base, 0.7), 7, 0.18);
-    lumpy(g, r, x - R * 0.1, y - R * 0.1, R * 0.5, mixC(base, 1), 6, 0.15);
-    lumpy(g, r, x - R * 0.22, y - R * 0.22, R * 0.28, mixC(base, 1.3), 4, 0.12);
-    return;
-  }
-  // broadleaf (sp 0 oak/ash, sp 2 birch/light) with occasional autumn tints
-  const autumn = sp === 0 && r() < 0.12,
-    bush = o.bush;
-  const base = hexRGB(
-    autumn
-      ? ["#b5652a", "#c98a2e", "#a8452a", "#c2a03a"][(r() * 4) | 0]
+    R = o.r * (0.85 + r() * 0.35),
+    q = r();
+  const kind =
+    sp === 1
+      ? q < 0.45
+        ? "pine"
+        : "conifer"
       : sp === 2
-        ? ["#7aa64a", "#86b052", "#6f9c44"][(r() * 3) | 0]
-        : ["#2f6528", "#3a7330", "#2e5e2c", "#447a2e", "#3b6a26", "#4f7a30"][(r() * 6) | 0],
-  );
-  treeShadow(g, x, y, R, R * 0.5, R * 0.5, 0.36);
-  lumpy(g, r, x, y, R * 0.95, mixC(base, 0.55), 9, 0.22); // dark underside / silhouette
-  lumpy(g, r, x - R * 0.08, y - R * 0.08, R * 0.82, mixC(base, 0.8), 8, 0.2); // mid
-  for (let i = 0; i < 6; i++) {
-    const a = rot + r() * 6.28,
-      d = R * (0.15 + r() * 0.45),
-      cxl = x + Math.cos(a) * d - R * 0.12,
-      cyl = y + Math.sin(a) * d - R * 0.12,
-      rr = R * (0.22 + r() * 0.18);
-    const gr = g.createRadialGradient(cxl - rr * 0.4, cyl - rr * 0.4, 0.5, cxl, cyl, rr);
-    gr.addColorStop(0, mixC(base, 1.3));
-    gr.addColorStop(1, mixC(base, 0.85));
-    g.fillStyle = gr;
-    g.beginPath();
-    g.arc(cxl, cyl, rr, 0, 7);
-    g.fill();
-  }
-  g.fillStyle = "rgba(10,25,8,0.18)";
-  for (let i = 0; i < 4; i++) {
-    const a = rot + r() * 6.28,
-      d = R * (0.3 + r() * 0.4);
-    g.beginPath();
-    g.arc(
-      x + Math.cos(a) * d + R * 0.1,
-      y + Math.sin(a) * d + R * 0.1,
-      R * 0.08 + r() * R * 0.06,
-      0,
-      7,
-    );
-    g.fill();
-  }
-  g.fillStyle = "rgba(255,255,215,0.16)";
-  g.beginPath();
-  g.arc(x - R * 0.35, y - R * 0.38, R * 0.26, 0, 7);
-  g.fill();
-  if (sp === 2 && r() < 0.5) {
-    g.fillStyle = "#e8e4da";
-    g.fillRect(x - 1, y - 1, 2, 3);
-  }
+        ? "birch"
+        : sp === 3
+          ? "beech"
+          : q < 0.14
+            ? "autumn"
+            : q < 0.4
+              ? "beech"
+              : "oak";
+  treePut(g, kind, o.seed, o.x, o.y, kind === "birch" ? R * 0.85 : R);
 }
 function drawBush(g, o) {
-  const r = mulberry(o.seed),
-    R = o.r,
-    x = o.x,
-    y = o.y;
-  const base = hexRGB(
-    o.hedge
-      ? ["#2f5a24", "#355f27"][(r() * 2) | 0]
-      : ["#4d7d33", "#5a8a3a", "#3f6f2e", "#557a2c"][(r() * 4) | 0],
-  );
-  treeShadow(g, x, y, R, R * 0.45, R * 0.45, 0.32);
-  lumpy(g, r, x, y, R, mixC(base, 0.62), o.hedge ? 10 : 7, 0.2);
-  lumpy(g, r, x - R * 0.12, y - R * 0.12, R * 0.75, mixC(base, 0.9), 6, 0.18);
-  for (let i = 0; i < 4; i++) {
-    g.fillStyle = mixC(base, 1.15 + r() * 0.2);
-    g.beginPath();
-    g.arc(
-      x - R * 0.25 + (r() - 0.5) * R * 0.6,
-      y - R * 0.25 + (r() - 0.5) * R * 0.6,
-      R * (0.15 + r() * 0.12),
-      0,
-      7,
-    );
-    g.fill();
-  }
-  if (!o.hedge && r() < 0.3) {
-    g.fillStyle = ["#f4e04d", "#fff", "#e86fa0"][(r() * 3) | 0];
-    for (let k = 0; k < 5; k++)
-      g.fillRect(x + (r() - 0.5) * R * 1.4, y + (r() - 0.5) * R * 1.4, 1.6, 1.6);
-  }
+  treePut(g, o.hedge ? "hedge" : "shrub", o.seed, o.x, o.y, o.r * (o.hedge ? 0.8 : 0.85));
 }

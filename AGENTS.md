@@ -396,3 +396,5 @@ Regenerate: `python3 build.py && python3 tools/mapviewer.py` → /workspace/mapg
 "K7" or "x,y"; Sandvale Military Base is a city box with prefix BASE-<C><R>; depots, fuel stations, Black Market
 yards and helipads are searchable POI markers — search "fuel", "helipad", "black market" etc.). `python3 tools/mapgrid.py [--pdf]` writes the gridded PNGs. The viewer's in-browser readout
 uses the same formulas.
+
+- Trees (v54, render.js): drawTree and drawBush use pre-rendered aerial-photo sprites (treeSprite: oak, beech, birch, autumn, pine, conifer, hedge, shrub; 6 variants each, lit from the upper-left). One drawImage per tree; the ground shadow still goes through treeShadow, so gfxshade's sun-following shadows keep working. The drawn size is TREE_VIS (1.75) times the generator radius; collision tiles are unchanged. Sprites are built lazily on the first bake, about 0.2 s once.
