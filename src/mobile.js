@@ -1,7 +1,7 @@
 /**
  * @file mobile.js — MOBILE: landscape thumb layout (controls in side gutters, never over the HUD) + portrait handheld deck
  * Exposes (globals): MOB, MOBCSS, mobBtn, act, mobCSS, mobInit, mobSteer, place, mobLayout,
- *   mobView, mobFit, mobContext
+ *   mobView, mobFit, mobContext, MOB_DPID, mobDpadDir, mobDpadSet, mobDpad
  * Depends on: world.js, physics.js, audio.js, depots.js, fuel.js, sites.js, career.js, ui.js,
  *   gamepad.js, mp.js, haptics.js, indicators.js, beams.js, main.js
  * Load order: #21 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
@@ -134,6 +134,57 @@ const act = (f) => () => {
   if (!started) return;
   f();
 };
+// v55 (James 20 Oct): one invisible touch zone over the whole D-pad (plus a forgiving margin) owns every D-pad touch.
+// Left half = left, right half = right (only the narrow up/down arm column above/below the centre is up/down), so a
+// thumb never misses; it reacts on pointerdown (fires on touchstart) and follows pointermove, so the thumb can slide
+// between left and right without lifting. The visible pads only show the pressed state.
+const MOB_DPID = { l: "mLeft", r: "mRight", u: "mUp", d: "mDown" };
+function mobDpadDir(x, y) {
+  const P = MOB.dp;
+  if (!P) return null;
+  const dx = x - P.cx,
+    dy = y - P.cy;
+  if (Math.abs(dx) < P.k / 2 + P.dg / 2 && Math.abs(dy) > P.k / 2) return dy < 0 ? "u" : "d";
+  return dx < 0 ? "l" : "r";
+}
+function mobDpadSet(pid, d) {
+  const T = MOB.dpT,
+    was = T[pid] || null;
+  if (was === d) return;
+  if (d) T[pid] = d;
+  else delete T[pid];
+  const held = new Set(Object.values(T));
+  for (const k in MOB_DPID)
+    document.getElementById(MOB_DPID[k]).classList.toggle("on", held.has(k));
+  input.left = held.has("l") && !career.uiOpen;
+  input.right = held.has("r") && !career.uiOpen;
+  if (!d) return;
+  if (typeof hapPress === "function") hapPress(MOB_DPID[d]);
+  if (career.uiOpen) MOB.nav[{ l: "left", r: "right", u: "up", d: "down" }[d]]();
+  else if (d === "u" && MP.on) mpToggleList();
+}
+function mobDpad() {
+  const z = document.createElement("div");
+  z.id = "mDZone";
+  z.style.cssText =
+    "position:absolute;pointer-events:auto;touch-action:none;z-index:2;display:none";
+  document.getElementById("mob").appendChild(z);
+  MOB.dpT = {};
+  const at = (e) => mobDpadDir(e.clientX, e.clientY);
+  z.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    if (audio.ctx && audio.ctx.state === "suspended") audio.ctx.resume();
+    if (z.setPointerCapture) z.setPointerCapture(e.pointerId);
+    mobDpadSet(e.pointerId, at(e));
+  });
+  z.addEventListener("pointermove", (e) => {
+    if (!(e.pointerId in MOB.dpT)) return;
+    e.preventDefault();
+    mobDpadSet(e.pointerId, at(e));
+  });
+  for (const ev of ["pointerup", "pointercancel", "lostpointercapture"])
+    z.addEventListener(ev, (e) => mobDpadSet(e.pointerId, null));
+}
 function mobCSS() {
   if (MOB.css) return;
   MOB.css = 1;
@@ -185,6 +236,7 @@ function mobInit() {
     if (career.uiOpen) MOB.nav.down();
   });
   mobBtn("mCen", "", "dp dpc", null);
+  mobDpad();
   mobBtn("mA", "A<small>GAS</small>", "ab", () => {
     if (career.uiOpen) MOB.nav.okA();
     else {
@@ -383,7 +435,7 @@ function mobLayout() {
       ph = Math.max(70, H - py - pad);
     place("mBrk", R, py + ph * 0.22, sw, ph * 0.78);
     place("mGas", R + sw + pad, py, sw, ph);
-    for (const id of ["mLeft", "mRight", "mUp", "mDown", "mCen", "mA", "mB"])
+    for (const id of ["mLeft", "mRight", "mUp", "mDown", "mCen", "mDZone", "mA", "mB"])
       place(id, 0, 0, 0, 0, false);
   } else {
     // portrait: handheld — screen on top, deck below
@@ -398,15 +450,26 @@ function mobLayout() {
     const DH = H - deckTop,
       u = Math.min(W / 412, DH / 330);
     const S = (v) => v * u;
-    const dcx = S(78),
+    const dcx = S(100),
       dcy = deckTop + S(98),
-      k = S(38);
+      k = S(40),
+      kw = S(64); // v55: wide left/right pads
     const dg = S(5); // v44: visible gap between the D-pad arms
     place("mUp", dcx - k / 2, dcy - k * 1.5 - dg, k, k);
     place("mDown", dcx - k / 2, dcy + k / 2 + dg, k, k);
-    place("mLeft", dcx - k * 1.5 - dg, dcy - k / 2, k, k);
-    place("mRight", dcx + k / 2 + dg, dcy - k / 2, k, k);
+    place("mLeft", dcx - k / 2 - dg - kw, dcy - k / 2, kw, k);
+    place("mRight", dcx + k / 2 + dg, dcy - k / 2, kw, k);
     place("mCen", dcx - k / 2, dcy - k / 2, k, k);
+    {
+      // touch zone: the D-pad box plus a forgiving margin, stopping short of B and the function row
+      const m = S(14),
+        x0 = Math.max(0, dcx - k / 2 - dg - kw - m),
+        x1 = Math.min(W - S(150) - S(6), dcx + k / 2 + dg + kw + m),
+        y0 = dcy - k * 1.5 - dg - S(8),
+        y1 = Math.min(deckTop + S(178) - S(6), dcy + k * 1.5 + dg + S(8));
+      place("mDZone", x0, y0, x1 - x0, y1 - y0);
+      MOB.dp = { cx: dcx, cy: dcy, k, dg };
+    }
     const ab = S(58);
     place("mB", W - S(150), dcy - ab * 0.2, ab, ab);
     place("mA", W - S(78), dcy - ab * 0.85, ab, ab);
