@@ -110,11 +110,6 @@
   },
   {
    "root": "world",
-   "key": "abRing",
-   "file": "state/world.abRing.json"
-  },
-  {
-   "root": "world",
    "key": "port",
    "file": "state/world.port.json"
   },

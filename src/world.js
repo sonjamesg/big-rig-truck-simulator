@@ -1171,7 +1171,9 @@ function* genWorldSteps() {
   for (const x of c1N) road("v", x, 103, C1.ys[0] - 1, RW, "city");
   for (const x of c1S) road("v", x, C1.Y1 + 1, 459, RW, "city");
   road("h", 460, 103, 600, RW, "city"); // Albion Airport road
-  {
+  // v65 (James 21 Oct, network audit): Albion Ring removed - it ran 8 tiles outside the grid edge streets on all four sides
+  // (two parallel roads). The outside links (c1W / c1N / c1S / c1E) already join the edge streets directly.
+  if (false) {
     const o = 12,
       X0 = C1.xs[0] - o,
       Y0 = C1.ys[0] - o,
