@@ -16,7 +16,7 @@ STAGE_DOMAIN=staging.trucksim.co.uk
 GIT=(git -c credential.https://github.com.helper= -c 'credential.https://github.com.helper=!/usr/local/bin/gh auth git-credential')
 die() { echo "deploy: $*" >&2; exit 1; }
 clean_tree() { # BigRigWeb.zip is a local build artefact and never committed
-  [ -z "$(git status --porcelain -- . ':!BigRigWeb.zip')" ] || die "uncommitted changes: commit them first (staging must match a commit)"
+  [ -z "$(git status --porcelain -- . ':!BigRigWeb.zip' ':!index.html' ':!mapdata.bin')" ] || die "uncommitted changes: commit them first (staging must match a commit)"
 }
 stage_dns_ok() { # true once staging.trucksim.co.uk is a CNAME to GitHub Pages (DNS over HTTPS; no dig needed)
   curl -fsS "https://dns.google/resolve?name=$STAGE_DOMAIN&type=CNAME" 2>/dev/null | grep -qi 'github\.io'
