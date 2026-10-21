@@ -70,7 +70,22 @@ function fogReveal(mx, my, rM) {
   if (ch) FOG.dirty = true;
   return ch;
 }
+const FOG_Q = [];
+let FOG_QT = 0;
 function fogToast(name) {
+  FOG_Q.push(name);
+  if (!FOG_QT) fogToastNext();
+}
+function fogToastNext() {
+  const name = FOG_Q.shift();
+  if (name === undefined) {
+    FOG_QT = 0;
+    return;
+  }
+  FOG_QT = setTimeout(fogToastNext, 2200);
+  fogToastShow(name);
+}
+function fogToastShow(name) {
   if (typeof uiInit === "function") uiInit();
   if (typeof uiRoot === "undefined" || !uiRoot) return;
   const d = document.createElement("div");
@@ -78,7 +93,7 @@ function fogToast(name) {
   d.innerHTML = '<span style="color:#f5b82e;letter-spacing:1px;font-size:11px">DISCOVERED</span><br>';
   d.appendChild(document.createTextNode(name));
   uiRoot.appendChild(d);
-  setTimeout(() => d.remove(), 3600);
+  setTimeout(() => d.remove(), 2150);
   if (!document.getElementById("fogcss")) {
     const s = document.createElement("style");
     s.id = "fogcss";
@@ -106,7 +121,7 @@ function fogScan(silent) {
     }
   });
   if (!silent)
-    for (const n of found.slice(0, 3)) {
+    for (const n of found.slice(0, 4)) {
       fogToast(n);
       if (typeof BigRig !== "undefined" && BigRig.emit) BigRig.emit("discovered", { name: n });
     }
@@ -195,7 +210,7 @@ function fogTex() {
   const mg = m.getContext("2d"),
     im = mg.createImageData(FOG_W, FOG_H);
   for (let i = 0; i < FOG.bits.length; i++) {
-    im.data[i * 4 + 3] = FOG.bits[i] ? 0 : 255;
+    im.data[i * 4 + 3] = FOG.bits[i] ? 255 : 0;
   }
   mg.putImageData(im, 0, 0);
   const S = hi ? 4 : 2,
@@ -203,14 +218,14 @@ function fogTex() {
   c.width = FOG_W * S;
   c.height = FOG_H * S;
   const g = c.getContext("2d");
-  g.clearRect(0, 0, c.width, c.height);
+  g.globalCompositeOperation = "source-over";
+  g.fillStyle = "#070a11";
+  g.fillRect(0, 0, c.width, c.height);
+  g.globalCompositeOperation = "destination-out"; // punch the revealed cells out (soft edged)
   g.imageSmoothingEnabled = true;
   if (hi && "filter" in g) g.filter = "blur(" + 2.2 * S + "px)";
   g.drawImage(m, 0, 0, c.width, c.height);
   g.filter = "none";
-  g.globalCompositeOperation = "source-in";
-  g.fillStyle = hi ? g.createPattern(fogNoise(), "repeat") : "#0b1018";
-  g.fillRect(0, 0, c.width, c.height);
   g.globalCompositeOperation = "source-over";
   FOG.tex = c;
   FOG.texHi = hi;
@@ -218,19 +233,41 @@ function fogTex() {
   return c;
 }
 // tile -> screen mapping: screen = ox + t*sc
+let FOG_L = null;
 function fogDraw(ox, oy, sc, clip) {
   if (!fogActive()) return;
-  const t = fogTex();
-  ctx.save();
-  if (clip) {
-    ctx.beginPath();
-    ctx.rect(clip[0], clip[1], clip[2], clip[3]);
-    ctx.clip();
+  const t = fogTex(),
+    hi = FOG.texHi,
+    [cx, cy, cw, ch] = clip;
+  if (!FOG_L) FOG_L = document.createElement("canvas");
+  const L = FOG_L;
+  if (L.width < cw || L.height < ch) {
+    L.width = Math.ceil(cw);
+    L.height = Math.ceil(ch);
   }
-  ctx.globalAlpha = 0.97;
-  ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(t, ox, oy, MW * sc, MH * sc);
-  // dark outside the world edge too
+  const g = L.getContext("2d");
+  g.globalCompositeOperation = "source-over";
+  g.clearRect(0, 0, L.width, L.height);
+  g.fillStyle = "#070a11"; // beyond the world edge: always fog
+  g.fillRect(0, 0, cw, ch);
+  g.clearRect(ox - cx, oy - cy, MW * sc, MH * sc);
+  g.imageSmoothingEnabled = true;
+  g.drawImage(t, ox - cx, oy - cy, MW * sc, MH * sc);
+  if (hi) {
+    // slow drifting cloud texture in screen space (not pixel art: soft 128px noise scaled up)
+    g.globalCompositeOperation = "source-atop";
+    const p = g.createPattern(fogNoise(), "repeat"),
+      k = 2.5,
+      d = ((typeof timeS === "number" ? timeS : 0) * 4) % (128 * k);
+    if (p.setTransform) p.setTransform(new DOMMatrix([k, 0, 0, k, d - cx, -cy * 0.5]));
+    g.globalAlpha = 0.55;
+    g.fillStyle = p;
+    g.fillRect(0, 0, cw, ch);
+    g.globalAlpha = 1;
+  }
+  ctx.save();
+  ctx.globalAlpha = 0.985;
+  ctx.drawImage(L, 0, 0, cw, ch, cx, cy, cw, ch);
   ctx.restore();
 }
 // ---------- hooks (wrap the existing global functions)
