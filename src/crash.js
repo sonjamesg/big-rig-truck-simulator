@@ -535,8 +535,8 @@ function updateCrash(dt) {
       e = v.crEnd || 1,
       ex = v.x + f[0] * e * (v.L || 4) * 0.35,
       ey = v.y + f[1] * e * (v.L || 4) * 0.35;
-    if (Math.random() < dt * (burning ? 18 : 6) * q)
-      fxEmit(ex, ey, (Math.random() - 0.5) * 0.8 + 0.4, (Math.random() - 0.5) * 0.8 - 0.3, 0.5, 2.6, burning ? "35,33,32" : d >= 1 ? "60,60,62" : "150,150,150", 1.6);
+    if (Math.random() < dt * (burning ? 10 : 5) * q)
+      fxEmit(ex, ey, (Math.random() - 0.5) * 0.8 + 0.4, (Math.random() - 0.5) * 0.8 - 0.3, 0.5, 2.6, burning ? "58,55,52" : d >= 1 ? "60,60,62" : "150,150,150", 1.6);
     if (burning && Math.random() < dt * 22 * q) {
       const t = v.trl && v.boomed ? v.trl : v;
       fxEmit(t.x + (Math.random() - 0.5) * 3, t.y + (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 0.6, (Math.random() - 0.5) * 0.6, 0.5 + Math.random() * 0.4, 0.55, "255," + (120 + ((Math.random() * 90) | 0)) + ",25", 1.2, 1);

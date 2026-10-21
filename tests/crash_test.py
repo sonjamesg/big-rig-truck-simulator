@@ -25,10 +25,10 @@ SETUP=r"""(sc)=>{
   Object.assign(T,{x:p[0],y:p[1],h:h,th:h,v:26.8,steer:0,mode:'D',gear:8,throttle:0,brake:0,skid:false,damage:0,crunchT:0,bump:0});
   window.__camHold=null; cam.z=cam.zLock=2.6;
   const mk=(along,dir,lane,v,kind,tank)=>{ const o=__oSpawn(0,0,true,{seg:sid,dir,lane,along,clear:0}); if(!o) return null;
-    if(kind){ o.kind=kind; Object.assign(o,{L:VTYPES[kind].L,W:VTYPES[kind].W,heavy:VTYPES[kind].heavy}); o.art=artFor(kind,tank?()=>0.01:o.r); if(tank){o.art.tank=true;o.tanker=true;} placeVeh(o);} o.v=v; o.drv=0.5; return o; };
+    if(kind){ o.kind=kind; Object.assign(o,{L:VTYPES[kind].L,W:VTYPES[kind].W,heavy:VTYPES[kind].heavy}); o.art=artFor(kind,tank?()=>0.01:(kind==='lorry'?()=>0.9:o.r)); if(tank){o.art.tank=true;o.tanker=true;} placeVeh(o);} o.v=v; o.drv=0.5; return o; };
   const M=4/1; const t0=A, out=[];
   if(sc==='A') out.push(mk(t0+10,1,0,13.4,'sedan'));
-  if(sc==='B') for(let i=0;i<4;i++) out.push(mk(t0+12+i*2.0,1,0,0,['hatch','sedan','suv','estate'][i]));
+  if(sc==='B') for(let i=0;i<4;i++) out.push(mk(t0+12+i*2.6,1,0,0,['hatch','sedan','suv','estate'][i]));
   if(sc==='C'){ const o=mk(t0+16,-1,0,20,'lorry'); const lp=lanePt(sg,-1,0,A); // put the rig on the oncoming lorry's line
      T.x=lp[0]; T.y=lp[1]; out.push(o); }
   if(sc==='D') out.push(mk(t0+12,1,0,0,'lorry',true));
