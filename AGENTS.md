@@ -407,6 +407,13 @@ uses the same formulas.
 
 - Horns (v59, src/horns.js): every horn sound lives in one table. HORNS[look.hrn] holds the player's horns: six pitches, levels, lowpass, bell, air, attack, an optional seq pattern and preview length. Index 0 is the stock deep air horn and stays the default, and the choice is still saved as the fitted hrn part. AI_HORNS / aiHornClass / aiHornShot give AI traffic horns: beep for small cars, a two-tone for SUVs, estates and vans, and an air horn for buses and lorries. Each vehicle gets its own pitch (v.hornPr, 0.92-1.08) plus pan and distance falloff; emergency vehicles never honk. audio.js updateHorn drives the player's horn and runs even while a menu pauses the game (main.js), which is what makes tune-shop previews audible. Every horn card has a PREVIEW button (touch / mouse); X on a pad and P on the keyboard preview the focused horn (tune3.js czHornFocus). Test: /workspace/horns/t.py.
 
+- Estate agents (v60, homes.js):
+  - **No auto-open.** In eaZone(a) (forecourt, drive and the kerbside lane in front), HOMES.atAgent is set and a bottom-centre #eaGo ENTER SHOP button appears, styled like #czGo. Tap or click it, press E or Enter, or press A on a pad (the gamepad.js A chain, after the couple / repair / customise prompts). eaEnter opens estatePanel only below EA_STOP (1.34 m/s, 3 mph); otherwise it flashes "Stop to enter …". Driveway home cards still open as before.
+  - **Art.** hAgentArt redraws the shop: block paving, an asphalt customer forecourt with bays and a brand roundel, planters, a totem sign, and a glass frontage with listing cards, a striped awning and a green/gold fascia on a slate roof. Night glow is drawn in drawHomes.
+  - **Menu.** EA_CSS styles a midnight + neon listing grid (.eam .pc cards: photo, OWNED / FOR SALE badge, HOME / COMMERCIAL YARD chip, price, facts, FAST TRAVEL). Tabs ALL / HOMES / COMMERCIAL step with eaTabStep (LB RB, Q E, PageUp/Down).
+  - **Fast travel.** homePOIs lists every home ("Home for sale" or "Your home") as a fast-travel point.
+  - **Test.** tests/property_ft_test.py runs the real fastTravel to every home and every world.forSale yard: lands on its own drive or yard with nothing solid under the rig, facing out.
+
 ## Buildings: culling, chunk ring, stable windows (bldfix)
 - `gfx3dDraw` culls on the UNION of footprint and leaned roof quad (min/max), so edge buildings are never dropped; `g3Roof` bakes a missing chunk (`getChunk(cx,cy,true)`) instead of skipping; roof cache cap 900.
 - `main.js chunkRing` pre-bakes a 1-chunk ring round the view (+2 ahead in travel direction) within the per-frame budget; skipped above 84 chunks.

@@ -141,7 +141,7 @@ const HOME_DEFS = [
     desc: "A trucker\u2019s ranch: single-storey homestead, paddock and a giant workshop with three roller doors.",
   },
 ];
-const HOMES = { list: [], agents: [], owned: {}, slot: null, tab: "res", thumbs: {} };
+const HOMES = { list: [], agents: [], owned: {}, slot: null, tab: "all", thumbs: {} };
 const HCITY = {
   C1: "Albion",
   SV: "Sandvale",
@@ -1402,56 +1402,184 @@ function hDrawPlot(h) {
 function hArt(h) {
   return h.art || (h.art = hDrawPlot(h));
 }
+// v60: estate agent shop, top-down (12 x 9 tiles): block-paved plot, asphalt customer forecourt with lined bays and a
+// painted brand mark, planters + totem sign, modern shop with a glass frontage full of listing cards, striped awning and
+// a green / gold fascia, slate roof with parapet, AC units and skylights. Night glow is drawn in drawHomes.
 function hAgentArt(a) {
   if (a.art) return a.art;
   const u = TILE,
     c = document.createElement("canvas");
   c.width = 12 * u;
   c.height = 9 * u;
-  const g = c.getContext("2d");
-  g.fillStyle = "#cfc9bd";
-  g.fillRect(0, 0, c.width, c.height);
-  g.strokeStyle = "rgba(0,0,0,0.08)";
-  for (let x = 0; x < c.width; x += 16) {
+  const g = c.getContext("2d"),
+    W = c.width,
+    GRN = "#0b4a35",
+    GLD = "#e3c16f";
+  const rr = (x, y, w, h, r) => {
     g.beginPath();
-    g.moveTo(x, 0);
-    g.lineTo(x, c.height);
+    g.roundRect ? g.roundRect(x, y, w, h, r) : g.rect(x, y, w, h);
+  };
+  // block paving over the whole plot
+  g.fillStyle = "#c9c2b4";
+  g.fillRect(0, 0, W, c.height);
+  for (let y = 0; y < c.height; y += 8)
+    for (let x = (y / 8) % 2 ? -8 : 0; x < W; x += 16) {
+      g.fillStyle = (x * 7 + y * 3) % 5 ? "rgba(0,0,0,.05)" : "rgba(255,255,255,.08)";
+      g.fillRect(x + 1, y + 1, 14, 6);
+    }
+  g.strokeStyle = "#a29b8e";
+  g.lineWidth = 3;
+  g.strokeRect(1.5, 1.5, W - 3, c.height - 3);
+  // customer forecourt (asphalt) with kerbs, bays and the brand mark
+  const fx = 3 * u,
+    fw = 6 * u,
+    fh = 4.4 * u;
+  g.fillStyle = "#3b4048";
+  g.fillRect(fx, 0, fw, fh);
+  g.fillStyle = "rgba(255,255,255,.05)";
+  for (let k = 0; k < 220; k++) g.fillRect(fx + ((k * 53) % fw), (k * 97) % fh, 2, 2);
+  g.fillStyle = "#d8d2c6";
+  g.fillRect(fx - 4, 0, 4, fh + 4);
+  g.fillRect(fx + fw, 0, 4, fh + 4);
+  g.fillRect(fx - 4, fh, fw + 8, 4);
+  g.strokeStyle = "#f2f2ee";
+  g.lineWidth = 2;
+  for (let k = 1; k < 3; k++) {
+    g.beginPath();
+    g.moveTo(fx + (k * fw) / 3, fh - 1.6 * u);
+    g.lineTo(fx + (k * fw) / 3, fh);
     g.stroke();
   }
-  g.fillStyle = "#9c9d99";
-  g.fillRect(3 * u, 0, 6 * u, 4 * u);
-  g.strokeStyle = "#fff";
-  g.lineWidth = 2;
-  g.strokeRect(3 * u + 6, 6, 6 * u - 12, 4 * u - 12);
-  g.fillStyle = "rgba(255,255,255,0.8)";
-  g.font = "bold 13px system-ui";
+  g.fillStyle = "rgba(242,242,238,.85)";
+  g.font = "900 9px system-ui";
   g.textAlign = "center";
-  g.fillText("CUSTOMER PARKING", 6 * u, 2.2 * u);
-  g.fillStyle = "rgba(0,0,0,0.3)";
-  g.fillRect(u + 8, 5 * u + 8, 10 * u, 4 * u);
-  g.fillStyle = "#2c3e50";
-  g.fillRect(u, 5 * u, 10 * u, 4 * u);
-  g.fillStyle = "#34495e";
-  g.fillRect(u, 5 * u, 10 * u, 1.2 * u);
-  g.fillStyle = "#0f5132";
-  g.fillRect(u - 6, 5 * u - 14, 10 * u + 12, 22);
-  g.fillStyle = "#d4af37";
-  g.font = "900 15px Georgia,serif";
-  g.fillText(a.name.toUpperCase(), 6 * u, 5 * u + 2);
-  g.fillStyle = "#bfe3f2";
-  for (let k = 0; k < 5; k++) g.fillRect(u + 12 + k * 2 * u, 5 * u + 10, 1.6 * u, 6);
-  g.fillStyle = "#e74c3c";
-  g.fillRect(1.5 * u, 4.2 * u, 6, 0.8 * u);
-  g.fillRect(10.2 * u, 4.2 * u, 6, 0.8 * u);
-  for (const x of [1.2 * u, 10.6 * u]) {
-    g.fillStyle = "#2e5f2a";
+  for (let k = 0; k < 3; k++) g.fillText("CUSTOMER", fx + ((k + 0.5) * fw) / 3, fh - 0.5 * u);
+  // painted roundel: house mark in the brand green with a gold ring
+  g.fillStyle = GRN;
+  g.beginPath();
+  g.arc(fx + fw / 2, 1.25 * u, 0.85 * u, 0, 7);
+  g.fill();
+  g.strokeStyle = GLD;
+  g.lineWidth = 3;
+  g.stroke();
+  g.fillStyle = GLD;
+  g.beginPath();
+  g.moveTo(fx + fw / 2, 0.75 * u);
+  g.lineTo(fx + fw / 2 + 0.5 * u, 1.2 * u);
+  g.lineTo(fx + fw / 2 + 0.36 * u, 1.2 * u);
+  g.lineTo(fx + fw / 2 + 0.36 * u, 1.65 * u);
+  g.lineTo(fx + fw / 2 - 0.36 * u, 1.65 * u);
+  g.lineTo(fx + fw / 2 - 0.36 * u, 1.2 * u);
+  g.lineTo(fx + fw / 2 - 0.5 * u, 1.2 * u);
+  g.closePath();
+  g.fill();
+  // planters with clipped hedges and flowers either side of the forecourt
+  for (const px of [0.35 * u, 9.25 * u]) {
+    g.fillStyle = "#6d6457";
+    rr(px, 0.5 * u, 2.4 * u, 3.6 * u, 6);
+    g.fill();
+    g.fillStyle = "#2f6b33";
+    rr(px + 4, 0.5 * u + 4, 2.4 * u - 8, 3.6 * u - 8, 6);
+    g.fill();
+    for (let k = 0; k < 14; k++) {
+      g.fillStyle = ["#ff5f8f", "#ffd23f", "#ffffff", "#c58bff"][k % 4];
+      g.beginPath();
+      g.arc(
+        px + 10 + ((k * 23) % (2.4 * u - 20)),
+        0.5 * u + 10 + ((k * 37) % (3.6 * u - 20)),
+        2.2,
+        0,
+        7,
+      );
+      g.fill();
+    }
+  }
+  // totem sign (left of the forecourt mouth)
+  g.fillStyle = "rgba(0,0,0,.35)";
+  g.fillRect(1.1 * u + 4, 4.35 * u + 4, 1.2 * u, 0.45 * u);
+  g.fillStyle = GRN;
+  g.fillRect(1.1 * u, 4.35 * u, 1.2 * u, 0.45 * u);
+  g.fillStyle = GLD;
+  g.fillRect(1.1 * u, 4.35 * u, 1.2 * u, 3);
+  // building shadow, then the shop
+  const bx = 0.7 * u,
+    by = 5.2 * u,
+    bw = 10.6 * u,
+    bh = 3.6 * u;
+  g.fillStyle = "rgba(0,0,0,.28)";
+  g.fillRect(bx + 10, by + 10, bw, bh);
+  // slate roof with parapet, skylights, AC units
+  g.fillStyle = "#2b3340";
+  g.fillRect(bx, by, bw, bh);
+  g.fillStyle = "#3a4454";
+  g.fillRect(bx, by, bw, 5);
+  g.fillRect(bx, by + bh - 5, bw, 5);
+  g.fillRect(bx, by, 5, bh);
+  g.fillRect(bx + bw - 5, by, 5, bh);
+  for (let k = 0; k < 3; k++) {
+    g.fillStyle = "#8fc4dc";
+    g.fillRect(bx + 1.2 * u + k * 2.6 * u, by + 1.55 * u, 1.6 * u, 0.7 * u);
+    g.fillStyle = "rgba(255,255,255,.35)";
+    g.fillRect(bx + 1.2 * u + k * 2.6 * u, by + 1.55 * u, 1.6 * u, 4);
+  }
+  for (const k of [0, 1]) {
+    const ax = bx + bw - 2.4 * u + k * 1.1 * u,
+      ay = by + 2.5 * u;
+    g.fillStyle = "#9aa3ad";
+    g.fillRect(ax, ay, 0.9 * u, 0.7 * u);
+    g.fillStyle = "#5d6670";
     g.beginPath();
-    g.arc(x, 4.4 * u, 12, 0, 7);
+    g.arc(ax + 0.45 * u, ay + 0.35 * u, 0.26 * u, 0, 7);
     g.fill();
   }
-  g.fillStyle = "#fff";
-  g.font = "900 22px Arial Black,Arial";
-  g.fillText("\u{1F3E0}", 6 * u, 7.6 * u);
+  // glass shopfront along the front face, listing cards in the window, door in the middle
+  const gy = by + 0.45 * u;
+  g.fillStyle = "#1d3b4f";
+  g.fillRect(bx + 6, gy, bw - 12, 0.85 * u);
+  const grd = g.createLinearGradient(0, gy, 0, gy + 0.85 * u);
+  grd.addColorStop(0, "rgba(160,215,240,.75)");
+  grd.addColorStop(1, "rgba(60,120,160,.55)");
+  g.fillStyle = grd;
+  g.fillRect(bx + 6, gy, bw - 12, 0.85 * u);
+  for (let k = 0; k < 9; k++) {
+    const cx = bx + 12 + k * 1.12 * u;
+    if (Math.abs(cx + 0.35 * u - (bx + bw / 2)) < 0.7 * u) continue; // door
+    g.fillStyle = "#fbfaf6";
+    g.fillRect(cx, gy + 4, 0.7 * u, 0.85 * u - 8);
+    g.fillStyle = ["#4a7a3a", "#b8673a", "#5a6f8f"][k % 3];
+    g.fillRect(cx + 3, gy + 7, 0.7 * u - 6, 0.35 * u);
+    g.fillStyle = k % 3 ? "#c0392b" : "#1e8449";
+    g.fillRect(cx + 3, gy + 0.85 * u - 11, 0.7 * u - 6, 3);
+  }
+  g.fillStyle = "#14232e";
+  g.fillRect(bx + bw / 2 - 0.55 * u, gy, 1.1 * u, 0.85 * u);
+  g.fillStyle = GLD;
+  g.fillRect(bx + bw / 2 - 2, gy + 6, 4, 0.85 * u - 12);
+  // striped awning projecting over the pavement + fascia with the name
+  const ay = by - 0.55 * u;
+  for (let k = 0; k < 20; k++) {
+    g.fillStyle = k % 2 ? "#f3efe4" : GRN;
+    g.fillRect(bx + (k * bw) / 20, ay, bw / 20 + 0.5, 0.55 * u);
+  }
+  g.fillStyle = "rgba(0,0,0,.25)";
+  g.fillRect(bx, ay + 0.55 * u, bw, 4);
+  g.fillStyle = GRN;
+  g.fillRect(bx - 4, ay - 0.62 * u, bw + 8, 0.66 * u);
+  g.fillStyle = GLD;
+  g.fillRect(bx - 4, ay - 0.62 * u, bw + 8, 2);
+  g.fillRect(bx - 4, ay + 0.02 * u, bw + 8, 2);
+  g.font = "900 14px Georgia,serif";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText(a.name.toUpperCase(), bx + bw / 2, ay - 0.29 * u, bw - 16);
+  g.textBaseline = "alphabetic";
+  // bollards along the pavement
+  g.fillStyle = "#30353c";
+  for (const x of [0.9, 2.4, 9.6, 11.1]) {
+    g.beginPath();
+    g.arc(x * u, 4.15 * u, 3.5, 0, 7);
+    g.fill();
+  }
   return (a.art = c);
 }
 // ---------- per-frame: driveway / agent triggers
@@ -1471,13 +1599,13 @@ function updateHomes(dt) {
         break;
       }
     }
-    if (!hit)
-      for (const a of HOMES.agents)
-        if (homeIn({ x0: a.x0 + 2, y0: a.y0 - a.gap, w: 8, h: a.gap + 4.5 })) {
-          hit = ["a", a];
-          break;
-        }
   }
+  // v60 (James 21 Oct): estate agents never auto-open. In the shop zone (forecourt, drive and the kerbside lane in front)
+  // an ENTER SHOP button appears; it opens the menu only when the rig is nearly stopped (eaEnter).
+  let at = null;
+  for (const a of HOMES.agents) if (homeIn(eaZone(a))) at = a;
+  HOMES.atAgent = at;
+  eaButton(at);
   const fresh = trigFresh("home", hit ? hit[0] + hit[1].id : null); // v50: only after driving in
   if (Math.abs(truck.v) >= 4) hit = null;
   const key = hit ? hit[0] + hit[1].id : null;
@@ -1485,11 +1613,71 @@ function updateHomes(dt) {
     HOMES.slot = key;
     if (hit && fresh && !career.uiOpen && !(typeof bigmap !== "undefined" && bigmap.open)) {
       trigUsed("home");
-      if (hit[0] === "h") homeCard(hit[1]);
-      else estatePanel(hit[1]);
+      homeCard(hit[1]);
     }
   }
 }
+function eaZone(a) {
+  return { x0: a.x0 - 2, y0: a.y0 - a.gap - 4, w: 16, h: a.gap + 8.5 };
+}
+const EA_STOP = 1.34; // m/s (3 mph): the menu only opens when the rig is nearly stopped
+function eaEnter() {
+  const a = HOMES.atAgent;
+  if (!a || career.uiOpen) return false;
+  if (Math.abs(truck.v) >= EA_STOP) {
+    flash("Stop to enter " + a.name);
+    return true;
+  }
+  estatePanel(a);
+  return true;
+}
+// bottom-centre action button (same look as CUSTOMISE / REPAIR): tap, click, Enter / E, A on a pad (gamepad.js)
+function eaButton(a) {
+  let el = document.getElementById("eaGo");
+  const show = a && !career.uiOpen && !(typeof bigmap !== "undefined" && bigmap.open);
+  if (!show) {
+    if (el) el.remove();
+    return;
+  }
+  const pa = typeof pad !== "undefined" && pad.active,
+    slow = Math.abs(truck.v) < EA_STOP,
+    key =
+      (pa ? "\u24b6" : document.body.classList.contains("touch") ? "Tap" : "E / Enter") +
+      (slow ? "" : " \u2022 stop first");
+  if (!el) {
+    el = document.createElement("button");
+    el.id = "eaGo";
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      eaEnter();
+    });
+    (document.getElementById("frame") || document.body).appendChild(el);
+    if (!document.getElementById("eaGoCss")) {
+      const st = document.createElement("style");
+      st.id = "eaGoCss";
+      st.textContent =
+        "#eaGo{position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:30;padding:14px 24px;min-height:58px;min-width:200px;border-radius:16px;border:0;font:900 18px system-ui;letter-spacing:1px;color:#111;background:linear-gradient(180deg,#ffd45e,#f5a91e);box-shadow:0 6px 18px rgba(0,0,0,.45);cursor:pointer;pointer-events:auto;touch-action:manipulation}#eaGo small{display:block;font-size:10px;opacity:.7;letter-spacing:.5px}#eaGo.mv{filter:saturate(.55) brightness(.85)}";
+      document.head.appendChild(st);
+    }
+  }
+  const html = "\u{1F3E1} ENTER SHOP <small>" + key + "</small>";
+  if (el.innerHTML !== html) el.innerHTML = html;
+  el.classList.toggle("mv", !slow);
+}
+addEventListener(
+  "keydown",
+  (e) => {
+    if (career.uiOpen || !(e.code === "Enter" || e.code === "NumpadEnter" || e.code === "KeyE"))
+      return;
+    if (!document.getElementById("eaGo")) return;
+    const t = e.target;
+    if (t && t.closest && t.closest("input,textarea,select")) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    eaEnter();
+  },
+  true,
+);
 // ---------- drawing in the world (low layer, under vehicles)
 function drawHomes(vx0, vy0, vx1, vy1) {
   if (!HOMES.list.length) return;
@@ -1538,10 +1726,23 @@ function drawHomes(vx0, vy0, vx1, vy1) {
     ctx.fillStyle = "#9c9d99";
     ctx.fillRect((a.x0 + 3) * u, (a.y0 - a.gap) * u, 6 * u, a.gap * u);
     ctx.drawImage(hAgentArt(a), x, y);
-    if (dark > 0.05 && typeof dnLight === "function") {
-      dnLight((a.x0 + 6) * u, (a.y0 + 5) * u, 170, "rgba(255,230,160,1)", 0.8);
-      for (const k of [1.5, 10.5])
-        dnLight((a.x0 + k) * u, (a.y0 + 4.4) * u, 60, "rgba(255,90,80,1)", 0.5);
+    if (dark > 0.05) {
+      // v60 night: lit shop window + fascia, green totem, warm bollards and forecourt floods
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, dark * 1.2);
+      ctx.fillStyle = "rgba(255,226,160,.85)";
+      ctx.fillRect((a.x0 + 0.9) * u, (a.y0 + 5.65) * u, 10.2 * u, 0.85 * u);
+      ctx.fillStyle = "rgba(120,255,190,.55)";
+      ctx.fillRect((a.x0 + 1.1) * u, (a.y0 + 4.35) * u, 1.2 * u, 0.45 * u);
+      ctx.restore();
+      if (typeof dnLight === "function") {
+        for (const k of [2.5, 6, 9.5])
+          dnLight((a.x0 + k) * u, (a.y0 + 4.6) * u, 120, "rgba(255,225,160,1)", 0.75);
+        dnLight((a.x0 + 1.7) * u, (a.y0 + 4.5) * u, 50, "rgba(80,255,170,1)", 0.7);
+        for (const x of [0.9, 2.4, 9.6, 11.1])
+          dnLight((a.x0 + x) * u, (a.y0 + 4.15) * u, 26, "rgba(255,200,130,1)", 0.6);
+        dnLight((a.x0 + 6) * u, (a.y0 + 1.5) * u, 140, "rgba(230,240,255,1)", 0.45);
+      }
     }
   }
 }
@@ -1549,11 +1750,13 @@ function drawHomes(vx0, vy0, vx1, vy1) {
 function homeMapIcons(icon, px, py) {
   for (const a of HOMES.agents) icon(px(a.entrance.x), py(a.entrance.y), "#0f5132", "E");
   for (const h of HOMES.list)
-    if (homeOwned(h)) icon(px(h.entrance.x), py(h.entrance.y), "#1e8449", "\u{1F3E0}");
+    icon(px(h.entrance.x), py(h.entrance.y), homeOwned(h) ? "#1e8449" : "#c0392b", "\u{1F3E0}");
 }
 function homePOIs(test) {
   for (const a of HOMES.agents) test(a.ft, a.entrance.x, a.entrance.y, "Estate agent");
-  for (const h of HOMES.list) if (homeOwned(h)) test(h.ft, h.entrance.x, h.entrance.y, "Your home");
+  // v60: every home is a fast-travel point (for-sale homes too, so you can go and view them in person)
+  for (const h of HOMES.list)
+    test(h.ft, h.entrance.x, h.entrance.y, homeOwned(h) ? "Your home" : "Home for sale");
 }
 // ---------- UI
 const HOME_CSS = `.hmm{width:min(980px,96%)!important;max-width:none!important;height:min(640px,92%);max-height:92%;padding:0!important;display:flex;flex-direction:column;overflow:hidden;background:linear-gradient(180deg,#14202c,#0d1620)!important;border:1px solid rgba(212,175,55,.35)!important}
@@ -1681,33 +1884,66 @@ function homeBuy(h) {
     BigRig.emit("homeBought", { id: h.id, name: h.name, price: h.price });
   return true;
 }
+// v60: estate agent menu = a property listing: cards with photo, OWNED / FOR SALE badge, HOME / COMMERCIAL YARD chip,
+// price and facts, FAST TRAVEL on every card. Tabs ALL / HOMES / COMMERCIAL (LB RB, Q E). Midnight + neon (EA_CSS).
+const EA_CSS = `.eam{width:min(1040px,96%)!important;height:min(680px,94%);background:#07080b!important;border:2px solid #2ad4ff!important;box-shadow:0 0 0 1px rgba(42,212,255,.25),0 18px 60px rgba(0,0,0,.7),0 0 40px rgba(42,212,255,.15)!important;border-radius:16px!important}
+.eam .hh{background:#0b0d12;border-bottom:1px solid rgba(42,212,255,.25)!important}.eam .hh h2{color:#eef8ff!important;letter-spacing:1px}.eam .hh .sub{color:#8fe3ff;opacity:.8!important}
+.eam .eal{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;background:#0d0f14;outline:2px solid #2ad4ff;outline-offset:-2px;flex:none}
+.eam .bank{background:#0d0f14!important;border:1px solid rgba(125,255,154,.45)!important}.eam .hx{background:#0d0f14!important;outline:2px solid rgba(42,212,255,.6);outline-offset:-2px}
+.eam .tabs{background:#0b0d12;padding:8px 14px!important;gap:8px!important;border-bottom:1px solid rgba(42,212,255,.15)}.eam .tabs .ti{border-radius:999px!important;border:0!important;background:#0d0f14!important;color:#9fb3c8!important;outline:2px solid rgba(42,212,255,.25);outline-offset:-2px;flex:0 1 auto!important;padding:8px 16px!important}
+.eam .tabs .ti.on{background:#0b2433!important;color:#fff!important;outline-color:#2ad4ff;box-shadow:0 0 12px rgba(42,212,255,.35)!important}
+body .eam .grid,body:not(.touch) .eam .grid{background:#07080b!important;display:grid!important;grid-template-columns:repeat(auto-fill,minmax(228px,1fr))!important;grid-auto-rows:min-content;gap:12px!important;padding:12px 14px!important;align-content:start}
+.eam .pc{background:#0d0f14;border-radius:14px;overflow:hidden;outline:1px solid rgba(42,212,255,.22);outline-offset:-1px;display:flex;flex-direction:column;min-width:0;transition:outline-color .15s,transform .15s}
+.eam .pc:hover,.eam .pc:has(.padfocus){outline:2px solid #2ad4ff;transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.5),0 0 18px rgba(42,212,255,.2)}
+.eam .pc .ph{position:relative;aspect-ratio:16/10;background:#11151c}.eam .pc .ph img{width:100%;height:100%;object-fit:cover;display:block}
+.eam .pc .ph:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(7,8,11,0) 55%,rgba(7,8,11,.85))}
+.eam .bd{position:absolute;top:8px;left:8px;z-index:1;font:900 10px system-ui;letter-spacing:1.5px;padding:4px 8px;border-radius:6px;color:#fff}.eam .bd.o{background:#14833f;box-shadow:0 0 10px rgba(125,255,154,.5)}.eam .bd.s{background:#d6264f;box-shadow:0 0 10px rgba(255,61,127,.45)}
+.eam .ty{position:absolute;top:8px;right:8px;z-index:1;font:900 9.5px system-ui;letter-spacing:1.2px;padding:4px 7px;border-radius:6px;background:rgba(7,8,11,.8);color:#8fe3ff;outline:1px solid rgba(42,212,255,.6)}.eam .ty.c{color:#ffd34d;outline-color:rgba(255,211,77,.7)}
+.eam .pp{position:absolute;left:10px;bottom:8px;z-index:1;font:900 19px system-ui;color:#fff;text-shadow:0 2px 6px #000}.eam .pp.ow{color:#7dff9a}
+.eam .pb{padding:9px 11px 11px;display:flex;flex-direction:column;gap:4px;flex:1}.eam .pn{font-weight:900;font-size:14px;color:#eef8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.eam .pl{font-size:11px;color:#8fa3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.eam .pf{display:flex;flex-wrap:wrap;gap:4px;margin:2px 0 4px}.eam .pf span{font-size:10.5px;color:#cfe8f5;background:#11151c;border-radius:6px;padding:3px 6px}
+.eam .ftb{margin-top:auto;width:100%;background:#0b2433!important;color:#eef8ff!important;outline:2px solid #2ad4ff;outline-offset:-2px;border-radius:10px!important;padding:10px!important;font-size:12px!important;letter-spacing:1px;min-height:40px}.eam .ftb:hover{background:#0f3247!important}
+.eam .ftb.off{outline-color:#3a4250;color:#7d8794!important;background:#0d0f14!important}.eam .ftb.padfocus,.eam .ti.padfocus,.eam .hx.padfocus{outline:3px solid #ffd34d!important}
+.eam .ft{background:#0b0d12;border-top:1px solid rgba(42,212,255,.15)!important;color:#8fa3b8;opacity:1!important}.eam .ft b{color:#eef8ff}
+@media (max-width:560px){body .eam .grid{grid-template-columns:1fr 1fr!important;gap:8px!important;padding:8px!important}.eam .pc .pp{font-size:15px}.eam .pn{font-size:12.5px}.eam .pf span:nth-child(n+3){display:none}.eam .tabs .ti{padding:7px 10px!important}}`;
 function estatePanel(agent) {
   homeCss();
-  const tab = HOMES.tab;
-  const res =
-    HOMES.list
-      .slice()
-      .sort((a, b) => a.price - b.price)
-      .map(
-        (h, i) =>
-          `<div class="li"><img src="${homeThumb(h, 184, 140)}" alt=""><div class="md"><div class="nm">${esc(h.name)}<span class="bdg ${homeOwned(h) ? "o" : "s"}">${homeOwned(h) ? "OWNED" : "FOR SALE"}</span></div><div class="rg">${esc(homeKind(h))} \u2022 ${esc(homeWhere(h))}</div><div class="fx">${h.bed} bed \u2022 ${homePlot(h)} \u2022 ${h.lorries} lorry space${h.lorries > 1 ? "s" : ""}</div></div><div class="rt"><div class="pr">${money(h.price)}</div><button class="ftb btn${i === 0 ? " sel" : ""}" data-h="${h.id}">FAST TRAVEL \u203a</button><div class="vf">${homeOwned(h) ? "Your home" : "View in person to buy"}</div></div></div>`,
-      )
-      .join("") || '<div class="li">No listings</div>';
-  const com =
-    (world.forSale || [])
-      .map((yd, i) => {
-        const o = ownedYard(yd),
-          t = o ? o.tier || 1 : yd.tier || 1,
-          T = OWN_TIERS[t];
-        return `<div class="li"><img src="${yardThumb(yd)}" alt=""><div class="md"><div class="nm">${esc(ydBrand(yd).name)}<span class="bdg ${o ? "o" : "s"}">${o ? "OWNED \u2022 T" + t : "FOR SALE"}</span></div><div class="rg">Haulage yard \u2022 ${esc(yd.region || "")}</div><div class="fx">${esc(T.label)} \u2022 ${T.trucks} AI trucks \u2022 +${money(T.pay)}/container \u2022 ${T.bays} bays${OWN_TIERS[t + 1] ? " \u2022 next tier " + money(OWN_TIERS[t + 1].price) : ""}</div></div><div class="rt"><div class="pr">${o ? "Owned" : money(OWN_TIERS[yd.tier || 1].price)}</div><button class="ftb btn${i === 0 ? " sel" : ""}" data-y="${yd.id}">FAST TRAVEL \u203a</button><div class="vf">${o ? "Your yard" : "View in person to buy"}</div></div></div>`;
-      })
-      .join("") || '<div class="li">No commercial listings</div>';
+  if (!document.getElementById("eacss")) {
+    const st = document.createElement("style");
+    st.id = "eacss";
+    st.textContent = EA_CSS;
+    document.head.appendChild(st);
+  }
+  const tab = ["all", "res", "com"].includes(HOMES.tab) ? HOMES.tab : "all";
+  const homes = HOMES.list
+    .slice()
+    .sort((a, b) => a.price - b.price)
+    .map((h) => {
+      const own = homeOwned(h);
+      return {
+        p: own ? 1e12 : h.price,
+        html: `<div class="pc"><div class="ph"><img src="${homeThumb(h, 368, 230)}" alt=""><span class="bd ${own ? "o" : "s"}">${own ? "OWNED" : "FOR SALE"}</span><span class="ty">\u{1F3E0} HOME</span><span class="pp${own ? " ow" : ""}">${own ? "Your home" : money(h.price)}</span></div><div class="pb"><div class="pn">${esc(h.name)}</div><div class="pl">${esc(homeKind(h))} \u2022 ${esc(homeWhere(h))}</div><div class="pf"><span>\u{1F6CF} ${h.bed} bed</span><span>\u{1F4D0} ${homePlot(h)}</span><span>\u{1F69B} ${h.lorries} rig${h.lorries > 1 ? "s" : ""}</span></div><button class="ftb btn" data-h="${h.id}">FAST TRAVEL \u203a</button></div></div>`,
+      };
+    });
+  const yards = (world.forSale || []).map((yd) => {
+    const o = ownedYard(yd),
+      t = o ? o.tier || 1 : yd.tier || 1,
+      T = OWN_TIERS[t];
+    return {
+      p: o ? 1e12 : OWN_TIERS[yd.tier || 1].price,
+      html: `<div class="pc"><div class="ph"><img src="${yardThumb(yd)}" alt=""><span class="bd ${o ? "o" : "s"}">${o ? "OWNED \u2022 T" + t : "FOR SALE"}</span><span class="ty c">\u{1F3ED} COMMERCIAL YARD</span><span class="pp${o ? " ow" : ""}">${o ? "Your yard" : money(OWN_TIERS[yd.tier || 1].price)}</span></div><div class="pb"><div class="pn">${esc(ydBrand(yd).name)}</div><div class="pl">Haulage yard \u2022 ${esc(yd.region || "")} \u2022 ${esc(T.label)}</div><div class="pf"><span>\u{1F69A} ${T.trucks} AI trucks</span><span>\u{1F4E6} ${T.bays} bays</span><span>+${money(T.pay)}/box</span></div><button class="ftb btn" data-y="${yd.id}">FAST TRAVEL \u203a</button></div></div>`,
+    };
+  });
+  const L =
+    tab === "res" ? homes : tab === "com" ? yards : homes.concat(yards).sort((a, b) => a.p - b.p);
+  const list = L.map((c) => c.html).join("") || '<div class="pl">No listings</div>';
+  const nC = (world.forSale || []).length;
   const b = openModal(
     "estate",
-    `<div class="hh"><div style="font-size:24px">\u{1F3E1}</div><div style="min-width:0"><h2>${esc(agent ? agent.name : "Estate agent")}</h2><div class="sub">Homes &amp; commercial property across the region</div></div><div class="bank">${money(truck.money)}</div><button class="hx btn" id="hmX">\u2715</button></div>
-    <div class="tabs"><button class="ti btn${tab === "res" ? " on" : ""}" data-t="res">RESIDENTIAL \u2022 ${HOMES.list.length}</button><button class="ti btn${tab === "com" ? " on" : ""}" data-t="com">COMMERCIAL \u2022 ${(world.forSale || []).length}</button></div>
-    <div class="grid">${tab === "res" ? res : com}</div><div class="ft"><span>No buying here \u2014 drive onto a property's driveway to view &amp; buy</span><span>\u2190 \u2192 / LB RB tabs \u2022 Enter / \u24b6 travel \u2022 Esc / \u24b7 close</span></div>`,
-    "hmm",
+    `<div class="hh"><div class="eal">\u{1F3E1}</div><div style="min-width:0"><h2>${esc(agent ? agent.name : "Estate agent")}</h2><div class="sub">Homes &amp; commercial yards across the region</div></div><div class="bank">${money(truck.money)}</div><button class="hx btn" id="hmX">\u2715</button></div>
+    <div class="tabs"><button class="ti btn${tab === "all" ? " on" : ""}" data-t="all">ALL \u2022 ${HOMES.list.length + nC}</button><button class="ti btn${tab === "res" ? " on" : ""}" data-t="res">\u{1F3E0} HOMES \u2022 ${HOMES.list.length}</button><button class="ti btn${tab === "com" ? " on" : ""}" data-t="com">\u{1F3ED} COMMERCIAL \u2022 ${nC}</button></div>
+    <div class="grid">${list}</div><div class="ft"><span>Buy on the property itself: drive onto its <b>driveway</b> or into the <b>yard</b></span><span>LB RB / Q E tabs \u2022 \u24b6 / Enter travel \u2022 \u24b7 / Esc close</span></div>`,
+    "hmm eam",
   );
   b.querySelector("#hmX").addEventListener("click", closeUI);
   for (const t of b.querySelectorAll(".ti"))
@@ -1715,15 +1951,11 @@ function estatePanel(agent) {
       if (HOMES.tab === t.dataset.t) return;
       HOMES.tab = t.dataset.t;
       estatePanel(agent);
-      setTimeout(() => {
-        const e = document.querySelector(".hmm .ti.on");
-        if (e && typeof padNav === "function") {
-          for (const q of document.querySelectorAll(".padfocus")) q.classList.remove("padfocus");
-        }
-      }, 50);
     });
   const jb = ftJobBlock();
+  let first = null;
   for (const f of b.querySelectorAll(".ftb")) {
+    first = first || f;
     if (jb) {
       f.classList.add("off"); // v50: greyed during a job; a click still explains why
       f.title = jb;
@@ -1741,16 +1973,22 @@ function estatePanel(agent) {
       setTimeout(() => fastTravel(o), 60);
     });
   }
+  if (first) first.classList.add("sel");
   HOMES.agentOpen = agent;
   if (typeof padNav === "function") setTimeout(() => padNav(null), 40);
+}
+const EA_TABS = ["all", "res", "com"];
+function eaTabStep(d) {
+  const i = Math.max(0, EA_TABS.indexOf(HOMES.tab));
+  HOMES.tab = EA_TABS[(i + d + 3) % 3];
+  estatePanel(HOMES.agentOpen);
 }
 addEventListener(
   "keydown",
   (e) => {
     if (career.uiOpen !== "estate") return;
     if (e.code === "KeyQ" || e.code === "KeyE" || e.code === "PageUp" || e.code === "PageDown") {
-      HOMES.tab = HOMES.tab === "res" ? "com" : "res";
-      estatePanel(HOMES.agentOpen);
+      eaTabStep(e.code === "KeyE" || e.code === "PageDown" ? 1 : -1);
       e.preventDefault();
     }
   },
@@ -1762,10 +2000,7 @@ setInterval(() => {
   if (!g) return;
   const lb = g.buttons[4] && g.buttons[4].pressed,
     rb = g.buttons[5] && g.buttons[5].pressed;
-  if ((lb || rb) && !HOMES.pb) {
-    HOMES.tab = HOMES.tab === "res" ? "com" : "res";
-    estatePanel(HOMES.agentOpen);
-  }
+  if ((lb || rb) && !HOMES.pb) eaTabStep(rb ? 1 : -1);
   HOMES.pb = lb || rb;
 }, 60);
 setTimeout(() => {

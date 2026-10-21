@@ -237,6 +237,7 @@ function padUpdate(dt) {
     if (cc && cc.ok) toggleCouple();
     else if (document.getElementById("rpGo") && typeof rpDo === "function") rpDo();
     else if (document.getElementById("czGo") && typeof czOpen === "function") czOpen();
+    else if (document.getElementById("eaGo") && typeof eaEnter === "function") eaEnter();
     else toggleCouple();
   }
   if (hit(2)) toggleRefuel();
