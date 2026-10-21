@@ -179,94 +179,187 @@ function makeTextures() {
     if (r() < 0.5) crack(g, r, "rgba(18,18,22,0.45)", 0.8);
     speckle(g, 32, 32, ["rgba(200,200,205,0.25)"], 18, r);
   });
+  // v61b: concrete / paving / natural surfaces: joints, staining, aggregate, layered speckle
+  function joints(g, col, lines) {
+    g.fillStyle = col;
+    for (const [x, y, w, h] of lines) g.fillRect(x, y, w, h);
+  }
   variants("walk", (g, r) => {
     g.fillStyle = "#b9b6ae";
     g.fillRect(0, 0, 32, 32);
-    speckle(g, 32, 32, ["#c4c1b9", "#aeaba3"], 80, r);
-    g.fillStyle = "#9d9a92";
-    g.fillRect(0, 0, 32, 1);
-    g.fillRect(0, 16, 32, 1);
-    g.fillRect(0, 0, 1, 32);
-    g.fillRect(16, 0, 1, 32);
+    // four flags with a slight tone each
+    for (const [x, y] of [
+      [0, 0],
+      [16, 0],
+      [0, 16],
+      [16, 16],
+    ]) {
+      g.fillStyle = ["rgba(255,255,255,0.05)", "rgba(0,0,0,0.04)", "rgba(120,110,90,0.05)"][
+        (r() * 3) | 0
+      ];
+      g.fillRect(x, y, 16, 16);
+    }
+    speckle(g, 32, 32, ["#c4c1b9", "#aeaba3", "#a5a29a", "#cbc8c0"], 150, r);
+    if (r() < 0.4) blob(g, r() * 32, r() * 32, 3 + r() * 3, 2.5 + r() * 2, "rgba(70,62,50,0.16)"); // stain / gum
+    joints(g, "#9d9a92", [
+      [0, 0, 32, 1],
+      [0, 16, 32, 1],
+      [0, 0, 1, 32],
+      [16, 0, 1, 32],
+    ]);
+    joints(g, "rgba(255,255,255,0.18)", [
+      [0, 1, 32, 1],
+      [0, 17, 32, 1],
+      [1, 0, 1, 32],
+      [17, 0, 1, 32],
+    ]);
   });
   variants("conc", (g, r) => {
     g.fillStyle = "#a3a39c";
     g.fillRect(0, 0, 32, 32);
-    speckle(g, 32, 32, ["#adada6", "#97978f", "#8f8f88"], 110, r);
-    g.fillStyle = "#86867e";
-    g.fillRect(0, 0, 32, 1);
-    g.fillRect(0, 0, 1, 32);
-    if (r() < 0.3) {
-      g.fillStyle = "rgba(60,50,40,0.18)";
-      g.beginPath();
-      g.ellipse(r() * 32, r() * 32, 6, 4, 0, 0, 7);
-      g.fill();
-    }
+    for (let k = 0; k < 2; k++)
+      blob(
+        g,
+        r() * 32,
+        r() * 32,
+        8 + r() * 8,
+        6 + r() * 6,
+        r() < 0.5 ? "rgba(255,255,250,0.07)" : "rgba(70,68,60,0.07)",
+      );
+    speckle(g, 32, 32, ["#adada6", "#97978f", "#8f8f88", "#b5b5ae"], 200, r);
+    stones(g, r, 14, ["rgba(130,128,118,0.5)", "rgba(180,178,170,0.5)"], 1, 1.8); // exposed aggregate
+    if (r() < 0.3) blob(g, r() * 32, r() * 32, 5 + r() * 3, 3.5 + r() * 2, "rgba(60,50,40,0.1)"); // staining
+    if (r() < 0.3) crack(g, r, "rgba(80,80,74,0.4)", 0.7);
+    joints(g, "#86867e", [
+      [0, 0, 32, 1],
+      [0, 0, 1, 32],
+    ]);
+    joints(g, "rgba(255,255,255,0.14)", [
+      [0, 1, 32, 1],
+      [1, 0, 1, 32],
+    ]);
   });
   variants("plaza", (g, r) => {
-    g.fillStyle = "#c9bfae";
+    g.fillStyle = "#b5ab9a"; // joint colour
     g.fillRect(0, 0, 32, 32);
     for (let y = 0; y < 32; y += 8)
-      for (let x = 0; x < 32; x += 8) {
-        g.fillStyle = ["#cfc5b4", "#c2b8a6", "#d6ccbb"][(r() * 3) | 0];
-        g.fillRect(x + ((y / 8) % 2 ? 4 : 0), y, 7, 7);
+      for (let x = -8; x < 32; x += 8) {
+        g.fillStyle = ["#cfc5b4", "#c2b8a6", "#d6ccbb", "#c8bdaa"][(r() * 4) | 0];
+        const sx = x + ((y / 8) % 2 ? 4 : 0);
+        g.fillRect(sx, y, 7, 7);
+        g.fillStyle = "rgba(255,255,255,0.12)";
+        g.fillRect(sx, y, 7, 1);
       }
+    speckle(g, 32, 32, ["rgba(120,110,95,0.35)", "rgba(255,250,240,0.3)"], 90, r);
+    if (r() < 0.35) blob(g, r() * 32, r() * 32, 4, 3, "rgba(90,80,60,0.14)");
   });
   variants("gravel", (g, r) => {
     g.fillStyle = "#8f8068";
     g.fillRect(0, 0, 32, 32);
-    speckle(g, 32, 32, ["#a08f74", "#7c6e58", "#b3a283", "#6a5e4b"], 260, r);
+    speckle(g, 32, 32, ["#a08f74", "#7c6e58", "#b3a283", "#6a5e4b"], 300, r);
+    stones(g, r, 60, ["#a8987c", "#7a6c56", "#c0b090", "#665a47", "#9a9286"], 1.4, 2.8); // pebbles
+    stones(g, r, 30, ["rgba(50,42,32,0.45)"], 1, 1.6); // gaps / shadows
+    speckle(g, 32, 32, ["rgba(255,245,220,0.4)"], 40, r); // glints
   });
   variants("sand", (g, r) => {
     g.fillStyle = "#d8c98f";
     g.fillRect(0, 0, 32, 32);
-    speckle(g, 32, 32, ["#e3d59c", "#cbbb80", "#bfae72"], 120, r);
+    for (let k = 0; k < 2; k++)
+      blob(
+        g,
+        r() * 32,
+        r() * 32,
+        9 + r() * 7,
+        6 + r() * 5,
+        r() < 0.5 ? "rgba(255,245,200,0.1)" : "rgba(170,150,95,0.09)",
+      );
+    speckle(g, 32, 32, ["#e3d59c", "#cbbb80", "#bfae72", "#e8dca8"], 220, r);
+    // wind ripples (wrapped, faint)
+    g.strokeStyle = "rgba(160,140,90,0.18)";
+    g.lineWidth = 1;
+    for (let k = 0; k < 3; k++) {
+      const y = r() * 32,
+        cy = y - 2 + r() * 4;
+      wrap9((ox, oy) => {
+        g.beginPath();
+        g.moveTo(ox, y + oy);
+        g.quadraticCurveTo(16 + ox, cy + oy, 32 + ox, y + oy);
+        g.stroke();
+      });
+    }
+    speckle(g, 32, 32, ["rgba(120,100,70,0.35)"], 20, r);
   });
   variants("quay", (g, r) => {
     g.fillStyle = "#8d9196";
     g.fillRect(0, 0, 32, 32);
-    speckle(g, 32, 32, ["#979ba0", "#83878c", "#7a7e83"], 120, r);
-    g.fillStyle = "#777b80";
-    g.fillRect(0, 31, 32, 1);
-    g.fillRect(31, 0, 1, 32);
+    speckle(g, 32, 32, ["#979ba0", "#83878c", "#7a7e83", "#9fa3a8"], 190, r);
+    if (r() < 0.4) blob(g, r() * 32, r() * 32, 5, 3.5, "rgba(40,40,44,0.18)");
+    joints(g, "#777b80", [
+      [0, 31, 32, 1],
+      [31, 0, 1, 32],
+    ]);
   });
   variants("field", (g, r) => {
     g.fillStyle = "#7a6a3f";
     g.fillRect(0, 0, 32, 32);
-    speckle(g, 32, 32, ["#86754a", "#6d5e36"], 120, r);
+    // furrows (every 4 px; 32 divides so the rows tile)
+    for (let y = 0; y < 32; y += 4) {
+      g.fillStyle = "rgba(60,48,26,0.35)";
+      g.fillRect(0, y, 32, 1);
+      g.fillStyle = "rgba(150,130,85,0.18)";
+      g.fillRect(0, y + 2, 32, 1);
+    }
+    speckle(g, 32, 32, ["#86754a", "#6d5e36", "#93825a", "#5e5030"], 200, r);
+    speckle(g, 32, 32, ["rgba(110,140,60,0.5)"], 14, r); // weeds
   });
   variants("island", (g, r) => {
-    g.fillStyle = "#629a42";
-    g.fillRect(0, 0, 32, 32);
-    speckle(g, 32, 32, ["#5d9440", "#68a046", "#5a8f3d"], 200, r, 2);
-    g.lineWidth = 1;
-    blades(g, r, 70, ["rgba(50,85,32,0.45)", "rgba(120,165,80,0.4)"], 2.2);
+    grassBase(g, r, "#629a42", ["#5d9440", "#68a046", "#5a8f3d"], 85, 0);
   });
   variants("rock", (g, r) => {
     g.fillStyle = "#8e8b84";
     g.fillRect(0, 0, 32, 32);
-    speckle(g, 32, 32, ["#9a978f", "#827f78", "#a6a39b", "#76736c"], 200, r);
-    if (r() < 0.4) {
-      g.strokeStyle = "rgba(60,58,54,0.4)";
-      g.beginPath();
-      g.moveTo(r() * 32, r() * 32);
-      g.lineTo(r() * 32, r() * 32);
-      g.stroke();
-    }
+    for (let k = 0; k < 3; k++)
+      blob(
+        g,
+        r() * 32,
+        r() * 32,
+        6 + r() * 8,
+        5 + r() * 6,
+        r() < 0.5 ? "rgba(255,255,250,0.08)" : "rgba(50,48,44,0.1)",
+      );
+    speckle(g, 32, 32, ["#9a978f", "#827f78", "#a6a39b", "#76736c"], 260, r);
+    stones(g, r, 18, ["rgba(110,106,98,0.6)", "rgba(170,166,156,0.5)"], 1.5, 3);
+    crack(g, r, "rgba(55,52,48,0.5)", 0.9);
+    if (r() < 0.5) crack(g, r, "rgba(55,52,48,0.35)", 0.7);
+    if (r() < 0.4) blob(g, r() * 32, r() * 32, 3, 2.5, "rgba(110,130,70,0.22)"); // lichen
   });
   variants("water", (g, r) => {
     g.fillStyle = "#2f6fb3";
     g.fillRect(0, 0, 32, 32);
-    speckle(g, 32, 32, ["#3579bf", "#2a66a6", "#3a82c8"], 90, r, 2);
-    g.strokeStyle = "rgba(170,215,255,0.35)";
-    for (let i = 0; i < 2; i++) {
-      const x = r() * 24,
-        y = r() * 30;
-      g.beginPath();
-      g.moveTo(x, y);
-      g.quadraticCurveTo(x + 4, y - 2, x + 8, y);
-      g.stroke();
+    for (let k = 0; k < 3; k++)
+      blob(
+        g,
+        r() * 32,
+        r() * 32,
+        8 + r() * 8,
+        6 + r() * 6,
+        r() < 0.5 ? "rgba(70,140,210,0.1)" : "rgba(20,60,120,0.1)",
+      );
+    speckle(g, 32, 32, ["#3579bf", "#2a66a6", "#3a82c8", "#2c6db0"], 140, r, 2);
+    g.lineWidth = 1;
+    for (let i = 0; i < 4; i++) {
+      const x = r() * 32,
+        y = r() * 32,
+        l = 5 + r() * 6;
+      g.strokeStyle = i < 2 ? "rgba(170,215,255,0.35)" : "rgba(220,240,255,0.22)";
+      wrap9((ox, oy) => {
+        g.beginPath();
+        g.moveTo(x + ox, y + oy);
+        g.quadraticCurveTo(x + ox + l / 2, y + oy - 2, x + ox + l, y + oy);
+        g.stroke();
+      });
     }
+    speckle(g, 32, 32, ["rgba(230,245,255,0.45)"], 8, r); // glints
   });
 }
 // ---- road markings per tile

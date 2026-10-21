@@ -452,3 +452,5 @@ uses the same formulas.
 
 ## v61 graphics brief (James), staged
 - (a) `makeTextures` (render.js): new wrapped helpers `wrap9`, `blob`, `stones`, `crack` and `grassBase`. Textures stay 32 px (TEX canvases are also used as createPattern fills, so do not change their size). Keep low-frequency marks faint (alpha 0.1 or less) or the 4 variants show the tile grid. Night bloom: `gfxBloomBegin` / `gfxBloomEnd` (gfx.js) copy GL.lc plus brake / indicator glows into a 1/8-res buffer, box-blur it and add it back. Gated on gfxHi() and night; switch off with `GFX.off.bloom`.
+- (b) The other surfaces (walk, conc, plaza, gravel, sand, quay, field, island, rock, water) use the same helpers. Controls inside `wrap9` callbacks must be computed once, outside the callback, or the tile seams break.
+- Note: tests/spawn_lane_test.py is flaky before v61 too (about 1 run in 3 fails, at a random destination, when AI traffic is in the spawn lane).
