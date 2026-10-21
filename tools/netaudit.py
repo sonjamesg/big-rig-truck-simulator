@@ -51,14 +51,16 @@ AUDIT = r"""(()=>{ const W=world,S=W.segs,F=[]; const add=(k,x,y,o)=>F.push(Obje
  window.__NA={F,J}; const n={}; for(const f of F) n[f.k]=(n[f.k]||0)+1; const jc={}; for(const j of J) jc[j.cls+(j.L?'+L':'')]=(jc[j.cls+(j.L?'+L':'')]||0)+1;
  return {counts:n,jclass:jc,nJ:W.junctions.length,nSeg:S.length,nCv:W.curves.length,nRb:W.rbs.length,nCorner:W.corners.length,F,J}; })()"""
 GRASS = r"""()=>{ const out=[]; const C=CHUNK; const px=(x,y)=>{ const cx=Math.floor(x/C),cy=Math.floor(y/C),c=getChunk(cx,cy,true); return c.getContext('2d').getImageData(Math.floor(x-cx*C),Math.floor(y-cy*C),1,1).data; };
- const avg=(pts)=>{let r=0,g=0,b=0;for(const p of pts){const d=px(p[0],p[1]);r+=d[0];g+=d[1];b+=d[2];}const n=pts.length;return [r/n,g/n,b/n];};
  const GT=new Set([T.GRASS,T.PGRASS]);
- for(const c of world.corners){ if(c.R<4) continue; const X=c.cx*TILE,Y=c.cy*TILE;
-   // land block lies on the side of the circle centre away from the junction box corner (px,py)
-   const ux=Math.sign(c.cx-c.px),uy=Math.sign(c.cy-c.py); const gt=get(Math.floor(c.cx+ux*0.5),Math.floor(c.cy+uy*0.5)); if(!GT.has(gt)) continue;
-   const Rr=(c.R-1)*TILE; const inn=[]; const a0=Math.atan2(c.py-c.cy,c.px-c.cx); for(let k=-2;k<=2;k++){const a=a0+k*0.2; inn.push([X+Math.cos(a)*Rr*0.55,Y+Math.sin(a)*Rr*0.55]);}
-   const oth=[]; for(const [ox,oy] of [[ux*2,uy*2],[ux*3,0],[0,uy*3],[ux*3,uy*1],[ux*1,uy*3]]){ const tx=Math.floor(c.cx+ox),ty=Math.floor(c.cy+oy); if(GT.has(get(tx,ty))) oth.push([(tx+0.5)*TILE,(ty+0.5)*TILE]); }
-   if(oth.length<2) continue; const a=avg(inn),b=avg(oth),d=Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]); out.push({x:Math.round(c.cx),y:Math.round(c.cy),d:+d.toFixed(1),gt,a:a.map(Math.round),b:b.map(Math.round)}); }
+ // seam check: the kerb object's grass quarter-disc meets the neighbouring grass tiles along the box edges on the land side.
+ // Compare 3 px inside vs 3 px outside that edge (both grass), averaged along the edge.
+ for(const o of world.objects){ if(o.kind!=='kerb') continue; const c=o.c; if(c.R<4) continue; const ux=Math.sign(c.cx-c.px),uy=Math.sign(c.cy-c.py);
+   const gt=get(Math.floor(c.cx+ux*0.5),Math.floor(c.cy+uy*0.5)); if(!GT.has(gt)) continue;
+   const X=c.cx*TILE,Y=c.cy*TILE,Rg=(c.R-1)*TILE; let s=0,n=0;
+   // vertical edge of the box at x = X (land side), y from Y toward the junction by up to Rg; and horizontal edge at y = Y
+   for(let t=8;t<Rg-8;t+=6){ for(const [ax,ay,nx,ny] of [[X,Y-uy*t,ux,0],[X-ux*t,Y,0,uy]]){ const tin=get(Math.floor((ax-nx*4)/TILE),Math.floor((ay-ny*4)/TILE)), tout=get(Math.floor((ax+nx*4)/TILE),Math.floor((ay+ny*4)/TILE)); if(!GT.has(tout)) continue;
+     const a=px(ax-nx*3,ay-ny*3),b=px(ax+nx*3,ay+ny*3); s+=Math.hypot(a[0]-b[0],a[1]-b[1],a[2]-b[2]); n++; } }
+   if(n<3) continue; out.push({x:Math.round(c.cx),y:Math.round(c.cy),d:+(s/n).toFixed(1),n,gt}); }
  return out; }"""
 CROP = r"""([x,y,r,s,lab])=>{ const C=CHUNK, x0=(x-r)*TILE,y0=(y-r)*TILE,sz=2*r*TILE, cv=document.createElement('canvas'); cv.width=cv.height=s; const g=cv.getContext('2d'); const k=s/sz;
  for(let cy=Math.floor(y0/C);cy<=Math.floor((y0+sz)/C);cy++) for(let cx=Math.floor(x0/C);cx<=Math.floor((x0+sz)/C);cx++){ if(cx<0||cy<0||cx*C>=MW*TILE||cy*C>=MH*TILE) continue; const ch=getChunk(cx,cy,true); if(ch) g.drawImage(ch,(cx*C-x0)*k,(cy*C-y0)*k,C*k,C*k); }
@@ -76,8 +78,8 @@ async def main():
         gr = [] if os.environ.get("NOGRASS") else await pg.evaluate(GRASS)
         r["grass"] = gr
         for q in gr:
-            if q["d"] > 18: r["F"].append({"k": "grass-mismatch", "x": q["x"], "y": q["y"], "d": q["d"]})
-        r["counts"]["grass-mismatch"] = sum(1 for q in gr if q["d"] > 18)
+            if q["d"] > 28: r["F"].append({"k": "grass-mismatch", "x": q["x"], "y": q["y"], "d": q["d"]})
+        r["counts"]["grass-mismatch"] = sum(1 for q in gr if q["d"] > 28)
         spots = r["F"]
         if ONLY: spots = [{"k": "at", "x": int(a.split(",")[0]), "y": int(a.split(",")[1])} for a in ONLY.split(";")]
         n = 0
