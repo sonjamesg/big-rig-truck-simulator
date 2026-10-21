@@ -28,7 +28,12 @@ staged_sha() { # the source commit currently published on staging
 cmd_staging() {
   clean_tree
   python3 build.py
-  clean_tree # build output must already be committed (index.html / mapdata.bin), otherwise live would differ
+  # every build stamps a new build id into index.html: commit the build output so staging == a commit == what goes live
+  local other; other=$(git status --porcelain -- . ':!BigRigWeb.zip' ':!index.html' ':!mapdata.bin' ':!dist' ':!BigRig.html')
+  [ -z "$other" ] || die "build changed files other than its output: $other"
+  if [ -n "$(git status --porcelain -- index.html mapdata.bin)" ]; then
+    git add index.html mapdata.bin && git commit -qm "build for staging"
+  fi
   local sha br tmp
   sha=$(git rev-parse HEAD); br=$(git branch --show-current)
   tmp=$(mktemp -d)
