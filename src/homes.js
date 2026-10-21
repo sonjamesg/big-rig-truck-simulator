@@ -1,7 +1,7 @@
 /**
  * @file homes.js — purchasable homes + estate agents
  * Exposes (globals): HOME_DEFS, HOMES, HCITY, homeOwned, homesSave, homesLoad, homesGen,
- *   homeClrB, homeNearCity, homeLayout, hShade, hTree, hRoof, hDrawPlot (+17 more)
+ *   homeClrB, homeNearCity, homeLayout, hShade, hTree, hRoof, hDrawPlot, hDrawHard, hDrawCabin (+17 more)
  * Depends on: world.js, render.js, lorry.js, physics.js, traffic.js, depots.js, career.js, ui.js,
  *   satnav.js, gamepad.js, porttrucks.js, owndepot.js, daynight.js, main.js, wanted.js
  * Load order: #30 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
@@ -797,40 +797,12 @@ function hRoof(g, x, y, w, h, f, u) {
     return;
   }
 }
-function hDrawPlot(h) {
+// lorry hardstanding (bays, kerbs) + path to the front door, drawn into a plot canvas g (plot-local px)
+function hDrawHard(g, h) {
   const u = TILE,
-    W = h.w * u,
-    H = h.h * u,
-    c = document.createElement("canvas");
-  c.width = W;
-  c.height = H;
-  const g = c.getContext("2d"),
-    R = mulberry(h.x0 * 31 + h.y0),
+    hd = h.hard,
     L = (x) => (x - h.x0) * u,
     Tt = (y) => (y - h.y0) * u;
-  // ground: lawn stripes (sand-tinted on the coast, gravel at the ranch)
-  const lawn =
-    h.kind === "villa"
-      ? "#79a85a"
-      : h.kind === "cabin" || h.kind === "lodge"
-        ? "#4f7d3c"
-        : h.kind === "bungalow"
-          ? "#7f9a5a"
-          : "#6aa04a";
-  g.fillStyle = lawn;
-  g.fillRect(0, 0, W, H);
-  g.fillStyle = "rgba(255,255,255,0.05)";
-  for (let x = 0; x < W; x += u) if ((x / u) % 2) g.fillRect(x, 0, u, H);
-  if (h.kind === "cabin" || h.kind === "lodge") {
-    g.fillStyle = "rgba(70,50,25,0.25)";
-    for (let i = 0; i < 60; i++) {
-      g.beginPath();
-      g.arc(R() * W, R() * H, 3 + R() * 6, 0, 7);
-      g.fill();
-    }
-  }
-  // driveway apron + hardstanding with lorry bays
-  const hd = h.hard;
   g.fillStyle = "#a7a8a4";
   g.fillRect(L(hd.x), 0, hd.w * u, hd.h * u);
   g.strokeStyle = "rgba(0,0,0,0.12)";
@@ -869,6 +841,42 @@ function hDrawPlot(h) {
     const px = L(house.x + house.w / 2) - u * 0.6;
     g.fillRect(px, hd.h * u, u * 1.2, Tt(house.y) - hd.h * u);
   }
+}
+function hDrawPlot(h) {
+  const u = TILE,
+    W = h.w * u,
+    H = h.h * u,
+    c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
+  const g = c.getContext("2d"),
+    R = mulberry(h.x0 * 31 + h.y0),
+    L = (x) => (x - h.x0) * u,
+    Tt = (y) => (y - h.y0) * u;
+  // ground: lawn stripes (sand-tinted on the coast, gravel at the ranch)
+  const lawn =
+    h.kind === "villa"
+      ? "#79a85a"
+      : h.kind === "cabin" || h.kind === "lodge"
+        ? "#4f7d3c"
+        : h.kind === "bungalow"
+          ? "#7f9a5a"
+          : "#6aa04a";
+  g.fillStyle = lawn;
+  g.fillRect(0, 0, W, H);
+  g.fillStyle = "rgba(255,255,255,0.05)";
+  for (let x = 0; x < W; x += u) if ((x / u) % 2) g.fillRect(x, 0, u, H);
+  if (h.kind === "cabin" || h.kind === "lodge") {
+    g.fillStyle = "rgba(70,50,25,0.25)";
+    for (let i = 0; i < 60; i++) {
+      g.beginPath();
+      g.arc(R() * W, R() * H, 3 + R() * 6, 0, 7);
+      g.fill();
+    }
+  }
+  // driveway apron + hardstanding with lorry bays, path to the door (shared with hDrawCabin)
+  const hd = h.hard;
+  hDrawHard(g, h);
   const trees = [];
   for (const f of h.feat) {
     const x = L(f.x),
@@ -1399,8 +1407,209 @@ function hDrawPlot(h) {
       h.lights.push([(f.x + 1) * u, (f.y + 1) * u, 90, "rgba(255,140,40,1)", 0.8]);
   return c;
 }
+// Ravensholt Cabin design by James (v61): his cabin plot renderer, used for every home of kind "cabin" (hArt).
+// Integration changes only (see AGENTS.md): seeded grass (stable), win() instead of shadowing window, house aligned to the
+// collision box (h.feat house), hard standing + path drawn via hDrawHard, trees kept off the drive / landing area,
+// lights converted to world px (the format drawHomes passes to dnLight).
+function hDrawCabin(h) {
+  const u = TILE;
+  const c = document.createElement("canvas");
+  c.width = h.w * u;
+  c.height = h.h * u;
+  const g = c.getContext("2d");
+  g.fillStyle = "#4a7c3a";
+  g.fillRect(0, 0, c.width, c.height);
+  g.fillStyle = "#5a8c48";
+  const Rg = mulberry(h.x0 * 31 + h.y0); // seeded grass tufts (was Math.random: changed every redraw)
+  for (let i = 0; i < 80; i++) {
+    const x = Rg() * c.width;
+    const y = Rg() * c.height;
+    g.fillRect(x, y, 3 + Rg() * 4, 2 + Rg() * 3);
+  }
+  hDrawHard(g, h); // the drive's hardstanding, lorry bay and door path stay visible (fast travel lands here)
+  const R = mulberry(h.id.charCodeAt(1) || 42);
+  function tree(x, y, r) {
+    g.fillStyle = "rgba(0,0,0,0.18)";
+    g.beginPath();
+    g.ellipse(x + r * 0.3, y + r * 0.4, r * 0.9, r * 0.7, 0, 0, Math.PI * 2);
+    g.fill();
+    const greens = ["#1e4d2a", "#2a6338", "#357a44", "#1a3d22"];
+    for (let k = 0; k < 4; k++) {
+      g.fillStyle = greens[k];
+      g.beginPath();
+      g.moveTo(x, y - r * 1.1 + k * r * 0.2);
+      g.lineTo(x - r * (0.7 - k * 0.12), y + r * 0.4);
+      g.lineTo(x + r * (0.7 - k * 0.12), y + r * 0.4);
+      g.closePath();
+      g.fill();
+    }
+    g.fillStyle = "#5a3a22";
+    g.fillRect(x - r * 0.08, y + r * 0.3, r * 0.16, r * 0.35);
+  }
+  const base = (h.w >> 1) * u - 3.5 * u; // James's layout origin (woodstore, fire pit hang off it)
+  const hf = h.feat.find((f) => f.k === "house");
+  const houseX = hf ? (hf.x - h.x0) * u : base; // house drawn exactly on its collision box
+  const houseY = 9 * u;
+  const hd = h.hard,
+    hL = (hd.x - h.x0) * u,
+    hR = hL + hd.w * u,
+    hB = hd.h * u;
+  for (let i = 0; i < 28; i++) {
+    const tx = 1.5 * u + R() * (h.w - 3) * u;
+    const ty = 1.5 * u + R() * (h.h - 3) * u;
+    if (Math.hypot(tx - houseX - 3.5 * u, ty - houseY - 2.5 * u) < 5.5 * u) continue;
+    if (ty < 8 * u) continue;
+    const r = 0.9 * u + R() * 0.7 * u;
+    if (tx > hL - r && tx < hR + r && ty - r * 1.1 < hB + u) continue; // keep the crown off the hardstanding / landing
+    tree(tx, ty, r);
+  }
+  const wsX = base - 3.5 * u;
+  const wsY = 9 * u;
+  g.fillStyle = "#5a3a22";
+  g.fillRect(wsX, wsY, 2 * u, 3 * u);
+  g.fillStyle = "#6b4a2c";
+  for (let i = 0; i < 5; i++) {
+    g.fillRect(wsX + 2, wsY + 4 + i * 8, 2 * u - 4, 5);
+  }
+  g.fillStyle = "#4a2e1a";
+  g.fillRect(wsX, wsY, 2 * u, 6);
+  const hx = houseX;
+  const hy = 9 * u;
+  const hw = 7 * u;
+  const hh = 5 * u;
+  g.fillStyle = "rgba(0,0,0,0.25)";
+  g.fillRect(hx + 6, hy + 6, hw, hh);
+  g.fillStyle = "#6b4a2c";
+  g.fillRect(hx, hy, hw, hh);
+  g.strokeStyle = "rgba(40,20,8,0.55)";
+  g.lineWidth = 2;
+  for (let y = hy + 6; y < hy + hh; y += 7) {
+    g.beginPath();
+    g.moveTo(hx, y);
+    g.lineTo(hx + hw, y);
+    g.stroke();
+  }
+  g.fillStyle = "#5a3a22";
+  g.fillRect(hx, hy, 5, hh);
+  g.fillRect(hx + hw - 5, hy, 5, hh);
+  g.fillStyle = "#4a2e1a";
+  g.beginPath();
+  g.moveTo(hx - 6, hy + 8);
+  g.lineTo(hx + hw / 2, hy - 18);
+  g.lineTo(hx + hw + 6, hy + 8);
+  g.closePath();
+  g.fill();
+  g.fillStyle = "#5a3a22";
+  g.beginPath();
+  g.moveTo(hx - 2, hy + 10);
+  g.lineTo(hx + hw / 2, hy - 12);
+  g.lineTo(hx + hw + 2, hy + 10);
+  g.closePath();
+  g.fill();
+  g.strokeStyle = "rgba(30,15,5,0.4)";
+  g.lineWidth = 1.5;
+  for (let i = 0; i < 6; i++) {
+    const yy = hy - 10 + i * 5;
+    g.beginPath();
+    g.moveTo(hx + 10 + i * 4, yy);
+    g.lineTo(hx + hw - 10 - i * 4, yy);
+    g.stroke();
+  }
+  g.fillStyle = "#5a5550";
+  g.fillRect(hx + hw - 1.4 * u, hy - 10, 1.1 * u, 1.6 * u);
+  g.fillStyle = "#3a3530";
+  g.fillRect(hx + hw - 1.5 * u, hy - 14, 1.3 * u, 5);
+  function win(wx, wy) {
+    g.fillStyle = "#1a2a3a";
+    g.fillRect(wx, wy, 14, 12);
+    g.fillStyle = "#cfe6ff";
+    g.fillRect(wx + 2, wy + 2, 4, 3);
+    g.fillRect(wx + 8, wy + 2, 4, 3);
+    g.fillRect(wx + 2, wy + 7, 4, 3);
+    g.fillRect(wx + 8, wy + 7, 4, 3);
+    g.strokeStyle = "#4a2e1a";
+    g.lineWidth = 2;
+    g.strokeRect(wx, wy, 14, 12);
+  }
+  win(hx + 12, hy + 18);
+  win(hx + hw - 28, hy + 18);
+  g.fillStyle = "#3a2418";
+  g.fillRect(hx + hw / 2 - 8, hy + hh - 22, 16, 22);
+  g.fillStyle = "#d4af37";
+  g.fillRect(hx + hw / 2 + 2, hy + hh - 12, 3, 3);
+  const dx = hx - 0.8 * u;
+  const dy = hy + hh;
+  const dw = hw + 1.6 * u;
+  g.fillStyle = "#7a5a3a";
+  g.fillRect(dx, dy, dw, 1.8 * u);
+  g.strokeStyle = "#5a3a22";
+  g.lineWidth = 2;
+  for (let x = dx; x < dx + dw; x += 8) {
+    g.beginPath();
+    g.moveTo(x, dy);
+    g.lineTo(x, dy + 1.8 * u);
+    g.stroke();
+  }
+  g.fillStyle = "#5a3a22";
+  g.fillRect(dx, dy, 4, 1.8 * u);
+  g.fillRect(dx + dw - 4, dy, 4, 1.8 * u);
+  g.fillRect(dx, dy, dw, 4);
+  g.fillStyle = "#6b4a2c";
+  g.fillRect(hx + hw / 2 - 12, dy + 1.8 * u, 24, 10);
+  g.fillRect(hx + hw / 2 - 10, dy + 1.8 * u + 10, 20, 8);
+  const fx = base - 4.2 * u;
+  const fy = hy + 1.2 * u;
+  g.fillStyle = "#6a6358";
+  g.beginPath();
+  g.arc(fx, fy, 18, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = "#4a453c";
+  g.beginPath();
+  g.arc(fx, fy, 12, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = "#ff6a20";
+  g.beginPath();
+  g.arc(fx, fy - 1, 7, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = "#ffd060";
+  g.beginPath();
+  g.arc(fx, fy - 2, 4, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = "#fff4c0";
+  g.beginPath();
+  g.arc(fx, fy - 3, 2, 0, Math.PI * 2);
+  g.fill();
+  function bench(bx, by, rot) {
+    g.save();
+    g.translate(bx, by);
+    g.rotate(rot);
+    g.fillStyle = "#6b4a2c";
+    g.fillRect(-12, -4, 24, 8);
+    g.fillStyle = "#5a3a22";
+    g.fillRect(-12, -5, 24, 3);
+    g.fillRect(-11, 3, 4, 6);
+    g.fillRect(7, 3, 4, 6);
+    g.restore();
+  }
+  const benches = [
+    [fx - 28, fy - 8, 0.2],
+    [fx - 22, fy + 16, 0.8],
+    [fx + 8, fy + 22, 1.6],
+    [fx + 26, fy + 6, 2.4],
+    [fx + 18, fy - 16, 3.2],
+    [fx - 6, fy - 22, 4.0],
+  ];
+  for (const [bx, by, rot] of benches) bench(bx, by, rot);
+  // night lights: drawHomes calls dnLight(x, y, r, colour, alpha) with x / y in WORLD px, so offset by the plot origin
+  const ox = h.x0 * u,
+    oy = h.y0 * u;
+  h.lights = [];
+  h.lights.push([ox + fx, oy + fy, 90, "rgba(255,140,40,1)", 0.85]);
+  h.lights.push([ox + hx + hw / 2, oy + hy + hh / 2, 70, "rgba(255,220,150,1)", 0.4]);
+  return c;
+}
 function hArt(h) {
-  return h.art || (h.art = hDrawPlot(h));
+  return h.art || (h.art = h.kind === "cabin" ? hDrawCabin(h) : hDrawPlot(h));
 }
 // v60: estate agent shop, top-down (12 x 9 tiles): block-paved plot, asphalt customer forecourt with lined bays and a
 // painted brand mark, planters + totem sign, modern shop with a glass frontage full of listing cards, striped awning and

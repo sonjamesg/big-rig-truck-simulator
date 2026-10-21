@@ -449,3 +449,9 @@ uses the same formulas.
   - Annotated tag `backup-2026-10-21` at 94df611 (v59).
   - GitHub release "Backup 2026-10-21" with BigRig_full_source.zip attached.
   - A local copy in /workspace/backups/.
+
+## v61: Ravensholt Cabin design by James
+- `hArt` uses `hDrawCabin(h)` (src/homes.js) for every home with `kind: "cabin"` (currently only H2 Ravensholt), `hDrawPlot` otherwise.
+- The hardstanding, lorry bays and door path come from the shared `hDrawHard(g, h)` (also used by hDrawPlot). Keep the fast-travel landing visible.
+- `h.lights` entries are `[x, y, r, colour, alpha]` in WORLD px (drawHomes feeds dnLight). Plot-canvas px must be offset by `h.x0*TILE, h.y0*TILE`.
+- The cabin house is drawn on its collision box (`homeLayout` case "cabin", house feat). Its trees are art only, so they have no collision.
