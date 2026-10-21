@@ -449,3 +449,6 @@ uses the same formulas.
   - Annotated tag `backup-2026-10-21` at 94df611 (v59).
   - GitHub release "Backup 2026-10-21" with BigRig_full_source.zip attached.
   - A local copy in /workspace/backups/.
+
+## v61 graphics brief (James), staged
+- (a) `makeTextures` (render.js): new wrapped helpers `wrap9`, `blob`, `stones`, `crack` and `grassBase`. Textures stay 32 px (TEX canvases are also used as createPattern fills, so do not change their size). Keep low-frequency marks faint (alpha 0.1 or less) or the 4 variants show the tile grid. Night bloom: `gfxBloomBegin` / `gfxBloomEnd` (gfx.js) copy GL.lc plus brake / indicator glows into a 1/8-res buffer, box-blur it and add it back. Gated on gfxHi() and night; switch off with `GFX.off.bloom`.

@@ -4,7 +4,8 @@
  *   warm headlight light on the road, streetlight pools, window glow, day + night brake / indicator glow with road
  *   spill, and vehicles lit by nearby lamps and other vehicles' headlights. The darkness itself stays the light/darkness
  *   compositing layer of daynight.js (drawNight: a low-res mask with lights cut out, then additive colour).
- * Exposes (globals): GFX, GFX_LOW_FPS, gfxHi, gfxSet, gfxGradeAt, gfxGrade, gfxLights, gfxVehLit (+ gfx* helpers)
+ * Exposes (globals): GFX, GFX_LOW_FPS, gfxHi, gfxSet, gfxGradeAt, gfxGrade, gfxLights, gfxVehLit, gfxBloomBegin,
+ *   gfxBloomEnd (+ gfx* helpers). v61: night bloom on the light layer (high quality only).
  * Depends on: daynight.js (DN, drawNight, dnVehs, dnGlow, slOn, SL), main.js (ctx, RSF, VW, VH, cam), traffic.js
  *   (traffic, VTYPES), indicators.js (indBlink), ui.js (toast)
  * Load order: after liftbridge.js in build.py (wraps drawNight). All files share one global scope (see AGENTS.md).
@@ -209,7 +210,19 @@ function gfxLights(vx0, vy0, vx1, vy1, z) {
     const R = r * z;
     ctx.globalAlpha = Math.min(1, a);
     ctx.drawImage(dnGlow(col), (x - vx0) * z - R, (y - vy0) * z - R, R * 2, R * 2);
+    if (bl) {
+      const s = bl.width / VW;
+      bl.g.globalAlpha = Math.min(1, a);
+      bl.g.drawImage(
+        dnGlow(col),
+        ((x - vx0) * z - R * 2) * s,
+        ((y - vy0) * z - R * 2) * s,
+        R * 4 * s,
+        R * 4 * s,
+      );
+    }
   };
+  const bl = hi && K > 0.05 && !GFX.off.bloom ? gfxBloomBegin() : null;
   if (K > 0.02 && DN.coneD && hi) {
     // coloured light layer: half-res canvas, all night light colour added here, then one additive composite
     const q = hi ? 0.5 : 0.34,
@@ -297,6 +310,10 @@ function gfxLights(vx0, vy0, vx1, vy1, z) {
     }
     ctx.globalAlpha = 1;
     ctx.drawImage(GL.lc, 0, 0, VW, VH);
+    if (bl) {
+      bl.g.globalAlpha = 1;
+      bl.g.drawImage(GL.lc, 0, 0, bl.width, bl.height);
+    }
   }
   // brake / indicator / reversing glow by day and night (night adds a spill pool on the road)
   const blink = typeof indBlink === "function" && indBlink();
@@ -326,7 +343,57 @@ function gfxLights(vx0, vy0, vx1, vy1, z) {
       gz("rgba(255,30,20,1)", (V.rx - rf[0] * 3) * PPM, (V.ry - rf[1] * 3) * PPM, 40, 0.22 * K);
   }
   if (hi && K > 0.05) gfxVehLit(vx0, vy0, vx1, vy1, z, veh, on);
+  if (bl) gfxBloomEnd(bl, K);
   ctx.restore();
+}
+// v61 bloom (high quality, night only): the coloured light layer (GL.lc) and the brake / indicator glows are copied
+// into a 1/8-res buffer, box-blurred with a few offset additive draws into a second buffer, then added back over the
+// screen with a controlled alpha. Two tiny canvases + ~6 blits a frame; no full-screen capture.
+function gfxBloomBegin() {
+  const w = Math.max(16, Math.ceil(VW / 8)),
+    h = Math.max(10, Math.ceil(VH / 8));
+  for (const k of ["bA", "bB"])
+    if (!GL[k] || GL[k].width !== w || GL[k].height !== h) {
+      GL[k] = document.createElement("canvas");
+      GL[k].width = w;
+      GL[k].height = h;
+      GL[k].g = GL[k].getContext("2d");
+    }
+  const b = GL.bA;
+  b.g.globalCompositeOperation = "source-over";
+  b.g.globalAlpha = 1;
+  b.g.clearRect(0, 0, w, h);
+  b.g.globalCompositeOperation = "lighter";
+  return b;
+}
+function gfxBloomEnd(b, K) {
+  const o = GL.bB,
+    q = o.g;
+  q.globalCompositeOperation = "source-over";
+  q.globalAlpha = 1;
+  q.clearRect(0, 0, o.width, o.height);
+  q.globalCompositeOperation = "lighter";
+  q.globalAlpha = 0.22;
+  for (const [dx, dy] of [
+    [0, 0],
+    [-2, 0],
+    [2, 0],
+    [0, -2],
+    [0, 2],
+  ])
+    q.drawImage(b, dx, dy);
+  q.globalAlpha = 0.12;
+  for (const [dx, dy] of [
+    [-3, -3],
+    [3, 3],
+    [3, -3],
+    [-3, 3],
+  ])
+    q.drawImage(b, dx, dy);
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = Math.min(0.6, 0.55 * K);
+  ctx.drawImage(o, 0, 0, VW, VH);
+  ctx.globalAlpha = 1;
 }
 // vehicles caught in lamp pools or another vehicle's headlights get a soft body highlight (body-sized, oriented)
 function gfxVehLit(vx0, vy0, vx1, vy1, z, veh, on) {

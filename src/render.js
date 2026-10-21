@@ -58,45 +58,126 @@ function makeTextures() {
       g.stroke();
     }
   }
-  variants("grass", (g, r) => {
-    g.fillStyle = "#5b8a3c";
+  // v61 texture overhaul helpers. Every mark is drawn at the 9 wrapped offsets so a tile stays seamless, and
+  // low-frequency marks stay faint so the four variants tile next to each other without a visible grid.
+  function wrap9(fn) {
+    for (const ox of [-32, 0, 32]) for (const oy of [-32, 0, 32]) fn(ox, oy);
+  }
+  function blob(g, x, y, rx, ry, col) {
+    wrap9((ox, oy) => {
+      const gr = g.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, Math.max(rx, ry));
+      gr.addColorStop(0, col);
+      gr.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = gr;
+      g.beginPath();
+      g.ellipse(x + ox, y + oy, rx, ry, 0, 0, 7);
+      g.fill();
+    });
+  }
+  function stones(g, r, n, cols, s0, s1) {
+    for (let i = 0; i < n; i++) {
+      const x = r() * 32,
+        y = r() * 32,
+        s = s0 + r() * (s1 - s0);
+      g.fillStyle = cols[(r() * cols.length) | 0];
+      wrap9((ox, oy) => {
+        if (x + ox > -s && x + ox < 32 + s && y + oy > -s && y + oy < 32 + s)
+          g.fillRect(x + ox - s / 2, y + oy - s / 2, s, s * (0.7 + ((i * 7) % 5) * 0.08));
+      });
+    }
+  }
+  function crack(g, r, col, w) {
+    let x = r() * 32,
+      y = r() * 32,
+      a = r() * 7;
+    const pts = [[x, y]];
+    for (let k = 0; k < 5; k++) {
+      a += (r() - 0.5) * 1.4;
+      x += Math.cos(a) * 3.5;
+      y += Math.sin(a) * 3.5;
+      pts.push([x, y]);
+    }
+    g.strokeStyle = col;
+    g.lineWidth = w;
+    wrap9((ox, oy) => {
+      g.beginPath();
+      g.moveTo(pts[0][0] + ox, pts[0][1] + oy);
+      for (const q of pts) g.lineTo(q[0] + ox, q[1] + oy);
+      g.stroke();
+    });
+  }
+  function grassBase(g, r, base, tones, nb, dry) {
+    g.fillStyle = base;
     g.fillRect(0, 0, 32, 32);
-    speckle(g, 32, 32, ["#55823a", "#61903f", "#507a35", "#5e8c40"], 220, r, 2);
+    // soft tonal mottling (faint, so the variants don't show the tile grid)
+    for (let k = 0; k < 3; k++)
+      blob(
+        g,
+        r() * 32,
+        r() * 32,
+        6 + r() * 8,
+        5 + r() * 7,
+        r() < 0.5 ? "rgba(30,60,20,0.07)" : "rgba(150,180,90,0.06)",
+      );
+    if (dry) blob(g, r() * 32, r() * 32, 5 + r() * 4, 4 + r() * 3, "rgba(185,170,95,0.16)"); // dry straw patch
+    if (dry > 1) blob(g, r() * 32, r() * 32, 2.5 + r() * 2, 2 + r() * 2, "rgba(110,85,50,0.2)"); // worn earth
+    speckle(g, 32, 32, tones, 260, r, 2);
     g.lineWidth = 1;
-    blades(
+    blades(g, r, nb, ["rgba(30,58,22,0.55)", "rgba(42,75,28,0.5)"], 2.4); // dark under-layer
+    blades(g, r, nb, ["rgba(80,122,50,0.5)", "rgba(96,140,58,0.45)", "rgba(70,110,44,0.5)"], 3.2);
+    blades(g, r, (nb * 0.6) | 0, ["rgba(130,168,82,0.4)", "rgba(150,182,96,0.3)"], 3.8); // sunlit tips
+    blades(g, r, dry ? 14 : 6, ["rgba(196,184,112,0.45)", "rgba(170,156,96,0.4)"], 3.4); // straw
+    speckle(g, 32, 32, ["rgba(25,48,18,0.5)", "rgba(170,190,110,0.35)"], 40, r);
+  }
+  variants("grass", (g, r) => {
+    const v = (r() * 4) | 0;
+    grassBase(
       g,
       r,
-      90,
-      [
-        "rgba(40,70,28,0.55)",
-        "rgba(110,150,70,0.45)",
-        "rgba(80,120,50,0.5)",
-        "rgba(130,160,80,0.35)",
-      ],
-      3,
+      "#5b8a3c",
+      ["#55823a", "#61903f", "#507a35", "#5e8c40", "#678f43"],
+      120,
+      v % 2 ? 1 + (v > 2) : 0,
     );
-    blades(g, r, 6, ["rgba(190,180,110,0.45)"], 3);
-    speckle(g, 32, 32, ["rgba(30,55,22,0.5)"], 30, r);
   });
   variants("pgrass", (g, r) => {
-    g.fillStyle = "#629a42";
-    g.fillRect(0, 0, 32, 32);
-    speckle(g, 32, 32, ["#5d9440", "#68a046", "#5a8f3d"], 200, r, 2);
-    g.lineWidth = 1;
-    blades(g, r, 80, ["rgba(50,85,32,0.45)", "rgba(120,165,80,0.4)", "rgba(90,135,58,0.45)"], 2.2);
-    speckle(g, 32, 32, ["rgba(35,65,25,0.4)"], 24, r);
+    grassBase(g, r, "#629a42", ["#5d9440", "#68a046", "#5a8f3d", "#6aa449"], 105, 0);
   });
   variants("asph", (g, r) => {
     g.fillStyle = "#3d4047";
     g.fillRect(0, 0, 32, 32);
-    speckle(g, 32, 32, ["#474a52", "#35383e", "#50535b", "#2f3237"], 170, r);
-    if (r() < 0.25) {
-      g.strokeStyle = "rgba(20,20,24,0.5)";
-      g.beginPath();
-      g.moveTo(r() * 32, r() * 32);
-      g.lineTo(r() * 32, r() * 32);
-      g.stroke();
+    // faint base colour variation + wear
+    for (let k = 0; k < 3; k++)
+      blob(
+        g,
+        r() * 32,
+        r() * 32,
+        7 + r() * 8,
+        6 + r() * 7,
+        r() < 0.5 ? "rgba(70,72,80,0.08)" : "rgba(20,22,26,0.08)",
+      );
+    // aggregate: fine grit + bigger stones in several greys
+    speckle(g, 32, 32, ["#474a52", "#35383e", "#50535b", "#2f3237", "#585b62"], 300, r);
+    stones(
+      g,
+      r,
+      28,
+      ["rgba(95,96,100,0.55)", "rgba(120,118,112,0.4)", "rgba(28,30,34,0.5)"],
+      1.2,
+      2.4,
+    );
+    // tyre-polished streaks (both directions, very faint: the tile is used on horizontal and vertical roads)
+    g.fillStyle = "rgba(255,255,255,0.025)";
+    for (let k = 0; k < 2; k++) {
+      const p = 6 + r() * 20;
+      g.fillRect(0, p, 32, 3);
+      g.fillRect(p, 0, 3, 32);
     }
+    g.fillStyle = "rgba(10,10,12,0.05)";
+    g.fillRect(0, 10 + r() * 12, 32, 2);
+    if (r() < 0.35) blob(g, r() * 32, r() * 32, 4 + r() * 3, 3 + r() * 2, "rgba(12,12,16,0.32)"); // oil stain
+    if (r() < 0.5) crack(g, r, "rgba(18,18,22,0.45)", 0.8);
+    speckle(g, 32, 32, ["rgba(200,200,205,0.25)"], 18, r);
   });
   variants("walk", (g, r) => {
     g.fillStyle = "#b9b6ae";
