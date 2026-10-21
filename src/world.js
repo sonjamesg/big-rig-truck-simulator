@@ -2315,7 +2315,7 @@ function* genWorldSteps() {
       J.lights = false; // v42: forecourt corners are plain bends; the T-junctions keep signals
   // v65 (James 21 Oct, network audit): the last two signalised 2-arm corners (no side road, no entrance) lose their signals
   for (const J of world.junctions)
-    if ((J.x === 470 && J.y === 222) || (J.x === 1715 && J.y === 1697)) J.lights = false;
+    if ((J.x === 470 && J.y === 222) || (J.x === 1715 && J.y === 1697)) J.lights = J.uk = false; // no masts / puffins / box either
   for (const rb of world.rbs) {
     for (const sg of S) {
       const ends =
