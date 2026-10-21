@@ -422,3 +422,23 @@ uses the same formulas.
 - `python3 build.py && python3 tools/junctionmap.py` regenerates `map/index.html` (from template `tools/junctionmap.html`) and `map/world.png` (1 px per tile, from the live world). Re-run after map changes. build.py does not touch `map/`.
 - Ids: J<junction id>, R<roundabout index>, C<curve id>. Types: sig (lights, 3+ arms), gw (no lights, 3+ arms), corner (2 arms; ring = has lights), rb, bend. Arms = box sides with road tiles 2 tiles out, plus entrance arms (lower-case letter: forecourt / yard / quay / depot frontage on a box side; `d` = driveway touching an arm within 6 tiles of the box), so a corner with an entrance counts as a T.
 - URL hash `#x,y,zoom,ID` deep-links a spot; the coordinate stamp is drawn into the canvas so screenshots carry it.
+
+## Release workflow: staging, then live, with rollback (tools/deploy.sh)
+- **Live:** repo `sonjamesg/big-rig-truck-simulator`, branch `main`, served by GitHub Pages at https://trucksim.co.uk (CNAME file `trucksim.co.uk`). Day-to-day work happens on `sb`, which is pushed to `main` and `wip-grid-thin` as usual.
+- **Staging:** repo `sonjamesg/big-rig-truck-simulator-staging`, branch `main`, served by Pages. It is reached at https://staging.trucksim.co.uk once DNS has `CNAME staging -> sonjamesg.github.io`, and at https://sonjamesg.github.io/big-rig-truck-simulator-staging/ until then.
+  - **What makes it different from live:** every page gets `noindex,nofollow`, has no canonical link and carries a "[STAGING]" title prefix. A red STAGING badge sits bottom-left. robots.txt is `Disallow: /`.
+  - **Paths:** root-absolute links are made relative, so the site works under the /repo/ path too.
+  - **Contents:** only the public site files are published (no src, tools, tests, supabase, dist, BigRig.html or zips). `STAGING_SOURCE` records the source commit and branch.
+  - **CNAME:** the live CNAME is never copied. deploy.sh writes `staging.trucksim.co.uk` into the staging CNAME only once that DNS record exists; writing it earlier would break the github.io URL.
+  - **Shared backend:** staging talks to the same Supabase backend as live (accounts, multiplayer).
+- **Flow when James sends a module:**
+  1. Review it: secrets, empty catches, duplicate globals.
+  2. Copy it into src/ and run build plus the relevant tests (world-gen changes: build, export_map, build, verify_map).
+  3. Run prettier and gen_index, then commit on `sb` (not yet pushed to main).
+  4. Run `tools/deploy.sh staging` and test on the staging URL (phone and desktop).
+  5. When it's good, run `tools/deploy.sh live`. This tags the current live main `live-YYYYMMDD-HHMM`, then fast-forwards main to exactly the staged commit; it refuses if that isn't a fast-forward. Push `wip-grid-thin` as usual.
+  6. **Undo:** `tools/deploy.sh rollback <tag>` (a live-* tag or `backup-2026-10-21`). This makes a new commit on main whose tree equals the tag, so history is kept and nothing is force-pushed.
+- **Backups:**
+  - Annotated tag `backup-2026-10-21` at 94df611 (v59).
+  - GitHub release "Backup 2026-10-21" with BigRig_full_source.zip attached.
+  - A local copy in /workspace/backups/.
