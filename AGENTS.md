@@ -475,3 +475,6 @@ uses the same formulas.
 
 ## v64 street lamps (daynight.js drawStreetLamps, gfx.js pools)
 - Top-down lamp head = opaque housing top (rounded dark-metal capsule, rim highlight, seam); plain grey by day. No visible bulb: the head glow dot is gone and the hi-quality core pool is soft (r64, a0.07). At night only a warm spill round the housing edge + the road pool show.
+
+## v65 vehicle shadows (gfxshade.js gsVehShadow, high gfx only)
+- blit/blitV shadow calls (player cab, trailer, AI, police, fire, bikes) draw a contact core (blur 0.7) plus the silhouette swept 5 steps from the footprint along SUN dir x SUN.L (blur 1.6 near, 3.2 far = penumbra). Night: contact core only. Each body part casts its own (articulation correct). Low gfx keeps the old fixed offset.

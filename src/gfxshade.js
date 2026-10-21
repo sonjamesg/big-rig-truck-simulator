@@ -6,7 +6,7 @@
  *     per-chunk world-space canvas (fixed GS_Q texels per world px), cuts the footprints / crowns back out;
  *     gsComposite() lays the visible ones into a screen scratch and composites it after the vehicles (so building
  *     shadows fall across traffic too). Re-baked only when the sun moves a 1-game-minute step or casters change.
- *   - Vehicles / trailers: blitV / blit calls with a shadow offset get the sun offset, the sun alpha and a pre-blurred
+ *   - Vehicles / trailers (v65): blitV / blit calls with a shadow offset get a swept, attached sun shadow + contact core, pre-blurred
  *     copy of the silhouette (cached per art canvas).
  * Exposes (globals): SUN, GS, gfxSun, gsPaint, gsKey, gsChunk, gsComposite, gfxShadeLayer, gfxShadowArt,
  *   gfxQualityChanged
@@ -240,12 +240,19 @@ function gfxShadeLayer(vx0, vy0, vx1, vy1, z) {
   gsComposite(vx0, vy0, vx1, vy1, z);
 }
 // ---------------------------------------------------------------- vehicle shadows: soft, sun-driven
-const GS_BLUR = new WeakMap();
-// padded, blurred copy of a silhouette canvas; sc = source px per world px
-function gfxShadowArt(c, sc) {
-  let b = GS_BLUR.get(c);
+// v65: a vehicle shadow is the body silhouette swept from the footprint toward the sun's shadow direction
+// (so it stays attached to the vehicle, like a real low box casts it), with a dark contact core under the
+// chassis and a penumbra that softens with distance. Same SUN direction / length as buildings and trees.
+// At night only the faint contact (ambient occlusion) shadow remains. Each body part (cab, trailer, car)
+// casts its own, so an articulated rig's shadows follow cab and trailer separately.
+const GS_BLUR = new Map();
+// padded, blurred copy of a silhouette canvas; sc = source px per world px, rw = blur radius in world px
+function gfxShadowArt(c, sc, rw = 1.6) {
+  let m = GS_BLUR.get(rw);
+  if (!m) GS_BLUR.set(rw, (m = new WeakMap()));
+  let b = m.get(c);
   if (b) return b;
-  const r = Math.max(1, Math.round(1.6 * sc)),
+  const r = Math.max(1, Math.round(rw * sc)),
     p = r * 2,
     o = document.createElement("canvas");
   o.width = c.width + p * 2;
@@ -260,41 +267,80 @@ function gfxShadowArt(c, sc) {
       for (let j = -2; j <= 2; j += 2) g.drawImage(c, p + i * (r / 2), p + j * (r / 2));
   }
   b = { c: o, p };
-  GS_BLUR.set(c, b);
+  m.set(c, b);
   return b;
+}
+// draw one swept shadow; put(b) draws blurred art b centred on the vehicle (the transform is already set)
+function gsVehShadow(x, y, ang, base, put, art, sc) {
+  const day = 1 - DN.dark,
+    len = base * SUN.L * day,
+    a0 = ctx.globalAlpha;
+  const core = gfxShadowArt(art, sc, 0.7),
+    near = gfxShadowArt(art, sc, 1.6),
+    far = gfxShadowArt(art, sc, 3.2);
+  ctx.save();
+  // contact shadow / ambient occlusion right under the body (day and night)
+  ctx.translate(x, y);
+  ctx.rotate(ang);
+  ctx.globalAlpha = a0 * (0.55 + 0.35 * day);
+  put(core, 1.02);
+  ctx.restore();
+  if (len > 0.5 && day > 0.02) {
+    const n = 5,
+      as = Math.min(1, 0.7 * SUN.a * day); // steps overlap: darkest at the footprint, lighter at the tip
+    for (let i = 1; i <= n; i++) {
+      const t = i / n;
+      ctx.save();
+      ctx.translate(x + SUN.dx * len * t, y + SUN.dy * len * t);
+      ctx.rotate(ang);
+      ctx.globalAlpha = a0 * as * (1 - 0.25 * t);
+      put(t < 0.5 ? near : far, 1);
+      ctx.restore();
+    }
+  }
 }
 {
   const bv = blitV;
   blitV = function (a, x, y, h, L, W, dx, dy) {
     if (!(dx || dy) || !gfxDyn()) return bv.apply(this, arguments);
-    const b = gfxShadowArt(a, VS / PPM),
-      d = Math.hypot(dx, dy) * SUN.L;
-    ctx.save();
-    ctx.globalAlpha *= SUN.a;
-    ctx.translate(x * PPM + SUN.dx * d, y * PPM + SUN.dy * d);
-    ctx.rotate(h);
     const k = PPM / VS;
-    ctx.drawImage(
-      b.c,
-      (-a.width / 2 - b.p) * k,
-      (-a.height / 2 - b.p) * k,
-      b.c.width * k,
-      b.c.height * k,
+    gsVehShadow(
+      x * PPM,
+      y * PPM,
+      h,
+      Math.hypot(dx, dy),
+      (b, s) =>
+        ctx.drawImage(
+          b.c,
+          (-a.width / 2 - b.p) * k * s,
+          (-a.height / 2 - b.p) * k * s,
+          b.c.width * k * s,
+          b.c.height * k * s,
+        ),
+      a,
+      VS / PPM,
     );
-    ctx.restore();
   };
   const bl = blit;
   blit = function (art, mx, my, ang, dx = 0, dy = 0) {
     if (!(dx || dy) || !gfxDyn() || !art || !art.c) return bl.apply(this, arguments);
-    const b = gfxShadowArt(art.c, ART_SCALE),
-      d = Math.hypot(dx, dy) * SUN.L,
-      k = 1 / ART_SCALE;
-    ctx.save();
-    ctx.globalAlpha *= SUN.a;
-    ctx.translate(mx * PPM + SUN.dx * d, my * PPM + SUN.dy * d);
-    ctx.rotate(ang);
-    ctx.drawImage(b.c, -(art.ox + b.p) * k, -(art.oy + b.p) * k, b.c.width * k, b.c.height * k);
-    ctx.restore();
+    const k = 1 / ART_SCALE;
+    gsVehShadow(
+      mx * PPM,
+      my * PPM,
+      ang,
+      Math.hypot(dx, dy),
+      (b, s) =>
+        ctx.drawImage(
+          b.c,
+          -(art.ox + b.p) * k * s,
+          -(art.oy + b.p) * k * s,
+          b.c.width * k * s,
+          b.c.height * k * s,
+        ),
+      art.c,
+      ART_SCALE,
+    );
   };
   // building / tree layer goes on after every ground vehicle and before rail / overhead / night
   const dr = drawRail;
