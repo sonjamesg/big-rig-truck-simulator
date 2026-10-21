@@ -2093,9 +2093,6 @@ function* genWorldSteps() {
     [240, 1100],
     [240, 1154],
     [294, 1154],
-    // v65 (James 21 Oct, network audit): the last two signalised 2-arm corners (no side road / entrance) become smooth bends
-    [470, 222],
-    [1715, 1697],
   ];
   world.bends = [];
   const SIG_ADD = new Set(
@@ -2316,6 +2313,9 @@ function* genWorldSteps() {
       J.y === 692
     )
       J.lights = false; // v42: forecourt corners are plain bends; the T-junctions keep signals
+  // v65 (James 21 Oct, network audit): the last two signalised 2-arm corners (no side road, no entrance) lose their signals
+  for (const J of world.junctions)
+    if ((J.x === 470 && J.y === 222) || (J.x === 1715 && J.y === 1697)) J.lights = false;
   for (const rb of world.rbs) {
     for (const sg of S) {
       const ends =
