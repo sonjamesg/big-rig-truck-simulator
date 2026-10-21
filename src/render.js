@@ -1426,6 +1426,24 @@ function drawObject(g, o) {
       g.beginPath();
       g.arc(o.x, o.y, 9, 0, 7);
       g.fill();
+      // v63: grass verge behind the footway follows the kerb radius instead of a square paved block
+      {
+        const bx = (o.x + o.w / 2) / TILE,
+          by = (o.y + o.h / 2) / TILE,
+          gt = get(
+            Math.floor(c.cx + Math.sign(c.cx - bx) * 0.5),
+            Math.floor(c.cy + Math.sign(c.cy - by) * 0.5),
+          );
+        if (gt === T.GRASS || gt === T.PGRASS) {
+          g.fillStyle = g.createPattern(
+            gt === T.PGRASS && TEX.pgrass ? TEX.pgrass[0] : TEX.grass[0],
+            "repeat",
+          );
+          g.beginPath();
+          g.arc(X, Y, Rr - TILE, 0, 7);
+          g.fill();
+        }
+      }
       g.strokeStyle = "#a8873a";
       g.beginPath();
       g.arc(o.x, o.y, 5, 0, 7);
@@ -1902,6 +1920,20 @@ function renderChunk(cx, cy) {
           g.fillStyle = "#6d7178";
           for (let k = 0; k < 32; k += 8) g.fillRect(px, py + k, 5, 2);
           g.fillStyle = "#c9ccd1";
+    // v63: carry the pavement 1.5 tiles back onto the wide road so the footway never shows a grass gap at the seam
+    for (const sd of [-1, 1]) {
+      const a0 = at(0, sd * hw(0, sd)),
+        a1 = at(0, sd * pw(0, sd)),
+        bx = -tp.dW[0] * 1.5 * T_,
+        by = -tp.dW[1] * 1.5 * T_;
+      g.beginPath();
+      g.moveTo(a0[0], a0[1]);
+      g.lineTo(a1[0], a1[1]);
+      g.lineTo(a1[0] + bx, a1[1] + by);
+      g.lineTo(a0[0] + bx, a0[1] + by);
+      g.closePath();
+      g.fill();
+    }
         }
         if (W(get(tx + 1, ty))) {
           g.fillRect(px + 27, py, 5, 32);
@@ -1917,6 +1949,19 @@ function renderChunk(cx, cy) {
       }
     }
   grassDetail(g, cx, cy);
+  // v63: UK lane-drop marking: each closing lane's divider continues as a bold short-gap broken line until the edge meets it
+  g.lineWidth = 4.5;
+  g.setLineDash([18, 9]);
+  for (const sd of [-1, 1])
+    for (let b = tp.wN / 2; b < hw(0, sd) - 0.5; b += 1) {
+      g.beginPath();
+      for (let i = 0; i < n && hw(i, sd) - b > 0.18; i++) {
+        const q = at(i, sd * b);
+        i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]);
+      }
+      g.stroke();
+    }
+  g.setLineDash([]);
   if (typeof railChunk === "function") railChunk(g, ox, oy);
   g.save();
   g.translate(-ox, -oy);

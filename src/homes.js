@@ -264,6 +264,7 @@ function homesGen(H) {
       taken.push([tx, ty]);
       access(x, y, D.w, gap);
       clearObjs(x, y, D.w, D.h);
+      clearObjs(x + (D.w >> 1) - 3, y - gap, 6, gap); // v63: no trees or bushes under the drive (their shadows showed through it)
       for (let j = y; j < y + D.h; j++)
         for (let i = x; i < x + D.w; i++) {
           world.reserved[idx(i, j)] = 1;

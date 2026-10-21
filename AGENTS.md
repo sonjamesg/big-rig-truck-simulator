@@ -460,3 +460,13 @@ uses the same formulas.
 - The cause of the flicker (live too, since stage 2): one view-sized half-res shadow layer was rebuilt every 250 ms whenever a chunk baked or the sun stepped. Each rebuild used a new fractional origin and the current zoom, so every edge re-rasterised at a different sub-pixel phase, plus pops.
 - Now: shadows are baked per ground chunk in world space (`gsChunk`, GS_Q = 0.5 texels per world px, fixed). The sun shape is quantised to 1-game-minute steps, at most 1 stale re-bake per frame, and missing chunks are baked at once. `gsComposite` lays the chunks opaque into a backing-res scratch (with a +0.5 overlap like the ground) and composites it 1:1 with an unquantised alpha.
 - Test: `tests/shadow_stability_test.py [html|url]` (mean frame-to-frame shadow change below 0.1, 0 pops).
+
+## v63a Ravensholt junction polish (render.js drawTaper / kerb, homes.js)
+- drawTaper: urban pavement band is carried 1.5 tiles back onto the wide road (no grass gap at the seam); every closing lane gets a UK lane-drop broken line (4.5px, dash 18/9) that runs until the converging edge meets it. Applies to all world.tapers.
+- kerb corner object: if the diagonal tile beyond the corner is GRASS/PGRASS, grass fills inside radius R-1 so the verge follows the kerb radius (no square paved blocks). Applies to every junction.
+- homesGen clears objects under each drive (bush shadows showed through). World gen: run the export_map workflow.
+
+## v63b Roundabouts (world.js rbSplitter/rbLaneR, render.js drawRB, rbx.js)
+- No splitter islands: rbSplitter(non-full) returns null; spF kept for tile gen only (map unchanged). Give-way triangle/dashes replaced by a solid stop line at rout+0.35 (where the AI holds), double white centre line between entry and exit.
+- 4 circulating lanes: rbLaneLines 3 spiral dividers + 4 arrow rows; rbLaneR picks 0.875/0.625/0.375/0.125 of the ring width by exit angle (traffic + satnav).
+- Heads: nearside primary at the stop line + secondary on the central island facing each entry (no repeaters). tests/roundabout_test.py expects splitters==0.
