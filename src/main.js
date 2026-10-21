@@ -479,6 +479,7 @@ function frame(ts) {
   padUpdate(dt);
   updateMP(dt);
   const paused = uiBlocking();
+  if (started && paused && typeof updateHorn === "function") updateHorn(truck, BD_IN); // horn previews in menus
   if (started && !paused) {
     acc += dt;
     const H = 1 / 120;

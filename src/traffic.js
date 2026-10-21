@@ -1492,53 +1492,11 @@ function aiHonkWanted(v, dt, hSig, lgap, lvel) {
   if (ls) return ls === "g" && v.greenT >= need && v.leadStillT >= need;
   return v.leadStillT >= 12 + 2 * v.hPat && !(typeof rbQueued === "function" && rbQueued(v));
 }
-function honkAt(x, y, heavy) {
+// v59: AI horns by vehicle class (small car beep / van two-tone / lorry + bus air horn), per-vehicle pitch, falloff: horns.js
+function honkAt(v) {
   traffic.honkReq = (traffic.honkReq || 0) + 1;
-  const ctx = audio.ctx;
-  if (!ctx || !audio.master) return;
-  const d = Math.hypot(x - truck.x, y - truck.y);
-  if (d > 110) return;
-  const vol = 0.16 * Math.max(0, 1 - d / 110) ** 1.3;
-  if (heavy && typeof airHornShot === "function") {
-    airHornShot(x, y, vol * 1.8);
-    traffic.honks = (traffic.honks || 0) + 1;
-    return;
-  }
-  const t = ctx.currentTime;
-  const g = ctx.createGain();
-  g.gain.value = 0;
-  let node = g;
-  if (ctx.createStereoPanner) {
-    const p = ctx.createStereoPanner();
-    p.pan.value = Math.max(-1, Math.min(1, (x - truck.x) / 40));
-    g.connect(p);
-    p.connect(audio.master);
-  } else g.connect(audio.master);
-  const lp = ctx.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.frequency.value = heavy ? 900 : 2400;
-  lp.connect(g);
-  const fr = heavy ? [150, 190, 227] : [392, 494];
-  const dur = 0.18 + Math.random() * 0.25,
-    two = Math.random() < 0.6;
-  for (const f of fr) {
-    const o = ctx.createOscillator();
-    o.type = heavy ? "sawtooth" : "square";
-    o.frequency.value = f * (0.97 + Math.random() * 0.06);
-    o.connect(lp);
-    o.start(t);
-    o.stop(t + (two ? dur * 2 + 0.12 : dur) + 0.05);
-  }
-  g.gain.setValueAtTime(0, t);
-  g.gain.linearRampToValueAtTime(vol, t + 0.01);
-  g.gain.setValueAtTime(vol, t + dur);
-  g.gain.linearRampToValueAtTime(0, t + dur + 0.02);
-  if (two) {
-    g.gain.setValueAtTime(0, t + dur + 0.1);
-    g.gain.linearRampToValueAtTime(vol, t + dur + 0.11);
-    g.gain.setValueAtTime(vol, t + dur * 2 + 0.1);
-    g.gain.linearRampToValueAtTime(0, t + dur * 2 + 0.12);
-  }
+  if (!audio.ctx || !audio.master || v.emResp) return;
+  aiHornShot(v);
   traffic.honks = (traffic.honks || 0) + 1;
 }
 function giveWayBusy(v, J) {
@@ -2001,7 +1959,7 @@ function stepVeh(v, dt, pbs) {
     v.honkT <= 0 &&
     timeS - (traffic.lastHonk || -99) > 1.5
   ) {
-    honkAt(v.x, v.y, v.heavy);
+    honkAt(v);
     traffic.lastHonk = timeS;
     v.honkT = 8 + v.r() * 10; // occasional: one toot, then a long wait
     v.honking = 0.5;

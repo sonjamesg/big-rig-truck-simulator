@@ -1,6 +1,6 @@
 /**
  * @file tune3.js — truck customiser stage 3: bumpers, lights, horns, cab extras, decals + company livery, MP sync
- * Exposes (globals): CZ_HORNS, czYardBrand, czDriver, czHornPreview, czStar, czLightsPreview,
+ * Exposes (globals): czYardBrand, czDriver, czHornPreview, czHornFocus, czStar, czLightsPreview,
  *   czLightsSide, czTruckGlow, czCosStr, mpCosmetic, czRemoteArt
  * Depends on: world.js, render.js, lorry.js, physics.js, audio.js, career.js, ui.js,
  *   indicators.js, beams.js, owndepot.js, tune.js, tune2.js, daynight.js, main.js
@@ -131,6 +131,12 @@ CZ_PARTS.push(
   { id: "hrn2", slot: "hrn", n: "Deep air horn", p: 1200, req: 2, look: { hrn: 2 } },
   { id: "hrn3", slot: "hrn", n: "Musical chime", p: 2000, req: 3, look: { hrn: 3 } },
   { id: "hrn4", slot: "hrn", n: "Train horn", p: 4000, req: 6, look: { hrn: 4 } },
+  // v59: more horns (sounds in horns.js HORNS[look.hrn])
+  { id: "hrn5", slot: "hrn", n: "Triple-chime train horn", p: 5000, req: 6, look: { hrn: 5 } },
+  { id: "hrn6", slot: "hrn", n: "Euro two-tone (hi-lo)", p: 800, req: 1, look: { hrn: 6 } },
+  { id: "hrn7", slot: "hrn", n: "Ship foghorn", p: 3000, req: 4, look: { hrn: 7 } },
+  { id: "hrn8", slot: "hrn", n: "La Cucaracha", p: 2500, req: 3, look: { hrn: 8 } },
+  { id: "hrn9", slot: "hrn", n: "Meep meep", p: 600, req: 1, look: { hrn: 9 } },
   { id: "vis1", slot: "vis", n: "Sun visor", p: 600, req: 1, look: { vis: 1 } },
   { id: "vis2", slot: "vis", n: "Chrome visor", p: 1100, req: 2, look: { vis: 2 } },
   {
@@ -184,13 +190,6 @@ CZ_PARTS.push(
   { id: "dec4", slot: "dec", n: "Starfield", p: 1500, req: 3, look: { dec: "stars" } },
   { id: "liv1", slot: "liv", n: "Company livery", p: 2000, req: 1, needYard: 1, look: { liv: 1 } },
 );
-const CZ_HORNS = {
-  0: [175, 176.3, 220.5, 222, 350, 441], // stock dual-trumpet air horn (F3 + A3, major third)
-  1: [330, 331.5, 415, 417, 660, 830],
-  2: [98, 99.5, 123, 124.6, 196, 247],
-  3: [277, 330, 370, 440, 554, 660],
-  4: [155.6, 185, 233, 311, 370, 466],
-};
 function czYardBrand() {
   if (typeof ownYards !== "function") return null;
   const y = ownYards().find((v) => ownedYard(v));
@@ -258,8 +257,23 @@ function czDriver() {
     if (!b) return;
     b.querySelectorAll(".czg .card").forEach((el) => {
       const p = czPart(el.dataset.p);
-      if (p && p.slot === "hrn") el.addEventListener("click", () => czHornPreview(p.look.hrn));
-      else if (el.dataset.p === "hrn_0") el.addEventListener("click", () => czHornPreview(0));
+      const hk = p && p.slot === "hrn" ? p.look.hrn : el.dataset.p === "hrn_0" ? 0 : -1;
+      if (hk < 0) return;
+      el.addEventListener("click", () => czHornPreview(hk));
+      // v59: explicit preview button on every horn card (touch / mouse); X on a pad, P on the keyboard
+      const pv = document.createElement("span");
+      pv.className = "hpv";
+      pv.setAttribute("role", "button");
+      pv.textContent =
+        (typeof pad !== "undefined" && pad.active ? GLYPH.X + " " : "\u25B6 ") + "PREVIEW";
+      pv.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        czHornPreview(hk);
+      });
+      pv.addEventListener("click", (e) => e.stopPropagation());
+      el.dataset.hk = hk;
+      el.appendChild(pv);
     });
     b.querySelectorAll(".czg .card.lock").forEach((el) =>
       el.classList.toggle(
@@ -271,9 +285,41 @@ function czDriver() {
 }
 function czHornPreview(k) {
   if (typeof audio === "undefined" || !audio.hornOsc) return;
+  if (audio.ctx && audio.ctx.state === "suspended") audio.ctx.resume();
   audio.hornP = -1;
   audio.hornPrev = k;
-  audio.hornUntil = performance.now() + 900;
+  audio.hornOn = false; // restart the attack (and any pattern) even if a preview is still sounding
+  audio.hornUntil = performance.now() + hornDef(k).pv;
+  CZ.pvK = k;
+}
+// v59: preview the focused / selected horn card: X on a gamepad (czPad), P on the keyboard
+function czHornFocus() {
+  const el =
+    (typeof pad !== "undefined" &&
+    pad.focus &&
+    pad.focus.dataset &&
+    pad.focus.dataset.hk !== undefined
+      ? pad.focus
+      : null) || uiRoot.querySelector(".czg .card.sel[data-hk]");
+  if (!el) return false;
+  czHornPreview(+el.dataset.hk);
+  return true;
+}
+{
+  const cp0 = czPad;
+  czPad = function (g, hit, now, dt) {
+    if (hit(2) && czHornFocus()) return true;
+    return cp0(g, hit, now, dt);
+  };
+}
+addEventListener("keydown", (e) => {
+  if (career.uiOpen === "tune" && e.code === "KeyP" && czHornFocus()) e.preventDefault();
+});
+{
+  const st = document.createElement("style");
+  st.textContent =
+    ".czg .card{position:relative} .czg .card .hpv{position:absolute;right:6px;top:6px;padding:7px 10px;min-height:30px;box-sizing:border-box;border-radius:9px;background:#0d0f14;color:#8fe3ff;border:2px solid #2ad4ff;font:900 12px system-ui;letter-spacing:1px;cursor:pointer;touch-action:manipulation;z-index:2} .czg .card .hpv:active{background:#0b2433}";
+  (document.head || document.documentElement).appendChild(st);
 }
 // ---- top-down parts
 function czStar(g, x, y, r, c) {
