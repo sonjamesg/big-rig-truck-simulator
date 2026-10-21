@@ -185,7 +185,7 @@ CZ_PARTS.push(
   { id: "liv1", slot: "liv", n: "Company livery", p: 2000, req: 1, needYard: 1, look: { liv: 1 } },
 );
 const CZ_HORNS = {
-  0: [116, 118.6, 147, 150.2, 233, 296],
+  0: [175, 176.3, 220.5, 222, 350, 441], // stock dual-trumpet air horn (F3 + A3, major third)
   1: [330, 331.5, 415, 417, 660, 830],
   2: [98, 99.5, 123, 124.6, 196, 247],
   3: [277, 330, 370, 440, 554, 660],

@@ -2051,6 +2051,119 @@ function* genWorldSteps() {
         (world.rbfix = world.rbfix || []).push([rb.id, sg.id, stub.id, off]);
       }
     }
+  // v57 (James 21 Oct): plain right-angle street corners (2 arms, no side entrance, driveway, depot or dock gate) are smooth
+  // bends, not junction boxes with lights. Each listed corner [vs.a, hs.a] is rebuilt before junction detection: both streets
+  // are cut back by the bend radius Rc (centre line; inner kerb Rc - w/2: 16 m on city / town streets, 12 m on estate roads),
+  // the freed tiles go back to open ground and a quarter-circle curve joins the two ends (AI, sat nav and markings treat it
+  // like any other curve). Corners with an entrance stay signalised T-junctions (decided per corner, see AGENTS.md).
+  const BEND_CORNERS = [
+    [150, 140],
+    [430, 140],
+    [150, 420],
+    [430, 420],
+    [1460, 170],
+    [1820, 170],
+    [1670, 1560],
+    [1560, 1648],
+    [250, 780],
+    [1000, 420],
+    [1066, 420],
+    [1600, 600],
+    [1666, 600],
+    [1666, 644],
+    [980, 1150],
+    [1068, 1150],
+    [1500, 1120],
+    [1566, 1120],
+    [294, 1100],
+    [138, 128],
+    [442, 128],
+    [1715, 1799],
+    [1078, 220],
+    [1434, 220],
+    [1078, 328],
+    [1434, 328],
+    [1820, 500],
+    [346, 876],
+    [240, 1100],
+    [240, 1154],
+    [294, 1154],
+  ];
+  world.bends = [];
+  const SIG_ADD = new Set(
+    [
+      [261, 1100],
+      [273, 1100],
+      [240, 1118],
+      [261, 1118],
+      [273, 1118],
+      [294, 1118],
+      [240, 1138],
+      [261, 1138],
+      [273, 1138],
+      [294, 1138],
+      [261, 1154],
+      [273, 1154],
+      [900, 97],
+      [1847, 1942],
+      [430, 1942],
+      [273, 977],
+      [1942, 1527],
+      [97, 1599],
+      [897, 1589],
+      [1078, 296],
+      [1434, 296],
+      [1248, 296],
+      [1292, 296],
+      [1248, 328],
+    ].map((p) => p.join(",")),
+  );
+  for (const [jx, jy] of BEND_CORNERS) {
+    const hs = world.segs.find(
+        (g) => g.dir === "h" && g.a === jy && g.b0 <= jx + 5 && g.b1 >= jx - 2,
+      ),
+      vs = world.segs.find((g) => g.dir === "v" && g.a === jx && g.b0 <= jy + 5 && g.b1 >= jy - 2);
+    if (!hs || !vs) continue;
+    const hE = Math.abs(hs.b0 - jx) <= vs.w ? 0 : 1, // which end of each street is at the corner
+      vE = Math.abs(vs.b0 - jy) <= hs.w ? 0 : 1,
+      sx = hE ? -1 : 1, // the street runs off east (+1) / west (-1), south (+1) / north (-1)
+      sy = vE ? -1 : 1,
+      Rc = hs.type === "res" || vs.type === "res" ? 5 : 6,
+      P = [jx + vs.w / 2, jy + hs.w / 2];
+    const cut = (g, e, to) => {
+      const lo = e ? to : g.b0,
+        hi = e ? g.b1 : to - 1,
+        key = g.dir === "h" ? "roadH" : "roadV";
+      for (let i = lo; i <= hi; i++)
+        for (let k = 0; k < g.w; k++) {
+          const x = g.dir === "h" ? i : g.a + k,
+            y = g.dir === "h" ? g.a + k : i;
+          if (!inb(x, y)) continue;
+          const q = idx(x, y);
+          if (world[key][q] === g.id) world[key][q] = -1;
+          if (world.roadH[q] === -1 && world.roadV[q] === -1)
+            G[q] = isDesert(x, y) ? T.SAND : T.GRASS;
+        }
+      if (e) g.b1 = to - 1;
+      else g.b0 = to;
+    };
+    cut(hs, hE, P[0] + sx * Rc + (hE ? 0 : 0));
+    cut(vs, vE, P[1] + sy * Rc);
+    const C = [P[0] + sx * Rc, P[1] + sy * Rc],
+      a0 = Math.atan2(-sy, 0),
+      a1 = Math.atan2(0, -sx);
+    let da = a1 - a0;
+    while (da > Math.PI) da -= 2 * Math.PI;
+    while (da < -Math.PI) da += 2 * Math.PI;
+    const pts = [],
+      n = Math.ceil(Rc * 6);
+    for (let k = 0; k <= n; k++) {
+      const a = a0 + (da * k) / n;
+      pts.push([C[0] + Rc * Math.cos(a), C[1] + Rc * Math.sin(a)]);
+    }
+    const cv = curve(hs.type, hs.w, pts, { seg: hs.id, end: hE }, { seg: vs.id, end: vE }, "bend");
+    world.bends.push([jx, jy, cv.id, Rc]);
+  }
   const S = world.segs;
   for (const hs of S) {
     if (hs.dir !== "h") continue;
@@ -2099,28 +2212,35 @@ function* genWorldSteps() {
             : hs.type === "town" || vs.type === "town"
               ? 5
               : 6;
-      const LT = (t) => t === "city" || t === "town" || t === "hwy" || t === "dual",
-        lights =
-          (LT(hs.type) &&
-            LT(vs.type) &&
-            (hs.type !== "hwy" || vs.type !== "dual") &&
-            (vs.type !== "hwy" || hs.type !== "dual")) ||
-          (jx >= 1385 &&
-            jy >= 1370 &&
-            hs.type !== "hwy" &&
-            vs.type !== "hwy" &&
-            (LT(hs.type) || LT(vs.type))); // v24: every Kingsbridge junction is signalised
+      const LT = (t) => t === "city" || t === "town" || t === "hwy" || t === "dual";
+      let lights =
+        (LT(hs.type) &&
+          LT(vs.type) &&
+          (hs.type !== "hwy" || vs.type !== "dual") &&
+          (vs.type !== "hwy" || hs.type !== "dual")) ||
+        (jx >= 1385 &&
+          jy >= 1370 &&
+          hs.type !== "hwy" &&
+          vs.type !== "hwy" &&
+          (LT(hs.type) || LT(vs.type))); // v24: every Kingsbridge junction is signalised
+      // v57 (James 21 Oct): every former give-way junction on the /map/ review list is signalised. Estate and military-base
+      // streets get the full UK design (puffin crossings, set-back stop lines, 12 m kerbs); motorway / country-road
+      // T-junctions get masts and UK phasing but keep their wide lorry radii (no pedestrians there).
+      const sigAdd = SIG_ADD.has(jx + "," + jy);
+      if (sigAdd) lights = true;
       // v53 (James 19 Oct): UK signalised crossroads inside the city/town street grids: 12 m kerbs, full-width signal-controlled
       // crossings, stop lines set back, puffin units (see ukjx below). Junctions outside the grids (the links out to the
       // motorways, depots and port: the lorry routes) and anything touching rural / dual / motorway roads keep their radii.
       const CT = (t) => t === "city" || t === "town",
+        URBJ = (t) => CT(t) || t === "res",
         uk =
-          lights &&
-          CT(hs.type) &&
-          CT(vs.type) &&
-          [...Object.values(world.cities || {}), ...Object.values(world.kbDistricts || {})].some(
-            (c) => jx >= c.xs[0] - 1 && jx <= c.X1 + 1 && jy >= c.ys[0] - 1 && jy <= c.Y1 + 1,
-          );
+          (sigAdd && URBJ(hs.type) && URBJ(vs.type)) ||
+          (lights &&
+            CT(hs.type) &&
+            CT(vs.type) &&
+            [...Object.values(world.cities || {}), ...Object.values(world.kbDistricts || {})].some(
+              (c) => jx >= c.xs[0] - 1 && jx <= c.X1 + 1 && jy >= c.ys[0] - 1 && jy <= c.Y1 + 1,
+            ));
       if (uk) kr = 3;
       const J = {
         id: world.junctions.length,

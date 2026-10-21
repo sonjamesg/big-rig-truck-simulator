@@ -78,55 +78,84 @@ function initAudio() {
     nd = nb.getChannelData(0);
   for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
   audio.noise = nb;
-  // horn: deep lorry air horn - detuned trumpet chord + harmonics, brassy waveshaper, limiter
+  // horn: dual-trumpet lorry air horn (v57): two low reed tones a major third apart (each a slightly detuned pair) built
+  // from a reed-like harmonic series, a soft saturator, two trumpet-bell resonances, an air-pressure pitch rise and hiss
+  // on attack (see audioUpdate), a short release. Tuning comes from CZ_HORNS (tune3.js), indexes 0-3 main, 4-5 octave.
   const hg = ctx.createGain();
   hg.gain.value = 0;
   const hsh = ctx.createWaveShaper();
   const cv = new Float32Array(1024);
   for (let i = 0; i < 1024; i++) {
     const x = i / 511.5 - 1;
-    cv[i] = Math.tanh(2.6 * x);
+    cv[i] = Math.tanh(1.7 * x) / Math.tanh(1.7);
   }
   hsh.curve = cv;
   hsh.oversample = "2x";
-  const hpk = ctx.createBiquadFilter();
-  hpk.type = "peaking";
-  hpk.frequency.value = 620;
-  hpk.Q.value = 1.1;
-  hpk.gain.value = 7;
+  const hb1 = ctx.createBiquadFilter();
+  hb1.type = "peaking";
+  hb1.frequency.value = 760;
+  hb1.Q.value = 2.2;
+  hb1.gain.value = 8;
+  const hb2 = ctx.createBiquadFilter();
+  hb2.type = "peaking";
+  hb2.frequency.value = 1550;
+  hb2.Q.value = 3;
+  hb2.gain.value = 4;
+  const hhp = ctx.createBiquadFilter();
+  hhp.type = "highpass";
+  hhp.frequency.value = 110;
   const hlp = ctx.createBiquadFilter();
   hlp.type = "lowpass";
-  hlp.frequency.value = 2600;
+  hlp.frequency.value = 3800;
   const hlim = ctx.createDynamicsCompressor();
-  hlim.threshold.value = -9;
-  hlim.knee.value = 2;
-  hlim.ratio.value = 20;
-  hlim.attack.value = 0.002;
-  hlim.release.value = 0.12;
+  hlim.threshold.value = -10;
+  hlim.knee.value = 4;
+  hlim.ratio.value = 12;
+  hlim.attack.value = 0.003;
+  hlim.release.value = 0.15;
   hg.connect(hsh);
-  hsh.connect(hpk);
-  hpk.connect(hlp);
+  hsh.connect(hhp);
+  hhp.connect(hb1);
+  hb1.connect(hb2);
+  hb2.connect(hlp);
   hlp.connect(hlim);
   hlim.connect(master);
+  // reed spectrum: strong low partials, slow 1/n^0.85 roll-off, odd partials a little stronger (pinched reed)
+  const NH = 28,
+    re = new Float32Array(NH + 1),
+    im = new Float32Array(NH + 1);
+  for (let n = 1; n <= NH; n++) im[n] = (n % 2 ? 1 : 0.72) / Math.pow(n, 0.85);
+  const reed = ctx.createPeriodicWave(re, im);
   audio.hornOsc = [];
-  for (const [f, a] of [
-    [116, 0.32],
-    [118.6, 0.26],
-    [147, 0.3],
-    [150.2, 0.24],
-    [233, 0.12],
-    [296, 0.08],
-  ]) {
-    const o = ctx.createOscillator();
-    o.type = "sawtooth";
-    o.frequency.value = f;
-    const og = ctx.createGain();
-    og.gain.value = a;
-    o.connect(og);
-    og.connect(hg);
-    o.start();
-    audio.hornOsc.push([o, f]);
-  }
+  const HG = [0.3, 0.22, 0.27, 0.2, 0.05, 0.035];
+  (typeof CZ_HORNS !== "undefined" ? CZ_HORNS[0] : [175, 176.3, 220.5, 222, 350, 441]).forEach(
+    (f, i) => {
+      const o = ctx.createOscillator();
+      o.setPeriodicWave(reed);
+      o.frequency.value = f;
+      const og = ctx.createGain();
+      og.gain.value = HG[i];
+      o.connect(og);
+      og.connect(hg);
+      o.start();
+      audio.hornOsc.push([o, f]);
+    },
+  );
+  // air: band-passed hiss, a burst on attack and a little under the tone
+  const hn = ctx.createBufferSource();
+  hn.buffer = nb;
+  hn.loop = true;
+  const hnf = ctx.createBiquadFilter();
+  hnf.type = "bandpass";
+  hnf.frequency.value = 2400;
+  hnf.Q.value = 0.8;
+  const hng = ctx.createGain();
+  hng.gain.value = 0;
+  hn.connect(hnf);
+  hnf.connect(hng);
+  hng.connect(hlim);
+  hn.start();
+  audio.hornAir = hng;
   audio.horn = hg;
   // reverse beeper
   const bo = ctx.createOscillator();
@@ -235,14 +264,23 @@ function updateAudio(s, inp, time) {
   }
   const hornIn = inp.horn || audio.hornUntil > performance.now();
   if (hornIn && !audio.hornOn) {
-    for (const [o, f] of audio.hornOsc) {
+    // pressure builds: each reed starts flat and sharpens up, slightly staggered; hiss burst as the valve opens
+    audio.hornOsc.forEach(([o, f], i) => {
       o.frequency.cancelScheduledValues(t);
-      o.frequency.setValueAtTime(f * 0.93, t);
-      o.frequency.setTargetAtTime(f, t, 0.06);
-    }
+      o.frequency.setValueAtTime(f * (0.9 - 0.01 * (i & 1)), t);
+      o.frequency.setTargetAtTime(f, t + 0.005 * i, 0.055);
+    });
+    audio.hornAir.gain.cancelScheduledValues(t);
+    audio.hornAir.gain.setValueAtTime(0.05, t);
+    audio.hornAir.gain.setTargetAtTime(0.012, t + 0.04, 0.05);
+  }
+  if (!hornIn && audio.hornOn) {
+    // valve closes: pitch sags a touch as pressure drops
+    for (const [o, f] of audio.hornOsc) o.frequency.setTargetAtTime(f * 0.96, t, 0.08);
+    audio.hornAir.gain.setTargetAtTime(0, t, 0.05);
   }
   audio.hornOn = !!hornIn;
-  audio.horn.gain.setTargetAtTime(hornIn ? 0.62 : 0, t, hornIn ? 0.006 : 0.035);
+  audio.horn.gain.setTargetAtTime(hornIn ? 0.6 : 0, t, hornIn ? 0.018 : 0.06);
   audio.beep.gain.setTargetAtTime(s.mode === "R" && time % 1 < 0.5 ? 0.09 : 0, t, 0.005);
 }
 // ---- v22: tyre screech, area ambience (city hum / birds / gulls / wind), volume control ----

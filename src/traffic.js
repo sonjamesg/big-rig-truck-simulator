@@ -1473,6 +1473,25 @@ function trafficHitTruck(s) {
     }
   return solid;
 }
+// v57 AI honk rule: never while queued at a red / amber. Only when the light ahead has been green for 5 s+ (plus this
+// driver's own patience) and the vehicle ahead (AI or the player) still hasn't moved off; away from signals only after a
+// long block. Some drivers never honk. Also a toot right after being hit. Rate limits live in stepVeh / traffic.lastHonk.
+function aiHonkWanted(v, dt, hSig, lgap, lvel) {
+  if (v.honker === undefined) {
+    v.honker = v.r() < 0.6;
+    v.hPat = v.r() * 4;
+  }
+  const still = lgap < 12 && lvel < 0.3 && v.v < 0.5;
+  v.leadStillT = still ? (v.leadStillT || 0) + dt : 0;
+  let ls = null;
+  if (hSig && hSig.d - (v.s + v.L / 2) < 70) ls = sigState(hSig.J, hSig.key, hSig.move);
+  v.greenT = ls === "g" ? (v.greenT || 0) + dt : 0;
+  if (v.shakeT > 1.3) return true; // just got shunted
+  if (!v.honker || !still || v.emResp) return false;
+  const need = 5 + v.hPat;
+  if (ls) return ls === "g" && v.greenT >= need && v.leadStillT >= need;
+  return v.leadStillT >= 12 + 2 * v.hPat && !(typeof rbQueued === "function" && rbQueued(v));
+}
 function honkAt(x, y, heavy) {
   traffic.honkReq = (traffic.honkReq || 0) + 1;
   const ctx = audio.ctx;
@@ -1647,7 +1666,8 @@ function stepVeh(v, dt, pbs) {
   if (v.emResp) v0 *= 1.3; // v50: blue lights drive ~30% over the road's normal speed
   const front = v.s + v.L / 2;
   let acc = v.kind === "bus" && !v.emResp ? busStopAcc(v, v0, dt) : 1e9, // v53d: buses call at stops (pedlife.js)
-    sig = 0;
+    sig = 0,
+    hSig = null; // v57 honk rule: the nearest signal stop line ahead (marker)
   v.ring = null;
   v.layer = 0;
   for (let k = v.mk.length - 1; k >= 0; k--) {
@@ -1700,6 +1720,7 @@ function stepVeh(v, dt, pbs) {
       let stop = false;
       if (m.kind === "light") {
         const ls = sigState(m.J, m.key, m.move);
+        if (!hSig || m.d < hSig.d) hSig = m;
         if (ls === "r" || ls === "ra") stop = true;
         else if (ls === "a") stop = gap > (v.v * v.v) / (2 * 3.5) + 1;
         if (stop && v.emResp) {
@@ -1975,9 +1996,14 @@ function stepVeh(v, dt, pbs) {
     v.blockT += dt;
   } else v.blockT = Math.max(0, v.blockT - dt);
   v.honkT -= dt;
-  if (v.honkT <= 0 && (v.shakeT > 1.3 || v.blockT > 1.4 || (lplayer && lgap < 5 && pv > 4))) {
+  if (
+    aiHonkWanted(v, dt, hSig, lgap, lvel) &&
+    v.honkT <= 0 &&
+    timeS - (traffic.lastHonk || -99) > 1.5
+  ) {
     honkAt(v.x, v.y, v.heavy);
-    v.honkT = 2.5 + v.r() * 3;
+    traffic.lastHonk = timeS;
+    v.honkT = 8 + v.r() * 10; // occasional: one toot, then a long wait
     v.honking = 0.5;
   }
   if (v.honking > 0) v.honking -= dt;

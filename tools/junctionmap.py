@@ -5,7 +5,8 @@ Loads BigRig.html headless, reads the generated world (tile grid, world.junction
 writes a 1 px-per-tile colour raster plus a JSON node list that map/index.html (static, noindex) draws with pan / pinch zoom.
 Node ids: J<id> = world.junctions[i].id, R<i> = world.rbs[i], C<id> = world.curves[i].id (bends).
 Types: sig = signalised junction (lights, 3+ arms), rb = roundabout, gw = unsignalised / give-way junction (3+ arms),
-corner = junction box with 2 arms (lights flag kept), bend = curve. Arms = sides of the box with road tiles just outside.
+corner = junction box with 2 arms (lights flag kept), bend = curve. Arms = sides of the box with road tiles just outside, plus entrance arms (lower-case
+side letter): a forecourt / yard / quay / depot frontage opening off the box, so a corner with an entrance is a T-junction.
 """
 import asyncio, base64, json, os
 from playwright.async_api import async_playwright
@@ -27,10 +28,26 @@ JS = r"""() => {
     const top = [], bot = [], lef = [], rig = [];
     for (let x = j.x; x < j.x + j.w; x++) { top.push([x, j.y - 2]); bot.push([x, j.y + j.h + 1]); }
     for (let y = j.y; y < j.y + j.h; y++) { lef.push([j.x - 2, y]); rig.push([j.x + j.w + 1, y]); }
-    for (const [k, pts] of [['N', top], ['S', bot], ['W', lef], ['E', rig]]) if (side(pts)) { n++; s.push(k); }
-    return [n, s.join('')]; };
+    // entrance arm: a side with no road but a drivable frontage (forecourt, yard, dock quay, depot gate) right outside the box
+    const DRV = new Set([T.CONC, T.LOT, T.QUAY, T.GRAVEL, T.PUMP]);
+    const ent = (pts, k) => { let c = 0; for (const [x0, y0] of pts) for (const dd of [0, 1]) {
+      const x = k === 'W' ? x0 + 1 - dd : k === 'E' ? x0 - 1 + dd : x0, y = k === 'N' ? y0 + 1 - dd : k === 'S' ? y0 - 1 + dd : y0;
+      if (DRV.has(get(x, y))) { c++; break; } }
+      return c >= Math.max(2, Math.floor(pts.length / 2)); };
+    // driveway on an arm right next to the box (within 6 tiles): frontage tiles that touch the arm's tarmac
+    const near = (k) => { const L = k === 'N' || k === 'S'; let c = 0;
+      for (let t = 0; t < 6; t++) for (const side of [-1, 1]) {
+        const u = k === 'N' ? j.y - 1 - t : k === 'S' ? j.y + j.h + t : k === 'W' ? j.x - 1 - t : j.x + j.w + t;
+        let v = side < 0 ? (L ? j.x : j.y) : (L ? j.x + j.w - 1 : j.y + j.h - 1);
+        while (L ? isR(v, u) : isR(u, v)) v += side;
+        if (DRV.has(L ? get(v, u) : get(u, v))) c++; }
+      return c >= 2; };
+    let e = 0;
+    for (const [k, pts] of [['N', top], ['S', bot], ['W', lef], ['E', rig]]) if (side(pts)) { n++; s.push(k); } else if (ent(pts, k)) { e++; s.push(k.toLowerCase()); }
+    if (n === 2 && !e && s.some((k) => near(k))) { e++; s.push('d'); }
+    return [n, s.join(''), e]; };
   const N = [];
-  for (const j of world.junctions) { const [a, s] = arms(j);
+  for (const j of world.junctions) { const [r, s, e] = arms(j), a = r + e;
     const t = a <= 2 ? 'corner' : j.lights ? 'sig' : 'gw';
     N.push({ id: 'J' + j.id, x: +(j.x + j.w / 2).toFixed(1), y: +(j.y + j.h / 2).toFixed(1), t, a, s, L: j.lights ? 1 : 0, w: j.w, h: j.h }); }
   world.rbs.forEach((r, i) => N.push({ id: 'R' + i, x: r.cx, y: r.cy, t: 'rb', a: (r.arms || []).length, L: 0, r: r.rout }));

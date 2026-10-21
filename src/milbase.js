@@ -23,7 +23,13 @@ const MB = {
 const MB_SIG = [
   [MB.av, 220],
   [1292, 220],
-]; // signalised T-junctions: gate avenue + depot yard road meeting the spine
+  [1078, 296],
+  [1434, 296],
+  [1248, 296],
+  [1292, 296],
+  [1248, 328],
+]; // signalised T-junctions: gate avenue + depot yard road meeting the spine; v57: every other base junction too (the four
+// outer corners became curved bends in world.js BEND_CORNERS)
 const MB_HP = [
   [1092, 180],
   [1116, 180],
@@ -457,7 +463,7 @@ function mbGen(objs) {
   for (let y = MB.y0 + 30; y < MB.y1 - 10; y += 40)
     (light(MB.x0 + 1.2, y, 8), light(MB.x1 - 1.2, y, 8));
   for (let x = 1100; x < 1430; x += 40) (light(x, 218.6, 8), light(x, 300.4, 8));
-  // base junctions: plain priority (no signals), except the two depot T-junctions on the spine (v50: UK signals)
+  // base junctions: v57 all signalised (MB_SIG, UK design); the corners are bends, so they are not junctions any more
   for (const J of world.junctions || [])
     if (J.x >= MB.x0 && J.x <= MB.x1 && J.y >= MB.y0 && J.y < MB.y1)
       J.lights = MB_SIG.some(([x, y]) => J.x === x && J.y === y);
