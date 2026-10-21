@@ -470,3 +470,4 @@ uses the same formulas.
 - No splitter islands: rbSplitter(non-full) returns null; spF kept for tile gen only (map unchanged). Give-way triangle/dashes replaced by a solid stop line at rout+0.35 (where the AI holds), double white centre line between entry and exit.
 - 4 circulating lanes: rbLaneLines 3 spiral dividers + 4 arrow rows; rbLaneR picks 0.875/0.625/0.375/0.125 of the ring width by exit angle (traffic + satnav).
 - Heads: nearside primary at the stop line + secondary on the central island facing each entry (no repeaters). tests/roundabout_test.py expects splitters==0.
+- v63c: onTarmacT allows 0.1 tile past rb.rout (exit paths graze the ring edge at fillets). roundabout_test: 120 s per roundabout and stuck = no movement for a full signal cycle + 15 s (red queues wait ~66 s). junction_audit takes ~55 min - use timeout >= 4000 or SKIP/LIMIT.

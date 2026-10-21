@@ -4,7 +4,7 @@ Usage: python3 tests/roundabout_test.py [BigRig.html] [seconds_per_roundabout]  
 import asyncio,json,sys,os
 from playwright.async_api import async_playwright
 HTML=sys.argv[1] if len(sys.argv)>1 else os.path.join(os.path.dirname(os.path.abspath(__file__)),'..','BigRig.html')
-SECS=int(sys.argv[2]) if len(sys.argv)>2 else 45
+SECS=int(sys.argv[2]) if len(sys.argv)>2 else 120  # must exceed one signal cycle (~81 s) so a real stall can be told from a red-light queue
 GEO=r"""(()=>{ const W=__bigrig.world, out=[]; for(const rb of W.rbs){ const r={id:rb.id,arms:rb.arms.length,splitters:0,offTarmac:0,inSplitter:0};
   for(const arm of rb.arms){ const nl=Math.max(1,Math.floor(W.segs[arm.seg].w/2)); if(rbSplitter(rb,arm)) r.splitters++;
     for(let i=0;i<nl;i++) for(const P of [rbEntry(rb,arm,i).pts,rbExit(rb,arm,i).pts]) for(const p of P){ const s=rbSurf(rb,p[0],p[1]); if(s===2) r.inSplitter++; else if(!onTarmacT(p[0],p[1])) r.offTarmac++; } }
@@ -14,6 +14,7 @@ GEO=r"""(()=>{ const W=__bigrig.world, out=[]; for(const rb of W.rbs){ const r={
   r.gaps=gaps; out.push(r);} return out; })()"""
 START=r"""((id)=>{ const B=__bigrig, rb=B.world.rbs[id], tk=B.truck; tk.x=rb.cx*M_T; tk.y=rb.cy*M_T; tk.v=0; B.cam.zLock=0.4; B.cam.z=0.4;
   const R={id,coll:new Set(),maxN:0,seen:new Set(),stuck:new Set(),last:new Map(),t0:timeS,rec0:B.traffic.recovers||0};
+  R.stuckT=(RBSIG.G+RBSIG.A+RBSIG.R)*rb.arms.length+15; // a car queued at red legitimately waits up to one full signal cycle
   const zone=v=>Math.hypot(v.x/M_T-rb.cx,v.y/M_T-rb.cy)<rb.rout+9;
   const box=(x,y,h,L,W)=>{ const f=fwd(h), r=rgt(h); return [[L,W],[L,-W],[-L,-W],[-L,W]].map(([a,b])=>[x+f[0]*a+r[0]*b,y+f[1]*a+r[1]*b]); };
   const corners=v=>{ const B=[box(v.x,v.y,v.h||0,v.L*0.45,v.W*0.42)]; if(v.trl) B.push(box(v.trl.x,v.trl.y,v.trl.h,13.6*0.45,2.5*0.42)); return B; };
@@ -22,7 +23,7 @@ START=r"""((id)=>{ const B=__bigrig, rb=B.world.rbs[id], tk=B.truck; tk.x=rb.cx*
   const inner=v=>Math.hypot(v.x/M_T-rb.cx,v.y/M_T-rb.cy)<rb.rout+4;   // collisions: the ring, its flares and splitter mouths
   window.__rbT=R; clearInterval(window.__rbI);
   window.__rbI=setInterval(()=>{ const vs=B.traffic.vs.filter(zone); R.maxN=Math.max(R.maxN,vs.length);
-    for(const v of vs){ R.seen.add(v.id); const L=R.last.get(v.id); if(!L||Math.hypot(v.x-L.x,v.y-L.y)>1){ R.last.set(v.id,{x:v.x,y:v.y,t:timeS}); } else if(timeS-L.t>30) R.stuck.add(v.id); }
+    for(const v of vs){ R.seen.add(v.id); const L=R.last.get(v.id); if(!L||Math.hypot(v.x-L.x,v.y-L.y)>1){ R.last.set(v.id,{x:v.x,y:v.y,t:timeS}); } else if(timeS-L.t>R.stuckT) R.stuck.add(v.id); }
     for(let i=0;i<vs.length;i++) for(let j=i+1;j<vs.length;j++){ const a=vs[i],b=vs[j]; if(a.ghostT>0||b.ghostT>0||!inner(a)&&!inner(b)||Math.hypot(a.x-b.x,a.y-b.y)>30) continue; if(hit(corners(a),corners(b))) R.coll.add(Math.min(a.id,b.id)+'-'+Math.max(a.id,b.id)); }
     if(vs.length<10 && Math.random()<0.5){ const arm=rb.arms[(Math.random()*rb.arms.length)|0], sg=B.world.segs[arm.seg], E=arm.side>0?sg.b1+1:sg.b0, al=E-arm.side*(18+Math.random()*20);
       const x=sg.dir==='h'?al:sg.a+sg.w/2, y=sg.dir==='h'?sg.a+sg.w/2:al; try{ B.spawnVehicle(x*M_T,y*M_T,true,{seg:sg.id,along:al,dir:arm.side}); }catch(e){} } },250); return rb.arms.length; })"""

@@ -406,7 +406,11 @@ function onTarmacT(x, y) {
     ty = Math.floor(y);
   if (!inb(tx, ty)) return false;
   const rb = rbAtTile(tx, ty);
-  if (rb) return rbSurf(rb, x, y) === 1;
+  if (rb) {
+    const s = rbSurf(rb, x, y);
+    // v63: 0.1-tile tolerance on the ring's outer edge (exit paths graze it where the arm fillet meets the ring)
+    return s === 1 || (s === 0 && Math.hypot(x - rb.cx, y - rb.cy) <= rb.rout + 0.1);
+  }
   const t = G[idx(tx, ty)];
   return t === T.ROAD || t === T.BRIDGE;
 }
