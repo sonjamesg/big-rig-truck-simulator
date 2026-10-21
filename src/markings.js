@@ -165,6 +165,7 @@ function buildMarkings(objs) {
         }
         if (!J.lights && J.y === 716 && (J.x === 410 || J.x === 346)) m.noArr = true;
         if (!J.lights && (J.x === 392 || J.x === 431) && J.y === 689) m.noArr = true; // v40: airport access L-bends: plain corners, no turn arrows
+        if (!J.lights && ((J.x === 470 && J.y === 222) || (J.x === 1715 && J.y === 1697))) m.noArr = true; // v65: plain corners
         // v53: the push below had been swallowed by the comment above since v40 (no approach marks were baked). Restored for
         // the UK junctions only; the other junctions' marks stay off until James has reviewed them
         if (J.uk) {
