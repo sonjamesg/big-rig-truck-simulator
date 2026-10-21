@@ -466,7 +466,8 @@ fit();
 }
 // ---------- loop
 function frame(ts) {
-  const dt = Math.min(0.1, (ts - last) / 1000 || 0.016);
+  const dt =
+    Math.min(0.1, (ts - last) / 1000 || 0.016) * (typeof crTimeScale === "function" ? crTimeScale() : 1);
   last = ts;
   timeS += dt;
   fpsAcc += dt;
@@ -513,6 +514,7 @@ function frame(ts) {
     if (started) updateCareer(dt);
     if (started) updateIndicators(dt);
     updateFX(dt);
+    updateCrash(dt);
   }
   updatePort(dt);
   mbUpdate(dt);
@@ -618,6 +620,7 @@ function draw() {
   ltgDraw(vx0, vy0, vx1, vy1);
   drawParkedTrailers(vx0, vy0, vx1, vy1);
   hlDrawPads(vx0, vy0, vx1, vy1);
+  drawCrashLow(vx0, vy0, vx1, vy1);
   drawTraffic(vx0, vy0, vx1, vy1);
   mbDrawLow(vx0, vy0, vx1, vy1);
   bmDrawLow(vx0, vy0, vx1, vy1);
@@ -634,6 +637,7 @@ function draw() {
     drawFlyovers(vx0, vy0, vx1, vy1, 0.72);
   drawRail(vx0, vy0, vx1, vy1);
   drawFXHigh();
+  drawCrashHigh(vx0, vy0, vx1, vy1);
   drawPortHigh(vx0, vy0, vx1, vy1);
   for (const o of world.overhead)
     if (o.x > vx0 - 400 && o.x < vx1 + 400 && o.y > vy0 - 400 && o.y < vy1 + 400) drawOverhead(o);

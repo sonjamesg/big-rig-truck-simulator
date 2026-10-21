@@ -1319,6 +1319,10 @@ function finishJob() {
       "Damage penalty (" + dmg.toFixed(0) + "%)",
       -Math.round(base * Math.min(0.6, dmg * 0.03)),
     ]);
+  {
+    const cp = typeof crCargoPenalty === "function" ? crCargoPenalty() : 0; // v66: crushed / spilled load
+    if (cp >= 1) lines.push(["Cargo damaged (" + cp.toFixed(0) + "%)", -Math.round(base * cp * 0.006)]);
+  }
   if (took <= j.mins * 1.15) lines.push(["On-time bonus (+10%)", Math.round(base * 0.1)]);
   const total = lines.reduce((s, l) => s + l[1], 0),
     xp = j.xp + (dmg < 0.5 ? Math.round(j.xp * 0.15) : 0);

@@ -557,6 +557,7 @@ function artFor(kind, r) {
       traffic.arts[key2] = { c, sh: shadowOf(c) };
     }
     out.trl = traffic.arts[key2];
+    out.tank = kk === "tank"; // v66: tankers explode in a hard crash
   }
   return out;
 }
@@ -1422,47 +1423,10 @@ function trafficHitTruck(s) {
         if (Math.abs(b.x - p.x) > 12 || Math.abs(b.y - p.y) > 12) continue;
         const m = obbMTV(p, b);
         if (!m) continue;
-        if (v.heavy) {
-          solid = true;
-          v.hitT = timeS;
-          s.hitN = [-m[0], -m[1]]; // v51: contact normal for crashResponse (heavy = near-immovable)
-          return;
-        }
-        v.offX += m[0] * (m[2] + 0.05);
-        v.offY += m[1] * (m[2] + 0.05);
-        v.x += m[0] * (m[2] + 0.05);
-        v.y += m[1] * (m[2] + 0.05);
-        if (v.trl) {
-          v.trl.x += m[0] * (m[2] + 0.05);
-          v.trl.y += m[1] * (m[2] + 0.05);
-        }
-        if (!v.parked) {
-          if (v.shakeT <= 0 && (!v.hitEnd || timeS - v.hitEnd > 1.2)) {
-            v.honkT = 0;
-            v.shakeT = 1.6;
-            v.v = 0;
-            v.hits = (v.hits || 0) + 1;
-          }
-          v.hitEnd = timeS;
-        }
-        v.h += (Math.random() - 0.5) * 0.04 * Math.min(1, Math.abs(s.v) / 5);
-        if (!v.hitCool || timeS - v.hitCool > 0.6) {
-          v.hitCool = timeS;
-          const imp = Math.abs(s.v);
-          if (typeof wantHit === "function")
-            try {
-              wantHit(v, imp);
-            } catch (e) {}
-          // v51: momentum by mass (light cars get shoved, the rig barely slows), restitution ~0.1
-          const mv = 170 * (v.L || 4.5) * (v.W || 1.8),
-            M = s.mass || 20000,
-            cn = Math.abs(fwd(s.h)[0] * m[0] + fwd(s.h)[1] * m[1]); // head-on share of the hit
-          s.v *= 1 - ((mv * 1.1) / (M + mv)) * cn;
-          if (imp > 1.5) {
-            s.bump = Math.min(1, (imp * cn) / 16);
-            s.hitV = imp * cn * Math.min(1, (2 * mv) / (M + mv)) * 2;
-          }
-        }
+        // v66: momentum / impulse by mass (crash.js): heavy rigs shunt light cars, truck vs truck hurts both
+        v.hitT = timeS;
+        if (!v.parked) v.hitEnd = timeS;
+        crPlayerHit(s, v, p, b, m);
         return;
       }
     }
@@ -1626,6 +1590,10 @@ function updateTraffic(dt) {
   updatePeds(dt);
 }
 function stepVeh(v, dt, pbs) {
+  if (v.cr) {
+    crashStepVeh(v, dt); // v66: knocked out of lane / wrecked: free body until it settles
+    return;
+  }
   const r = v.r;
   while (pathEnd(v) - v.s < 90) if (!planPiece(v, r)) break;
   const sg = world.segs[v.plan.seg];
@@ -2273,8 +2241,9 @@ function drawTraffic(vx0, vy0, vx1, vy1) {
       if (v.trl && v.art.trl) {
         blitV(v.art.trl.c, v.trl.x, v.trl.y, v.trl.h, 13.6, 2.55, 0, 0);
       }
-      blitV(v.art.body.c, v.x, v.y, v.h, v.L, v.W, 0, 0);
-      if (v.parked) continue;
+      if (v.dmg > 0.05) crDrawBody(v.art.body.c, v.x, v.y, v.h, v.L, v.W, v);
+      else blitV(v.art.body.c, v.x, v.y, v.h, v.L, v.W, 0, 0);
+      if (v.parked || v.wreck) continue;
       const rx = v.trl || v;
       const rL = v.trl ? 13.6 : v.L,
         rW = v.trl ? 2.55 : v.W;

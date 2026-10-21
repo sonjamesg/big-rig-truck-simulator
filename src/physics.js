@@ -244,6 +244,7 @@ function stepTruck(s, inp, dt) {
     }
   } // roundabout: exact flared outline
   // v51 crash 'crunch': a short moment of no drive after a solid impact (the rig stops dead instead of pushing on)
+  if (s.rolled) s.throttle = 0;
   if (s.crunchT > 0) {
     s.crunchT -= dt;
     s.throttle *= 0.15;
@@ -389,6 +390,7 @@ function stepTruck(s, inp, dt) {
       s.jkLimit = true;
     } else s.jkLimit = false;
   }
+  if (typeof crRig === "function") crRig(s, prev, dt); // v66: jackknife / rollover
   // ----- collisions
   const hit =
     hitTest(s) ||
