@@ -1499,6 +1499,8 @@ function drawMinimap() {
     ctx.fillStyle = v.heavy ? "#ff9f1a" : "#ffffff";
     ctx.fillRect(mx - 1.5, my - 1.5, 3, 3);
   }
+  if (typeof fogDraw === "function")
+    fogDraw(x - (cxT - span / 2) * sc, y - (cyT - sh / 2) * sc, sc, [x, y, w, h]);
   ctx.translate(x + w / 2, y + h / 2);
   ctx.rotate(s.h);
   if (nmK() > 0.05) {
@@ -1859,6 +1861,22 @@ function drawBigMap() {
     ctx.fillText(n, X, Y);
   }
   ctx.textBaseline = "alphabetic";
+  if (typeof fogDraw === "function" && fogActive()) {
+    // v66: fog over terrain/icons; the sat-nav route + mission flag still show through
+    fogDraw(BX(0), BY(0), z, [20, 40, VW - 40, VH - 60]);
+    navLine(
+      (m) => BX(m / 4),
+      (m) => BY(m / 4),
+      4,
+      "#ff3df0",
+    );
+    if (typeof missionFlag === "function")
+      missionFlag(
+        (m) => BX(m / 4),
+        (m) => BY(m / 4),
+        true,
+      );
+  }
   const lx = VW / 2 + ((truck.x * PPM) / TILE - bigmap.cx) * z,
     ly = VH / 2 + 10 + ((truck.y * PPM) / TILE - bigmap.cy) * z;
   {

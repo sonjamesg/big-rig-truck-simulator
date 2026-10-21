@@ -29,6 +29,7 @@ async def main():
         await pg.goto("file://" + os.path.abspath(HTML))
         await pg.wait_for_function("window.__bigrig&&__bigrig.world.ready", timeout=300000)
         await pg.keyboard.press("Enter"); await pg.wait_for_timeout(2000)
+        await pg.evaluate("BigRig.fog&&BigRig.fog.revealAll()")  # v66: revealed mode
         L = await pg.evaluate(LIST); npass = 0
         for q in L:
             r = await pg.evaluate(ONE, q); npass += bool(r.get("ok"))

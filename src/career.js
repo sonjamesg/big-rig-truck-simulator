@@ -652,6 +652,7 @@ function saveGame() {
       settings: SETTINGS,
       hb: !!(typeof HB !== "undefined" && HB.on),
       own: typeof ownSave === "function" ? ownSave() : null,
+      fog: typeof fogSave === "function" ? fogSave() : undefined,
       hist: career.hist || [],
       jobs: career.jobs.filter((j) => !j.taken).map(jobSer),
       active: a
@@ -726,6 +727,11 @@ function loadGame() {
   if (!d) return false;
   truck.money = d.money ?? truck.money;
   if (typeof ownLoad === "function") ownLoad(d.own);
+  try {
+    fogLoad(d.fog); // v66: saves from before map discovery have no d.fog -> fully revealed
+  } catch (e) {
+    window.__fogPend = [d.fog];
+  }
   truck.fuel = d.fuel ?? truck.fuel;
   truck.damage = d.damage || 0;
   career.xp = d.xp || 0;
