@@ -472,3 +472,6 @@ uses the same formulas.
 - Heads: nearside primary at the stop line + secondary on the central island facing each entry (no repeaters). tests/roundabout_test.py expects splitters==0.
 - v63c: onTarmacT allows 0.1 tile past rb.rout (exit paths graze the ring edge at fillets). roundabout_test: 120 s per roundabout and stuck = no movement for a full signal cycle + 15 s (red queues wait ~66 s). junction_audit takes ~55 min - use timeout >= 4000 or SKIP/LIMIT.
 - v63d: roundabout lane discipline (traffic.js planRB): ring lane follows the entry lane (kerb lane -> outer), exit lane follows the ring lane; inner-lane leavers get an "rbx" mark and give way to outer-lane cars about to pass their exit (6 s timeout). roundabout_test records collision details (det).
+
+## v64 street lamps (daynight.js drawStreetLamps, gfx.js pools)
+- Top-down lamp head = opaque housing top (rounded dark-metal capsule, rim highlight, seam); plain grey by day. No visible bulb: the head glow dot is gone and the hi-quality core pool is soft (r64, a0.07). At night only a warm spill round the housing edge + the road pool show.

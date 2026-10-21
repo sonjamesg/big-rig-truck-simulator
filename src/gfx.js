@@ -283,7 +283,7 @@ function gfxLights(vx0, vy0, vx1, vy1, z) {
               const so = slOn(l);
               if (so < 0.02) continue;
               gl("rgba(255,184,104,1)", l.hx, l.hy, 120, 0.2 * so * K);
-              if (hi) gl("rgba(255,226,170,1)", l.hx, l.hy, 46, 0.16 * so * K);
+              if (hi) gl("rgba(255,214,150,1)", l.hx, l.hy, 64, 0.07 * so * K); // v64: soft, no white bulb core
             }
         }
     }

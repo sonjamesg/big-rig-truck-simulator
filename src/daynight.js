@@ -395,8 +395,7 @@ function drawNight(vx0, vy0, vx1, vy1, z) {
     if (l.k === "st") {
       const so = slOn(l.l);
       if (so > 0.02) {
-        gz(DN_COL.st, l.x, l.y, l.r * 0.6, 0.8 * so);
-        gz("rgba(255,236,190,1)", l.l.hx, l.l.hy, 12, 0.95 * so);
+        gz(DN_COL.st, l.x, l.y, l.r * 0.6, 0.8 * so); // v64: no bulb dot at the head (the bulb is under the housing)
       }
     } else if (l.k === "cl") {
       const f = l.bl ? ((timeS * (l.bl === 1 ? 2.2 : 0.8)) % 1 < 0.5 ? 1 : 0.2) : 1;
@@ -1060,27 +1059,36 @@ function drawStreetLamps(vx0, vy0, vx1, vy1) {
           ctx.arc(l.px - 1.2, l.py - 1.2, 1.6, 0, 7);
           ctx.fill();
         }
-        // lamp head
+        // v64 lamp head seen from above: the opaque TOP of the housing (dark metal, rim highlight); the bulb is
+        // underneath, so at night only a soft warm spill shows round the housing edge (plus the pool on the road)
         ctx.save();
         ctx.translate(l.hx, l.hy);
         ctx.rotate(ang);
-        ctx.fillStyle = head;
+        if (on > 0.05) {
+          const sp = ctx.createRadialGradient(0, 0, 4, 0, 0, 15);
+          sp.addColorStop(0, "rgba(255,206,140," + 0.42 * on + ")");
+          sp.addColorStop(1, "rgba(255,190,120,0)");
+          ctx.fillStyle = sp;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 15, 11, 0, 0, 7);
+          ctx.fill();
+        }
+        const hw = 8.5,
+          hh2 = 4.4;
+        ctx.fillStyle = K > 0.02 ? col(52, 56, 62) : col(128, 133, 140);
         ctx.beginPath();
-        ctx.ellipse(0, 0, 7, 4.6, 0, 0, 7);
+        ctx.roundRect
+          ? ctx.roundRect(-hw, -hh2, hw * 2, hh2 * 2, hh2)
+          : ctx.rect(-hw, -hh2, hw * 2, hh2 * 2);
         ctx.fill();
-        ctx.fillStyle =
-          on > 0.05
-            ? "rgba(255," +
-              ((200 + 40 * on) | 0) +
-              "," +
-              ((120 + 80 * on) | 0) +
-              "," +
-              (0.5 + 0.5 * on) +
-              ")"
-            : col(170, 176, 184);
+        ctx.strokeStyle = K > 0.02 ? col(96, 102, 110) : col(176, 181, 188);
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.ellipse(0.5, 0, 4.6, 2.8, 0, 0, 7);
-        ctx.fill();
+        ctx.moveTo(-hw + hh2, -hh2 + 0.6);
+        ctx.lineTo(hw - hh2, -hh2 + 0.6);
+        ctx.stroke();
+        ctx.fillStyle = K > 0.02 ? col(40, 43, 48) : col(104, 109, 116);
+        ctx.fillRect(-hw + 2.5, -0.6, hw * 2 - 5, 1.2); // housing seam
         ctx.restore();
       }
     }
