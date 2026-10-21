@@ -24,10 +24,10 @@ START=r"""((id)=>{ const B=__bigrig, rb=B.world.rbs[id], tk=B.truck; tk.x=rb.cx*
   window.__rbT=R; clearInterval(window.__rbI);
   window.__rbI=setInterval(()=>{ const vs=B.traffic.vs.filter(zone); R.maxN=Math.max(R.maxN,vs.length);
     for(const v of vs){ R.seen.add(v.id); const L=R.last.get(v.id); if(!L||Math.hypot(v.x-L.x,v.y-L.y)>1){ R.last.set(v.id,{x:v.x,y:v.y,t:timeS}); } else if(timeS-L.t>R.stuckT) R.stuck.add(v.id); }
-    for(let i=0;i<vs.length;i++) for(let j=i+1;j<vs.length;j++){ const a=vs[i],b=vs[j]; if(a.ghostT>0||b.ghostT>0||!inner(a)&&!inner(b)||Math.hypot(a.x-b.x,a.y-b.y)>30) continue; if(hit(corners(a),corners(b))) R.coll.add(Math.min(a.id,b.id)+'-'+Math.max(a.id,b.id)); }
+    for(let i=0;i<vs.length;i++) for(let j=i+1;j<vs.length;j++){ const a=vs[i],b=vs[j]; if(a.ghostT>0||b.ghostT>0||!inner(a)&&!inner(b)||Math.hypot(a.x-b.x,a.y-b.y)>30) continue; if(hit(corners(a),corners(b))){ const key=Math.min(a.id,b.id)+'-'+Math.max(a.id,b.id); if(!R.coll.has(key)){ const inf=v=>({id:v.id,k:v.kind,v:+v.v.toFixed(1),r:+(Math.hypot(v.x/M_T-rb.cx,v.y/M_T-rb.cy)).toFixed(2),a:+Math.atan2(v.y/M_T-rb.cy,v.x/M_T-rb.cx).toFixed(2),h:+(v.h||0).toFixed(2),ring:!!v.ring,mk:v.mk.map(m=>m.kind+(m.go?'*':'')).join(' ')}); (R.det=R.det||[]).push([inf(a),inf(b)]); } R.coll.add(key); } }
     if(vs.length<10 && Math.random()<0.5){ const arm=rb.arms[(Math.random()*rb.arms.length)|0], sg=B.world.segs[arm.seg], E=arm.side>0?sg.b1+1:sg.b0, al=E-arm.side*(18+Math.random()*20);
       const x=sg.dir==='h'?al:sg.a+sg.w/2, y=sg.dir==='h'?sg.a+sg.w/2:al; try{ B.spawnVehicle(x*M_T,y*M_T,true,{seg:sg.id,along:al,dir:arm.side}); }catch(e){} } },250); return rb.arms.length; })"""
-STOP="""(()=>{ clearInterval(window.__rbI); const R=window.__rbT; return {rb:R.id,seconds:+(timeS-R.t0).toFixed(1),vehicles:R.seen.size,peakOnRb:R.maxN,stuck:R.stuck.size,collisions:[...R.coll].length,recoveries:(__bigrig.traffic.recovers||0)-R.rec0}; })()"""
+STOP="""(()=>{ clearInterval(window.__rbI); const R=window.__rbT; return {rb:R.id,seconds:+(timeS-R.t0).toFixed(1),vehicles:R.seen.size,peakOnRb:R.maxN,stuck:R.stuck.size,collisions:[...R.coll].length,det:R.det||[],recoveries:(__bigrig.traffic.recovers||0)-R.rec0}; })()"""
 async def main():
   async with async_playwright() as p:
     b=await p.chromium.launch(executable_path='/usr/bin/google-chrome'); pg=await b.new_page(viewport={'width':1000,'height':800}); errs=[]

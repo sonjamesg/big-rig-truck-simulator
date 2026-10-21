@@ -471,3 +471,4 @@ uses the same formulas.
 - 4 circulating lanes: rbLaneLines 3 spiral dividers + 4 arrow rows; rbLaneR picks 0.875/0.625/0.375/0.125 of the ring width by exit angle (traffic + satnav).
 - Heads: nearside primary at the stop line + secondary on the central island facing each entry (no repeaters). tests/roundabout_test.py expects splitters==0.
 - v63c: onTarmacT allows 0.1 tile past rb.rout (exit paths graze the ring edge at fillets). roundabout_test: 120 s per roundabout and stuck = no movement for a full signal cycle + 15 s (red queues wait ~66 s). junction_audit takes ~55 min - use timeout >= 4000 or SKIP/LIMIT.
+- v63d: roundabout lane discipline (traffic.js planRB): ring lane follows the entry lane (kerb lane -> outer), exit lane follows the ring lane; inner-lane leavers get an "rbx" mark and give way to outer-lane cars about to pass their exit (6 s timeout). roundabout_test records collision details (det).

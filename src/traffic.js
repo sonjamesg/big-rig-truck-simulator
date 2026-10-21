@@ -1022,7 +1022,8 @@ function planRB(v, rb, sg, d, r, forceArm) {
     Q = world.segs[arm.seg],
     qd = arm.side < 0 ? 1 : -1,
     qpos = arm.side < 0 ? Q.b0 : Q.b1 + 1;
-  const lane = Math.min(nLanes(Q) - 1, (r() * nLanes(Q)) | 0);
+  let lane = Math.min(nLanes(Q) - 1, (r() * nLanes(Q)) | 0),
+    rIx = 0;
   // v31: pick the circulating lane from how far round the exit is
   let Rt = rbRingR(rb);
   {
@@ -1033,7 +1034,15 @@ function planRB(v, rb, sg, d, r, forceArm) {
       a1 = rbExit(rb, arm, lane).phi;
     let dl = mod2pi(a1 - a0);
     if (dl < 0.4) dl += 6.283185307;
-    Rt = rbLaneR(rb, dl);
+    // v63d: lane discipline - the ring lane follows the entry lane (kerb lane -> outer ring lane .. offside lane ->
+    // inner lanes), so entry paths never cross each other; the exit lane follows the ring lane the same way
+    let ix = dl < 2.2 ? 0 : dl < 3.8 ? 1 : dl < 5 ? 2 : 3;
+    const nE = myArm ? nLanes(sg) : 1,
+      li = v.plan.lane | 0;
+    if (nE > 1) ix = li <= 0 ? 0 : li < nE - 1 ? 1 : dl < 5 ? 2 : 3;
+    Rt = rb.rin + (rb.rout - rb.rin) * (0.875 - 0.25 * ix);
+    lane = Math.min(nLanes(Q) - 1, ix);
+    rIx = ix;
   }
   const R = Rt * M_T;
   const dIn = pathEnd(v);
@@ -1082,6 +1091,7 @@ function planRB(v, rb, sg, d, r, forceArm) {
   }
   const d1 = pathEnd(v);
   for (const p of ex.pts) pathPush(v, p[0] * M_T, p[1] * M_T);
+  if (rIx > 0) v.mk.push({ kind: "rbx", d: d1, d1: d1 + 4, rb, aOut, R }); // v63d: give way to outer lanes before cutting across them to exit
   v.mk.push({ kind: "ring", d0: dGw - 1.5, d1: pathEnd(v), rb });
   v.mk.push({ kind: "slow", d0: dIn, d1: pathEnd(v), v: 8 });
   v.mk.push({ kind: "sig", d0: d1 - 14, d1: pathEnd(v), side: -1 });
@@ -1772,6 +1782,27 @@ function stepVeh(v, dt, pbs) {
       }
       if (!stop && m.turn && gap < 8 && !m.go && turnSweepBlocked(v, m)) stop = true; // v25: hold the turn while a stopped car sits in our swept path
       if (stop) acc = Math.min(acc, idmAcc(v, v0, Math.max(0.1, gap), 0));
+    } else if (m.kind === "rbx" && !m.go) {
+      // v63d: leaving from an inner ring lane: hold short of the exit while a car in an outer lane is about to pass it
+      const gap = m.d - front;
+      if (gap < 14 && gap > -1) {
+        let blk = false;
+        if (v.stopT < 6)
+          for (const o of traffic.vs) {
+            if (o === v || o.ring !== m.rb) continue;
+            const dx = o.x - m.rb.cx * M_T,
+              dy = o.y - m.rb.cy * M_T,
+              ro = Math.hypot(dx, dy);
+            if (ro < m.R + 2) continue;
+            const df = mod2pi(m.aOut - Math.atan2(dy, dx) + 0.2) - 0.2;
+            if (df > -0.2 && df < 0.25 + (o.v * 2.5) / m.R) {
+              blk = true;
+              break;
+            }
+          }
+        if (!blk && gap < 1) m.go = true;
+        else if (blk) acc = Math.min(acc, idmAcc(v, v0, Math.max(0.1, gap), 0));
+      }
     } else if (m.kind === "major" && m.turn && !m.swOk) {
       const gap = m.d - front - 0.8;
       if (gap < 8 && gap > -0.5) {
