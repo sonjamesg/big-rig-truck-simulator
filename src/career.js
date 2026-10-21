@@ -579,6 +579,7 @@ function modelArt(m, col) {
   g.lineWidth = 2;
   rr(g, X(-1.25), Y(cab0), 2.5 * S, (cab1 - cab0) * S, 0.35 * S);
   g.stroke();
+  if (typeof artCabDetail === "function") artCabDetail(g, W, H, X, Y, S, cab0, cab1, col); // v61c
   return (modelArtCache[key] = { c, W, H, ox: W / 2, oy: Y(0) });
 }
 const modelById = (id) => TRUCK_MODELS.find((m) => m.id === id) || TRUCK_MODELS[0];

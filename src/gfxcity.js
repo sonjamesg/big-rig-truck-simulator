@@ -453,6 +453,9 @@ function gcVehGloss(c) {
   g.fillRect(-W, -H * 0.06, W * 2, H * 0.05);
   g.fillRect(-W, H * 0.12, W * 2, H * 0.02);
   g.restore();
+  // v61c: faint road film + mud specks (static per art canvas; lorry.js artGrime)
+  if (typeof artGrime === "function" && !GFX.off.grime)
+    artGrime(g, W, H, (W * 31 + H) | 0, 0.2, []);
   return c;
 }
 {
