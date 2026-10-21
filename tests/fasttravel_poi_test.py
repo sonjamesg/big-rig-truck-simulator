@@ -32,6 +32,7 @@ async def main():
         await pg.goto("file://" + os.path.abspath(HTML))
         await pg.wait_for_function("window.__bigrig&&__bigrig.truck", timeout=60000)
         await pg.wait_for_timeout(2500)
+        await pg.evaluate("__bigrig.BigRig.fog&&__bigrig.BigRig.fog.revealAll()")  # v66: revealed mode
         res = await pg.evaluate(JS + f"({NEAR})")
         kinds = {}; npass = 0
         for r in res:

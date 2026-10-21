@@ -1916,33 +1916,37 @@ function estatePanel(agent) {
     document.head.appendChild(st);
   }
   const tab = ["all", "res", "com"].includes(HOMES.tab) ? HOMES.tab : "all";
+  const fogA = (e) => typeof fogSeen !== "function" || fogSeen(e.x, e.y); // v66: only discovered areas
+  const fogK = (o) => typeof fogKnownObj !== "function" || fogKnownObj(o);
+  if (typeof fogScan === "function") fogScan(true);
   const homes = HOMES.list
+    .filter((h) => fogA(h.entrance))
     .slice()
     .sort((a, b) => a.price - b.price)
     .map((h) => {
       const own = homeOwned(h);
       return {
         p: own ? 1e12 : h.price,
-        html: `<div class="pc"><div class="ph"><img src="${homeThumb(h, 368, 230)}" alt=""><span class="bd ${own ? "o" : "s"}">${own ? "OWNED" : "FOR SALE"}</span><span class="ty">\u{1F3E0} HOME</span><span class="pp${own ? " ow" : ""}">${own ? "Your home" : money(h.price)}</span></div><div class="pb"><div class="pn">${esc(h.name)}</div><div class="pl">${esc(homeKind(h))} \u2022 ${esc(homeWhere(h))}</div><div class="pf"><span>\u{1F6CF} ${h.bed} bed</span><span>\u{1F4D0} ${homePlot(h)}</span><span>\u{1F69B} ${h.lorries} rig${h.lorries > 1 ? "s" : ""}</span></div><button class="ftb btn" data-h="${h.id}">FAST TRAVEL \u203a</button></div></div>`,
+        html: `<div class="pc"><div class="ph"><img src="${homeThumb(h, 368, 230)}" alt=""><span class="bd ${own ? "o" : "s"}">${own ? "OWNED" : "FOR SALE"}</span><span class="ty">\u{1F3E0} HOME</span><span class="pp${own ? " ow" : ""}">${own ? "Your home" : money(h.price)}</span></div><div class="pb"><div class="pn">${esc(h.name)}</div><div class="pl">${esc(homeKind(h))} \u2022 ${esc(homeWhere(h))}</div><div class="pf"><span>\u{1F6CF} ${h.bed} bed</span><span>\u{1F4D0} ${homePlot(h)}</span><span>\u{1F69B} ${h.lorries} rig${h.lorries > 1 ? "s" : ""}</span></div><button class="ftb btn${fogK(h.ft) ? "" : " off fogv"}" data-h="${h.id}">${fogK(h.ft) ? "FAST TRAVEL \u203a" : "VISIT IN PERSON FIRST"}</button></div></div>`,
       };
     });
-  const yards = (world.forSale || []).map((yd) => {
+  const yards = (world.forSale || []).filter((yd) => fogA(yd.entrance)).map((yd) => {
     const o = ownedYard(yd),
       t = o ? o.tier || 1 : yd.tier || 1,
       T = OWN_TIERS[t];
     return {
       p: o ? 1e12 : OWN_TIERS[yd.tier || 1].price,
-      html: `<div class="pc"><div class="ph"><img src="${yardThumb(yd)}" alt=""><span class="bd ${o ? "o" : "s"}">${o ? "OWNED \u2022 T" + t : "FOR SALE"}</span><span class="ty c">\u{1F3ED} COMMERCIAL YARD</span><span class="pp${o ? " ow" : ""}">${o ? "Your yard" : money(OWN_TIERS[yd.tier || 1].price)}</span></div><div class="pb"><div class="pn">${esc(ydBrand(yd).name)}</div><div class="pl">Haulage yard \u2022 ${esc(yd.region || "")} \u2022 ${esc(T.label)}</div><div class="pf"><span>\u{1F69A} ${T.trucks} AI trucks</span><span>\u{1F4E6} ${T.bays} bays</span><span>+${money(T.pay)}/box</span></div><button class="ftb btn" data-y="${yd.id}">FAST TRAVEL \u203a</button></div></div>`,
+      html: `<div class="pc"><div class="ph"><img src="${yardThumb(yd)}" alt=""><span class="bd ${o ? "o" : "s"}">${o ? "OWNED \u2022 T" + t : "FOR SALE"}</span><span class="ty c">\u{1F3ED} COMMERCIAL YARD</span><span class="pp${o ? " ow" : ""}">${o ? "Your yard" : money(OWN_TIERS[yd.tier || 1].price)}</span></div><div class="pb"><div class="pn">${esc(ydBrand(yd).name)}</div><div class="pl">Haulage yard \u2022 ${esc(yd.region || "")} \u2022 ${esc(T.label)}</div><div class="pf"><span>\u{1F69A} ${T.trucks} AI trucks</span><span>\u{1F4E6} ${T.bays} bays</span><span>+${money(T.pay)}/box</span></div><button class="ftb btn${fogK(yd) ? "" : " off fogv"}" data-y="${yd.id}">${fogK(yd) ? "FAST TRAVEL \u203a" : "VISIT IN PERSON FIRST"}</button></div></div>`,
     };
   });
   const L =
     tab === "res" ? homes : tab === "com" ? yards : homes.concat(yards).sort((a, b) => a.p - b.p);
-  const list = L.map((c) => c.html).join("") || '<div class="pl">No listings</div>';
-  const nC = (world.forSale || []).length;
+  const list = L.map((c) => c.html).join("") || '<div class="pl">No listings in the areas you\u2019ve discovered yet \u2014 drive around to find more</div>';
+  const nC = yards.length;
   const b = openModal(
     "estate",
     `<div class="hh"><div class="eal">\u{1F3E1}</div><div style="min-width:0"><h2>${esc(agent ? agent.name : "Estate agent")}</h2><div class="sub">Homes &amp; commercial yards across the region</div></div><div class="bank">${money(truck.money)}</div><button class="hx btn" id="hmX">\u2715</button></div>
-    <div class="tabs"><button class="ti btn${tab === "all" ? " on" : ""}" data-t="all">ALL \u2022 ${HOMES.list.length + nC}</button><button class="ti btn${tab === "res" ? " on" : ""}" data-t="res">\u{1F3E0} HOMES \u2022 ${HOMES.list.length}</button><button class="ti btn${tab === "com" ? " on" : ""}" data-t="com">\u{1F3ED} COMMERCIAL \u2022 ${nC}</button></div>
+    <div class="tabs"><button class="ti btn${tab === "all" ? " on" : ""}" data-t="all">ALL \u2022 ${homes.length + nC}</button><button class="ti btn${tab === "res" ? " on" : ""}" data-t="res">\u{1F3E0} HOMES \u2022 ${homes.length}</button><button class="ti btn${tab === "com" ? " on" : ""}" data-t="com">\u{1F3ED} COMMERCIAL \u2022 ${nC}</button></div>
     <div class="grid">${list}</div><div class="ft"><span>Buy on the property itself: drive onto its <b>driveway</b> or into the <b>yard</b></span><span>LB RB / Q E tabs \u2022 \u24b6 / Enter travel \u2022 \u24b7 / Esc close</span></div>`,
     "hmm eam",
   );
@@ -1964,6 +1968,10 @@ function estatePanel(agent) {
     f.addEventListener("click", () => {
       if (ftJobBlock()) {
         flash(ftJobBlock());
+        return;
+      }
+      if (f.classList.contains("fogv")) {
+        flash("Visit this property in person first to unlock fast travel");
         return;
       }
       const o = f.dataset.h
