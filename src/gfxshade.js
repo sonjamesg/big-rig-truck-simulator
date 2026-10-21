@@ -2,36 +2,43 @@
  * @file gfxshade.js — GRAPHICS stage 2: soft drop shadows whose direction and length follow the sun (long and warm-angled
  *   at dawn/dusk, short at noon, faded at night). High quality only; low quality keeps the old baked shadows.
  *   - Buildings / trees / props: while a chunk is baked (renderChunk) bShadow, drawShadowRect and treeShadow record
- *     casters (world-space footprint + height) instead of painting. gfxShadeLayer() fills sun-swept hulls into a cached
- *     half-res world-space layer, cuts the footprints / crowns back out, and composites it after the vehicles (so
- *     building shadows fall across traffic too). The layer is rebuilt only when the view leaves it, the zoom changes,
- *     the sun moves a step or new chunks were baked.
+ *     casters (world-space footprint + height) instead of painting. v62: gsChunk() fills sun-swept hulls into a
+ *     per-chunk world-space canvas (fixed GS_Q texels per world px), cuts the footprints / crowns back out;
+ *     gsComposite() lays the visible ones into a screen scratch and composites it after the vehicles (so building
+ *     shadows fall across traffic too). Re-baked only when the sun moves a 1-game-minute step or casters change.
  *   - Vehicles / trailers: blitV / blit calls with a shadow offset get the sun offset, the sun alpha and a pre-blurred
  *     copy of the silhouette (cached per art canvas).
- * Exposes (globals): SUN, GS, gfxSun, gfxShadeLayer, gfxShadowArt, gfxQualityChanged
+ * Exposes (globals): SUN, GS, gfxSun, gsPaint, gsKey, gsChunk, gsComposite, gfxShadeLayer, gfxShadowArt,
+ *   gfxQualityChanged
  * Depends on: gfx.js (GFX, gfxHi, gfxSunDir), daynight.js (gameT, DN), render.js (renderChunk, chunkCache, chunkLo, CHUNK, bShadow via bldg2.js,
  *   drawShadowRect, treeShadow), traffic.js (blitV, VS), main.js (blit, drawRail, ctx, RSF), lorry.js (ART_SCALE)
  * Load order: after gfx.js in build.py. All files share one global scope (see AGENTS.md).
  */
 const SUN = { dx: 0.7, dy: 0.7, L: 1, a: 1, k: "" }; // unit shadow direction, length factor, alpha factor
-const GS = { ch: new Map(), rec: null, ver: 0, lc: null, key: "", R: null };
+// ch: casters per ground chunk, cv: their record version, sc: per-chunk shadow canvases, sk: screen scratch
+const GS = { ch: new Map(), cv: new Map(), sc: new Map(), rec: null, ver: 0, sk: null };
 function gfxDyn() {
   return gfxHi() && !GFX.off.shade;
 }
 // per frame: sun from the game clock (shadow angle 160 deg at 6h -> 45 at noon -> -70 at 18h)
 function gfxSun() {
   const h = ((gameT % 24) + 24) % 24,
-    hc = Math.max(6, Math.min(18, h)),
+    // v62: the baked building / tree shadows follow the sun in tiny steps (1 game minute = 0.83 s real time; the
+    // tip of a long shadow moves about 1 px per step), so a chunk re-bake never makes a visible jump
+    hq = Math.round(h * 60) / 60,
+    hc = Math.max(6, Math.min(18, hq)),
     s = gfxSunDir(hc),
-    e = Math.max(0, Math.sin((Math.PI * (h - 6)) / 12)), // sun elevation proxy 0..1
-    day = 1 - DN.dark;
+    e = Math.max(0, Math.sin((Math.PI * (hq - 6)) / 12)), // sun elevation proxy 0..1
+    day = Math.round((1 - DN.dark) * 200) / 200;
   SUN.dx = -s[0];
   SUN.dy = -s[1];
   // long shadows near the horizon, short at noon; at night a short, faint contact shadow remains
   const Ld = Math.min(3, 1.05 / Math.pow(Math.max(e, 0.25), 0.9));
   SUN.L = Ld * day + 0.45 * (1 - day);
-  SUN.a = Math.max(0.3, day * Math.min(1, e * 6));
-  SUN.k = Math.round(h * 30) + ":" + Math.round(SUN.a * 20);
+  // alpha is applied at composite time (never baked), from the unquantised clock, so it changes smoothly
+  const ea = Math.max(0, Math.sin((Math.PI * (h - 6)) / 12));
+  SUN.a = Math.max(0.3, (1 - DN.dark) * Math.min(1, ea * 6));
+  SUN.k = Math.round(hq * 60) + ":" + Math.round(day * 200); // shape key: direction + length only
 }
 // ---------------------------------------------------------------- baked casters (recorded during renderChunk)
 function gsPts(g, x, y, w, h) {
@@ -75,6 +82,7 @@ function gsPts(g, x, y, w, h) {
       return rc.apply(this, arguments);
     } finally {
       GS.ch.set(k, GS.rec.l);
+      GS.cv.set(k, (GS.cv.get(k) || 0) + 1);
       GS.ver++;
       GS.rec = prev;
     }
@@ -84,8 +92,8 @@ function gfxQualityChanged() {
   chunkCache.clear(); // re-bake: baked shadows on low, recorded casters on high
   chunkLo.clear();
   GS.ch.clear();
-  GS.key = "";
-  GS.R = null;
+  GS.cv.clear();
+  GS.sc.clear();
 }
 // convex hull (monotone chain) of a few points
 function gsHull(P) {
@@ -104,32 +112,14 @@ function gsHull(P) {
   }
   return lo.slice(0, -1).concat(up.slice(0, -1));
 }
-const GS_MAXL = 280; // longest shadow (world px)
-function gsBuild(R, z) {
-  const q = 0.5,
-    W = Math.ceil((R[2] - R[0]) * z * q),
-    H = Math.ceil((R[3] - R[1]) * z * q);
-  if (!GS.lc) GS.lc = document.createElement("canvas");
-  const c = GS.lc;
-  if (c.width !== W || c.height !== H) {
-    c.width = W;
-    c.height = H;
-  }
-  const g = c.getContext("2d");
-  g.setTransform(1, 0, 0, 1, 0, 0);
-  g.clearRect(0, 0, W, H);
-  const s = z * q;
-  g.setTransform(s, 0, 0, s, -R[0] * s, -R[1] * s);
-  const L = [],
-    x0 = Math.floor((R[0] - GS_MAXL) / CHUNK),
-    x1 = Math.floor((R[2] + GS_MAXL) / CHUNK),
-    y0 = Math.floor((R[1] - GS_MAXL) / CHUNK),
-    y1 = Math.floor((R[3] + GS_MAXL) / CHUNK);
-  for (let cy = y0; cy <= y1; cy++)
-    for (let cx = x0; cx <= x1; cx++) {
-      const a = GS.ch.get(cx + "," + cy);
-      if (a) for (const o of a) L.push(o);
-    }
+const GS_MAXL = 280; // longest shadow (world px); < CHUNK, so a chunk's shadows come from its 3x3 neighbourhood
+const GS_Q = 0.5; // shadow texels per world px (fixed: independent of zoom, so zooming never re-bakes)
+const GS_MAXC = 56; // cached shadow chunks
+// v62: shadows are baked per ground chunk in world space (GS_Q texels per world px, chunk-aligned), so panning only
+// moves them rigidly with the ground: no re-rasterising at a new sub-pixel origin and no zoom-dependent layer (the old
+// single view-sized layer was rebuilt every 250 ms as chunks baked / the sun stepped, each time at a new fractional
+// origin and zoom, which is what made every shadow edge shimmer and pop while driving)
+function gsPaint(g, L) {
   const dx = SUN.dx * SUN.L,
     dy = SUN.dy * SUN.L;
   g.fillStyle = "#000";
@@ -168,32 +158,86 @@ function gsBuild(R, z) {
   g.fill();
   g.globalCompositeOperation = "source-over";
 }
+// key of a shadow chunk: sun shape step + record versions of the 3x3 ground chunks whose casters reach it
+function gsKey(cx, cy) {
+  let k = SUN.k;
+  for (let j = -1; j <= 1; j++)
+    for (let i = -1; i <= 1; i++) k += "," + (GS.cv.get(cx + i + "," + (cy + j)) || 0);
+  return k;
+}
+function gsChunk(cx, cy, key) {
+  const id = cx + "," + cy,
+    L = [];
+  for (let j = -1; j <= 1; j++)
+    for (let i = -1; i <= 1; i++) {
+      const a = GS.ch.get(cx + i + "," + (cy + j));
+      if (a) for (const o of a) L.push(o);
+    }
+  let e = GS.sc.get(id);
+  if (!L.length) {
+    e = { c: null, key };
+  } else {
+    const n = Math.round(CHUNK * GS_Q),
+      c = (e && e.c) || document.createElement("canvas");
+    if (c.width !== n) c.width = c.height = n;
+    const g = c.getContext("2d");
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, n, n);
+    g.setTransform(GS_Q, 0, 0, GS_Q, -cx * CHUNK * GS_Q, -cy * CHUNK * GS_Q);
+    gsPaint(g, L);
+    e = { c, key };
+  }
+  GS.sc.delete(id);
+  GS.sc.set(id, e); // Map order = LRU
+  if (GS.sc.size > GS_MAXC) GS.sc.delete(GS.sc.keys().next().value);
+  return e;
+}
+// the shadow chunks under the view are drawn opaque into a backing-resolution screen scratch canvas (with the same
+// world transform as the ground, overlapping by half a pixel like the ground chunks, so there are no seams), then the
+// scratch goes on 1:1 with one alpha: overlaps never double up and no resampling of the layer happens per frame
+function gsComposite(vx0, vy0, vx1, vy1, z) {
+  const W = Math.round(VW * RSF),
+    H = Math.round(VH * RSF);
+  if (!GS.sk) GS.sk = document.createElement("canvas");
+  const S = GS.sk;
+  if (S.width !== W || S.height !== H) {
+    S.width = W;
+    S.height = H;
+  }
+  const g = S.getContext("2d"),
+    zr = z * RSF;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, W, H);
+  g.setTransform(zr, 0, 0, zr, -vx0 * zr, -vy0 * zr);
+  g.imageSmoothingEnabled = true;
+  let stale = 1, // re-bakes per frame for a sun step (missing chunks are always baked at once: no pop-in)
+    any = 0;
+  for (let cy = Math.floor(vy0 / CHUNK); cy <= Math.floor(vy1 / CHUNK); cy++)
+    for (let cx = Math.floor(vx0 / CHUNK); cx <= Math.floor(vx1 / CHUNK); cx++) {
+      const key = gsKey(cx, cy);
+      let e = GS.sc.get(cx + "," + cy);
+      if (!e) e = gsChunk(cx, cy, key);
+      else if (e.key !== key) {
+        // casters changed (a neighbour chunk was baked): re-bake now; only a sun step may wait a few frames
+        const sunOnly = e.key.slice(e.key.indexOf(",")) === key.slice(key.indexOf(","));
+        if (!sunOnly || stale-- > 0) e = gsChunk(cx, cy, key);
+      }
+      if (e.c) {
+        g.drawImage(e.c, cx * CHUNK, cy * CHUNK, CHUNK + 0.5, CHUNK + 0.5);
+        any = 1;
+      }
+    }
+  if (!any) return;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 0.4 * SUN.a;
+  ctx.drawImage(S, 0, 0);
+  ctx.restore();
+}
 // composite the building / tree shadow layer (world transform is active; args are the view rect + zoom)
 function gfxShadeLayer(vx0, vy0, vx1, vy1, z) {
   if (!gfxDyn()) return;
-  const R = GS.R,
-    m = (vx1 - vx0) * 0.35,
-    k = SUN.k + ":" + GS.ver;
-  if (
-    !R ||
-    vx0 < R[0] ||
-    vy0 < R[1] ||
-    vx1 > R[2] ||
-    vy1 > R[3] ||
-    Math.abs(z / R[4] - 1) > 0.08 ||
-    (GS.key !== k && performance.now() - (GS.t || 0) > 250)
-  ) {
-    GS.R = [vx0 - m, vy0 - m, vx1 + m, vy1 + m, z];
-    GS.key = k;
-    GS.t = performance.now();
-    gsBuild(GS.R, z);
-  }
-  const Q = GS.R;
-  ctx.save();
-  ctx.globalAlpha = 0.4 * SUN.a;
-  ctx.filter = "none";
-  ctx.drawImage(GS.lc, Q[0], Q[1], Q[2] - Q[0], Q[3] - Q[1]);
-  ctx.restore();
+  gsComposite(vx0, vy0, vx1, vy1, z);
 }
 // ---------------------------------------------------------------- vehicle shadows: soft, sun-driven
 const GS_BLUR = new WeakMap();

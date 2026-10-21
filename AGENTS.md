@@ -455,3 +455,8 @@ uses the same formulas.
 - (b) The other surfaces (walk, conc, plaza, gravel, sand, quay, field, island, rock, water) use the same helpers. Controls inside `wrap9` callbacks must be computed once, outside the callback, or the tile seams break.
 - Note: tests/spawn_lane_test.py is flaky before v61 too (about 1 run in 3 fails, at a random destination, when AI traffic is in the spawn lane).
 - (c) Vehicles: lorry.js `artCabDetail` (headlight housings, indicators, seams, rivets, edge highlight, grime) is shared by makeCabArt and career.js modelArt. The trailer gets rivets, tail-light clusters and grime. AI art gets faint grime from gcVehGloss → `artGrime` (switch off with `GFX.off.grime`). Everything is baked once into the art canvases, so it costs nothing per frame. Light glows still come from gfx.js / daynight.js at the same positions.
+
+## v62: steady sun shadows (gfxshade.js)
+- The cause of the flicker (live too, since stage 2): one view-sized half-res shadow layer was rebuilt every 250 ms whenever a chunk baked or the sun stepped. Each rebuild used a new fractional origin and the current zoom, so every edge re-rasterised at a different sub-pixel phase, plus pops.
+- Now: shadows are baked per ground chunk in world space (`gsChunk`, GS_Q = 0.5 texels per world px, fixed). The sun shape is quantised to 1-game-minute steps, at most 1 stale re-bake per frame, and missing chunks are baked at once. `gsComposite` lays the chunks opaque into a backing-res scratch (with a +0.5 overlap like the ground) and composites it 1:1 with an unquantised alpha.
+- Test: `tests/shadow_stability_test.py [html|url]` (mean frame-to-frame shadow change below 0.1, 0 pops).
