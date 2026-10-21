@@ -43,12 +43,12 @@ body.touch #mob .steer{background:#2a2d33;border:none;box-shadow:inset 0 3px 6px
 #deck{display:none;position:fixed;left:0;right:0;bottom:0;pointer-events:none;background:linear-gradient(180deg,#c9cdd6,#aeb3be 60%,#9aa0ac);border-radius:28px 28px 0 0;box-shadow:inset 0 3px 0 rgba(255,255,255,.6),inset 0 -2px 0 rgba(0,0,0,.2),0 -6px 24px rgba(0,0,0,.45)}
 body.touch.portrait #deck{display:block}
 #deck .brand{position:absolute;left:50%;transform:translateX(-50%);top:10px;font:italic 900 15px system-ui;letter-spacing:2px;color:#3b3f86;white-space:nowrap} #deck .brand b{color:#b0282c}
-#deck .grille{position:absolute;right:16px;bottom:calc(10px + env(safe-area-inset-bottom));width:44px;height:30px;background:repeating-linear-gradient(180deg,rgba(60,60,70,.55) 0 5px,transparent 5px 12px);border-radius:4px}
 body.touch #mob .dp{background:#2a2d33;border:none;border-radius:6px;box-shadow:0 3px 0 #111,inset 0 1px 0 rgba(255,255,255,.15);color:#aab}
 body.touch #mob .dpc{background:#2a2d33;border:none;border-radius:0;box-shadow:none}
 body.touch #mob .ab{border-radius:50%;background:radial-gradient(circle at 35% 30%,#d9446b,#9b1f45);border:none;box-shadow:0 4px 0 #5c1028,inset 0 1px 0 rgba(255,255,255,.35);font-size:22px}
 body.touch #mob .ab small{position:absolute;bottom:-19px;left:50%;transform:translateX(-50%);color:#3b3f86;font-size:12px;opacity:1;max-width:none}
-body.portrait #mob .pill{border-radius:20px;background:#6b7080;border:none;box-shadow:0 2px 0 #3a3e48;font-size:14px;letter-spacing:1px;transform:none;flex-direction:row;gap:6px}
+body.portrait #mob .pill{border-radius:12px;background:#3d4252;border:none;box-shadow:0 3px 0 #1d2029;transform:none}
+body.portrait #mob .tile{font-size:22px;gap:3px;flex-direction:column} body.portrait #mob .tile small{font-size:11px;letter-spacing:1px}
 body.portrait #mob .pill small{color:#fff;font-size:11px;margin:0;max-width:none}
 body.touch #mob .fn{border-radius:12px;background:#3d4252;border:none;box-shadow:0 3px 0 #1d2029;font-size:17px}
 body.touch #mob .fn.on,body.touch #mob .ab.on,body.touch #mob .dp.on{transform:translateY(2px);filter:brightness(1.3)}
@@ -209,7 +209,7 @@ function mobInit() {
   document.body.appendChild(m);
   const dk = document.createElement("div");
   dk.id = "deck";
-  dk.innerHTML = '<div class="grille"></div>';
+  dk.innerHTML = ""; // v58: the decorative grille (looked like a hamburger menu but did nothing) is gone
   document.body.insertBefore(dk, m);
   for (const [id, h] of [
     ["deckL", ""],
@@ -322,6 +322,8 @@ function mobInit() {
       bigmap.open ? closeMap() : openMap();
     }),
   );
+  for (const id of ["mIndL", "mIndR", "mHaz", "mBeam", "mMap", "mJobs"])
+    document.getElementById(id).classList.add("tile");
   document.getElementById("frame").addEventListener(
     "touchmove",
     (e) => {
@@ -450,8 +452,11 @@ function mobLayout() {
     const DH = H - deckTop,
       u = Math.min(W / 412, DH / 330);
     const S = (v) => v * u;
-    const dcx = S(100),
-      dcy = deckTop + S(98),
+    // v58 (James 21 Oct): IND / HAZ / BEAM / IND and MAP / JOBS are square-ish icon + label tiles. On short decks the D-pad,
+    // A/B and the function row move up into the gap above them to make room (avail = deck height in layout units).
+    const tight = DH / u < 392,
+      dcx = S(100),
+      dcy = deckTop + S(tight ? 80 : 98),
       k = S(40),
       kw = S(64); // v55: wide left/right pads
     const dg = S(5); // v44: visible gap between the D-pad arms
@@ -466,14 +471,14 @@ function mobLayout() {
         x0 = Math.max(0, dcx - k / 2 - dg - kw - m),
         x1 = Math.min(W - S(150) - S(6), dcx + k / 2 + dg + kw + m),
         y0 = dcy - k * 1.5 - dg - S(8),
-        y1 = Math.min(deckTop + S(178) - S(6), dcy + k * 1.5 + dg + S(8));
+        y1 = Math.min(deckTop + S(tight ? 152 : 178) - S(6), dcy + k * 1.5 + dg + S(8));
       place("mDZone", x0, y0, x1 - x0, y1 - y0);
       MOB.dp = { cx: dcx, cy: dcy, k, dg };
     }
     const ab = S(58);
     place("mB", W - S(150), dcy - ab * 0.2, ab, ab);
     place("mA", W - S(78), dcy - ab * 0.85, ab, ab);
-    const fy = deckTop + S(178),
+    const fy = deckTop + S(tight ? 152 : 178),
       fw = Math.min(S(60), (W - 24) / 5 - 14), // v44: narrower keys -> wider gaps
       gap = (W - 5 * fw) / 6;
     ["mCouple", "mFuel", "mUnload", "mHand", "mHorn"].forEach((id, i) =>
@@ -481,22 +486,15 @@ function mobLayout() {
     );
     {
       const g4 = gap,
-        w4 = (W - 5 * g4) / 4;
+        w4 = (W - 5 * g4) / 4,
+        th = Math.min(w4 * 0.85, S(tight ? 52 : 64)),
+        ty = fy + fw * 0.78 + S(tight ? 6 : 10),
+        ty2 = ty + th + S(tight ? 6 : 10);
       ["mIndL", "mHaz", "mBeam", "mIndR"].forEach((id, i) =>
-        place(id, g4 + i * (w4 + g4), fy + fw * 1.2, w4, fw * 0.5),
+        place(id, g4 + i * (w4 + g4), ty, w4, th),
       );
-    }
-    const py = fy + fw * 1.98;
-    const pw = S(84),
-      ph2 = S(26);
-    place("mMap", W / 2 - pw - S(8), py, pw, ph2);
-    place("mJobs", W / 2 + S(8), py, pw, ph2);
-    const gr = document.querySelector("#deck .grille");
-    if (gr) {
-      gr.style.top = py - deckTop + ph2 / 2 - S(9) + "px";
-      gr.style.bottom = "auto";
-      gr.style.height = S(18) + "px";
-      gr.style.width = S(40) + "px";
+      place("mMap", g4 + (w4 + g4), ty2, w4, th);
+      place("mJobs", g4 + 2 * (w4 + g4), ty2, w4, th);
     }
     for (const id of ["mSteer", "mGas", "mBrk"]) place(id, 0, 0, 0, 0, false);
   }
