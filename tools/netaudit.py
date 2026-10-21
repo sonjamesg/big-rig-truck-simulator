@@ -84,7 +84,7 @@ async def main():
         if not os.environ.get("NOCROP"):
             for f in spots:
                 fn = os.path.join(OUT, TAG, f"{f['k']}_{f['x']}_{f['y']}.png")
-                rad = 8 if f["k"] == "grass-mismatch" else 22 if f["k"] == "parallel-dup" else 14
+                rad = int(os.environ.get("RAD", 0)) or 8 if f["k"] == "grass-mismatch" else 22 if f["k"] == "parallel-dup" else 14
                 u = await pg.evaluate(CROP, [f["x"], f["y"], rad, 420, f"{TAG}: {f['k']} @ {f['x']},{f['y']}"])
                 open(fn, "wb").write(base64.b64decode(u.split(",")[1])); f["img"] = fn; n += 1
         json.dump(r, open(os.path.join(OUT, TAG + ".json"), "w"), indent=1)

@@ -1435,13 +1435,18 @@ function drawObject(g, o) {
             Math.floor(c.cy + Math.sign(c.cy - by) * 0.5),
           );
         if (gt === T.GRASS || gt === T.PGRASS) {
-          g.fillStyle = g.createPattern(
-            gt === T.PGRASS && TEX.pgrass ? TEX.pgrass[0] : TEX.grass[0],
-            "repeat",
-          );
+          // v65: per tile, the same texture variant the ground pass gives that tile (was one flat variant for the whole fillet)
+          const TX = gt === T.PGRASS && TEX.pgrass ? TEX.pgrass : TEX.grass;
+          g.save();
           g.beginPath();
           g.arc(X, Y, Rr - TILE, 0, 7);
-          g.fill();
+          g.clip();
+          for (let ty = Math.floor(o.y / TILE); ty * TILE < o.y + o.h; ty++)
+            for (let tx = Math.floor(o.x / TILE); tx * TILE < o.x + o.w; tx++)
+              g.drawImage(TX[(hash2(tx, ty) * 4) | 0], tx * TILE, ty * TILE);
+          g.restore();
+          g.beginPath();
+          g.arc(X, Y, Rr - TILE, 0, 7);
           // v65 (James 21 Oct): the fillet grass gets the same large-scale tint (lighter / darker / yellower swathes, forest
           // floor) as the surrounding grass tiles of this chunk, so it no longer reads as a different, flat grass type
           if (CUR_CHUNK && GD_KEY === CUR_CHUNK[0] + "," + CUR_CHUNK[1]) {
