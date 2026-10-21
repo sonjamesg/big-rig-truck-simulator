@@ -1182,8 +1182,8 @@ function drawRB(g, o) {
   for (let k = 0; k < rb.arms.length; k++) {
     const arm = rb.arms[k],
       gm = G2[k],
-      sp = rbSplitter(rb, arm);
-    // give-way: double dashed line across the entry mouth along the ring edge (entry side, v>c), triangle just behind it
+      sp = null; // v63: splitter islands removed
+    // entry mouth arc on the ring edge (entry side, v>c)
     const f = gm.fil.find((q) => q.sd > 0),
       ve = f.e - 0.15,
       aT = ang(rbW(gm, rb, Math.sqrt(Math.max(0, (rb.rout + 0.3) ** 2 - ve * ve)), ve));
@@ -1198,122 +1198,22 @@ function drawRB(g, o) {
     }
     let da = a1 - a0;
     while (da < 0) da += Math.PI * 2;
+    // v63: signalised UK entry: one solid stop line across the entry lanes where the AI holds (rout+0.35),
+    // no give-way triangle, no splitter island; a double white centre line separates entry from exit up to the ring
     g.strokeStyle = "#ececec";
-    // v51: give-way double dashes at every entry, signalised or not
-    g.lineWidth = 4;
-    g.setLineDash([12, 9]);
-    for (const rr of [rb.rout + 0.12, rb.rout + 0.42]) {
+    g.lineWidth = 6;
+    g.beginPath();
+    g.arc(X, Y, (rb.rout + 0.35) * S, a0 + 0.01, a0 + da - 0.01);
+    g.stroke();
+    g.lineWidth = 2.5;
+    for (const dv of [-0.07, 0.07]) {
+      const c0 = W(gm, rb.rout + 0.35, gm.c + dv),
+        c1 = W(gm, gm.uE + RB_BACK + 3, gm.c + dv);
       g.beginPath();
-      g.arc(X, Y, rr * S, a0 + 0.02, a0 + da - 0.02);
+      g.moveTo(c0[0], c0[1]);
+      g.lineTo(c1[0], c1[1]);
       g.stroke();
     }
-    g.setLineDash([]);
-
-    const tri = W(gm, rb.rout + 2.4, (vb + gm.c + gm.hw + 1.2) / 2);
-    g.save();
-    g.translate(tri[0], tri[1]);
-    g.rotate(Math.atan2(gm.o[1], gm.o[0]) + Math.PI / 2);
-    g.lineWidth = 3;
-    g.beginPath();
-    g.moveTo(-11, -26);
-    g.lineTo(11, -26);
-    g.lineTo(0, 26);
-    g.closePath();
-    g.stroke();
-    g.restore();
-    if (!sp) continue;
-    // v51: the old triangular island is now paint only: white outline + diagonal hatching (keep off), no grass
-    if (sp.full) {
-      const fp = sp.full.poly.map(P),
-        fpath = () => {
-          g.beginPath();
-          g.moveTo(fp[0][0], fp[0][1]);
-          for (const q of fp) g.lineTo(q[0], q[1]);
-          g.closePath();
-        };
-      g.save();
-      fpath();
-      g.clip();
-      g.strokeStyle = "rgba(236,236,236,0.8)";
-      g.lineWidth = 2.5;
-      const cx = fp.reduce((t, q) => t + q[0], 0) / fp.length,
-        cy = fp.reduce((t, q) => t + q[1], 0) / fp.length,
-        oa = Math.atan2(gm.o[1], gm.o[0]) + 0.75,
-        ca = Math.cos(oa),
-        sa = Math.sin(oa);
-      for (let k = -13; k <= 13; k++) {
-        const ox = -sa * k * 18,
-          oy = ca * k * 18;
-        g.beginPath();
-        g.moveTo(cx + ox - ca * 400, cy + oy - sa * 400);
-        g.lineTo(cx + ox + ca * 400, cy + oy + sa * 400);
-        g.stroke();
-      }
-      g.restore();
-      g.strokeStyle = "#ececec";
-      g.lineWidth = 3;
-      g.lineJoin = "round";
-      fpath();
-      g.stroke();
-    }
-    // painted hatched nose ahead of the raised median
-    const n0 = W(gm, sp.uN, gm.c),
-      n1 = W(gm, gm.uE + RB_BACK + 2.5, gm.c),
-      nl = W(gm, sp.uN, gm.c + 0.12),
-      nr = W(gm, sp.uN, gm.c - 0.12);
-    g.fillStyle = "#ececec";
-    g.beginPath();
-    g.moveTo(nl[0], nl[1]);
-    g.lineTo(n1[0], n1[1]);
-    g.lineTo(nr[0], nr[1]);
-    g.closePath();
-    g.fill();
-    // narrow raised kerb median: shadow, concrete top, kerb edge, keep-left bollard at the nose
-    const pp = sp.poly.map(P);
-    const path = () => {
-      g.beginPath();
-      g.moveTo(pp[0][0], pp[0][1]);
-      for (const q of pp) g.lineTo(q[0], q[1]);
-      g.closePath();
-    };
-    g.save();
-    g.translate(2, 2);
-    path();
-    g.fillStyle = "rgba(0,0,0,0.3)";
-    g.fill();
-    g.restore();
-    path();
-    g.fillStyle = "#d4d1c8";
-    g.fill();
-    g.lineJoin = "round";
-    g.strokeStyle = "#8e8b84";
-    g.lineWidth = 1.6;
-    g.stroke();
-    const bol = (p) => {
-      g.fillStyle = "rgba(0,0,0,0.35)";
-      g.beginPath();
-      g.arc(p[0] + 2, p[1] + 2, 4.5, 0, 7);
-      g.fill();
-      g.fillStyle = "#f4f4f4";
-      g.beginPath();
-      g.arc(p[0], p[1], 4.5, 0, 7);
-      g.fill();
-      g.fillStyle = "#1d5fbf";
-      g.beginPath();
-      g.arc(p[0], p[1], 3.2, 0, 7);
-      g.fill();
-      g.strokeStyle = "#fff";
-      g.lineWidth = 1.2;
-      g.beginPath();
-      const dx = -gm.o[0] * 2,
-        dy = -gm.o[1] * 2,
-        lx = gm.l[0] * 2,
-        ly = gm.l[1] * 2;
-      g.moveTo(p[0] - dx - lx, p[1] - dy - ly);
-      g.lineTo(p[0] + dx + lx, p[1] + dy + ly);
-      g.stroke();
-    };
-    bol(W(gm, sp.uN - 0.3, gm.c));
   }
   g.lineWidth = 1;
 }
@@ -1426,24 +1326,6 @@ function drawObject(g, o) {
       g.beginPath();
       g.arc(o.x, o.y, 9, 0, 7);
       g.fill();
-      // v63: grass verge behind the footway follows the kerb radius instead of a square paved block
-      {
-        const bx = (o.x + o.w / 2) / TILE,
-          by = (o.y + o.h / 2) / TILE,
-          gt = get(
-            Math.floor(c.cx + Math.sign(c.cx - bx) * 0.5),
-            Math.floor(c.cy + Math.sign(c.cy - by) * 0.5),
-          );
-        if (gt === T.GRASS || gt === T.PGRASS) {
-          g.fillStyle = g.createPattern(
-            gt === T.PGRASS && TEX.pgrass ? TEX.pgrass[0] : TEX.grass[0],
-            "repeat",
-          );
-          g.beginPath();
-          g.arc(X, Y, Rr - TILE, 0, 7);
-          g.fill();
-        }
-      }
       g.strokeStyle = "#a8873a";
       g.beginPath();
       g.arc(o.x, o.y, 5, 0, 7);
@@ -1544,6 +1426,24 @@ function drawObject(g, o) {
       g.beginPath();
       g.arc(X, Y, Rr, 0, 7);
       g.fill();
+      // v63: grass verge behind the footway follows the kerb radius instead of a square paved block
+      {
+        const bx = (o.x + o.w / 2) / TILE,
+          by = (o.y + o.h / 2) / TILE,
+          gt = get(
+            Math.floor(c.cx + Math.sign(c.cx - bx) * 0.5),
+            Math.floor(c.cy + Math.sign(c.cy - by) * 0.5),
+          );
+        if (gt === T.GRASS || gt === T.PGRASS) {
+          g.fillStyle = g.createPattern(
+            gt === T.PGRASS && TEX.pgrass ? TEX.pgrass[0] : TEX.grass[0],
+            "repeat",
+          );
+          g.beginPath();
+          g.arc(X, Y, Rr - TILE, 0, 7);
+          g.fill();
+        }
+      }
       g.strokeStyle = "#8a877f";
       g.lineWidth = 3;
       g.beginPath();
@@ -1920,20 +1820,6 @@ function renderChunk(cx, cy) {
           g.fillStyle = "#6d7178";
           for (let k = 0; k < 32; k += 8) g.fillRect(px, py + k, 5, 2);
           g.fillStyle = "#c9ccd1";
-    // v63: carry the pavement 1.5 tiles back onto the wide road so the footway never shows a grass gap at the seam
-    for (const sd of [-1, 1]) {
-      const a0 = at(0, sd * hw(0, sd)),
-        a1 = at(0, sd * pw(0, sd)),
-        bx = -tp.dW[0] * 1.5 * T_,
-        by = -tp.dW[1] * 1.5 * T_;
-      g.beginPath();
-      g.moveTo(a0[0], a0[1]);
-      g.lineTo(a1[0], a1[1]);
-      g.lineTo(a1[0] + bx, a1[1] + by);
-      g.lineTo(a0[0] + bx, a0[1] + by);
-      g.closePath();
-      g.fill();
-    }
         }
         if (W(get(tx + 1, ty))) {
           g.fillRect(px + 27, py, 5, 32);
@@ -1949,19 +1835,6 @@ function renderChunk(cx, cy) {
       }
     }
   grassDetail(g, cx, cy);
-  // v63: UK lane-drop marking: each closing lane's divider continues as a bold short-gap broken line until the edge meets it
-  g.lineWidth = 4.5;
-  g.setLineDash([18, 9]);
-  for (const sd of [-1, 1])
-    for (let b = tp.wN / 2; b < hw(0, sd) - 0.5; b += 1) {
-      g.beginPath();
-      for (let i = 0; i < n && hw(i, sd) - b > 0.18; i++) {
-        const q = at(i, sd * b);
-        i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]);
-      }
-      g.stroke();
-    }
-  g.setLineDash([]);
   if (typeof railChunk === "function") railChunk(g, ox, oy);
   g.save();
   g.translate(-ox, -oy);
@@ -2047,6 +1920,20 @@ function drawTaper(g, tp) {
     };
     g.fillStyle = g.createPattern(TEX.walk[0], "repeat");
     for (const sd of [-1, 1]) band(hw, pw, sd);
+    // v63: carry the pavement 1.5 tiles back onto the wide road so the footway never shows a grass gap at the seam
+    for (const sd of [-1, 1]) {
+      const a0 = at(0, sd * hw(0, sd)),
+        a1 = at(0, sd * pw(0, sd)),
+        bx = -tp.dW[0] * 1.5 * T_,
+        by = -tp.dW[1] * 1.5 * T_;
+      g.beginPath();
+      g.moveTo(a0[0], a0[1]);
+      g.lineTo(a1[0], a1[1]);
+      g.lineTo(a1[0] + bx, a1[1] + by);
+      g.lineTo(a0[0] + bx, a0[1] + by);
+      g.closePath();
+      g.fill();
+    }
     g.strokeStyle = "#8a877f";
     g.lineWidth = 2;
     for (const sd of [-1, 1]) poly((i, sd) => hw(i, sd) + 0.03, sd);
@@ -2062,6 +1949,19 @@ function drawTaper(g, tp) {
   g.strokeStyle = "#ececec";
   g.lineWidth = 2;
   for (const sd of [-1, 1]) poly((i, sd) => hw(i, sd) - 5 / T_, sd);
+  // v63: UK lane-drop marking: each closing lane's divider continues as a bold short-gap broken line until the edge meets it
+  g.lineWidth = 4.5;
+  g.setLineDash([18, 9]);
+  for (const sd of [-1, 1])
+    for (let b = tp.wN / 2; b < hw(0, sd) - 0.5; b += 1) {
+      g.beginPath();
+      for (let i = 0; i < n && hw(i, sd) - b > 0.18; i++) {
+        const q = at(i, sd * b);
+        i ? g.lineTo(q[0], q[1]) : g.moveTo(q[0], q[1]);
+      }
+      g.stroke();
+    }
+  g.setLineDash([]);
   // merge arrows in each dropped lane for traffic heading wide -> narrow (UK: drive on the left => negative offset side)
   const d = tp.dW,
     J = P[0],

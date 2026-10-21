@@ -1,5 +1,5 @@
 """Roundabout soak: geometry audit + AI traffic run at several roundabouts.
-Checks: entry/exit paths stay on the visible tarmac and clear of splitter islands, no stuck AI, no AI-AI collisions, no console errors.
+Checks: entry/exit paths stay on the visible tarmac and no splitter islands (v63), no stuck AI, no AI-AI collisions, no console errors.
 Usage: python3 tests/roundabout_test.py [BigRig.html] [seconds_per_roundabout]   (needs playwright + /usr/bin/google-chrome)"""
 import asyncio,json,sys,os
 from playwright.async_api import async_playwright
@@ -33,7 +33,7 @@ async def main():
     pg.on('pageerror',lambda e: errs.append(str(e)[:300])); pg.on('console',lambda m: errs.append(m.text[:200]) if m.type=='error' else None)
     await pg.goto('file://'+os.path.abspath(HTML)); await pg.wait_for_function("window.__bigrig&&__bigrig.world.ready",timeout=120000)
     await pg.keyboard.press('Enter'); await pg.wait_for_timeout(500)
-    geo=await pg.evaluate(GEO); ok=all(r['offTarmac']==0 and r['inSplitter']==0 and r['gaps']==0 and r['splitters']>0 for r in geo)
+    geo=await pg.evaluate(GEO); ok=all(r['offTarmac']==0 and r['inSplitter']==0 and r['gaps']==0 and r['splitters']==0 for r in geo)  # v63: splitter islands removed
     runs=[]
     for rid in [0,1,3,4,6]:
       await pg.evaluate(START+f"({rid})"); await pg.wait_for_timeout(SECS*1000); r=await pg.evaluate(STOP); runs.append(r); print(json.dumps(r),flush=True)

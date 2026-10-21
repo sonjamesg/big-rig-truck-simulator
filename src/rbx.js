@@ -1,5 +1,5 @@
 /**
- * @file rbx.js — ROUNDABOUTS: 3-lane spiral markings, signalised entries (heads on the left verge), clean lit island
+ * @file rbx.js — ROUNDABOUTS: 4-lane spiral markings, signalised entries (stop line, nearside + island heads), clean lit island
  * Exposes (globals): RBSIG, rbArmKey, rbSigState, rbMouths, rbLaneLines, rbIsland, rbSigHeads
  * Depends on: world.js, traffic.js, repair.js
  * Load order: #47 of 55 in build.py; all files share one global scope (see AGENTS.md, SYMBOLS.md).
@@ -49,7 +49,7 @@ function rbMouths(rb, G2) {
 function rbLaneLines(g, rb, G2, X, Y, S) {
   const M = rbMouths(rb, G2),
     w = rb.rout - rb.rin,
-    rs = [rb.rin + w / 3, rb.rin + (2 * w) / 3],
+    rs = [rb.rin + w / 4, rb.rin + w / 2, rb.rin + (3 * w) / 4], // v63: 4 circulating lanes
     inM = (a) =>
       M.some((m) => {
         let d = a - m.a0;
@@ -106,7 +106,12 @@ function rbLaneLines(g, rb, G2, X, Y, S) {
     let d = n.a0 - m.a1;
     while (d < 0) d += Math.PI * 2;
     const a = m.a1 + d * 0.45;
-    for (const r of [rb.rin + w / 6, rb.rin + w / 2, rb.rin + (5 * w) / 6]) {
+    for (const r of [
+      rb.rin + w / 8,
+      rb.rin + (3 * w) / 8,
+      rb.rin + (5 * w) / 8,
+      rb.rin + (7 * w) / 8,
+    ]) {
       const x = X + Math.cos(a) * r * S,
         y = Y + Math.sin(a) * r * S;
       g.save();
@@ -163,9 +168,11 @@ function rbSigHeads(vx0, vy0, vx1, vy1) {
     for (const a of rb.arms) {
       const gm = rbArmGeom(rb, a),
         st = rbSigState(rb, rbArmKey(a));
-      // v51: both heads on the LEFT verge (the narrow median has no room): primary at the line, repeater on the approach
-      const p = rbW(gm, rb, rb.rout + 1.1, gm.c + gm.hw + 0.45),
-        q = rbW(gm, rb, gm.uE + 1.5, gm.c + gm.hw + 0.55);
+      // v63: primary on the nearside verge at the stop line, secondary on the central island facing the entry
+      const ve = gm.c + gm.hw / 2,
+        ri = rb.rin - 0.7,
+        p = rbW(gm, rb, rb.rout + 1.1, gm.c + gm.hw + 0.45),
+        q = rbW(gm, rb, Math.sqrt(Math.max(0, ri * ri - ve * ve)), ve);
       for (const pt of [p, q]) {
         const x = pt[0] * TILE,
           y = pt[1] * TILE,

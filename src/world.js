@@ -197,7 +197,8 @@ function rbRingR(rb) {
 // v31: 3 circulating lanes - left (outer) for the 1st exit, middle for ahead, right (inner) for later exits / U-turns
 function rbLaneR(rb, del) {
   const w = rb.rout - rb.rin;
-  return del < 2.2 ? rb.rin + w * 0.8 : del < 3.8 ? rb.rin + w * 0.5 : rb.rin + w * 0.2;
+  // v63: 4 circulating lanes (outer first exit .. inner for late exits / U-turns)
+  return rb.rin + w * (del < 2.2 ? 0.875 : del < 3.8 ? 0.625 : del < 5 ? 0.375 : 0.125);
 }
 function rbArmGeom(rb, arm) {
   if (arm.g) return arm.g;
@@ -297,7 +298,7 @@ const RB_MED = 0.15;
 function rbSplitter(rb, arm, full) {
   const g = rbArmGeom(rb, arm);
   if (g.spN === undefined) rbSplitBuild(rb, arm, g);
-  return full ? g.spF : g.spN;
+  return full ? g.spF : null; // v63: no drawn or kerbed splitter islands; spF stays for tile generation only
 }
 function rbSplitBuild(rb, arm, g) {
   const sg = g.sg,
