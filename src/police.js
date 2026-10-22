@@ -1710,7 +1710,7 @@ function hideAt(x, y) {
   return null;
 }
 function drawHideSpots(vx0, vy0, vx1, vy1) {
-  if (!(WANT.lvl || POL.chase)) return;
+  if (!(WANT.lvl >= 1)) return; // v68b: only while wanted (1+ stars)
   const L = HIDE.list || hideBuild();
   const W1 = true,
     pu = 0.75 + 0.25 * Math.sin(timeS * 3);
@@ -1749,10 +1749,9 @@ function drawHideSpots(vx0, vy0, vx1, vy1) {
 }
 function hideMapDots(px, py, icon) {
   // v68: always on the world map + minimap (only in discovered areas), brighter while wanted
-  const L = HIDE.list || hideBuild(),
-    w = WANT.lvl || POL.chase;
+  if (!(WANT.lvl >= 1)) return; // v68b: only while wanted (1+ stars)
+  const L = HIDE.list || hideBuild();
   ctx.save();
-  if (!w) ctx.globalAlpha = 0.8;
   for (const h of L) {
     const cx = h.x + h.w / 2,
       cy = h.y + h.h / 2;
@@ -1766,7 +1765,7 @@ function hideMapDots(px, py, icon) {
 }
 // v38: hide boxes as sat-nav targets (full map tap/click/controller pick) while wanted
 function hidePOIs() {
-  if (!(WANT.lvl || POL.chase)) return [];
+  if (!(WANT.lvl >= 1)) return [];
   return (HIDE.list || hideBuild()).map(
     (h, i) =>
       h.poi ||
