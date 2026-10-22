@@ -26,6 +26,7 @@ async def main():
     b=await p.chromium.launch(executable_path='/usr/bin/google-chrome'); pg=await b.new_page(); errs=[]
     pg.on('pageerror',lambda e: errs.append(str(e)[:300]))
     await pg.goto('file://'+os.path.abspath(HTML)); await pg.wait_for_function('window.__bigrig&&__bigrig.truck',timeout=60000); await pg.wait_for_timeout(2000)
+    await pg.evaluate("__bigrig.BigRig.fog&&__bigrig.BigRig.fog.revealAll()")  # v66: revealed mode
     res=await pg.evaluate(JS); ok=True; n=0
     for r in res:
       bad='err' in r or r.get('trlDeg',0)>0.5 or r.get('trlOff',0)>0.05 or (not r.get('yard') and (r['side']>=0 or not r['headOK'] or r['footBad']>0))
