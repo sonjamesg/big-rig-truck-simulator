@@ -1422,12 +1422,79 @@ function* railRouteSteps(objs) {
   railCachePut(RKEY, raw);
   return raw;
 }
+// v64 (James 22 Oct): the main line runs straight through the middle of the Albion Airport terminal (Airport
+// Station under the concourse). Road edits used to let the router swing it round the south side; the stretch
+// between the west line (x157) and the east curve (638,690) is now a fixed alignment.
+const RAIL_AP_FORCE = { a: [157, 640], b: [640, 688], y: 673 };
+function railAirportForce(raw) {
+  const F = RAIL_AP_FORCE,
+    n = raw.length,
+    near = (tx, ty) => {
+      let bi = -1,
+        bd = 1e18;
+      for (let i = 0; i < n; i++) {
+        const d = (raw[i][0] - tx * M_T) ** 2 + (raw[i][1] - ty * M_T) ** 2;
+        if (d < bd) {
+          bd = d;
+          bi = i;
+        }
+      }
+      return bd < (30 * M_T) ** 2 ? bi : -1;
+    };
+  const ia = near(F.a[0], F.a[1]),
+    ib = near(F.b[0], F.b[1]);
+  if (ia < 0 || ib < 0 || ia === ib) {
+    RAIL.apForce = "anchors missing";
+    return raw;
+  }
+  const fwd = (((ib - ia) % n) + n) % n < n / 2;
+  const A = raw[ia],
+    B = raw[ib],
+    pts = [],
+    y = F.y * M_T,
+    R = 26 * M_T;
+  // west: straight down x157 to the bend, quarter circle (R 104 m) onto y673
+  const ax = A[0];
+  for (let yy = A[1]; yy < y - R; yy += 4) pts.push([ax, yy]);
+  for (let k = 0; k <= 24; k++) {
+    const t = (k / 24) * (Math.PI / 2);
+    pts.push([ax + R * (1 - Math.cos(t)), y - R + R * Math.sin(t)]);
+  }
+  // straight through the terminal, then a gentle S-free ease down onto the east anchor
+  const xe = B[0] - 70 * M_T;
+  for (let xx = ax + R + 4; xx < xe; xx += 4) pts.push([xx, y]);
+  const nB = raw[(ib + (fwd ? 1 : -1) + n) % n],
+    tx = nB[0] - B[0],
+    ty = nB[1] - B[1],
+    tl = Math.hypot(tx, ty) || 1;
+  const P0 = [xe, y],
+    P1 = [xe + 35 * M_T, y],
+    P3 = B,
+    P2 = [B[0] - (tx / tl) * 35 * M_T, B[1] - (ty / tl) * 35 * M_T];
+  for (let k = 1; k < 40; k++) {
+    const t = k / 40,
+      u = 1 - t;
+    pts.push([
+      u * u * u * P0[0] + 3 * u * u * t * P1[0] + 3 * u * t * t * P2[0] + t * t * t * P3[0],
+      u * u * u * P0[1] + 3 * u * u * t * P1[1] + 3 * u * t * t * P2[1] + t * t * t * P3[1],
+    ]);
+  }
+  const seq = fwd ? pts : pts.slice().reverse();
+  const out = [];
+  if (fwd) {
+    if (ia < ib) return raw.slice(0, ia + 1).concat(seq, raw.slice(ib));
+    return seq.concat(raw.slice(ib, ia + 1));
+  }
+  if (ib < ia) return raw.slice(0, ib + 1).concat(seq, raw.slice(ia));
+  return seq.concat(raw.slice(ia, ib + 1)).concat(out);
+}
 // ---------- geometry
 function railBuild(objs) {
   for (const _ of railBuildSteps(objs));
 }
 function* railBuildSteps(objs) {
   let raw = yield* railRouteSteps(objs);
+  if (raw && raw.length) raw = railAirportForce(raw); // v64: main line forced through the Albion terminal (y673)
   if (!raw) {
     raw = [];
     const W = RAIL_WP.map((p) => [p[0] * M_T, p[1] * M_T]),
@@ -1541,7 +1608,7 @@ function* railBuildSteps(objs) {
     RAIL.route && RAIL.route.stations
       ? RAIL_ST.map((r, i) => [r[0], RAIL.route.stations[i][1], RAIL.route.stations[i][2], r[3]])
       : RAIL_ST;
-  for (const [name, tx, ty, kind] of STT.concat([["Albion Airport", 435, 663, "city"]])) {
+  for (const [name, tx, ty, kind] of STT.concat([["Albion Airport", 435, 673, "city"]])) {
     let best = 0,
       bd = 1e18;
     for (let s = 0; s < L; s++) {
