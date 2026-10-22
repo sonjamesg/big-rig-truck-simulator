@@ -272,7 +272,7 @@ CZ_PARTS.push(
       ar = czPart(fit.arm),
       bp = czPart(fit.bpl);
     // fuel tanks: cylinders on the chassis sides behind the cab, longer per level
-    if (tk) {
+    if (tk && m.id !== "rigger") {
       const len = 0.6 + tk.lv * 0.28,
         sides = tk.lv >= 3 ? [-1, 1] : [1];
       for (const s of sides) {
@@ -484,7 +484,7 @@ CZ_PARTS.push(
       g.translate(0, low * sc);
     }
     sd0(g, cx, cy, sc, m, col, fit);
-    if (tk) {
+    if (tk && m.id !== "rigger") {
       const len = 0.6 + tk.lv * 0.28,
         gr = g.createLinearGradient(0, Y(1.3), 0, Y(0.7));
       gr.addColorStop(0, "#fff");
@@ -493,7 +493,7 @@ CZ_PARTS.push(
       rr(g, X(-2.35), Y(1.3), len * sc, 0.62 * sc, 0.25 * sc);
       g.fill();
     }
-    const es = L.exs || (ex ? "chrome" : null);
+    const es = m.id === "rigger" ? null : L.exs || (ex ? "chrome" : null);
     if (es && es !== "side") {
       const h = es === "tall" ? roofH + 1.0 : roofH + 0.6,
         w = (0.18 + (ex ? ex.lv * 0.035 : 0)) * sc;
