@@ -68,8 +68,17 @@ async def main():
         await pg.evaluate("()=>{polEndChase&&POL.chase&&polEndChase();wantClear();}")
         # map shot with blue hide icons
         await pg.evaluate(PLACE, [s["x"], s["y"], 0])
-        await pg.evaluate("openMap();mapZoomTo(bigmap.zt/2.5)"); await pg.wait_for_timeout(1500)
+        cnt = "(()=>{let n=0;hideMapDots(x=>x,y=>y,()=>n++);return n})()"
+        await pg.evaluate("wantClear()")
+        n0 = await pg.evaluate(cnt)
+        await pg.evaluate("openMap();mapZoomTo(bigmap.zt/2.5)"); await pg.wait_for_timeout(1200)
+        await pg.screenshot(path=OUT + "/police_map_not_wanted.png"); await pg.evaluate("closeMap()")
+        await pg.evaluate("WANT.lvl=1;WANT.t=60")
+        n1 = await pg.evaluate(cnt)
+        await pg.evaluate("openMap();mapZoomTo(bigmap.zt/2.5)"); await pg.wait_for_timeout(1200)
         await pg.screenshot(path=OUT + "/police_map_hide_icons.png"); await pg.evaluate("closeMap()")
+        chk("hide icons only while wanted", n0 == 0 and n1 > 0, json.dumps([n0, n1]))
+        await pg.evaluate("wantClear()")
         chk("no page errors", not errs, json.dumps(errs))
         await b.close()
         print("SUMMARY %d/%d %s" % (sum(R), len(R), "PASS" if all(R) else "FAIL"))

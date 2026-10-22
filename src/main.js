@@ -2042,8 +2042,8 @@ function drawBigMap() {
       ["#d63b2f", "H", "Haulage truck"],
       ["#1b1022", "\u2620", "Black Market"],
       ["#ffffff", "~L", "Training ground"],
-      ["#1e6cff", "H", "Hide spot"],
     ];
+    if (typeof WANT !== "undefined" && WANT.lvl >= 1) items.push(["#1e6cff", "H", "Hide spot"]); // only while wanted
     const lx0 = 28,
       w = bigmap.leg ? 232 : 92,
       h = bigmap.leg ? 24 + Math.ceil(items.length / 2) * 17 + 4 : 24,
