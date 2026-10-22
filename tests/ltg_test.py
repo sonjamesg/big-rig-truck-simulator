@@ -69,6 +69,7 @@ async def main():
         await pg.goto("file://" + os.path.abspath(HTML))
         await pg.wait_for_function("window.__bigrig&&__bigrig.world.ready", timeout=300000)
         await pg.keyboard.press("Enter"); await pg.wait_for_timeout(1500)
+        await pg.evaluate("BigRig.fog&&BigRig.fog.revealAll()")  # v66 map fog hides undiscovered POIs: test in revealed mode
         r = await pg.evaluate(JS)
         # reload: knocked-over cones are runtime only, every cone is back upright at home
         await pg.evaluate("()=>{ltgCones();for(const c of LTG.cones.slice(0,30)){c.dn=1;c.x+=5;}}")
