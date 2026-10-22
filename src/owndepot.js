@@ -814,6 +814,10 @@ addEventListener(
   true,
 );
 // ---- in-game yard art
+function ydFit(t, x, y, px, col, maxW, font, id) {
+  ctx.fillStyle = col;
+  return signFit(ctx, t, x, y, maxW, px, font || "900 ", "Arial Black,Arial", { id: id || "yard" });
+}
 function ydText(t, x, y, px, col, font) {
   ctx.font = (font || "900 ") + px + "px Arial Black,Arial";
   ctx.fillStyle = col;
@@ -882,7 +886,7 @@ function drawOwnDepots(vx0, vy0, vx1, vy1) {
       ctx.save();
       ctx.translate(sx, sy);
       ctx.rotate(-Math.PI / 2);
-      ydText(lbl, 0, 0, Math.round(0.36 * Tt), col);
+      ydFit(lbl, 0, 0, Math.round(0.36 * Tt), col, s.L * S - 0.3 * Tt, "900 ", "yard-pad");
       ctx.restore();
     };
     if (own) {
@@ -894,7 +898,7 @@ function drawOwnDepots(vx0, vy0, vx1, vy1) {
         here = ownIn(s);
       pad(s, "STOP TO BUY", here ? "#2ecc71" : "#ffd866");
       ctx.globalAlpha = 0.5;
-      ydText("FOR SALE", X0 + W / 2 + 1.5 * Tt, Y0 + H * 0.6, Math.round(1.25 * Tt), "#f39c12");
+      ydFit("FOR SALE", X0 + W / 2 + 1.5 * Tt, Y0 + H * 0.6, Math.round(1.25 * Tt), "#f39c12", W - 3.5 * Tt, "900 ", "yard-forsale");
       ctx.globalAlpha = 1;
     }
     // office (solid): shadow, walls, livery band, windows (lit at night), roof logo
@@ -920,7 +924,7 @@ function drawOwnDepots(vx0, vy0, vx1, vy1) {
       ctx.beginPath();
       ctx.arc(ox + ow / 2, oy + oh / 2 - 0.25 * Tt, 0.9 * Tt, 0, 7);
       ctx.fill();
-      ydText("SALE", ox + ow / 2, oy + oh / 2 - 0.25 * Tt, Math.round(0.42 * Tt), "#fff");
+      ydFit("SALE", ox + ow / 2, oy + oh / 2 - 0.25 * Tt, Math.round(0.42 * Tt), "#fff", 1.5 * Tt, "900 ", "yard-sale");
     }
     // garage (solid): roof ribs + roller door, open when it's yours
     const ga = yd.garage,
@@ -939,7 +943,7 @@ function drawOwnDepots(vx0, vy0, vx1, vy1) {
     if (own) {
       ctx.fillStyle = B.col;
       ctx.fillRect(gx, gy, gw, 0.4 * Tt);
-      ydText("GARAGE", gx + gw / 2, gy + gh / 2, Math.round(0.45 * Tt), "#fff");
+      ydFit("GARAGE", gx + gw / 2, gy + gh / 2, Math.round(0.45 * Tt), "#fff", gw - 0.5 * Tt, "900 ", "yard-garage");
       if (dark > 0.05) dnLight(gx + gw / 2, gy + gh + 0.4 * Tt, 90, "rgba(255,230,180,0.9)", 0.7);
     }
     // fence (gate gap at the top middle) + posts
@@ -967,26 +971,28 @@ function drawOwnDepots(vx0, vy0, vx1, vy1) {
     {
       const sx = X(5.6),
         sy = Y(-0.9);
+      // v71: board widens (up to +2 tiles) to fit the name, then text shrinks / wraps to fit the padding
+      const nm = B.name.toUpperCase(),
+        subT = own ? ownCompany().toUpperCase() : "FOR SALE \u2022 " + money(OWN_TIERS[yd.tier || 1].price),
+        tx = sx - 1.45 * Tt,
+        need = Math.max(
+          signNeed(ctx, nm, Math.round(0.3 * Tt), "900 ", "Arial Black,Arial"),
+          signNeed(ctx, subT, Math.round(0.2 * Tt), "bold ", "Arial Black,Arial"),
+        ),
+        bR = Math.min(sx + 4 * Tt, Math.max(sx + 2 * Tt, tx + need + 0.18 * Tt)),
+        bw = bR - (sx - 2.6 * Tt),
+        inner = bR - 0.15 * Tt - tx;
       ctx.fillStyle = "#444";
       ctx.fillRect(sx - 0.1 * Tt, sy, 0.2 * Tt, 0.8 * Tt);
       ctx.fillStyle = own || 1 ? B.col : "#7f8c8d";
-      ctx.fillRect(sx - 2.6 * Tt, sy - 0.55 * Tt, 4.6 * Tt, 1.1 * Tt);
+      ctx.fillRect(sx - 2.6 * Tt, sy - 0.55 * Tt, bw, 1.1 * Tt);
       ctx.strokeStyle = B.acc;
       ctx.lineWidth = 2;
-      ctx.strokeRect(sx - 2.6 * Tt, sy - 0.55 * Tt, 4.6 * Tt, 1.1 * Tt);
+      ctx.strokeRect(sx - 2.6 * Tt, sy - 0.55 * Tt, bw, 1.1 * Tt);
       ydLogo(ctx, sx - 2 * Tt, sy, 0.45 * Tt, B);
       ctx.textAlign = "left";
-      ydText(B.name.toUpperCase(), sx - 1.45 * Tt, sy - 0.08 * Tt, Math.round(0.3 * Tt), "#fff");
-      ydText(
-        own
-          ? ownCompany().toUpperCase()
-          : "FOR SALE \u2022 " + money(OWN_TIERS[yd.tier || 1].price),
-        sx - 1.45 * Tt,
-        sy + 0.27 * Tt,
-        Math.round(0.2 * Tt),
-        B.acc,
-        "bold ",
-      );
+      ydFit(nm, tx, sy - 0.08 * Tt, Math.round(0.3 * Tt), "#fff", inner, "900 ", "yardboard-name");
+      ydFit(subT, tx, sy + 0.27 * Tt, Math.round(0.2 * Tt), B.acc, inner, "bold ", "yardboard-sub");
       ctx.textAlign = "center";
       if (dark > 0.05) dnLight(sx, sy, 80, "rgba(255,255,255,0.9)", 0.6);
     }
@@ -1054,7 +1060,7 @@ function ownBld(R, yd, X, Y, Tt, dark, body, rib, label, col, doors) {
   for (let k = 8; k < w; k += 16) ctx.fillRect(x + k, y, 5, h);
   ctx.fillStyle = col;
   ctx.fillRect(x, y, w, 0.45 * Tt);
-  ydText(label, x + w / 2, y + h * 0.42, Math.round(0.42 * Tt), "#fff");
+  ydFit(label, x + w / 2, y + h * 0.42, Math.round(0.42 * Tt), "#fff", w - 0.5 * Tt, "900 ", "yard-bld");
   for (let k = 0; k < doors; k++) {
     const dx = x + ((k + 0.5) * w) / doors;
     ctx.fillStyle = dark > 0.05 ? "#ffd27a" : "#2a2e33";
@@ -1075,12 +1081,15 @@ function ownDrawBack(yd, X, Y, Tt, dark, own, B, tr) {
     ctx.strokeRect(X(R.x0 - yd.x0) + 3, Y(R.y0 - yd.y0) + 3, R.w * Tt - 6, R.h * Tt - 6);
     ctx.setLineDash([]);
     if (own)
-      ydText(
+      ydFit(
         "UPGRADE PLOT",
         X(R.x0 - yd.x0) + (R.w * Tt) / 2,
         Y(R.y0 - yd.y0) + (R.h * Tt) / 2,
         Math.round(0.3 * Tt),
         "rgba(255,255,255,0.4)",
+        R.w * Tt - 0.5 * Tt,
+        "900 ",
+        "yard-plot",
       );
   };
   if (tr >= 2 && own)

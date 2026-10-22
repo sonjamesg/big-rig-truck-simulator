@@ -294,13 +294,13 @@ OBJX.hgvbay = (g, o) => {
   g.fillRect(o.x, o.y, o.w, 4);
   g.fillRect(o.x, o.y + o.h - 4, o.w, 4);
   g.save();
-  g.translate(o.x + o.w / 2, o.y + o.h * 0.72);
+  g.translate(o.x + o.w / 2, o.y + o.h * 0.5 + 2); // v71: centred between the lane arrows
   g.rotate(Math.PI / 2);
   g.fillStyle = "rgba(245,245,235,0.9)";
   g.font = "bold 22px Arial";
   g.textAlign = "center";
   g.textBaseline = "middle";
-  g.fillText("HGV DIESEL " + o.n, 0, 0);
+  fitText(g, "HGV DIESEL " + o.n, 0, 0, o.h > 260 ? o.h - 150 : o.h - 16, "hgv-lane", { wrap: false });
   g.restore();
   g.fillStyle = "rgba(245,245,235,0.85)";
   for (const yy of [o.y + 50, o.y + o.h - 60]) {
@@ -369,7 +369,7 @@ OBJX.pboard = (g, o) => {
   g.font = "bold 9px Arial";
   g.textAlign = "center";
   g.textBaseline = "middle";
-  g.fillText(o.brand, x + 26, y + 10);
+  fitText(g, o.brand, x + 26, y + 10, 42, "fuel-price-board", { wrap: false, min: 6 });
   const rows = [
     ["DIESEL", o.price],
     ["HGV", o.price - 0.04],
@@ -438,13 +438,14 @@ OBJX.mall = (g, o) => {
   g.fillStyle = o.col;
   g.fillRect(o.x, o.y + o.h - 16, o.w, 16);
   g.fillStyle = o.col;
-  pill(g, o.x + o.w * 0.06, o.y + o.h * 0.1, Math.min(o.w * 0.5, o.brand.length * 22 + 40), 44, 8);
+  const pw = Math.min(o.w * 0.88, signNeed(g, o.brand, 28, "900 ", "Arial Black,Arial") + 40);
+  pill(g, o.x + o.w * 0.06, o.y + o.h * 0.1, pw, 44, 8);
   g.fill();
   g.fillStyle = "#fff";
   g.font = "900 28px Arial Black,Arial";
   g.textAlign = "left";
   g.textBaseline = "middle";
-  g.fillText(o.brand, o.x + o.w * 0.06 + 20, o.y + o.h * 0.1 + 23);
+  fitText(g, o.brand, o.x + o.w * 0.06 + 20, o.y + o.h * 0.1 + 23, pw - 40, "mall-brand", { wrap: false });
 };
 OBJX.mallyard = (g, o) => {
   const m = o.mall;
@@ -475,11 +476,7 @@ OBJX.mallyard = (g, o) => {
   g.fillStyle = "rgba(245,245,235,0.8)";
   g.font = "bold 16px sans-serif";
   g.textAlign = "left";
-  g.fillText(
-    "LOADING DOCK \u2022 REVERSE IN \u2022 BAY NUMBERS",
-    o.x + 8,
-    o.y + o.h - m.bays[0].L * PPM - 14,
-  );
+  fitText(g, "LOADING DOCK \u2022 REVERSE IN \u2022 BAY NUMBERS", o.x + 8, o.y + o.h - m.bays[0].L * PPM - 14, o.w - 16, "mall-dock");
 };
 OBJX.dpad = (g, o) => {
   g.fillStyle = "rgba(142,68,173,0.13)";
@@ -494,7 +491,7 @@ OBJX.dpad = (g, o) => {
   g.font = "bold 22px sans-serif";
   g.textAlign = "center";
   g.textBaseline = "middle";
-  g.fillText("SHOWROOM \u2022 STOP HERE", o.x + o.w / 2, o.y + o.h / 2);
+  fitText(g, "SHOWROOM \u2022 STOP HERE", o.x + o.w / 2, o.y + o.h / 2, o.w - 20, "dealer-pad");
 };
 OBJX.dealer = (g, o) => {
   drawShadowRect(g, o.x, o.y, o.w, o.h, o.height * 0.55);
@@ -516,10 +513,10 @@ OBJX.dealer = (g, o) => {
   g.font = "900 22px Arial Black,Arial";
   g.textAlign = "center";
   g.textBaseline = "middle";
-  g.fillText("BIG RIG TRUCKS", o.x + o.w / 2, o.y + 20);
+  fitText(g, "BIG RIG TRUCKS", o.x + o.w / 2, o.y + 20, o.w - 16, "dealer-roof", { wrap: false });
   g.fillStyle = "#fff";
   g.font = "bold 14px Arial";
-  g.fillText(o.name.toUpperCase(), o.x + o.w / 2, o.y + o.h - 16);
+  fitText(g, o.name.toUpperCase(), o.x + o.w / 2, o.y + o.h - 16, o.w - 16, "dealer-name");
 };
 OBJX.showtruck = (g, o) => {
   const m = TRUCK_MODELS[o.model];

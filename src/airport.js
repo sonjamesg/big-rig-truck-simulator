@@ -1621,26 +1621,18 @@ function apTerminal(A, vx0, vy0, vx1, vy1, night) {
     g.fillStyle = "#fff";
     g.font = "bold " + 1.1 * T_ + "px sans-serif";
     g.textAlign = "center";
-    g.fillText("\u2708 DEPARTURES", px + pw * 0.5, py + 1.5 * T_);
+    fitText(g, "\u2708 DEPARTURES", px + pw * 0.5, py + 1.5 * T_, pw * 0.4 - 0.3 * T_, "apt-departures", { wrap: false });
     g.textAlign = "left";
   }
   // roof lettering: airside hall + landside hall
   g.textAlign = "center";
   g.fillStyle = "rgba(20,50,100,0.85)";
   g.font = "bold " + 3.6 * T_ + "px sans-serif";
-  g.fillText("ALBION AIRPORT", x0 + W * 0.36, y0 + (rs0 - y0) * 0.55);
+  fitText(g, "ALBION AIRPORT", x0 + W * 0.36, y0 + (rs0 - y0) * 0.55, W * 0.6, "apt-roof");
   g.font = "bold " + 1.4 * T_ + "px sans-serif";
-  g.fillText(
-    "\u2708 Gates 1\u20133  \u2022  Airside",
-    x0 + W * 0.36,
-    y0 + (rs0 - y0) * 0.55 + 2.2 * T_,
-  );
+  fitText(g, "\u2708 Gates 1\u20133  \u2022  Airside", x0 + W * 0.36, y0 + (rs0 - y0) * 0.55 + 2.2 * T_, W * 0.6, "apt-roof2", { wrap: false });
   g.font = "bold " + 1.6 * T_ + "px sans-serif";
-  g.fillText(
-    "Check-in  \u2022  Arrivals  \u2022  \u{1F686} Airport Station",
-    x0 + W * 0.4,
-    rs1 + (y1 - rs1) * 0.5,
-  );
+  fitText(g, "Check-in  \u2022  Arrivals  \u2022  \u{1F686} Airport Station", x0 + W * 0.4, rs1 + (y1 - rs1) * 0.5, W * 0.72, "apt-roof3", { wrap: false });
   g.textAlign = "left";
   if (night > 0.2 && typeof dnLight === "function") {
     for (let x = x0 + 6 * T_; x < x1; x += 12 * T_) {
@@ -1689,7 +1681,7 @@ function apStationHigh(A, night) {
       g.fillStyle = "#1f4e9c";
       g.fillRect(X - 3.2 * T_, y, 6.4 * T_, T_);
       g.fillStyle = "#fff";
-      g.fillText("ALBION AIRPORT \u2708", X, y + 0.78 * T_);
+      fitText(g, "ALBION AIRPORT \u2708", X, y + 0.78 * T_, 6.4 * T_ - 0.4 * T_, "apt-banner", { wrap: false });
     }
   g.textAlign = "left";
 }
