@@ -6,11 +6,11 @@
   [false,"Millford","town",10040,9684,false,160,23,1],
   [false,"Albion Central","city",11158,11158,true,200,30,1],
   [true,"Albion Airport","city",12904,12904,false,200,30,1],
-  [false,"Dustwater","desert",15872,15948,false,120,25,1],
+  [false,"Dustwater","desert",15872,15949,false,120,28,1],
   [false,"Sound Coast","coast",16208,15402,false,120,20,1],
   [false,"Sandvale Parkway","city",18604,18457,false,200,30,1],
   [false,"Coppermine","rural",19269,19269,true,120,26,1],
-  [false,"Fenwick Forest","forest",20981,20981,false,120,23,1],
-  [false,"Kingsbridge North","city",22114,22122,false,200,30,1],
-  [false,"Redhill Central","hub",23906,23906,false,300,40,1]
+  [false,"Fenwick Forest","forest",20980,20980,false,120,25,1],
+  [false,"Kingsbridge North","city",22113,22121,false,200,30,1],
+  [false,"Redhill Central","hub",23905,23905,false,300,40,1]
  ]}

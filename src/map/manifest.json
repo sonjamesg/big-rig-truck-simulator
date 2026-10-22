@@ -455,6 +455,11 @@
   },
   {
    "root": "RAIL",
+   "key": "eased",
+   "file": "state/RAIL.eased.json"
+  },
+  {
+   "root": "RAIL",
    "key": "moved",
    "file": "state/RAIL.moved.json"
   },
