@@ -1,6 +1,6 @@
 /**
  * @file crash.js — v66 CRASH: mass/momentum vehicle collisions, progressive damage, wrecks, tanker explosions, clearance crews,
- *   jackknife / rollover, spilled cargo, pile-up slow motion, police response.
+ *   jackknife (no rollover since v67), spilled cargo, pile-up slow motion, police response.
  * Exposes (globals): CRASH, crMass, crPlayerHit, crashStepVeh, crImpulse, updateCrash, drawCrashLow, drawCrashHigh, crDrawBody,
  *   crRig, crTimeScale, crCargoPenalty
  * Depends on: traffic.js (traffic, boxesOf, obbMTV, pathAt, VTYPES), physics.js (fwd, rgt, kingpin, solidAtM), fx.js (fxEmit, FX),
@@ -379,45 +379,13 @@ function crBoom(x, y, src) {
   if (typeof BigRig !== "undefined" && BigRig.emit) BigRig.emit("tankerExplode", { x, y });
   if (typeof toast === "function" && d < 200) toast("\u{1F525} Tanker explosion!");
 }
-// ---------------- player rig: jackknife + rollover (called from stepTruck after the kinematics, 120 Hz) ----------------
+// ---------------- player rig: jackknife (called from stepTruck after the kinematics, 120 Hz) ----------------
 function crRig(s, prev, dt) {
-  if (!s.trl || s.rolled) {
-    if (s.rolled) {
-      s.throttle = 0;
-      const dec = 6 * dt;
-      s.v = Math.sign(s.v) * Math.max(0, Math.abs(s.v) - dec);
-    }
-    return;
-  }
+  if (s.rolled) s.rolled = null; // no rollover any more (old state cleared)
+  if (!s.trl) return;
   const w = s.trl.weight || 0,
-    av = Math.abs(s.v),
-    yaw = Math.atan2(Math.sin(s.h - prev.h), Math.cos(s.h - prev.h)) / dt,
-    alat = Math.abs(yaw * s.v);
-  // rollover: sustained lateral acceleration beyond what a loaded trailer's high centre of gravity takes
-  const lim = 5.6 - Math.min(1.4, Math.max(0, w - 15000) / 15000);
-  if (av > 12 && w > 15000 && alat > lim) s.rollT = (s.rollT || 0) + dt;
-  else s.rollT = Math.max(0, (s.rollT || 0) - dt * 2);
-  if (s.rollT > 0.3) {
-    s.rolled = { t: timeS, side: Math.sign(yaw * s.v) || 1 };
-    s.rollT = 0;
-    CRASH.stats.roll++;
-    s.damage = Math.min(100, (s.damage || 0) + 30);
-    s.bump = 1;
-    s.hitV = 1e-6;
-    cam.shake = 18;
-    crSound(6e5, true);
-    crSpill(s, 36);
-    const a = typeof career !== "undefined" && career.active;
-    if (a) a.cdmg = Math.min(100, (a.cdmg || 0) + 50);
-    if (typeof toast === "function") toast("\u26A0\uFE0F Rolled the trailer! Recovery is on the way");
-    setTimeout(() => {
-      if (!s.rolled) return;
-      s.rolled = null;
-      const o = typeof BREAKDOWN !== "undefined" && BREAKDOWN.options.find((o) => o.id === "respawn");
-      if (o) o.run();
-    }, 6000);
-    return;
-  }
+    av = Math.abs(s.v);
+  // v67: trailer rollover removed (James) - jackknife only
   // jackknife: locking the drive wheels hard at speed with a heavy trailer (or a swerve under braking) lets the trailer swing round
   if (av > 15 && w > 12000 && (s.brake > 0.85 || s.skid) && (Math.abs(s.steer) > 0.05 || s.skid)) {
     s.jkT = (s.jkT || 0) + dt;
