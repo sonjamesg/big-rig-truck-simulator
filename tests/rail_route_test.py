@@ -38,7 +38,7 @@ AUDIT=r"""(()=>{ const R=__bigrig.RAIL, W=__bigrig.world, L=R.L, fail=[], H=R.ha
   // bridges, stations, hub, timetable
   if(!R.route||!R.route.cells) fail.push('router fell back to legacy spline: '+R.routeFail);
   if((R.bridges||[]).length<3) fail.push('too few suspension bridges: '+(R.bridges||[]).length);
-  if(R.stations.length!==13||!R.hub) fail.push('stations/hub missing');
+  if(R.stations.length!==RAIL_ST.length+1||!R.hub) fail.push('stations/hub missing');
   const st5=railSelfTest(5,1); if(!st5.ok) fail.push('timetable clash '+JSON.stringify(st5));
   return {L,samples,bad,where,cross:R.cross.length,over:R.cross.filter(c=>c.over).length,crossDeg:ang,bridges:(R.bridges||[]).length,stations:R.stations.map(s=>s.name),minR:Math.round(minR),minRat:at,rP5:pct(0.05),rP50:pct(0.5),trees,route:{ms:R.route&&R.route.ms},self5:st5,fail}; })()""".replace('R_MIN','40')
 async def main():
