@@ -1455,17 +1455,25 @@ function railAirportForce(raw) {
     B = raw[ib],
     pts = [],
     y = F.y * M_T,
-    R = 26 * M_T;
-  // west: straight down x157 to the bend, quarter circle (R 104 m) onto y673
+    yg = 663 * M_T, // the grass strip between the airside apron and the tank farm / hangars (y660-665)
+    R = 10.2 * M_T; // 41 m: tight enough to stay off the apron corner at x160
+  // west: straight down x157, a quarter bend onto the y663 grass strip (clear of the tank farm and hangars), a long easy
+  // S-bend down to y673 in the open ground before the terminal (x305-345), then straight through the middle of the terminal
   const ax = A[0];
-  for (let yy = A[1]; yy < y - R; yy += 4) pts.push([ax, yy]);
-  for (let k = 0; k <= 24; k++) {
-    const t = (k / 24) * (Math.PI / 2);
-    pts.push([ax + R * (1 - Math.cos(t)), y - R + R * Math.sin(t)]);
+  for (let yy = A[1]; yy < yg - R; yy += 4) pts.push([ax, yy]);
+  for (let k = 0; k <= 16; k++) {
+    const t = (k / 16) * (Math.PI / 2);
+    pts.push([ax + R * (1 - Math.cos(t)), yg - R + R * Math.sin(t)]);
   }
-  // straight through the terminal, then a gentle S-free ease down onto the east anchor
+  const s0 = 303 * M_T,
+    s1 = 345 * M_T;
+  for (let xx = ax + R + 4; xx < s0; xx += 4) pts.push([xx, yg]);
+  for (let xx = s0; xx < s1; xx += 4) {
+    const u = (xx - s0) / (s1 - s0);
+    pts.push([xx, yg + (y - yg) * (u * u * (3 - 2 * u))]);
+  }
   const xe = B[0] - 60 * M_T;
-  for (let xx = ax + R + 4; xx < xe; xx += 4) pts.push([xx, y]);
+  for (let xx = s1; xx < xe; xx += 4) pts.push([xx, y]);
   const nB = raw[(ib + (fwd ? 1 : -1) + n) % n],
     tx = nB[0] - B[0],
     ty = nB[1] - B[1],

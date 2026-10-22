@@ -484,6 +484,15 @@ const GEN_R_PIN = {
   "Building the docks": 56328,
   "Building airports": 57298,
   "Planting farmland": 57359,
+  // v64: each farmland block also starts at its live draw count, so the Albion landside rebuild (first block) cannot
+  // reshuffle the fields further south (one had moved under the pinned main line near Millford)
+  "farm:1": 65712,
+  "farm:2": 77532,
+  "farm:3": 85285,
+  "farm:4": 99193,
+  "farm:5": 117319,
+  "farm:6": 136062,
+  "farm:7": 137896,
   "Growing forests": 143709,
   "Launching boats": 305222,
   "Carving kerbs": 305273,
@@ -3601,10 +3610,30 @@ function* genWorldSteps() {
     });
   }
   (world.tm = world.tm || []).push(["// ---- farmland", (performance.now() - t0) | 0]);
+  // v64: the main line's quarter bend onto the y663 grass strip passes the apron's south-west corner: round it off
+  for (let y = 655; y < 660; y++)
+    for (let x = 160; x < 164; x++) if (get(x, y) === T.CONC && Math.hypot(x - 164, y - 655) > 3) set(x, y, T.GRASS);
   pinR("Planting farmland");
   yield "Planting farmland";
   // ---- farmland with hedgerows, pasture with livestock
   const crops = ["wheat", "green", "plough", "rape", "pasture", "wheat", "pasture", "green"];
+  // v64: the main line is pinned (railbake pin), so it no longer routes round farmyards: a farmyard that would sit on the
+  // pinned alignment is planted as a field instead (fields, hedges and bales are cleared from the rail corridor as before)
+  const farmRail = new Set();
+  try {
+    const B = window.RAIL_BAKE;
+    if (B && B.pin && !window.__NOPIN)
+      for (const [x, y] of railUnpack(B.raw)) {
+        const tx = Math.floor(x / M_TILE),
+          ty = Math.floor(y / M_TILE);
+        for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) farmRail.add((ty + dy) * MW + tx + dx);
+      }
+  } catch (e) {}
+  const farmOnRail = (fx, fy, fw, fh) => {
+    if (!farmRail.size) return false;
+    for (let y = fy; y < fy + fh; y++) for (let x = fx; x < fx + fw; x++) if (farmRail.has(y * MW + x)) return true;
+    return false;
+  };
   function farmland(x0, y0, x1, y1) {
     for (let fy = y0; fy < y1; fy += 18 + ((R() * 8) | 0)) {
       for (let fx = x0; fx < x1; fx += 20 + ((R() * 10) | 0)) {
@@ -3622,7 +3651,7 @@ function* genWorldSteps() {
             }
           }
         if (!ok) continue;
-        if (R() < 0.12) {
+        if (R() < 0.12 && !farmOnRail(fx, fy, fw, fh)) {
           fill(fx, fy, fw, fh, T.GRAVEL);
           building(fx + 1, fy + 1, 6, 4, "barn", 16);
           const hb = building(fx + 8, fy + 1, 4, 4, "house", 13);
@@ -3698,12 +3727,19 @@ function* genWorldSteps() {
   }
   world.crops = [];
   farmland(110, 680, 600, 960);
+  pinR("farm:1");
   farmland(110, 1000, 560, 1250);
+  pinR("farm:2");
   farmland(450, 1300, 640, 1900);
+  pinR("farm:3");
   farmland(700, 1100, 1350, 1370);
+  pinR("farm:4");
   farmland(1250, 950, 1950, 1420);
+  pinR("farm:5");
   farmland(700, 1400, 1350, 1780);
+  pinR("farm:6");
   farmland(780, 560, 1000, 850);
+  pinR("farm:7");
   farmland(110, 1780, 880, 1930);
   for (let k = 0; k < 90; k++) {
     const tx = 40 + ((R() * 1960) | 0),
