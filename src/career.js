@@ -1468,13 +1468,10 @@ function updateCareer(dt) {
     const p = d.pad;
     if (cx > p.x0 && cx < p.x1 && cy > p.y0 && cy < p.y1) inPad = d;
   }
-  const padFresh = trigFresh("dealer", inPad ? inPad.id || inPad.name : null); // v50: only after driving in
-  if (inPad && padFresh && Math.abs(s.v) < 0.2 && !career.padLatch && !career.uiOpen) {
-    career.padLatch = true;
-    trigUsed("dealer");
-    openDealer(inPad);
-  }
-  if (!inPad) career.padLatch = false;
+  // v70 (James 22 Oct): the truck shop never auto-opens; on the pad a TRUCK SHOP button shows (like the estate agent) and
+  // opens it under 3 mph (dlEnter: tap / click, E / Enter, A on a pad)
+  career.atDealer = inPad;
+  if (typeof dlButton === "function") dlButton(inPad);
   // depot: stopping inside a yard with no job opens the board once
   let inDepot = null;
   for (const d of world.depots) {

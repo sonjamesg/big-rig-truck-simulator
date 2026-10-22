@@ -1613,33 +1613,56 @@ function czTick() {
     if (e) e.remove();
     return;
   }
-  const here = Math.abs(truck.v) < 0.4 && !career.uiOpen ? czBayHere() : null;
+  // v70 (James 22 Oct): like the estate agent - in the bay the CUSTOMISE button shows (greyed "stop first" while moving);
+  // it opens only under 3 mph (czEnter), never by itself
+  const here = !career.uiOpen ? czBayHere() : null;
   CZ.bay = here || (career.uiOpen === "tune" ? CZ.bay : null);
   let el = document.getElementById("czGo");
   if (here && !el) {
     el = document.createElement("button");
     el.id = "czGo";
-    el.innerHTML = "\u{1F527} CUSTOMISE <small>Enter / \u24b6</small>";
     el.addEventListener("click", (e) => {
       e.stopPropagation();
-      czOpen();
+      czEnter();
     });
     (document.getElementById("frame") || document.body).appendChild(el);
     const st = document.createElement("style");
+    st.id = "czGoCss";
+    if (!document.getElementById("czGoCss")) {
     st.textContent =
-      "#czGo{position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:30;padding:14px 22px;min-height:56px;border-radius:16px;border:0;font:900 18px system-ui;color:#111;background:linear-gradient(180deg,#ffd45e,#f5a91e);box-shadow:0 6px 18px rgba(0,0,0,.45);cursor:pointer;pointer-events:auto}#czGo small{display:block;font-size:10px;opacity:.7}";
-    el.appendChild(st);
+      "#czGo{position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:30;padding:14px 22px;min-height:56px;border-radius:16px;border:0;font:900 18px system-ui;color:#111;background:linear-gradient(180deg,#ffd45e,#f5a91e);box-shadow:0 6px 18px rgba(0,0,0,.45);cursor:pointer;pointer-events:auto}#czGo small{display:block;font-size:10px;opacity:.7}#czGo.mv{filter:saturate(.55) brightness(.85)}";
+    document.head.appendChild(st);
+    }
+  }
+  if (here && el) {
+    const slow = Math.abs(truck.v) < EA_STOP,
+      pa = typeof pad !== "undefined" && pad.active,
+      key = (pa ? "\u24b6" : document.body.classList.contains("touch") ? "Tap" : "E / Enter") + (slow ? "" : " \u2022 stop first"),
+      html = "\u{1F527} CUSTOMISE <small>" + key + "</small>";
+    if (el.innerHTML !== html) el.innerHTML = html;
+    el.classList.toggle("mv", !slow);
   }
   if (!here && el) el.remove();
+}
+function czEnter() {
+  if (career.uiOpen || !CZ.bay) return false;
+  if (Math.abs(truck.v) >= EA_STOP) {
+    flash("Stop to enter the tune shop");
+    return true;
+  }
+  czOpen();
+  return true;
 }
 addEventListener(
   "keydown",
   (e) => {
-    if (career.uiOpen || !(e.code === "Enter" || e.code === "NumpadEnter")) return;
+    if (career.uiOpen || !(e.code === "Enter" || e.code === "NumpadEnter" || e.code === "KeyE")) return;
     if (document.getElementById("czGo")) {
+      const t = e.target;
+      if (t && t.closest && t.closest("input,textarea,select")) return;
       e.preventDefault();
       e.stopImmediatePropagation();
-      czOpen();
+      czEnter();
     }
   },
   true,

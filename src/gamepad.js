@@ -236,7 +236,8 @@ function padUpdate(dt) {
     const cc = !truck.trl && typeof coupleCandidate === "function" ? coupleCandidate() : null; // v31: a lined-up trailer always wins; repair/tune prompts never uncouple
     if (cc && cc.ok) toggleCouple();
     else if (document.getElementById("rpGo") && typeof rpDo === "function") rpDo();
-    else if (document.getElementById("czGo") && typeof czOpen === "function") czOpen();
+    else if (document.getElementById("czGo") && typeof czEnter === "function") czEnter();
+    else if (document.getElementById("dlGo") && typeof dlEnter === "function") dlEnter();
     else if (document.getElementById("eaGo") && typeof eaEnter === "function") eaEnter();
     else toggleCouple();
   }

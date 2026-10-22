@@ -1665,6 +1665,63 @@ function eaButton(a) {
   if (el.innerHTML !== html) el.innerHTML = html;
   el.classList.toggle("mv", !slow);
 }
+// v70: truck shop (dealer pad) uses the same Enter button: shows on the pad, opens under 3 mph
+function dlEnter() {
+  const d = career.atDealer;
+  if (!d || career.uiOpen) return false;
+  if (Math.abs(truck.v) >= EA_STOP) {
+    flash("Stop to enter " + (d.name || "the truck shop"));
+    return true;
+  }
+  openDealer(d);
+  return true;
+}
+function dlButton(d) {
+  let el = document.getElementById("dlGo");
+  const show = d && started && !career.uiOpen && !(typeof bigmap !== "undefined" && bigmap.open);
+  if (!show) {
+    if (el) el.remove();
+    return;
+  }
+  const pa = typeof pad !== "undefined" && pad.active,
+    slow = Math.abs(truck.v) < EA_STOP,
+    key =
+      (pa ? "\u24b6" : document.body.classList.contains("touch") ? "Tap" : "E / Enter") +
+      (slow ? "" : " \u2022 stop first");
+  if (!el) {
+    el = document.createElement("button");
+    el.id = "dlGo";
+    el.className = "eaLike";
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      dlEnter();
+    });
+    (document.getElementById("frame") || document.body).appendChild(el);
+    if (!document.getElementById("dlGoCss")) {
+      const st = document.createElement("style");
+      st.id = "dlGoCss";
+      st.textContent =
+        "#dlGo{position:absolute;left:50%;bottom:22%;transform:translateX(-50%);z-index:30;padding:14px 24px;min-height:58px;min-width:200px;border-radius:16px;border:0;font:900 18px system-ui;letter-spacing:1px;color:#111;background:linear-gradient(180deg,#ffd45e,#f5a91e);box-shadow:0 6px 18px rgba(0,0,0,.45);cursor:pointer;pointer-events:auto;touch-action:manipulation}#dlGo small{display:block;font-size:10px;opacity:.7;letter-spacing:.5px}#dlGo.mv{filter:saturate(.55) brightness(.85)}";
+      document.head.appendChild(st);
+    }
+  }
+  const html = "\u{1F69A} ENTER TRUCK SHOP <small>" + key + "</small>";
+  if (el.innerHTML !== html) el.innerHTML = html;
+  el.classList.toggle("mv", !slow);
+}
+addEventListener(
+  "keydown",
+  (e) => {
+    if (career.uiOpen || !(e.code === "Enter" || e.code === "NumpadEnter" || e.code === "KeyE")) return;
+    if (!document.getElementById("dlGo")) return;
+    const t = e.target;
+    if (t && t.closest && t.closest("input,textarea,select")) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    dlEnter();
+  },
+  true,
+);
 addEventListener(
   "keydown",
   (e) => {
