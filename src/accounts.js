@@ -80,12 +80,12 @@ async function accPull() {
     if (j.save && j.save.k && j.save.d) {
       let loc = null;
       try {
-        loc = JSON.parse(localStorage.getItem(j.save.k) || "null");
+        loc = JSON.parse(localStorage.getItem(saveKey()) || "null");
       } catch (e) {}
       const ct = +(j.save.d.t || j.save.t || 0),
         lt = +((loc && loc.t) || 0);
       if (!loc || ct >= lt) {
-        localStorage.setItem(j.save.k, JSON.stringify(j.save.d));
+        localStorage.setItem(saveKey(), JSON.stringify(j.save.d)); // v67: into this driver's profile slot
         if (
           typeof world !== "undefined" &&
           world.ready &&
@@ -264,6 +264,7 @@ body.acctin #wbNew,body.acctin #reset{display:none!important} #wbCard{display:fl
           $("acPin2").value = "";
         } else {
           accSetSession(j);
+          if (profUse(ACC.name)) return; // v67: different driver -> their own save (reloads, then pulls the cloud save)
           await accPull();
           refresh();
           msg("");
@@ -284,6 +285,7 @@ body.acctin #wbNew,body.acctin #reset{display:none!important} #wbCard{display:fl
     $("acGuest").addEventListener("click", () => {
       ACC.mode = "guest";
       accClear();
+      if (profUse("Guest")) return; // v67: guest = its own local save, never the last driver's
       ACC.padT = 0;
       if (typeof MP !== "undefined" && MP.on && typeof mpLeave === "function") mpLeave();
       startGame();
@@ -337,6 +339,7 @@ body.acctin #wbNew,body.acctin #reset{display:none!important} #wbCard{display:fl
             if (j.ok) {
               ACC.name = j.name;
               ACC.admin = !!j.is_admin;
+              if (!started && profUse(j.name)) return;
               accPull();
             } else {
               accClear(true);

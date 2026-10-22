@@ -224,6 +224,7 @@ async function boot() {
   truck.money = 5000; // v45: new players start with £5,000 (existing saves keep their own balance via loadGame)
   truck.damage = 0;
   const hadSave = loadGame();
+  window.__hadSave = hadSave;
   if (!hadSave) applyModel("rigger");
   uiInit();
   padInstall();
@@ -277,6 +278,18 @@ async function boot() {
     if (ld) ld.textContent = "World ready";
   }
   if (hadSave) welcomeCard();
+  try {
+    // v67: after switching driver the page reloads straight into the game
+    if (sessionStorage.getItem("bigrig.autostart")) {
+      sessionStorage.removeItem("bigrig.autostart");
+      const t = setInterval(() => {
+        if (world.ready && !started) {
+          clearInterval(t);
+          startGame();
+        }
+      }, 200);
+    }
+  } catch (e) {}
   requestAnimationFrame(frame);
 }
 // ---------- input
@@ -300,7 +313,7 @@ function welcomeCard() {
   c.id = "wbCard";
   c.style.cssText =
     "margin:14px auto;padding:14px 18px;max-width:340px;border-radius:12px;background:rgba(15,21,34,.92);border:1px solid rgba(245,184,46,.5);text-align:center;font-family:inherit";
-  c.innerHTML = `<div style="font-size:20px;font-weight:900;color:#f5b82e">Welcome back, ${nm}</div><div style="font-size:12px;opacity:.8;margin:4px 0 10px">${money(truck.money)} \u2022 Level ${levelOf ? levelOf(career.xp) : ""} \u2022 ${modelById(career.cur).name}${career.active ? " \u2022 job in progress" : ""}</div><button id="wbGo" style="font:inherit;font-weight:900;padding:9px 26px;border-radius:9px;border:2px solid #fff;background:#f5b82e;color:#111;cursor:pointer">CONTINUE \u24B6</button> <button id="wbNew" style="font:inherit;padding:9px 14px;border-radius:9px;border:1px solid rgba(255,255,255,.3);background:transparent;color:#ddd;cursor:pointer">Reset progress</button>`;
+  c.innerHTML = `<div style="font-size:20px;font-weight:900;color:#f5b82e">Welcome back, ${nm}</div><div style="font-size:12px;opacity:.8;margin:4px 0 10px">${money(truck.money)} \u2022 Level ${levelOf ? levelOf(career.xp) : ""} \u2022 ${modelById(career.cur).name}${career.active ? " \u2022 job in progress" : ""}</div><button id="wbGo" style="font:inherit;font-weight:900;padding:9px 26px;border-radius:9px;border:2px solid #fff;background:#f5b82e;color:#111;cursor:pointer">CONTINUE \u24B6</button> <button id="wbSw" style="font:inherit;padding:9px 14px;border-radius:9px;border:1px solid rgba(255,255,255,.3);background:transparent;color:#ddd;cursor:pointer">Not you? Switch driver</button> <button id="wbNew" style="font:inherit;padding:9px 14px;border-radius:9px;border:1px solid rgba(255,255,255,.3);background:transparent;color:#ddd;cursor:pointer">Reset progress</button>`;
   const go = ov.querySelector(".go");
   (go || ov).after ? go.after(c) : ov.appendChild(c);
   const b = c.querySelector("#wbGo");
@@ -309,6 +322,13 @@ function welcomeCard() {
     startGame();
   });
   b.focus();
+  c.querySelector("#wbSw").addEventListener("click", (e) => {
+    e.stopPropagation();
+    const r = prompt("Driver name (a new name starts a new save; leave blank for guest)");
+    if (r === null) return;
+    const nm = r.trim();
+    profUse(nm || "guest");
+  });
   const n = c.querySelector("#wbNew");
   n.addEventListener("click", (e) => {
     e.stopPropagation();

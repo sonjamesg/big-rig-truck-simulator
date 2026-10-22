@@ -390,7 +390,62 @@ const career = {
   uiOpen: null,
 };
 const SAVE_KEY_OLD = "bigrig.save.v7";
-const saveKey = () => "bigrig.save." + (world.v2poi ? "v2" : "main");
+// v67: one save per driver profile (bigrig.profile = lower-cased name; "" = unnamed). The old single save
+// (bigrig.save.v2) is copied once to its owner's profile (its d.name) and left in place as a backup.
+const saveKeyLegacy = () => "bigrig.save." + (world.v2poi ? "v2" : "main");
+function profNorm(n) {
+  return String(n || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .slice(0, 24);
+}
+function curProfile() {
+  try {
+    const L = saveKeyLegacy();
+    if (!localStorage.getItem("bigrig.profmig." + L)) {
+      const s = localStorage.getItem(L);
+      if (s) {
+        let d = null;
+        try {
+          d = JSON.parse(s);
+        } catch (e) {}
+        const owner = profNorm(
+          (d && d.name) || localStorage.getItem("bigrig.lastacct") || localStorage.getItem("bigrig.name"),
+        );
+        const k = L + "@" + encodeURIComponent(owner);
+        if (!localStorage.getItem(k)) localStorage.setItem(k, s);
+        if (localStorage.getItem("bigrig.profile") === null) localStorage.setItem("bigrig.profile", owner);
+      }
+      localStorage.setItem("bigrig.profmig." + L, "1");
+    }
+    return localStorage.getItem("bigrig.profile") || "";
+  } catch (e) {
+    return "";
+  }
+}
+const saveKey = () => saveKeyLegacy() + "@" + encodeURIComponent(curProfile());
+// switch driver: guest / new account / another name -> that driver's own save (fresh if none). Returns true if the page reloads.
+function profUse(name) {
+  const p = profNorm(name);
+  if (p === curProfile()) {
+    if (name) localStorage.setItem("bigrig.name", String(name).trim().slice(0, 16));
+    return false;
+  }
+  try {
+    if (typeof started !== "undefined" && started && !career.noSave) saveGame();
+  } catch (e) {}
+  const freshNow = !window.__hadSave && !(typeof started !== "undefined" && started);
+  localStorage.setItem("bigrig.profile", p);
+  if (name) localStorage.setItem("bigrig.name", String(name).trim().slice(0, 16));
+  if (freshNow && !localStorage.getItem(saveKey())) return false; // nothing loaded yet and no save for them: just carry on fresh
+  career.noSave = 1; // the old driver's state must not be written into the new driver's save
+  try {
+    sessionStorage.setItem("bigrig.autostart", "1");
+  } catch (e) {}
+  location.reload();
+  return true;
+}
 const SETTINGS = { vol: 0.7 };
 // ---------- levels & tiers
 const levelNeed = (n) => Math.round(120 * Math.pow(n - 1, 1.55)); // cumulative XP to reach level n
@@ -627,7 +682,7 @@ function jobDe(o) {
 }
 function saveGame() {
   try {
-    if (!world.ready) return false;
+    if (!world.ready || career.noSave) return false;
     const tr = truck.trl,
       a = career.active;
     const d = {

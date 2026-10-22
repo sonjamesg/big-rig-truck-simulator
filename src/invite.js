@@ -214,6 +214,7 @@ html.invmode #lobby,html.invmode #acct,html.invmode #wbCard,html.invmode #overla
     try {
       localStorage.setItem("bigrig.name", name);
     } catch (e) {}
+    if (typeof profUse === "function" && profUse(name)) return; // v67: own save per driver (the ?join link survives the reload)
     const nm = document.getElementById("lbName");
     if (nm) nm.value = name;
     if (typeof Peer === "undefined") {

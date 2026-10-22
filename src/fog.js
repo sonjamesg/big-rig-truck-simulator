@@ -25,9 +25,8 @@ const FOG = {
 function fogDev() {
   try {
     if (/[?&]fog=off\b/.test(location.search)) return true;
-    const n = (localStorage.getItem("bigrig.name") || "").trim().toLowerCase();
-    if (n === "sonjames") return true;
-    const a = typeof ACC !== "undefined" && ACC && (ACC.user || ACC.name);
+    if (typeof curProfile === "function" && curProfile() === "sonjames") return true; // v67: the driver profile actually in use
+    const a = typeof ACC !== "undefined" && ACC && ACC.tok && ACC.name;
     if (a && String(a.name || a.username || a).trim().toLowerCase() === "sonjames") return true;
   } catch (e) {}
   return false;

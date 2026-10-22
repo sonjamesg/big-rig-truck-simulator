@@ -853,9 +853,15 @@ function mpInit() {
       return false;
     }
     localStorage.setItem("bigrig.name", n);
+    if (profUse(n)) {
+      mpStatus("Switching driver to " + n + "\u2026");
+      return false;
+    }
     return true;
   };
   lb.querySelector("#lbSolo").onclick = () => {
+    const sn = nameIn.value.trim();
+    if (sn && profUse(sn)) return; // v67: a different name = that driver's own save
     if (MP.on) mpLeave();
     startGame();
   };
