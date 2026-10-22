@@ -1499,54 +1499,13 @@ function railAirportForce(raw) {
   if (ib < ia) return raw.slice(0, ib + 1).concat(seq, raw.slice(ia));
   return seq.concat(raw.slice(ia, ib + 1)).concat(out);
 }
-// v65: ease any isolated corner tighter than ~40 m (left over where the pinned line meets newer road work):
-// resample at 2 m, then relax only the samples around the tight spot so the rest of the line stays put
-function railEaseTight(raw) {
-  const n0 = raw.length;
-  if (n0 < 50) return raw;
-  const cum = [0];
-  for (let i = 1; i <= n0; i++) cum.push(cum[i - 1] + Math.hypot(raw[i % n0][0] - raw[i - 1][0], raw[i % n0][1] - raw[i - 1][1]));
-  const Lt = cum[n0], n = Math.floor(Lt / 2), P = [];
-  let j = 0;
-  for (let k = 0; k < n; k++) {
-    const S = (k * Lt) / n;
-    while (cum[j + 1] < S) j++;
-    const a = raw[j], b = raw[(j + 1) % n0], f = (S - cum[j]) / (cum[j + 1] - cum[j] || 1);
-    P.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]);
-  }
-  const rad = (i) => {
-    const a = P[(i - 10 + n) % n], b = P[i], c = P[(i + 10) % n];
-    const A2 = Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]));
-    return A2 < 1e-6 ? 1e9 : (Math.hypot(b[0] - a[0], b[1] - a[1]) * Math.hypot(c[0] - b[0], c[1] - b[1]) * Math.hypot(c[0] - a[0], c[1] - a[1])) / (2 * A2);
-  };
-  let eased = 0;
-  for (let pass = 0; pass < 6; pass++) {
-    const hot = [];
-    for (let i = 0; i < n; i++) if (rad(i) < 39) hot.push(i);
-    if (!hot.length) break;
-    const W = 40, w = new Float32Array(n);
-    for (const h of hot) for (let d = -W; d <= W; d++) { const i = (h + d + n) % n; w[i] = Math.max(w[i], 0.5 * (1 + Math.cos((Math.PI * d) / W))); }
-    for (let it = 0; it < 30; it++) {
-      const Q = P.map((p) => p.slice());
-      for (let i = 0; i < n; i++) if (w[i] > 0) {
-        const a = P[(i - 1 + n) % n], c = P[(i + 1) % n], m = 0.5 * w[i];
-        Q[i][0] += m * ((a[0] + c[0]) / 2 - P[i][0]);
-        Q[i][1] += m * ((a[1] + c[1]) / 2 - P[i][1]);
-      }
-      for (let i = 0; i < n; i++) P[i] = Q[i];
-    }
-    eased += hot.length;
-  }
-  RAIL.eased = eased;
-  return P;
-}
 // ---------- geometry
 function railBuild(objs) {
   for (const _ of railBuildSteps(objs));
 }
 function* railBuildSteps(objs) {
   let raw = yield* railRouteSteps(objs);
-  if (raw && raw.length) raw = railEaseTight(railAirportForce(raw)); // v64: main line forced through the Albion terminal (y673)
+  if (raw && raw.length) raw = railAirportForce(raw); // v64: main line forced through the Albion terminal (y673)
   if (!raw) {
     raw = [];
     const W = RAIL_WP.map((p) => [p[0] * M_T, p[1] * M_T]),
