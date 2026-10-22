@@ -366,7 +366,7 @@ function czArt(m, col, fit) {
   col = L.col || col;
   const key = m.id + "|" + col + "|" + JSON.stringify(fit);
   if (czArtCache[key]) return czArtCache[key];
-  const base = modelArt(m, col),
+  const base = modelArt(m, col, rigHide(fit, L)),
     S = PPM * ART_SCALE,
     pf = Math.round(1.2 * S),
     ps = Math.round(0.5 * S),
@@ -579,6 +579,7 @@ function czDrawParts(g, L, fit, X, Y, S, front, m) {
 }
 // ---- side view for the turntable (procedural profile in the game's palette)
 function czSide(g, cx, cy, sc, m, col, fit) {
+  if (m.id === "rigger") return rigSide(g, cx, cy, sc, m, col, fit);
   const L = czLook(m.id, fit);
   col = L.col || col;
   const st = m.style || {},
