@@ -476,10 +476,10 @@ function addXP(n) {
 }
 // ---------- truck models
 const modelArtCache = {};
-function modelArt(m, col) {
-  const key = m.id + col;
+function modelArt(m, col, hide) {
+  const key = m.id + col + (m.id === "rigger" ? "|" + rigHideKey(hide) : "");
   if (modelArtCache[key]) return modelArtCache[key];
-  if (m.id === "rigger") return (modelArtCache[key] = makeCabArt(col));
+  if (m.id === "rigger") return (modelArtCache[key] = rigTopArt(col, hide));
   const st = m.style,
     nose = st.nose || 0,
     front = CAB.front - nose,

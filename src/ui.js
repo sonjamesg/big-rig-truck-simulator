@@ -109,6 +109,7 @@ const UICSS = `
 .stage{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;padding:12px 16px}
 .stage .floor{width:100%;height:250px;border-radius:14px;background:radial-gradient(ellipse at 50% 60%,#3b4a63 0%,#1b2333 55%,#0f1522 100%);position:relative;overflow:hidden}
 .stage .floor canvas{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(90deg);animation:float 4s ease-in-out infinite;filter:drop-shadow(-14px 10px 10px rgba(0,0,0,.55))}
+.stage .floor canvas.tt360{left:0;top:0;transform:none;animation:none;filter:none;width:100%;height:100%;touch-action:none}
 @keyframes float{50%{transform:translate(-50%,-52%) rotate(92deg)}}
 .stage .floor:after{content:'';position:absolute;left:50%;top:56%;width:340px;height:120px;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(ellipse,rgba(255,255,255,.12),transparent 70%);pointer-events:none}
 .stage h3{margin:10px 0 2px;font-size:22px;font-weight:900;letter-spacing:.5px}
@@ -710,7 +711,8 @@ function renderDealer(stageOnly) {
     a = modelArt(m, col);
   const mx = { hp: 750, vmax: 28, tank: 800 },
     econ = (v) => Math.round(36 * v);
-  stg.innerHTML = `<div class="floor"><canvas width="${a.W}" height="${a.H}" style="width:${a.W * 1.45}px;height:${a.H * 1.45}px"></canvas></div><h3>${esc(m.name)}</h3><div style="font-size:12px;opacity:.7">${esc(m.blurb)}</div>
+  const tt360 = typeof ttShowroom === "function";
+  stg.innerHTML = `<div class="floor">${tt360 ? '<canvas class="tt360" style="width:100%;height:100%;min-height:180px;cursor:grab"></canvas><div style="position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:10px;opacity:.55;pointer-events:none">drag / right stick / Z X to turn</div>' : `<canvas width="${a.W}" height="${a.H}" style="width:${a.W * 1.45}px;height:${a.H * 1.45}px"></canvas>`}</div><h3>${esc(m.name)}</h3><div style="font-size:12px;opacity:.7">${esc(m.blurb)}</div>
    <div class="stats">${[
      ["Power", m.hp + " hp", m.hp / mx.hp],
      ["Top speed", Math.round(m.vmax * 2.23694) + " mph", m.vmax / mx.vmax],
@@ -724,7 +726,16 @@ function renderDealer(stageOnly) {
      .join("")}</div>
    <div class="cols">${m.cols.map((c) => `<div class="sw ${c === col ? "on" : ""}" data-c="${c}" style="background:${c}"></div>`).join("")}</div>
    <div class="buyrow"><div class="price">${own ? "Owned" : money(m.price)}</div>${own ? (career.cur === m.id && col === (career.colors[m.id] || m.cols[0]) ? '<button class="btn ghost bigbuy" disabled>\u2713 Currently driving</button>' : `<button class="btn g bigbuy" id="use">${career.cur === m.id ? "Apply colour" : "DRIVE THIS TRUCK"}</button>`) : truck.money < m.price ? `<div class="need"><b>\u{1F512} Need ${money(m.price - truck.money)} more</b><span>You have ${money(truck.money)} in the bank \u2022 earn it by delivering</span></div>` : `<button class="btn bigbuy" id="buy">BUY \u2022 ${money(m.price)}</button>`}</div>`;
-  stg.querySelector(".floor canvas").getContext("2d").drawImage(a.c, 0, 0);
+  if (tt360)
+    ttShowroom(stg.querySelector(".floor canvas"), () => {
+      const mm = modelById(dealerState.sel);
+      return {
+        m: mm,
+        col: dealerState.col || career.colors[mm.id] || mm.cols[0],
+        fit: career.owned.includes(mm.id) && typeof czFitted === "function" ? czFitted(mm.id) : {},
+      };
+    });
+  else stg.querySelector(".floor canvas").getContext("2d").drawImage(a.c, 0, 0);
   stg.querySelectorAll(".sw").forEach((el) =>
     el.addEventListener("click", () => {
       dealerState.col = el.dataset.c;

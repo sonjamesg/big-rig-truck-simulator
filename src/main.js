@@ -159,7 +159,7 @@ async function boot() {
   await stage("Spawning traffic");
   initParked();
   await stage("Fuelling your truck");
-  CABART = makeCabArt("#d63b2f");
+  CABART = rigTopArt("#d63b2f");
   TRLART = makeTrailerArt();
   CABSH = silhouette(CABART);
   TRLSH = silhouette(TRLART);

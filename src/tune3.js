@@ -646,7 +646,7 @@ function czStar(g, x, y, r, c) {
       nose = st.nose || 0,
       cf = -5.0 - nose;
     col = L.col || col;
-    if (L.skt) {
+    if (L.skt && m.id !== "rigger") {
       g.fillStyle = shade(col, 0.85);
       g.fillRect(X(-3.2), Y(1.15), 2.6 * sc, 0.55 * sc);
       if (L.skt > 1) {
@@ -654,7 +654,7 @@ function czStar(g, x, y, r, c) {
         g.fillRect(X(-3.2), Y(0.66), 2.6 * sc, 0.06 * sc);
       }
     }
-    if (L.mud) {
+    if (L.mud && m.id !== "rigger") {
       g.fillStyle = "#111";
       g.fillRect(X(0.6), Y(1.0), 0.1 * sc, 0.75 * sc);
       if (L.mud > 1) {
@@ -690,7 +690,8 @@ function czStar(g, x, y, r, c) {
       g.lineTo(X(-4.9), Y(roofH - 0.15));
       g.fill();
     }
-    if (L.spl) {
+    const rig = m.id === "rigger";
+    if (L.spl && !rig) {
       g.fillStyle = shade(col, 1.15);
       g.beginPath();
       g.moveTo(X(-4.6), Y(roofH));
@@ -704,14 +705,15 @@ function czStar(g, x, y, r, c) {
       g.closePath();
       g.fill();
     }
-    const top = roofH + (L.spl ? (L.spl > 1 ? 1.0 : 0.75) : 0);
+    const top = rig ? (L.spl > 1 ? 3.95 : 3.72) : roofH + (L.spl ? (L.spl > 1 ? 1.0 : 0.75) : 0),
+      rbTop = rig ? 2.86 : top;
     if (L.rbar) {
       g.fillStyle = "#2b2e33";
-      g.fillRect(X(-4.9), Y(top + 0.18), 1.0 * sc, 0.08 * sc);
+      g.fillRect(X(-4.9), Y(rbTop + 0.18), 1.0 * sc, 0.08 * sc);
       g.fillStyle = "#fff6c8";
       for (let k = 0; k < 3; k++) {
         g.beginPath();
-        g.arc(X(-4.8 + k * 0.4), Y(top + 0.28), 0.1 * sc, 0, 7);
+        g.arc(X(-4.8 + k * 0.4), Y(rbTop + 0.28), 0.1 * sc, 0, 7);
         g.fill();
       }
     }

@@ -366,7 +366,7 @@ function czArt(m, col, fit) {
   col = L.col || col;
   const key = m.id + "|" + col + "|" + JSON.stringify(fit);
   if (czArtCache[key]) return czArtCache[key];
-  const base = modelArt(m, col),
+  const base = modelArt(m, col, rigHide(fit, L)),
     S = PPM * ART_SCALE,
     pf = Math.round(1.2 * S),
     ps = Math.round(0.5 * S),
@@ -579,6 +579,7 @@ function czDrawParts(g, L, fit, X, Y, S, front, m) {
 }
 // ---- side view for the turntable (procedural profile in the game's palette)
 function czSide(g, cx, cy, sc, m, col, fit) {
+  if (m.id === "rigger") return rigSide(g, cx, cy, sc, m, col, fit);
   const L = czLook(m.id, fit);
   col = L.col || col;
   const st = m.style || {},
@@ -1190,12 +1191,12 @@ function czOpen() {
   czCss();
   const m = modelById(career.cur);
   CZ.sel = null;
-  CZ.view = "top";
+  CZ.view = "side";
   CZ.tab = CZ.tab || "engine";
   const b = openModal(
     "tune",
     `<div class="czh"><button class="czb x" id="czBack" aria-label="Back">\u2039</button><div class="cztl"><h2>TUNE SHOP</h2><small>${esc(m.name)}${CZ.bay ? " \u2022 " + esc(CZ.bay.name) : ""}</small></div><div class="wallet" title="Bank"><span aria-hidden="true">\u{1F437}</span> <b id="czBank"></b></div><button class="czb x" aria-label="Close">\u2715</button></div>
-   <div class="czm"><div class="czt"><div class="czp"><canvas></canvas><span class="vt"></span><span class="vh">drag / right stick to rotate \u2022 tap: top / side</span></div><div class="czs"></div></div>
+   <div class="czm"><div class="czt"><div class="czp"><canvas></canvas><span class="vt"></span><span class="vh">drag / right stick / Z X to rotate \u2022 tap or V: top / 360\u00B0</span></div><div class="czs"></div></div>
    <div class="czk"><div class="cztabs"></div><div class="czg"></div></div></div>
    <div class="czf"><div style="flex:0 1 38%;min-width:0"><div id="czSelN" style="font-weight:800;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div><div class="msg" id="czMsg"></div></div><button class="btn sel" id="czAct"></button></div>`,
     "tz",
@@ -1465,12 +1466,12 @@ function czPreview(b) {
   g.clearRect(0, 0, W, H);
   if (!CZ.drag) CZ.ang += CZ.spin * 0.016;
   const lights = CZ.tab === "lights";
-  b.querySelector(".vt").textContent = CZ.view === "top" ? "TOP VIEW" : "SIDE VIEW";
+  b.querySelector(".vt").textContent = CZ.view === "top" ? "TOP VIEW" : "360\u00B0 VIEW";
   // turntable
   const cx = W / 2,
     cy = H * 0.5,
     R = Math.min(W * 0.5, H * 0.52),
-    sq = CZ.view === "top" ? 1 : 0.22;
+    sq = CZ.view === "top" ? 1 : 0.27;
   g.save();
   g.translate(cx, CZ.view === "top" ? cy : H * 0.8);
   g.scale(1, sq);
@@ -1514,6 +1515,10 @@ function czPreview(b) {
     if (lights && typeof czLightsPreview === "function") czLightsPreview(g, A, sc, fit, m);
     g.restore();
   } else {
+    if (typeof ttDraw === "function") {
+      const k = Math.min(W / 10.5, H / 6.2);
+      ttDraw(g, cx, H * 0.8, k, CZ.ang, 0.27, m, career.colors[m.id] || m.cols[0], fit);
+    } else {
     const sc = Math.min(W / 12, H / 6.0),
       flip = Math.cos(CZ.ang) < 0;
     g.save();
@@ -1522,6 +1527,7 @@ function czPreview(b) {
     czSide(g, 1.8 * sc, 0, sc, m, career.colors[m.id] || m.cols[0], fit);
     if (lights && typeof czLightsSide === "function") czLightsSide(g, 1.8 * sc, 0, sc, m, fit);
     g.restore();
+    }
   }
 }
 function czPad(g, hit, now, dt) {
