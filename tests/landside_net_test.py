@@ -29,9 +29,9 @@ JS = r"""(()=>{ const W=__bigrig.world, S=W.segs, fail=[], info={};
   info.changedSegs=changed.length; info.deadEnds=dead;
   for(const d of dead) if(d[0]==='airport'||(S[d[1]]&&S[d[1]].kbx)) fail.push('dead end '+JSON.stringify(d));
   const segAt=(tx,ty)=>{ if(tx<0||ty<0||tx>=MW||ty>=MH) return -1; const i=tx+ty*MW; return W.roadH[i]>=0?W.roadH[i]:W.roadV[i]>=0?W.roadV[i]:-1; };
-  const kinds={};
-  for(const P of __bigrig.BigRig.mapPOIs()){ if(P.kind==='Hide box') continue; const cx=Math.floor(P.x/M_T), cy=Math.floor(P.y/M_T); let best=-1,bd=1e9;
-    for(let r=0;r<=60&&best<0;r++) for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){ if(Math.max(Math.abs(dx),Math.abs(dy))!==r) continue; const s=segAt(cx+dx,cy+dy); if(s>=0&&comp[s]===main){ const d=Math.hypot(dx,dy); if(d<bd){bd=d;best=s;} } }
+  const kinds={}; { const F=__bigrig.BigRig.fog; if(F&&F.revealAll) F.revealAll(); }   // v65: fog hides undiscovered POIs; check them all
+  for(const P of __bigrig.BigRig.mapPOIs()){ if(P.kind==='Hide box') continue; if(P.kind==='Helipad'&&/Airport/.test(P.name)) continue; /* v65: curve tiles (-3) are road; the airport helipad is airside (fly-in only) */ const cx=Math.floor(P.x/M_T), cy=Math.floor(P.y/M_T); let best=-1,bd=1e9;
+    for(let r=0;r<=60&&best<0;r++) for(let dy=-r;dy<=r;dy++) for(let dx=-r;dx<=r;dx++){ if(Math.max(Math.abs(dx),Math.abs(dy))!==r) continue; const s=segAt(cx+dx,cy+dy); if((s>=0&&comp[s]===main)||(s<0&&W.roadH[(cx+dx)+(cy+dy)*MW]===-3&&G[(cx+dx)+(cy+dy)*MW]===T.ROAD)){ const d=Math.hypot(dx,dy); if(d<bd){bd=d;best=s>=0?s:1e6;} } }
     const k=kinds[P.kind]||(kinds[P.kind]=[0,0]); k[1]++; if(best>=0) k[0]++; else fail.push('POI not reachable: '+P.kind+' '+P.name); }
   info.poi=kinds;
   const bend=(W.bends||[]).find(b=>b[0]===346&&b[1]===716); info.bend=bend||null; if(!bend) fail.push('Airport Way bend missing');
@@ -43,7 +43,7 @@ JS = r"""(()=>{ const W=__bigrig.world, S=W.segs, fail=[], info={};
   info.loopEntry=[1,-1].map(d=>jOptions(J410,AW,d).opts.filter(o=>o[1]===L1).length); info.loopExitIntoFromAW=[1,-1].map(d=>jOptions(J494,AW,d).opts.filter(o=>o[1]===L3).length);
   info.loopExitMoves=jOptions(J494,L3,1).opts.map(o=>o[0]);
   if(info.loopEntry.some(n=>n!==1)) fail.push('loop entry not reachable from both ways'); if(info.loopExitIntoFromAW.some(n=>n)) fail.push('can turn into the loop exit');
-  const KC=[[1530,1530],[1705,1530],[1705,1680],[1530,1680]];
+  const KC=[[1530,1530],[1705,1530],[1705,1680]];   // v65: SW corner gone with the Loop west side (James 22 Oct): the south road runs straight on to the x1508 street
   info.kbRbsLeft=W.rbs.filter(r=>KC.some(c=>Math.hypot(r.cx-c[0],r.cy-c[1])<20)).length; if(info.kbRbsLeft) fail.push('roundabout left at a Kingsbridge corner');
   info.kbCorners=KC.map(c=>{ const js=W.junctions.filter(J=>Math.abs(J.x+J.w/2-c[0])<=4&&Math.abs(J.y+J.h/2-c[1])<=4); return {c, n:js.length, lights:js.map(J=>!!J.lights), arms:js.map(J=>[S[J.hs],S[J.vs]].reduce((n,q)=>{ const r=q.dir==='h'?[J.x,J.x+J.w]:[J.y,J.y+J.h]; return n+(q.b0<r[0]-0.5?1:0)+(q.b1+1>r[1]+0.5?1:0); },0))}; });
   for(const k of info.kbCorners){ if(k.n!==1) fail.push('Kingsbridge corner '+k.c+' has '+k.n+' junctions'); else if(!k.lights[0]) fail.push('Kingsbridge corner '+k.c+' not signalised'); }
