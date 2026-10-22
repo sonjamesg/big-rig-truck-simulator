@@ -1294,6 +1294,7 @@ function polPay() {
     if (typeof OFF !== "undefined")
       OFF.add({ type: o.type, amount: amt, reason: o.reason, police: true });
     else truck.money -= amt;
+    if (typeof pmCountFine === "function") pmCountFine(amt);
   }
   closeUI();
   const arrest = c.arrest;

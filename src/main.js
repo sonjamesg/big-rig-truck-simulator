@@ -1325,7 +1325,7 @@ function drawOverhead(o) {
 function drawHUD() {
   const s = truck,
     kmh = Math.abs(s.v) * 2.23694;
-  drawMinimap();
+  if (SETTINGS.mm !== false) drawMinimap(); // v69: minimap on/off (pause menu settings)
   drawClockHUD();
   drawWeatherHUD();
   drawCoupleHUD();
@@ -2429,6 +2429,7 @@ addEventListener(
   "keydown",
   (e) => {
     if (!world.ready) return;
+    if (typeof pmKey === "function" && pmKey(e)) return; // v69 pause menu: Esc opens, Q/E tabs, arrows/Enter
     if (career.uiOpen) {
       if (
         e.code === "Escape" ||

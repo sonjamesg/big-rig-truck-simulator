@@ -117,6 +117,7 @@ function padUpdate(dt) {
     }
     pad.lastUse = timeS;
   }
+  if (typeof pmPad === "function" && pmPad(hit)) return; // v69 pause menu: LB/RB tabs, Start closes
   // ---- menus (job board, dealership, results, tier unlock)
   if (
     career.uiOpen ||
@@ -152,7 +153,7 @@ function padUpdate(dt) {
         if (k) k.click();
       } else closeUI();
     }
-    if (hit(9) && (career.uiOpen === "board" || career.uiOpen === "armyboard")) closeUI();
+    if (hit(9) && (career.uiOpen === "board" || career.uiOpen === "armyboard" || career.uiOpen === "pause")) closeUI();
     if (hit(3) && career.uiOpen === "board") {
       boardState.sort = boardState.sort === "near" ? "pay" : "near";
       renderBoard();
@@ -202,7 +203,7 @@ function padUpdate(dt) {
     if (hit(1) || hit(8)) closeMap();
     if (hit(9)) {
       closeMap();
-      openBoard();
+      openPause("jobs");
     }
     return;
   }
@@ -251,7 +252,7 @@ function padUpdate(dt) {
     input.horn = false;
   }
   if (hit(8)) openMap();
-  if (hit(9)) openBoard();
+  if (hit(9)) openPause(); // v69: Start = pause menu
   if (hit(5)) pad.rbT = timeS;
   if (now[5] && !now[4] && pad.rbT != null && timeS - pad.rbT > 0.8) {
     pad.rbT = null;
