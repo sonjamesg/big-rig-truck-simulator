@@ -478,7 +478,7 @@ function bmCopSpawn(x, y) {
 function bmLoseUpdate(a) {
   const Z = BM.zone || (BM.zone = { x: truck.x, y: truck.y, r: BM_ZONE_R, seen: timeS });
   const seen =
-    POL.chase || polCanSee().length > 0 || POL.aux.some((c) => !c.goal && onView(c.v.x, c.v.y));
+    POL.chase || polCanSee().length > 0 || POL.aux.some((c) => !c.goal && polSees(c.v));
   if (seen) {
     Z.x = truck.x;
     Z.y = truck.y;

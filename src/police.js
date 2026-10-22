@@ -679,8 +679,40 @@ function polUpdatePatrols(dt) {
   if (POL.parkIn) POL.parkIn = POL.parkIn.filter((k) => !emFollow(k, dt, 4));
 }
 // ---------- detection
+// v68: police see the rig only with a clear line of sight (buildings, walls, trees, hedges block it) within POL_SEE_R;
+// right on your tail (< POL_TAIL_R) they always see you. Parked inside a blue hide spot while wanted = never seen.
+const POL_SEE_R = 150,
+  POL_TAIL_R = 22;
+function polRay(x0, y0, x1, y1) {
+  // true when nothing solid lies between (x0,y0) and (x1,y1) [metres]; ends excluded (4 m) so the cars themselves don't block
+  const d = Math.hypot(x1 - x0, y1 - y0),
+    n = Math.ceil(d / 2);
+  for (let k = 1; k < n; k++) {
+    const t = k / n;
+    if (t * d < 4 || (1 - t) * d < 4) continue;
+    const x = x0 + (x1 - x0) * t,
+      y = y0 + (y1 - y0) * t;
+    if (isSolidTile(Math.floor(x / M_T), Math.floor(y / M_T))) return false;
+  }
+  return true;
+}
+function polSeesPt(x, y, px, py) {
+  const d = Math.hypot(px - x, py - y);
+  if (d < POL_TAIL_R) return true;
+  if (d > POL_SEE_R * (typeof nmK === "function" ? 1 - 0.3 * nmK() : 1)) return false;
+  return polRay(x, y, px, py);
+}
+function polSeesRig(x, y) {
+  const P = truck;
+  if (Math.hypot(P.x - x, P.y - y) < POL_TAIL_R) return true;
+  if (Math.abs(P.v) < 0.5 && hideAt(P.x, P.y)) return false; // parked in a blue hide spot
+  if (polSeesPt(x, y, P.x, P.y)) return true;
+  const f = fwd(P.h);
+  if (polSeesPt(x, y, P.x + f[0] * 3, P.y + f[1] * 3)) return true;
+  return !!(P.trl && polSeesPt(x, y, P.trl.x, P.trl.y));
+}
 function polSees(v) {
-  return onView(v.x, v.y) && onView(truck.x, truck.y);
+  return polSeesRig(v.x, v.y);
 }
 function polCanSee() {
   return POL.cars.filter((v) => v.pol && polSees(v));
@@ -785,11 +817,15 @@ function polPedHit(p) {
 // ---------- v29 wanted level: unseen ped hit -> 1 star, 60 s; searchers roam near (not on) the player; spotted -> chase -> fine/arrest
 const WANT = { lvl: 0, t: 0, sp: 0, chased: false };
 function wantSearchGoal(v) {
-  const a = Math.random() * 6.283,
-    d = 30 + Math.random() * 120;
+  // v68: search round the last place they saw you (not your live position), widening the longer you stay hidden
+  const lx = WANT.lx ?? truck.x,
+    ly = WANT.ly ?? truck.y,
+    age = timeS - (WANT.seenT ?? timeS),
+    a = Math.random() * 6.283,
+    d = 20 + Math.random() * Math.min(260, 60 + age * 4);
   if (typeof aiGoal === "function")
     aiGoal(v, {
-      entrance: { x: truck.x + Math.cos(a) * d, y: truck.y + Math.sin(a) * d },
+      entrance: { x: lx + Math.cos(a) * d, y: ly + Math.sin(a) * d },
       name: "search",
     });
   v.pol.sg = timeS + 12 + Math.random() * 10;
@@ -1080,7 +1116,7 @@ function polUpdateChase(dt) {
       return;
     }
   } else c.stuckT = 0;
-  if (!onView(v.x, v.y) && dP > polViewR() * 1.2) {
+  if (!polSeesRig(v.x, v.y)) {
     POL.lostT += dt;
     if (POL.lostT > 10) {
       polLose("sight");

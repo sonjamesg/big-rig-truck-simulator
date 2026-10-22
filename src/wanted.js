@@ -135,8 +135,8 @@ function want2Update(dt) {
   if (!world.ready) return;
   const seen =
     polCanSee().length > 0 ||
-    (POL.chase && onView(POL.chase.v.x, POL.chase.v.y)) ||
-    POL.aux.some((c) => onView(c.v.x, c.v.y));
+    (POL.chase && polSees(POL.chase.v)) ||
+    POL.aux.some((c) => polSees(c.v));
   if (seen) {
     WANT.seenT = timeS;
     WANT.lx = truck.x;
@@ -170,7 +170,7 @@ function want2Update(dt) {
       if (v) {
         v.pol.search = true;
         v.pinT = timeS + 1e6;
-        aiGoal(v, { entrance: { x: truck.x, y: truck.y }, name: "search" });
+        aiGoal(v, { entrance: { x: WANT.lx ?? truck.x, y: WANT.ly ?? truck.y }, name: "search" });
         v.pol.sg = timeS + 6;
       }
     }
@@ -178,8 +178,9 @@ function want2Update(dt) {
       if (v.pol && v.pol.search && timeS > v.pol.sg && traffic.vs.includes(v)) {
         aiGoal(v, {
           entrance: {
-            x: truck.x + (Math.random() - 0.5) * 30,
-            y: truck.y + (Math.random() - 0.5) * 30,
+            // v68: last sighting, not the live position
+            x: (WANT.lx ?? truck.x) + (Math.random() - 0.5) * 80,
+            y: (WANT.ly ?? truck.y) + (Math.random() - 0.5) * 80,
           },
           name: "search",
         });
