@@ -50,10 +50,22 @@ async def main():
         await pg.evaluate(PLACE, [o["x"], o["y"], 1.5708])
         seen = await pg.evaluate("(o)=>{truck.v=1;const r=polSeesRig(o.px,o.py);truck.v=0;return r}", o)
         chk("rig in the open: seen", seen, json.dumps(o))
+        # v70 view cone / screen / close-behind / tailing (police on the same straight road, rig at o)
+        CONE = """(q)=>{truck.v=1;const v={x:truck.x+q.dx,y:truck.y,h:q.h,pol:{}};if(q.off){cam.x+=8000;}
+          let r;if(q.chase){const c0=POL.chase;POL.chase={v};r=polSees(v);POL.chase=c0;}else r=polSees(v);
+          if(q.off)cam.x=truck.x*PPM;truck.v=0;return r}"""
+        W_, E_ = -1.5708, 1.5708   # heading west (towards rig) / east (away)
+        chk("cone: police 45 m ahead facing rig -> seen", await pg.evaluate(CONE, {"dx": 45, "h": W_}))
+        chk("cone: rig 30 deg off-axis still in cone", await pg.evaluate(CONE, {"dx": 45, "h": W_ + 0.52}))
+        chk("behind: police 45 m away heading away -> not seen", not await pg.evaluate(CONE, {"dx": 45, "h": E_}))
+        chk("side: rig 90 deg to the side -> not seen", not await pg.evaluate(CONE, {"dx": 45, "h": 0}))
+        chk("close behind (10 m, queued) -> seen", await pg.evaluate(CONE, {"dx": 10, "h": E_}))
+        chk("off-screen police facing rig -> not seen", not await pg.evaluate(CONE, {"dx": 45, "h": W_, "off": 1}))
+        chk("tailing chase car 25 m, rig behind its heading -> still seen", await pg.evaluate(CONE, {"dx": 25, "h": E_, "chase": 1}))
         # live sim
         SIM = """async(q)=>{polEndChase&&POL.chase&&polEndChase();WANT.lvl=1;WANT.t=60;WANT.chased=false;
-          const v=spawnVehicle(q.px,q.py,true,{kind:'estate'});if(!v)return 'nospawn';polMake(v,null);v.pol.search=true;v.pinT=timeS+1e6;v.x=q.px;v.y=q.py;v.v=0;
-          await new Promise(r=>setTimeout(r,3000));const c=!!POL.chase;return {chase:c,pd:Math.round(Math.hypot(v.x-truck.x,v.y-truck.y))}}"""
+          const v=spawnVehicle(q.px,q.py,true,{kind:'estate'});if(!v)return 'nospawn';let ever=false;const pi=setInterval(()=>{if(POL.chase)ever=true},20);polMake(v,null);v.pol.search=true;v.pinT=timeS+1e6;v.x=q.px;v.y=q.py;v.v=0;if(q.face){const D=Math.abs(q.px-truck.x);for(let k=0;k<10&&!POL.chase;k++){await new Promise(r=>setTimeout(r,250));if(!polInCone(v,truck.x,truck.y)){const f=fwd(v.h),T=truck;T.x=v.x+f[0]*D;T.y=v.y+f[1]*D;if(T.trl){const g=fwd(T.h);T.trl.x=T.x-g[0]*9;T.trl.y=T.y-g[1]*9;}cam.x=T.x*PPM;cam.y=T.y*PPM;}}}
+          await new Promise(r=>setTimeout(r,3000));clearInterval(pi);const c=ever||!!POL.chase;return {h:+v.h.toFixed(2),dx:Math.round(v.x-truck.x),dy:Math.round(v.y-truck.y),cone:polInCone(v,truck.x,truck.y),scr:onScreen(v.x,v.y,0),chase:c,pd:Math.round(Math.hypot(v.x-truck.x,v.y-truck.y))}}"""
         near = await pg.evaluate("""(s)=>{let best=null,bd=1e9;const tx=Math.floor(s.x/M_T),ty=Math.floor(s.y/M_T);
           for(let dy=-18;dy<=18;dy++)for(let dx=-18;dx<=18;dx++){const x=tx+dx,y=ty+dy;if(inb(x,y)&&isRoadT(idx(x,y))){const d=Math.hypot(dx,dy);if(d<bd&&d*M_T>POL_TAIL_R+4){bd=d;best={px:(x+.5)*M_T,py:(y+.5)*M_T}}}}return best}""", s)
         await pg.evaluate(PLACE, [s["x"], s["y"], 0])
@@ -62,10 +74,21 @@ async def main():
         chk("sim: hidden rig, police nearby -> no chase", isinstance(a, dict) and not a["chase"], json.dumps(a))
         await pg.evaluate("()=>{for(const v of POL.cars.slice()){const i=traffic.vs.indexOf(v);if(i>=0)traffic.vs.splice(i,1)}POL.cars.length=0;wantClear();}")
         await pg.evaluate(PLACE, [o["x"], o["y"], 1.5708])
-        a2 = await pg.evaluate(SIM, {"px": o["x"] + 45, "py": o["y"]})
+        a2 = await pg.evaluate(SIM, {"px": o["x"] + 32, "py": o["y"], "face": 1})
         await pg.screenshot(path=OUT + "/police_visible.png")
         chk("sim: rig in view -> chase", isinstance(a2, dict) and a2["chase"], json.dumps(a2))
         await pg.evaluate("()=>{polEndChase&&POL.chase&&polEndChase();wantClear();}")
+        # v70 night searchlight shot: searching car near the rig at 23:00
+        await pg.evaluate("()=>{for(const v of POL.cars.slice()){const i=traffic.vs.indexOf(v);if(i>=0)traffic.vs.splice(i,1)}POL.cars.length=0;gameT=23;}")
+        await pg.evaluate(PLACE, [o["x"], o["y"], 1.5708])
+        await pg.evaluate("""(q)=>{let v=null;for(const d of [0,6,-6,12,-12,18,-30,-36])if(!v)v=spawnVehicle(q.px+d,q.py,true,{kind:'estate'})||spawnVehicle(q.px+d,q.py-M_T,true,{kind:'estate'});if(!v)return;polMake(v,null);v.pol.search=true;v.pinT=timeS+1e6;v.v=0;}""", {"px": o["x"] + 22, "py": o["y"]})
+        await pg.evaluate("()=>{const v=POL.cars.find(v=>v.pol&&v.pol.search);if(v){const iv=setInterval(()=>{v.v=0;v.h=v.th=-1.5708},16);setTimeout(()=>clearInterval(iv),1600)}}")
+        await pg.wait_for_timeout(1500)
+        SL = os.environ.get("SLSHOT", OUT + "/night_searchlight.png")
+        await pg.screenshot(path=SL)
+        nsl = await pg.evaluate("(()=>{DN.dyn=[];const r=viewRectM();polSearchlights(r[0]*PPM,r[1]*PPM,r[2]*PPM,r[3]*PPM);const n=DN.dyn.filter(l=>l.k==='sl').length;DN.dyn=[];return n+'/'+POL.cars.filter(v=>v.pol&&v.pol.search&&traffic.vs.includes(v)).length})()")
+        chk("night: searching police draw a searchlight", not nsl.startswith("0"), nsl)
+        await pg.evaluate("()=>{for(const v of POL.cars.slice()){const i=traffic.vs.indexOf(v);if(i>=0)traffic.vs.splice(i,1)}POL.cars.length=0;gameT=12;wantClear();}")
         # map shot with blue hide icons
         await pg.evaluate(PLACE, [s["x"], s["y"], 0])
         cnt = "(()=>{let n=0;hideMapDots(x=>x,y=>y,()=>n++);return n})()"

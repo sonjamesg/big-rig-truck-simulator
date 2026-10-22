@@ -323,6 +323,26 @@ function drawNight(vx0, vy0, vx1, vy1, z) {
   const dyn = DN.dyn || [];
   for (const l of lights.concat(dyn)) {
     if (l.k === "b") continue;
+    if (l.k === "sl") {
+      // v70: police roof searchlight - a soft wedge punched out of the darkness (flat on low quality)
+      const r = l.r * z * q,
+        X = sx(l.x),
+        Y = sy(l.y);
+      L.globalAlpha = 1;
+      if (l.hi) {
+        const gr = L.createRadialGradient(X, Y, r * 0.04, X, Y, r);
+        gr.addColorStop(0, "rgba(0,0,0,0.95)");
+        gr.addColorStop(0.55, "rgba(0,0,0,0.7)");
+        gr.addColorStop(1, "rgba(0,0,0,0)");
+        L.fillStyle = gr;
+      } else L.fillStyle = "rgba(0,0,0,0.6)";
+      L.beginPath();
+      L.moveTo(X, Y);
+      L.arc(X, Y, r, l.a - l.w, l.a + l.w);
+      L.closePath();
+      L.fill();
+      continue;
+    }
     if (l.k === "sh") {
       const r = l.r * z * q;
       L.globalAlpha = 0.9;

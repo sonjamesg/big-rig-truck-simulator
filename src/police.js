@@ -711,8 +711,32 @@ function polSeesRig(x, y) {
   if (polSeesPt(x, y, P.x + f[0] * 3, P.y + f[1] * 3)) return true;
   return !!(P.trl && polSeesPt(x, y, P.trl.x, P.trl.y));
 }
-function polSees(v) {
+// v70 (James 22 Oct): spotting needs the police car on the player's screen and the rig inside its forward view cone
+// (POL_CONE each side of its heading: front, front-left, front-right); a rig right behind it (< POL_CLOSE, e.g. queued at
+// the same lights) is still seen. A chase in progress keeps the old rule (polSeesRig: LOS + tail range) so tailing works.
+const POL_CONE = (65 * Math.PI) / 180,
+  POL_CLOSE = 15;
+function polInCone(v, px, py) {
+  const f = fwd(v.h || 0),
+    dx = px - v.x,
+    dy = py - v.y,
+    d = Math.hypot(dx, dy) || 1;
+  return (dx * f[0] + dy * f[1]) / d >= Math.cos(POL_CONE);
+}
+function polSpots(v) {
+  const P = truck,
+    d = Math.hypot(P.x - v.x, P.y - v.y);
+  if (d < POL_CLOSE) return !(Math.abs(P.v) < 0.5 && hideAt(P.x, P.y));
+  if (!onScreen(v.x, v.y, 0)) return false;
+  const f = fwd(P.h),
+    pts = [[P.x, P.y], [P.x + f[0] * 3, P.y + f[1] * 3]];
+  if (P.trl) pts.push([P.trl.x, P.trl.y]);
+  if (!pts.some(([x, y]) => polInCone(v, x, y))) return false;
   return polSeesRig(v.x, v.y);
+}
+function polSees(v) {
+  if ((POL.chase && v === POL.chase.v) || POL.aux.some((a) => a.v === v)) return polSeesRig(v.x, v.y);
+  return polSpots(v);
 }
 function polCanSee() {
   return POL.cars.filter((v) => v.pol && polSees(v));
@@ -1522,6 +1546,22 @@ function drawPolice(vx0, vy0, vx1, vy1) {
   for (const a of POL.aux) {
     emBlit(a.v, "police");
     emDrawBar(a.v, true, "police");
+  }
+  polSearchlights(vx0, vy0, vx1, vy1);
+}
+// v70: at night searching police sweep a roof searchlight across their view cone (cosmetic: the whole cone with a clear line
+// of sight counts as seen, see polSpots). Pushed into the night light layer as a soft wedge (daynight.js kind "sl").
+function polSearchlights(vx0, vy0, vx1, vy1) {
+  if (typeof DN === "undefined" || DN.dark < 0.05) return;
+  for (const v of POL.cars) {
+    if (!(v.pol && v.pol.search && traffic.vs.includes(v))) continue;
+    const X = v.x * PPM,
+      Y = v.y * PPM;
+    if (X < vx0 - 600 || X > vx1 + 600 || Y < vy0 - 600 || Y > vy1 + 600) continue;
+    const f = fwd(v.h || 0),
+      a0 = Math.atan2(f[1], f[0]),
+      a = a0 + Math.sin(timeS * 0.9 + (v.id || 0) * 1.7) * POL_CONE * 0.8;
+    (DN.dyn || (DN.dyn = [])).push({ k: "sl", x: X, y: Y, r: 55 * PPM, a, w: 0.16, hi: typeof gfxHi === "function" ? gfxHi() : true });
   }
 }
 function drawPoliceHUD() {
