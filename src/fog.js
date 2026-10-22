@@ -108,7 +108,7 @@ function fogScan(silent) {
     act = fogActive(),
     found = [];
   FOG_MPL((o, mx, my, kind) => {
-    if (!o) return;
+    if (!o || kind === "Hide box") return; // hide spots: shown wherever the map is revealed, no discovery toast
     const k = fogKey(o, mx, my);
     FOG.okey.set(o, k);
     if (!act || FOG.disc.has(k)) return;
@@ -274,6 +274,7 @@ const FOG_MPL = mapPOIList;
 mapPOIList = function (cb) {
   FOG_MPL((o, mx, my, kind) => {
     if (!fogActive()) return cb(o, mx, my, kind);
+    if (kind === "Hide box") return fogSeen(mx, my) ? cb(o, mx, my, kind) : undefined;
     const k = fogKey(o, mx, my);
     FOG.okey.set(o, k);
     if (FOG.disc.has(k)) cb(o, mx, my, kind);

@@ -1584,7 +1584,7 @@ setTimeout(() => {
     svcMapIcons = function (icon, px, py) {
       sm.apply(this, arguments);
       try {
-        hideMapDots(px, py);
+        hideMapDots(px, py, icon);
         polMapDots(px, py);
       } catch (e) {}
     };
@@ -1612,46 +1612,91 @@ function hideBad(x, y) {
     if (d.entrance && Math.hypot(d.entrance.x - x, d.entrance.y - y) < 30) return true;
   return false;
 }
+// v68: hide spots are places a rig can actually reach but can't be seen from any road within HIDE_LOS_R
+// (behind buildings, in back yards / lanes, forest tracks); checked with the same ray test the police use (polRay).
+const HIDE_LOS_R = 72; // m
+function hideSeenFromRoad(cx, cy) {
+  const r = Math.ceil(HIDE_LOS_R / M_T),
+    tx = Math.floor(cx / M_T),
+    ty = Math.floor(cy / M_T);
+  for (let dy = -r; dy <= r; dy += 2)
+    for (let dx = -r; dx <= r; dx += 2) {
+      const x = tx + dx,
+        y = ty + dy;
+      if (!inb(x, y) || !isRoadT(idx(x, y))) continue;
+      const mx = (x + 0.5) * M_T,
+        my = (y + 0.5) * M_T;
+      if (Math.hypot(mx - cx, my - cy) > HIDE_LOS_R) continue;
+      if (polRay(mx, my, cx, cy)) return true;
+    }
+  return false;
+}
 function hideBuild() {
   const L = [],
-    C = 70;
-  const ok = (x, y) => {
-    if (!inb(x, y)) return false;
-    const t = get(x, y);
-    return t === T.LOT || t === T.CONC || t === T.PLAZA;
-  };
-  const nearRd = (x, y) => {
-    for (let d = -2; d <= 5; d++)
-      for (const [a, b] of [
-        [x + d, y - 1],
-        [x + d, y + 2],
-        [x - 1, y],
-        [x + 4, y + 1],
-      ])
-        if (inb(a, b) && isRoadT(idx(a, b))) return true;
-    return false;
-  };
+    C = 96,
+    N = MW * MH;
+  // drivable-from-road distance (tiles) over open ground, capped at 40: the spot must be reachable
+  const D = new Uint8Array(N).fill(255),
+    q = new Int32Array(N);
+  let qh = 0,
+    qt = 0;
+  for (let i = 0; i < N; i++)
+    if (isRoadT(i)) {
+      D[i] = 0;
+      q[qt++] = i;
+    }
+  const open = (i) => !SOLID[G[i]] && G[i] !== T.WATER && !(DOCK_FENCE && DOCK_FENCE[i]);
+  while (qh < qt) {
+    const i = q[qh++],
+      d = D[i];
+    if (d >= 40) continue;
+    const x = i % MW;
+    for (const j of [x > 0 ? i - 1 : -1, x < MW - 1 ? i + 1 : -1, i - MW, i + MW])
+      if (j >= 0 && j < N && D[j] === 255 && open(j)) {
+        D[j] = d + 1;
+        q[qt++] = j;
+      }
+  }
+  const R = mulberry(4242);
   for (let cy = 0; cy < MH; cy += C)
     for (let cx = 0; cx < MW; cx += C) {
       let f = null;
-      for (let y = cy + 4; y < cy + C - 4 && !f; y += 2)
-        for (let x = cx + 4; x < cx + C - 6 && !f; x += 2) {
-          let g = true;
-          for (let b = 0; b < 2 && g; b++)
-            for (let a = 0; a < 4 && g; a++) if (!ok(x + a, y + b)) g = false;
-          if (g && nearRd(x, y)) f = [x, y];
+      const o = (R() * 3) | 0;
+      for (let t = 0, y = cy + 2 + o; y < cy + C - 4 && !f; y += 3)
+        for (let x = cx + 2 + o; x < cx + C - 6 && !f; x += 3) {
+          if (D[idx(x + 2, y + 1)] < 4 || D[idx(x + 2, y + 1)] > 15 || ++t > 900) continue;
+        let g = true;
+        for (let b = 0; b < 2 && g; b++)
+          for (let a = 0; a < 4 && g; a++) {
+            if (!inb(x + a, y + b)) g = false;
+            else {
+              const i = idx(x + a, y + b);
+              if (D[i] < 4 || D[i] > 40 || !open(i)) g = false;
+            }
+          }
+        if (!g) continue;
+        const mx = (x + 2) * M_T,
+          my = (y + 1) * M_T;
+        if (hideBad(mx, my)) continue;
+        if (D[idx(x + 2, y + 1)] > 15) continue; // within ~60 m of a road: concealed, not just remote
+        const A = typeof apA === "function" && apA(); // not on the airfield
+        if (A && x + 4 >= A.x0 - 8 && x <= A.x1 + 8 && y + 2 >= A.y0 - 8 && y <= A.y1 + 8) continue;
+        if (solidAtM(mx, my) || solidAtM(mx - 7, my) || solidAtM(mx + 7, my)) continue;
+        if (hideSeenFromRoad(mx, my)) continue;
+        f = [x, y];
         }
-      if (f && hideBad(f[0] * M_T, f[1] * M_T)) f = null;
-      if (f)
+      if (f) {
+        const k = get(f[0], f[1]);
         L.push({
           x: f[0] * M_T,
           y: f[1] * M_T,
           w: 4 * M_T,
           h: 2 * M_T,
-          kind: get(f[0], f[1]) === T.LOT ? "car park" : "alley",
+          kind: k === T.TREE || k === T.GRASS || k === T.PGRASS ? "hidden track" : "back yard",
         });
+      }
     }
-  // under bridges: road tiles beneath an overpass
+  // under bridges: road tiles beneath an overpass (hidden by the deck)
   if (world.bridges)
     for (const b of world.bridges.slice(0, 40)) {
       if (b.under) L.push({ x: b.under.x, y: b.under.y, w: 4 * M_T, h: 2 * M_T, kind: "bridge" });
@@ -1702,26 +1747,20 @@ function drawHideSpots(vx0, vy0, vx1, vy1) {
   }
   ctx.restore();
 }
-function hideMapDots(px, py) {
-  if (!(WANT.lvl || POL.chase)) return;
-  const L = HIDE.list || hideBuild();
+function hideMapDots(px, py, icon) {
+  // v68: always on the world map + minimap (only in discovered areas), brighter while wanted
+  const L = HIDE.list || hideBuild(),
+    w = WANT.lvl || POL.chase;
   ctx.save();
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.font = "bold 9px sans-serif";
+  if (!w) ctx.globalAlpha = 0.8;
   for (const h of L) {
-    const X = px(h.x + h.w / 2),
-      Y = py(h.y + h.h / 2);
+    const cx = h.x + h.w / 2,
+      cy = h.y + h.h / 2;
+    if (typeof fogSeen === "function" && !fogSeen(cx, cy)) continue;
+    const X = px(cx),
+      Y = py(cy);
     if (X < -10 || Y < -10 || X > VW + 10 || Y > VH + 10) continue;
-    ctx.fillStyle = "#1e6cff";
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.roundRect(X - 7, Y - 7, 14, 14, 3);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "#fff";
-    ctx.fillText("H", X, Y + 0.5);
+    if (icon) icon(X, Y, "#1e6cff", "H");
   }
   ctx.restore();
 }
