@@ -975,7 +975,7 @@ function* genWorldSteps() {
     MWD = 6,
     RBT = 11;
   // motorway from axis-aligned waypoints [x,y,'rb'?] with large-radius curved bends
-  function mway(P, closed, Rc, name, type, w) {
+  function mway(P, closed, Rc, name, type, w, thru) {
     type = type || "hwy";
     w = w || MWD;
     const n = P.length,
@@ -993,7 +993,7 @@ function* genWorldSteps() {
       pt[2] === "rb"
         ? RBT
         : pt[2] === "x"
-          ? (closed ? -w : w) / 2
+          ? (closed || thru ? -w : w) / 2
           : adj === null
             ? 0
             : Math.min(Rc, Math.min(len, adj) / 2 - 2);
@@ -1245,16 +1245,18 @@ function* genWorldSteps() {
   // in-line loop leg (one segment through each box), see the kbx merge below.
   mway(
     [
-      [1530, 1530, "x"],
+      [1512, 1530],
       [1705, 1530, "x"],
       [1705, 1680, "x"],
       [1530, 1680, "x"],
     ],
-    true,
+    false,
     0,
     "Kingsbridge Loop",
     "dual",
-  );
+    MWD,
+    true,
+  ); // v65 (James 22 Oct): the Loop's west side (x1530) is gone; the north side runs on west to T into the x1508 street, the south side carries straight on as K4 Westway
   mway(
     [
       [1360, 1380, "rb"],
@@ -1301,7 +1303,7 @@ function* genWorldSteps() {
   // y1589 Dam Road feed (2 tiles under the y1583 street = stacked half-junctions, offset yellow boxes, doubled signals) are gone:
   // Westway, Airport Way and Dam Road now meet the x1404 column / y1583 street directly as single clean junctions
   for (const y of thinSet(KB, "y", [1, 3])) {
-    road("h", y, 1533, KB.xs[0] - 1, RW, "city");
+    road("h", y, 1512, KB.xs[0] - 1, RW, "city"); // v65: run on past the removed loop west side to the x1508 street
     road("h", y, KB.X1 + 1, 1701, RW, "city");
   }
   for (const x of thinSet(KB, "x", [1, 4])) {
@@ -1817,7 +1819,7 @@ function* genWorldSteps() {
       world.kbMerged = kill.size;
     }
     for (const q of world.segs)
-      if (q.kbx && q.type === "dual" && ((q.dir === "h" && q.a === 1677) || (q.dir === "v" && q.a === 1527)))
+      if (q.kbx && q.type === "dual" && q.dir === "h" && (q.a === 1677 || q.a === 1527))
         q.name = "Kingsbridge Loop"; // v64: merged loop sides keep the loop's name (radials join them in line)
   }
   buildFlyovers();
