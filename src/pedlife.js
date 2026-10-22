@@ -362,7 +362,7 @@ function drawPedLife(inV) {
     ctx.save();
     ctx.translate(0, 9 * PPM);
     ctx.rotate(-Math.PI / 2);
-    ctx.fillText("BUS STOP", 0, 3);
+    fitText(ctx, "BUS STOP", 0, 3, 14 * PPM, "bus-stop", { wrap: false });
     ctx.restore();
     ctx.restore();
     // shelter on the pavement + flag at the kerb

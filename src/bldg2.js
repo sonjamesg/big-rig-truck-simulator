@@ -423,17 +423,13 @@ function bWarehouse(g, o, r) {
   if (o.logo) {
     g.save();
     g.fillStyle = "rgba(255,255,255,0.88)";
-    g.fillRect(
-      x + w / 2 - o.logo.length * 7 - 8,
-      y + (h - f) / 2 - 13,
-      o.logo.length * 14 + 16,
-      26,
-    );
+    const lw = Math.min(w - 8, signNeed(g, o.logo, 18, "900 ", "Arial Black,Arial,sans-serif") + 16);
+    g.fillRect(x + w / 2 - lw / 2, y + (h - f) / 2 - 13, lw, 26);
     g.fillStyle = "#22324a";
     g.font = "900 18px Arial Black,Arial,sans-serif";
     g.textAlign = "center";
     g.textBaseline = "middle";
-    g.fillText(o.logo, x + w / 2, y + (h - f) / 2 + 1);
+    fitText(g, o.logo, x + w / 2, y + (h - f) / 2 + 1, lw - 12, "roof-logo2", { wrap: false });
     g.restore();
   }
 }

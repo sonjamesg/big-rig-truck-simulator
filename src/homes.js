@@ -794,7 +794,7 @@ function hRoof(g, x, y, w, h, f, u) {
     g.fillStyle = "#fff";
     g.font = "900 " + Math.round(u * 0.55) + "px Arial Black,Arial";
     g.textAlign = "center";
-    g.fillText("LONGHAUL RANCH", x + w / 2, y + h / 2 - 6);
+    fitText(g, "LONGHAUL RANCH", x + w / 2, y + h / 2 - 6, w - 12, "ranch");
     return;
   }
 }
@@ -1572,7 +1572,7 @@ function hAgentArt(a) {
   g.font = "900 14px Georgia,serif";
   g.textAlign = "center";
   g.textBaseline = "middle";
-  g.fillText(a.name.toUpperCase(), bx + bw / 2, ay - 0.29 * u, bw - 16);
+  fitText(g, a.name.toUpperCase(), bx + bw / 2, ay - 0.29 * u, bw - 8, "estate-agent", { wrap: false });
   g.textBaseline = "alphabetic";
   // bollards along the pavement
   g.fillStyle = "#30353c";
@@ -1769,7 +1769,7 @@ function drawHomes(vx0, vy0, vx1, vy1) {
     ctx.fillStyle = "#fff";
     ctx.font = "bold 9px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText(own ? "HOME" : "FOR SALE", bx + 22, by + 13);
+    fitText(ctx, own ? "HOME" : "FOR SALE", bx + 22, by + 13, 38, "home-board", { wrap: false });
     ctx.textAlign = "left";
     if (dark > 0.05 && typeof dnLight === "function") {
       for (const L of h.lights) dnLight(L[0], L[1], L[2], L[3], L[4] * (own ? 1 : 0.55));

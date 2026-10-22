@@ -1682,13 +1682,14 @@ function drawFuelSign(g, o) {
   g.fillRect(o.x - 10, o.y + 8, 30, 16);
   g.fillStyle = "#55595f";
   g.fillRect(o.x - 2, o.y, 4, 30);
+  const fw = Math.max(44, Math.min(60, signNeed(g, o.brand, 9, "bold ", "Arial") + 8)); // v71: widens for long brands
   g.fillStyle = o.col;
-  g.fillRect(o.x - 22, o.y - 26, 44, 34);
+  g.fillRect(o.x - fw / 2, o.y - 26, fw, 34);
   g.fillStyle = "#fff";
   g.font = "bold 9px Arial";
   g.textAlign = "center";
   g.textBaseline = "middle";
-  g.fillText(o.brand, o.x, o.y - 18);
+  fitText(g, o.brand, o.x, o.y - 18, fw - 4, "fuel-sign", { wrap: false });
   g.fillStyle = "#111";
   g.fillRect(o.x - 18, o.y - 10, 36, 14);
   g.fillStyle = "#ffcf33";

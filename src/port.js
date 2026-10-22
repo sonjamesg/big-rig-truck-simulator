@@ -2802,7 +2802,7 @@ function drawPortPickBays(vx0, vy0, vx1, vy1) {
       ctx.save();
       ctx.translate(-6.8 * S, 0);
       if (Math.abs(Math.atan2(f[1], f[0])) > Math.PI / 2) ctx.rotate(Math.PI);
-      ctx.fillText("CONTAINER PICKUP", 0, 0);
+      fitText(ctx, "CONTAINER PICKUP", 0, 0, 15.5 * S, "port-pickup", { wrap: false });
       ctx.restore();
       ctx.restore();
       if (typeof DN !== "undefined" && DN.dark > 0.05)
@@ -3220,7 +3220,7 @@ function dgLabel(P, g) {
   ctx.fillStyle = "rgba(0,0,0,0.6)";
   ctx.fillRect(-32, -9, 64, 18);
   ctx.fillStyle = g.name === "IN" ? "#7dffa8" : "#ffd36b";
-  ctx.fillText("GATE " + g.name, 0, 1);
+  fitText(ctx, "GATE " + g.name, 0, 1, 58, "port-gate", { wrap: false });
   ctx.restore();
 }
 function dgLamp(x, y, green, K) {

@@ -554,7 +554,7 @@ function svcSign(g, x, y, w, h, bg, fg, txt, font) {
   g.font = font || "900 " + Math.round(h * 0.62) + "px Arial";
   g.textAlign = "center";
   g.textBaseline = "middle";
-  g.fillText(txt, x + w / 2, y + h / 2 + 1);
+  fitText(g, txt, x + w / 2, y + h / 2 + 1, w - 10, "svc-sign", { wrap: false });
 }
 OBJX.svc = (g, o) => {
   const s = o.s,
@@ -606,7 +606,7 @@ OBJX.svc = (g, o) => {
     g.fillStyle = "#fff";
     g.font = "bold 14px Arial";
     g.textAlign = "center";
-    g.fillText(s.town.toUpperCase(), hx + hw / 2, hy + hh * 0.3);
+    fitText(g, s.town.toUpperCase(), hx + hw / 2, hy + hh * 0.3, hw - 16, "fire-town", { wrap: false });
     const t = P.tower,
       tx = X(t.x),
       ty = X(t.y),
@@ -683,7 +683,7 @@ OBJX.svc = (g, o) => {
     g.fillStyle = "#24303f";
     g.font = "bold 13px Arial";
     g.textAlign = "left";
-    g.fillText(s.town.toUpperCase(), mx + mw * 0.08, my + 70);
+    fitText(g, s.town.toUpperCase(), mx + mw * 0.08, my + 70, mw * 0.84, "police-town", { wrap: false });
     const lx = mx + mw / 2,
       ly = my - 6;
     g.fillStyle = "#222";
@@ -752,7 +752,7 @@ OBJX.svc = (g, o) => {
     g.fillStyle = "#24303f";
     g.font = "bold 12px Arial";
     g.textAlign = "left";
-    g.fillText(s.name.toUpperCase(), mx + mw * 0.08, my + mh - 48);
+    fitText(g, s.name.toUpperCase(), mx + mw * 0.08, my + mh - 48, mw * 0.84, "hospital-name", { wrap: false });
     const cx = X(c.x),
       cy = X(c.y),
       cw = X(c.w),

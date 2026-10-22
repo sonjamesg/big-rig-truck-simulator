@@ -343,10 +343,10 @@ OBJX.bm = function (g, o) {
   g.font = "bold 17px sans-serif";
   g.textAlign = "center";
   g.textBaseline = "middle";
-  g.fillText(Y.name.toUpperCase(), sx + 3 * T_, sy + 0.55 * T_);
+  fitText(g, Y.name.toUpperCase(), sx + 3 * T_, sy + 0.55 * T_, 6 * T_ - 16, "bm-yard", { wrap: false });
   g.fillStyle = "#e8e0e0";
   g.font = "bold 11px sans-serif";
-  g.fillText("CASH ONLY \u2022 NO QUESTIONS \u2022 \u2620", sx + 3 * T_, sy + 1.1 * T_);
+  fitText(g, "CASH ONLY \u2022 NO QUESTIONS \u2022 \u2620", sx + 3 * T_, sy + 1.1 * T_, 6 * T_ - 16, "bm-yard-sub", { wrap: false });
 };
 // ---------------------------------------------------------------- mission registry (add more theft jobs here)
 // each entry: { id, name, pay, xp, risk, blurb, steps(a) -> [labels], start(a) -> bool, update(a, dt), onCouple(a, tr), onUncouple(a, tr) }

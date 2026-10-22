@@ -606,7 +606,7 @@ function drawLorryPark(g, o) {
   for (let x = o.x + TILE; x < o.x + o.w - TILE; x += 30) g.fillRect(x, o.y + o.h / 2 - 1.5, 16, 3);
   g.fillStyle = "rgba(255,255,255,0.85)";
   g.font = "bold 26px sans-serif";
-  g.fillText("HGV LORRY PARK", o.x + o.w / 2, o.y + o.h / 2 - 24);
+  fitText(g, "HGV LORRY PARK", o.x + o.w / 2, o.y + o.h / 2 - 24, o.w - 16, "lorry-park");
 }
 function drawShadowRect(g, x, y, w, h, s) {
   g.fillStyle = "rgba(10,15,25,0.33)";
@@ -839,17 +839,18 @@ function roof(g, o) {
       g.font = "bold 22px sans-serif";
       g.textAlign = "center";
       g.textBaseline = "middle";
-      g.fillText("BIG RIG HAULAGE", x + w / 2, y + h / 2);
+      fitText(g, "BIG RIG HAULAGE", x + w / 2, y + h / 2, w - 16, "depot-roof");
     }
     if (o.logo) {
       g.save();
       g.fillStyle = "rgba(255,255,255,0.85)";
-      g.fillRect(x + w / 2 - o.logo.length * 8 - 10, y + h / 2 - 16, o.logo.length * 16 + 20, 32);
+      const lw = Math.min(w - 8, signNeed(g, o.logo, 22, "900 ", "Arial Black,Arial,sans-serif") + 20);
+      g.fillRect(x + w / 2 - lw / 2, y + h / 2 - 16, lw, 32);
       g.fillStyle = "#22324a";
       g.font = "900 22px Arial Black,Arial,sans-serif";
       g.textAlign = "center";
       g.textBaseline = "middle";
-      g.fillText(o.logo, x + w / 2, y + h / 2 + 1);
+      fitText(g, o.logo, x + w / 2, y + h / 2 + 1, lw - 16, "roof-logo", { wrap: false });
       g.restore();
     }
   }
@@ -876,7 +877,7 @@ function roof(g, o) {
     g.fillStyle = "#d32f2f";
     g.font = "bold 16px sans-serif";
     g.textAlign = "center";
-    g.fillText("CITY HOSPITAL", x + w / 2, y + 18);
+    fitText(g, "CITY HOSPITAL", x + w / 2, y + 18, w - 12, "city-hospital", { wrap: false });
   }
   if (st === "supermarket") {
     g.fillStyle = "#e4e6e9";

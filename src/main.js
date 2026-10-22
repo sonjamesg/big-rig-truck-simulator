@@ -1277,13 +1277,9 @@ function drawOverhead(o) {
       ctx.font = "900 26px Arial Black,Arial";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(o.brand, o.x + o.w / 2, o.y + o.h / 2 - 14);
+      fitText(ctx, o.brand, o.x + o.w / 2, o.y + o.h / 2 - 14, o.w - 24, "fuel-canopy", { wrap: false });
       ctx.font = "bold 16px sans-serif";
-      ctx.fillText(
-        o.hgv ? "HGV \u2022 HIGH CLEARANCE" : "CARS \u2022 VANS",
-        o.x + o.w / 2,
-        o.y + o.h / 2 + 16,
-      );
+      fitText(ctx, o.hgv ? "HGV \u2022 HIGH CLEARANCE" : "CARS \u2022 VANS", o.x + o.w / 2, o.y + o.h / 2 + 16, o.w - 24, "fuel-canopy-sub", { wrap: false });
       ctx.globalAlpha = 1;
       return;
     }
