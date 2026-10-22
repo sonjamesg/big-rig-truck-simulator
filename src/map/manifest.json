@@ -200,11 +200,6 @@
   },
   {
    "root": "world",
-   "key": "rbfix",
-   "file": "state/world.rbfix.json"
-  },
-  {
-   "root": "world",
    "key": "bends",
    "file": "state/world.bends.json"
   },
@@ -455,18 +450,8 @@
   },
   {
    "root": "RAIL",
-   "key": "_GW",
-   "file": "state/RAIL._GW.json"
-  },
-  {
-   "root": "RAIL",
    "key": "route",
    "file": "state/RAIL.route.json"
-  },
-  {
-   "root": "RAIL",
-   "key": "_all",
-   "file": "state/RAIL._all.json"
   },
   {
    "root": "RAIL",

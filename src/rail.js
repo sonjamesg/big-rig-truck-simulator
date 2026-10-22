@@ -294,7 +294,10 @@ function railInKey(H) {
 function railCacheGet(k) {
   try {
     const B = window.RAIL_BAKE;
-    if (B && B.k === k) return { raw: railUnpack(B.raw), route: JSON.parse(B.route), src: "bake" };
+    // v64: a pinned bake (B.pin) is the main line's fixed alignment: used even when road edits change the router's inputs,
+    // so the railway never moves on its own (railAirportForce then lays the terminal stretch on top)
+    if (B && (B.k === k || (B.pin && !window.__NOPIN)))
+      return { raw: railUnpack(B.raw), route: JSON.parse(B.route), src: B.pin ? "pin" : "bake" };
     const s = localStorage.getItem("bigrig.railc");
     if (s) {
       const o = JSON.parse(s);
@@ -1425,7 +1428,7 @@ function* railRouteSteps(objs) {
 // v64 (James 22 Oct): the main line runs straight through the middle of the Albion Airport terminal (Airport
 // Station under the concourse). Road edits used to let the router swing it round the south side; the stretch
 // between the west line (x157) and the east curve (638,690) is now a fixed alignment.
-const RAIL_AP_FORCE = { a: [157, 640], b: [640, 688], y: 673 };
+const RAIL_AP_FORCE = { a: [157, 640], b: [675, 655], y: 673 };
 function railAirportForce(raw) {
   const F = RAIL_AP_FORCE,
     n = raw.length,
@@ -1461,7 +1464,7 @@ function railAirportForce(raw) {
     pts.push([ax + R * (1 - Math.cos(t)), y - R + R * Math.sin(t)]);
   }
   // straight through the terminal, then a gentle S-free ease down onto the east anchor
-  const xe = B[0] - 70 * M_T;
+  const xe = B[0] - 60 * M_T;
   for (let xx = ax + R + 4; xx < xe; xx += 4) pts.push([xx, y]);
   const nB = raw[(ib + (fwd ? 1 : -1) + n) % n],
     tx = nB[0] - B[0],

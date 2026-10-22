@@ -16,12 +16,12 @@
   ["G15","Kingsbridge Central Truck Repairs",6540,6192,{"x":6540,"y":6174},45,"Highmoor"],
   ["G16","Kingsbridge Park Truck Repairs",6744,6224,{"x":6744,"y":6206},45,"Highmoor"],
   ["G17","Millford South Truck Repairs",1236,3464,{"x":1236,"y":3446},45,"Westmere"],
-  ["G18","Millford West Truck Repairs",1180,3348,{"x":1180,"y":3330},45,"Westmere"],
+  ["G18","Millford West Truck Repairs",1452,2932,{"x":1452,"y":2914},45,"Westmere"],
   ["G19","Millford Central Truck Repairs",1184,3264,{"x":1184,"y":3246},45,"Westmere"],
   ["G20","Coppermine Central Truck Repairs",6144,2108,{"x":6144,"y":2090},45,"The Sandreach"],
   ["G21","Redhill South Truck Repairs",4156,5016,{"x":4156,"y":4998},45,"Highmoor"],
-  ["G22","Redhill West Truck Repairs",4028,4820,{"x":4028,"y":4802},45,"Highmoor"],
-  ["G23","Redhill Central Truck Repairs",4152,4824,{"x":4152,"y":4806},45,"Highmoor"],
+  ["G22","Redhill West Truck Repairs",3988,4916,{"x":3988,"y":4898},45,"Highmoor"],
+  ["G23","Redhill Central Truck Repairs",4000,4664,{"x":4000,"y":4646},45,"Highmoor"],
   ["G24","Fenwick Central Truck Repairs",6160,4616,{"x":6160,"y":4598},45,"Highmoor"],
   ["G25","Ashby Central Truck Repairs",1012,4516,{"x":1012,"y":4506},45,"Westmere"]
  ]}

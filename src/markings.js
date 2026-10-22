@@ -30,6 +30,7 @@ function jOptions(J, sg, d) {
     if (!ok) continue;
     const cv = dirVec(C, cd),
       z = hv[0] * cv[1] - hv[1] * cv[0];
+    if (C.ow && cd !== C.ow) continue; // v64: one-way roads: no turn against the flow
     opts.push([z < 0 ? "L" : "R", C, cd, z < 0 ? 2.6 : 2.2]);
   }
   return { stop, exitA, C, opts, cs, ce };
@@ -111,6 +112,7 @@ function buildMarkings(objs) {
       for (const d of [1, -1]) {
         const [js, je] = jRange(sg, J);
         if (!(d > 0 ? sg.b0 < js - 0.5 : sg.b1 + 1 > je + 0.5)) continue;
+        if (sg.ow && d !== sg.ow) continue; // v64: one-way road: no approach against the flow
         const o = jOptions(J, sg, d);
         if (!o.opts.length) continue;
         const cw = sg.type === "city" || sg.type === "town" || sg.type === "res",
@@ -164,11 +166,15 @@ function buildMarkings(objs) {
             });
         }
         if (!J.lights && J.y === 716 && (J.x === 410 || J.x === 346)) m.noArr = true;
-        if (!J.lights && (J.x === 392 || J.x === 431) && J.y === 689) m.noArr = true; // v40: airport access L-bends: plain corners, no turn arrows
         if (!J.lights && ((J.x === 470 && J.y === 222) || (J.x === 1715 && J.y === 1697))) m.noArr = true; // v65: plain corners
         // v53: the push below had been swallowed by the comment above since v40 (no approach marks were baked). Restored for
         // the UK junctions only; the other junctions' marks stay off until James has reviewed them
         if (J.uk) {
+          objs.push(m);
+          world.marks.push(m);
+        } else if (m.mode === "gw" && J.y === 716 && (J.x === 410 || J.x === 494 || J.x === 528)) {
+          // v64: Albion landside T-junctions: the minor arm (loop exit, long-stay ring) gets its give-way lines + triangle
+          apprBox(m);
           objs.push(m);
           world.marks.push(m);
         }
@@ -355,8 +361,9 @@ function drawApproach(g, o) {
   const nl = nLanes(sg),
     rows = [];
   for (let i = 0; i < nl; i++) rows.push(laneLat(sg, d, i));
-  const rmin = Math.min(...rows),
-    rmax = Math.max(...rows) + 1;
+  const ow = !!sg.ow; // v64: one-way road: give-way line kerb to kerb, triangle/arrow on the carriageway centre
+  const rmin = ow ? sg.a : Math.min(...rows),
+    rmax = ow ? sg.a + sg.w : Math.max(...rows) + 1;
   const Cb = sg.a + sg.w / 2,
     a1 = o.lineA,
     L = o.Lapp,
@@ -371,7 +378,7 @@ function drawApproach(g, o) {
     fn();
     g.restore();
   };
-  if (L > 0) {
+  if (L > 0 && !ow) {
     g.fillStyle = g.createPattern(TEX.asph[1], "repeat");
     for (let b = rmin + 1; b < rmax; b++) rect(a0, a1, b - 0.07, b + 0.12);
     if (!hw) rect(a0, a1, Cb - 0.12, Cb + 0.07);
@@ -396,8 +403,8 @@ function drawApproach(g, o) {
     }
   }
   if (L < 2) return;
-  for (let i = 0; i < nl; i++) {
-    const cr = laneLat(sg, d, i) + 0.5;
+  for (let i = 0; i < (ow ? 1 : nl); i++) {
+    const cr = ow ? Cb : laneLat(sg, d, i) + 0.5;
     if (o.mode === "gw" && L >= 3)
       at(a1 - d * 2.0, cr, () => {
         g.strokeStyle = "#ececec";

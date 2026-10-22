@@ -645,8 +645,14 @@ function* buildDepotsSteps(objs, R) {
     });
     dp.region = region(H.x, H.y);
   }
+  const DEPOT_PIN = { "Albion Airport Cargo": [402, 721] }; // v64: keeps its live spot on Airport Way (the landside rebuild freed land nearer its anchor)
   for (const [n, c, tier, tx, ty] of plan) {
-    const s = findSpot(tx, ty, 20, 15);
+    const pin = DEPOT_PIN[n],
+      ps = pin && findSpot(pin[0], pin[1], 20, 15),
+      s =
+        ps && Math.abs(ps[0] - pin[0]) <= 2 && Math.abs(ps[1] - pin[1]) <= 2
+          ? ps
+          : findSpot(tx, ty, 20, 15);
     if (!s) {
       console.warn("no depot spot", n);
       continue;

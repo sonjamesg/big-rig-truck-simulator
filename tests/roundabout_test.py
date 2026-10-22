@@ -36,7 +36,8 @@ async def main():
     await pg.keyboard.press('Enter'); await pg.wait_for_timeout(500)
     geo=await pg.evaluate(GEO); ok=all(r['offTarmac']==0 and r['inSplitter']==0 and r['gaps']==0 and r['splitters']==0 for r in geo)  # v63: splitter islands removed
     runs=[]
-    for rid in [0,1,3,4,6]:
+    nrb=await pg.evaluate("__bigrig.world.rbs.length")
+    for rid in range(nrb):  # v64: Kingsbridge corners are signals now; test every roundabout left
       await pg.evaluate(START+f"({rid})"); await pg.wait_for_timeout(SECS*1000); r=await pg.evaluate(STOP); runs.append(r); print(json.dumps(r),flush=True)
       if r['stuck'] or r['collisions'] or r['vehicles']<5: ok=False
     if errs: ok=False

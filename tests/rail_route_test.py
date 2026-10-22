@@ -53,7 +53,7 @@ async def main():
     cr=await pg.evaluate("""(()=>{ const R=__bigrig.RAIL; const c=R.cross.find(c=>!c.over); if(!c) return {none:1}; let closed=0,open=0; for(let t=0;t<2400;t+=2){ const st=__bigrig.railCrossState(c,t); if(st.f>0.9) closed++; else if(st.f<0.05) open++; } return {closed,open}; })()""")
     if not cr.get('none') and (cr['closed']==0 or cr['open']==0): a['fail'].append('crossing never cycles '+json.dumps(cr))
     # fast travel to a station
-    ft=await pg.evaluate("""(()=>{ const P=railPOIs(); const t=__bigrig.truck; if(t.trl){ t.trl.coupled=false; t.trl=null; } t.v=0; const st=P.find(q=>/Millford/.test(q.name))||P[0]; const x0=t.x; t.money=1e6; const ok=fastTravel(st); return {ok,name:st.name,sx:st.x,sy:st.y}; })()""")
+    ft=await pg.evaluate("""(()=>{ const F=__bigrig.BigRig.fog; if(F&&F.revealAll) F.revealAll(); const P=railPOIs(); const t=__bigrig.truck; if(t.trl){ t.trl.coupled=false; t.trl=null; } t.v=0; const st=P.find(q=>/Millford/.test(q.name))||P[0]; const x0=t.x; t.money=1e6; const ok=fastTravel(st); return {ok,name:st.name,sx:st.x,sy:st.y}; })()""")
     await pg.wait_for_timeout(1500)
     pos=await pg.evaluate("[__bigrig.truck.x,__bigrig.truck.y]")
     d=((pos[0]-ft['sx'])**2+(pos[1]-ft['sy'])**2)**0.5

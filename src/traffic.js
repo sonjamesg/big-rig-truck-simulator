@@ -655,6 +655,10 @@ function planPiece(v, r) {
       const f = opts.filter((q) => !(q[1] && q[1].mil)); // v45: civilians never turn into the military base
       if (f.length) opts = f;
     }
+    {
+      const f = opts.filter((q) => !(q[1] && q[1].ow && q[2] !== q[1].ow)); // v64: never turn into a one-way road against the flow
+      if (f.length) opts = f;
+    }
     const distT = Math.abs(lineA - P.pos),
       allOpts = opts;
     if (lanes && distT < 5) {
@@ -1150,7 +1154,7 @@ function spawnVehicle(x, y, force, opt) {
   if (along < sg.b0 + 2 || along > sg.b1 - 1) return null;
   if (segDeadEnd(sg)) return null; // v26: never spawn onto a road that leads nowhere
   if (sg.mil && mbFull()) return null; // v45: base traffic capped (MB_CAP military vehicles in total)
-  const dir = opt && opt.dir ? opt.dir : r() < 0.5 ? 1 : -1,
+  const dir = sg.ow ? sg.ow : opt && opt.dir ? opt.dir : r() < 0.5 ? 1 : -1, // v64: one-way roads (sg.ow)
     lane = opt ? Math.min(opt.lane || 0, nLanes(sg) - 1) : (r() * nLanes(sg)) | 0;
   const p = lanePt(sg, dir, lane, along);
   const kind =

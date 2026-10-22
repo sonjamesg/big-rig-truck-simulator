@@ -1249,39 +1249,31 @@ function apLandside(A, night) {
     T_ = TILE,
     rnd = mulberry(77);
   // drop-off loop + kerbside along the terminal front (real road tiles already laid; this is the painted surface)
-  // v41: arrivals frontage is a real road now (392..433 x 692..694, v44: moved south clear of the canopy); paint drop-off bays + DROP OFF lettering on the kerb lane by the doors, zebras across to the car parks
+  // v64: departures loop (one-way: x410 north, 692 east along the terminal kerb, x494 south). Drop-off bays in the kerb
+  // lane by the doors, one-way arrows, ONE WAY / NO ENTRY signs at the two T-junctions, zebra from the short stay.
   g.strokeStyle = "#f0f0f0";
-  g.lineWidth = 0.14 * T_;
-  for (const bx of APX_BAYS) {
-    g.strokeRect((bx - 2.4) * T_, 692.1 * T_, 4.8 * T_, 1.1 * T_);
-  }
-  g.fillStyle = "rgba(255,255,255,0.85)";
-  g.font = "bold " + 0.55 * T_ + "px sans-serif";
+  g.lineWidth = 0.12 * T_;
+  for (const bx of APX_BAYS) g.strokeRect((bx - 2.2) * T_, 692.12 * T_, 4.4 * T_, 0.9 * T_);
+  g.fillStyle = "rgba(255,255,255,0.88)";
+  g.font = "bold " + 0.42 * T_ + "px sans-serif";
   g.textAlign = "center";
-  for (const bx of APX_BAYS) g.fillText("DROP OFF", bx * T_, 692.85 * T_);
+  for (const bx of APX_BAYS) g.fillText("DROP OFF", bx * T_, 692.72 * T_);
   g.textAlign = "left";
-  g.fillStyle = "#f0f0f0";
-  for (const zx of [398, 424]) {
-    for (let k = 0; k < 5; k++) g.fillRect((zx + k * 0.7) * T_, 692.2 * T_, 0.4 * T_, 2.6 * T_);
-  }
-  // v40: tidy outer kerb on the access road's south-east L-bend (410..414,716..720): pave outside a 4-tile arc round the inner corner
-  {
-    const cx = 410 * T_,
-      cy = 716 * T_,
-      r = 4 * T_;
-    g.fillStyle = "#c4c2bb";
-    g.beginPath();
-    g.moveTo(cx + r, cy + r);
-    g.lineTo(cx + r, cy);
-    g.arc(cx, cy, r, 0, Math.PI / 2, false);
-    g.closePath();
-    g.fill();
-    g.strokeStyle = "#e2dfd6";
-    g.lineWidth = 0.18 * T_;
-    g.beginPath();
-    g.arc(cx, cy, r - 0.1 * T_, 0, Math.PI / 2, false);
-    g.stroke();
-  }
+  // kerb lane edge (bays | running lane), dashed
+  g.fillStyle = "rgba(240,240,240,0.8)";
+  for (let x = 419; x < 488; x += 1.5) g.fillRect(x * T_, 693.02 * T_, 0.75 * T_, 0.1 * T_);
+  for (const [x, y, dx, dy] of [
+    [411.5, 711, 0, -1],
+    [411.5, 703.5, 0, -1],
+    [425, 693.85, 1, 0],
+    [470, 693.85, 1, 0],
+    [495.5, 698, 0, 1],
+    [495.5, 705, 0, 1],
+  ])
+    apArrow(g, x * T_, y * T_, dx, dy, T_);
+  for (let k = 0; k < 6; k++) g.fillRect((451.2 + k * 0.62) * T_, 692.15 * T_, 0.36 * T_, 2.7 * T_);
+  apSign(g, 413.6 * T_, 714.6 * T_, "oneway", T_);
+  apSign(g, 497.6 * T_, 714.6 * T_, "noentry", T_);
   // v42: multi-storey = open top deck (real parked cars come from initParked on its lot object): parapet wall, stair/lift cores, ramp, signs
   {
     const m = A.ms,
@@ -1338,21 +1330,182 @@ function apLandside(A, night) {
     g.font = "bold 30px sans-serif";
     g.fillText("MULTI-STOREY • ENTRANCE →", (m.x0 + 4) * T_, (m.y0 - 0.6) * T_);
   }
-  // surface car park bay paint (cars come from initParked on the lot objects)
-  for (const L of A.lots || []) {
-    g.fillStyle = "#f4d03f";
-    g.font = "bold 50px sans-serif";
-    g.fillText("P", (L.x0 + 0.6) * T_, (L.y0 + 1.9) * T_);
-  }
-  // animated cars: loop from the access road into a bay then leave (pure function of timeS)
+  // v64 secure surface car parks: fence + posts, barrier gates with booths (arm lifts for a vehicle at the gate), aisle
+  // arrows, names. Bays are baked from the lot objects; parked cars come from initParked.
+  for (const L of A.lots || []) apLotDraw(g, L, T_);
   // pedestrians between parks, drop-off and the terminal doors
   apPeds(A);
   apDropPeds();
   if (night > 0.05 && typeof dnLight === "function") {
-    for (let x = 360; x < 442; x += 10) dnLight(x * T_, 691 * T_, 90, "rgba(255,225,170,0.7)", 0.7);
-    dnLight(431 * T_, 710 * T_, 160, "rgba(255,225,170,0.6)", 0.6);
-    dnLight(370 * T_, 702 * T_, 200, "rgba(255,225,170,0.55)", 0.55);
+    for (let x = 360; x < 492; x += 10) dnLight(x * T_, 691 * T_, 90, "rgba(255,225,170,0.7)", 0.7);
+    for (const L of A.lots || [])
+      for (let x = L.x0 + 8; x < L.x1 - 4; x += 16)
+        dnLight(x * T_, ((L.y0 + L.y1) / 2) * T_, 190, "rgba(255,232,190,0.55)", 0.55);
+    dnLight(393 * T_, 702 * T_, 200, "rgba(255,225,170,0.55)", 0.55);
   }
+}
+function apArrow(g, X, Y, dx, dy, T_) {
+  g.save();
+  g.translate(X, Y);
+  g.rotate(Math.atan2(dy, dx));
+  g.fillStyle = "rgba(245,245,245,0.9)";
+  g.beginPath();
+  g.moveTo(1.3 * T_, 0);
+  g.lineTo(0.3 * T_, -0.55 * T_);
+  g.lineTo(0.3 * T_, -0.2 * T_);
+  g.lineTo(-1.3 * T_, -0.2 * T_);
+  g.lineTo(-1.3 * T_, 0.2 * T_);
+  g.lineTo(0.3 * T_, 0.2 * T_);
+  g.lineTo(0.3 * T_, 0.55 * T_);
+  g.closePath();
+  g.fill();
+  g.restore();
+}
+function apSign(g, X, Y, k, T_) {
+  g.fillStyle = "rgba(0,0,0,0.25)";
+  g.beginPath();
+  g.arc(X + 4, Y + 4, 0.42 * T_, 0, 7);
+  g.fill();
+  g.fillStyle = "#7f8c8d";
+  g.fillRect(X - 1.5, Y - 1.5, 3, 3);
+  if (k === "noentry") {
+    g.fillStyle = "#c0392b";
+    g.beginPath();
+    g.arc(X, Y, 0.42 * T_, 0, 7);
+    g.fill();
+    g.fillStyle = "#fff";
+    g.fillRect(X - 0.28 * T_, Y - 0.07 * T_, 0.56 * T_, 0.14 * T_);
+  } else {
+    g.fillStyle = "#1f5fa8";
+    g.fillRect(X - 0.5 * T_, Y - 0.28 * T_, T_, 0.56 * T_);
+    g.fillStyle = "#fff";
+    g.fillRect(X - 0.36 * T_, Y - 0.05 * T_, 0.56 * T_, 0.1 * T_);
+    g.beginPath();
+    g.moveTo(X + 0.38 * T_, Y);
+    g.lineTo(X + 0.16 * T_, Y - 0.16 * T_);
+    g.lineTo(X + 0.16 * T_, Y + 0.16 * T_);
+    g.closePath();
+    g.fill();
+  }
+}
+// gate arm state: up while any vehicle (player or AI) is within 3 tiles of the gate opening
+function apGateOpen(gt) {
+  const cx = gt.x * M_T,
+    cy = ((gt.y0 + gt.y1) / 2) * M_T,
+    near = (x, y) => Math.abs(x - cx) < 14 && Math.abs(y - cy) < 8;
+  if (typeof truck !== "undefined" && near(truck.x, truck.y)) return true;
+  if (typeof traffic !== "undefined" && traffic.vs) for (const v of traffic.vs) if (near(v.x, v.y)) return true;
+  return false;
+}
+function apLotDraw(g, L, T_) {
+  const x0 = L.x0 * T_,
+    y0 = L.y0 * T_,
+    x1 = L.x1 * T_,
+    y1 = L.y1 * T_,
+    gaps = (side) =>
+      L.gates
+        .filter((q) => q.side === side)
+        .map((q) => [q.y0 * T_, q.y1 * T_])
+        .concat(side === 0 && L.ped ? [[L.ped.x0 * T_, L.ped.x1 * T_]] : []);
+  // fence: dark green weld mesh with posts every 2 tiles; gaps at the gates (west / east sides) and the pedestrian gate (north)
+  const run = (ax, ay, bx, by, gp) => {
+    const hz = ay === by,
+      lo = hz ? Math.min(ax, bx) : Math.min(ay, by),
+      hi = hz ? Math.max(ax, bx) : Math.max(ay, by);
+    const segs = [];
+    let c = lo;
+    for (const [p, q] of gp.sort((u, v) => u[0] - v[0])) {
+      if (p > c) segs.push([c, p]);
+      c = Math.max(c, q);
+    }
+    if (c < hi) segs.push([c, hi]);
+    for (const [p, q] of segs) {
+      g.strokeStyle = "rgba(0,0,0,0.25)";
+      g.lineWidth = 0.16 * T_;
+      g.beginPath();
+      if (hz) {
+        g.moveTo(p + 3, ay + 3);
+        g.lineTo(q + 3, ay + 3);
+      } else {
+        g.moveTo(ax + 3, p + 3);
+        g.lineTo(ax + 3, q + 3);
+      }
+      g.stroke();
+      g.strokeStyle = "#2f4f3a";
+      g.lineWidth = 0.12 * T_;
+      g.beginPath();
+      if (hz) {
+        g.moveTo(p, ay);
+        g.lineTo(q, ay);
+      } else {
+        g.moveTo(ax, p);
+        g.lineTo(ax, q);
+      }
+      g.stroke();
+      g.fillStyle = "#1e3326";
+      for (let t = p; t <= q + 0.5; t += 2 * T_) {
+        if (hz) g.fillRect(t - 2.5, ay - 2.5, 5, 5);
+        else g.fillRect(ax - 2.5, t - 2.5, 5, 5);
+      }
+    }
+  };
+  run(x0, y0, x1, y0, gaps(0));
+  run(x0, y1, x1, y1, []);
+  run(x0, y0, x0, y1, gaps(-1));
+  run(x1, y0, x1, y1, gaps(1));
+  // gates: booth on the inside kerb, red/white arm across the opening (lifts when a vehicle is at it), ENTRY/EXIT paint
+  for (const gt of L.gates) {
+    const X = gt.x * T_,
+      Ya = gt.y0 * T_,
+      Yb = gt.y1 * T_,
+      inS = -gt.side,
+      bx = X + inS * 1.1 * T_,
+      by = (gt.kind === "in" ? Ya - 0.15 * T_ : Yb + 0.15 * T_),
+      up = apGateOpen(gt);
+    g.fillStyle = "rgba(0,0,0,0.28)";
+    g.fillRect(bx - 0.55 * T_ + 5, by - 0.55 * T_ + 5, 1.1 * T_, 1.1 * T_);
+    g.fillStyle = "#ecf0f1";
+    g.fillRect(bx - 0.55 * T_, by - 0.55 * T_, 1.1 * T_, 1.1 * T_);
+    g.fillStyle = "#1f5fa8";
+    g.fillRect(bx - 0.55 * T_, by - 0.55 * T_, 1.1 * T_, 0.32 * T_);
+    g.fillStyle = "#85c1e9";
+    g.fillRect(bx - 0.42 * T_, by - 0.12 * T_, 0.84 * T_, 0.3 * T_);
+    // arm pivots at the booth end of the opening
+    const px = X,
+      py = gt.kind === "in" ? Ya : Yb,
+      dir = gt.kind === "in" ? 1 : -1,
+      len = (Yb - Ya) * 0.96;
+    g.fillStyle = "#34495e";
+    g.fillRect(px - 4, py - 4, 8, 8);
+    g.save();
+    g.translate(px, py);
+    if (up) g.scale(1, 0.18);
+    g.fillStyle = "#fdfefe";
+    g.fillRect(-2.5, 0, 5, dir * len);
+    g.fillStyle = "#c0392b";
+    for (let t = 0.12; t < 1; t += 0.25) g.fillRect(-2.5, dir * len * t, 5, dir * len * 0.12);
+    g.restore();
+    g.fillStyle = "rgba(255,255,255,0.85)";
+    g.font = "bold " + 0.45 * T_ + "px sans-serif";
+    g.textAlign = "center";
+    g.fillText(gt.kind === "in" ? "ENTRY" : "EXIT", X + inS * 2.4 * T_, ((gt.y0 + gt.y1) / 2 + 0.17) * T_);
+    g.textAlign = "left";
+  }
+  // aisle arrows: one-way circulation in from the entry gate, round, out at the exit
+  for (let k = 0; k < L.gates.length; k++) {
+    const gt = L.gates[k],
+      y = ((gt.y0 + gt.y1) / 2) * T_;
+    apArrow(g, (gt.x - gt.side * 4) * T_, y, gt.kind === "in" ? -gt.side : gt.side, 0, T_ * 0.8);
+  }
+  // name board + P
+  g.fillStyle = "#1f5fa8";
+  g.fillRect(x0 + 0.3 * T_, y1 - 1.55 * T_, 1.2 * T_, 1.2 * T_);
+  g.fillStyle = "#fff";
+  g.font = "bold " + 1.0 * T_ + "px sans-serif";
+  g.fillText("P", x0 + 0.52 * T_, y1 - 0.5 * T_);
+  g.fillStyle = "rgba(255,255,255,0.9)";
+  g.font = "bold " + 0.7 * T_ + "px sans-serif";
+  g.fillText(L.name, x0 + 1.9 * T_, y1 - 0.62 * T_);
 }
 function apCar(g, x, y, h, col, L) {
   g.save();
@@ -1369,94 +1522,6 @@ function apCar(g, x, y, h, col, L) {
   g.fillStyle = "#7f8c8d";
   g.fillRect(-L * 0.15, -7, L * 0.35, 14);
   g.restore();
-}
-// v40: real park/leave cycle. Parked AI cars at a few kerb-row slots next to the 708 car-park road are lifted out of traffic.parked
-// and animated: drive in along the lane, swing into the slot, park (driver walks to the terminal), pull out and drive on.
-function apSlots(A) {
-  if (A.slots) return A.slots;
-  A.slots = [];
-  if (typeof traffic === "undefined" || !traffic.parked || !traffic.parked.length) return A.slots;
-  for (const L of A.lots || []) {
-    const xs = L.x0 * 4,
-      xe = L.x1 * 4;
-    const row = traffic.parked
-      .filter((v) => v.x > xs + 3 && v.x < xe - 3 && v.y > 2822 && v.y < 2832)
-      .sort((a, b) => a.x - b.x);
-    if (!row.length) continue;
-    const ry = row[0].y,
-      pick = [];
-    for (let x = xs + 4; x < xe - 4; x += 2.8) {
-      if (pick.length >= 5) break;
-      if (((x * 7) | 0) % 3 === 0) pick.push(x);
-    }
-    for (const x of pick) {
-      for (let k = traffic.parked.length - 1; k >= 0; k--) {
-        const v = traffic.parked[k];
-        if (Math.abs(v.x - x) < 1.6 && Math.abs(v.y - ry) < 1.5) traffic.parked.splice(k, 1);
-      }
-      if (traffic.parkedIdx)
-        for (const arr of traffic.parkedIdx.values())
-          for (let k = arr.length - 1; k >= 0; k--)
-            if (Math.abs(arr[k].x - x) < 1.6 && Math.abs(arr[k].y - ry) < 1.5) arr.splice(k, 1);
-      A.slots.push({ x, y: ry, i: A.slots.length });
-    }
-  }
-  return A.slots;
-}
-function apSlotState(sl, t) {
-  const P = 140 + sl.i * 23,
-    tt = (((t + sl.i * 37) % P) + P) % P,
-    lane = 2835,
-    x0 = 1650,
-    xEnd = 1950,
-    sp = 8,
-    E = Math.PI / 2; // headings: game convention (0 = north, PI/2 = east)
-  const tIn = (sl.x - 4 - x0) / sp;
-  if (tt < tIn) return { x: x0 + tt * sp, y: lane, h: E, ph: "in" };
-  let o = tt - tIn;
-  if (o < 3.5) {
-    const u = o / 3.5,
-      a = (u * Math.PI) / 2;
-    return {
-      x: sl.x - 4 + 4 * Math.sin(a),
-      y: lane - (lane - sl.y) * (1 - Math.cos(a)) * 0.55 - (lane - sl.y) * 0.45 * u * u,
-      h: E * (1 - u),
-      ph: "turn",
-    };
-  }
-  o -= 3.5;
-  if (o < 80) return { x: sl.x, y: sl.y, h: 0, ph: "park", tp: o };
-  o -= 80;
-  if (o < 3.5) {
-    const u = o / 3.5;
-    return {
-      x: sl.x + 2 * u * u,
-      y: sl.y + (lane - sl.y) * Math.sin((u * Math.PI) / 2),
-      h: E * u * u,
-      ph: "out",
-    };
-  }
-  o -= 3.5; // reverse out, swing round to face east
-  const x = sl.x + 2 + o * sp;
-  if (x > xEnd) return null;
-  return { x, y: lane, h: E, ph: "away" };
-}
-function apParkFlow(A) {
-  const g = ctx,
-    cols = ["#c0392b", "#2980b9", "#ecf0f1", "#2c3e50", "#f1c40f", "#27ae60", "#8e44ad"];
-  // drop-off loop circulation
-  for (const sl of apSlots(A)) {
-    const p = apSlotState(sl, timeS);
-    if (!p) continue;
-    apCar(g, p.x * PPM, p.y * PPM, p.h, cols[sl.i % cols.length], 35);
-  }
-  // multi-storey ramp: one car up, one down
-  {
-    const t = (timeS * 0.08) % 1;
-    apCar(g, (390 + t * 20) * TILE, 701.2 * TILE, Math.PI / 2, cols[1], 35);
-    const u = (timeS * 0.08 + 0.5) % 1;
-    apCar(g, (410 - u * 20) * TILE, 702.4 * TILE, -Math.PI / 2, cols[4], 35);
-  }
 }
 function apPedDraw(g, x, y, col, ph) {
   g.fillStyle = "rgba(0,0,0,0.25)";
@@ -1501,30 +1566,32 @@ function apPeds(A) {
   // v42: footway-only routes: MSCP lift core -> x388 footpath -> terminal-front pavement (row 688) -> doors; surface parks -> their north footpath -> plaza -> east doors.
   const paths = [
     [
-      [385, 694.2],
-      [388.5, 694.2],
-      [388.5, 688.5],
-      [402, 688.5],
+      [377.5, 711],
+      [374.5, 711],
+      [374.5, 688.5],
+      [392, 688.5],
     ],
     [
-      [388.5, 697],
-      [388.5, 688.5],
-      [372, 688.5],
+      [374.5, 700],
+      [374.5, 688.5],
+      [366, 688.5],
     ],
     [
-      [440, 695.5],
-      [440, 688.5],
-      [452, 688.5],
+      [440, 695.8],
+      [452.6, 695.8],
+      [452.6, 688.5],
+      [446, 688.5],
     ],
     [
-      [470, 695.5],
-      [470, 688.5],
+      [452.6, 701.8],
+      [452.6, 688.5],
       [462, 688.5],
     ],
     [
-      [484, 695.5],
-      [484, 688.5],
-      [478, 688.5],
+      [480, 695.8],
+      [453.6, 695.8],
+      [453.6, 688.5],
+      [470, 688.5],
     ],
   ];
   for (let i = 0; i < 12; i++) {
@@ -1801,7 +1868,7 @@ function apSolidM(mx, my) {
 }
 
 // ---------- v41: real AI traffic on the arrivals road pulls into a drop-off bay, pauses while a passenger gets out and walks in, then leaves ----------
-const APX_BAYS = [404, 418];
+const APX_BAYS = [424, 434, 444, 462, 472, 482]; // v64: kerb-lane drop-off bays on the departures loop (692)
 const APDROP = { peds: [] };
 setTimeout(() => {
   if (typeof updateTraffic !== "function") return;

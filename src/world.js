@@ -978,8 +978,16 @@ function* genWorldSteps() {
         q = P[(i + 1) % n];
       lens.push(Math.abs(q[0] - p[0]) + Math.abs(q[1] - p[1]));
     }
+    // v64: "x" = signalised junction node: a closed loop's legs run through the box (-w/2), radials stop at its edge (+w/2)
+    // and are merged into the in-line loop leg afterwards (kbx), so each corner is one junction, not a roundabout
     const tr = (pt, len, adj) =>
-      pt[2] === "rb" ? RBT : adj === null ? 0 : Math.min(Rc, Math.min(len, adj) / 2 - 2);
+      pt[2] === "rb"
+        ? RBT
+        : pt[2] === "x"
+          ? (closed ? -w : w) / 2
+          : adj === null
+            ? 0
+            : Math.min(Rc, Math.min(len, adj) / 2 - 2);
     for (let i = 0; i < L; i++) {
       const p = P[i],
         q = P[(i + 1) % n],
@@ -1013,16 +1021,22 @@ function* genWorldSteps() {
         );
       }
       sg.name = name;
+      if (P[i][2] === "x" || q[2] === "x") sg.kbx = 1;
       legs.push({ sg, s, t1 });
     }
-    for (const p of P) if (p[2] === "rb") rbNode(p[0], p[1]);
+    for (const p of P)
+      if (p[2] === "rb") rbNode(p[0], p[1]);
+      else if (p[2] === "x" && !rbAt.has(p[0] + "," + p[1])) {
+        rbAt.set(p[0] + "," + p[1], null);
+        R(); // v64: keep the generator's random stream exactly as when this node was a roundabout (its seed draw)
+      }
     for (let i = 0; i < L; i++) {
       const j = i + 1;
       if (!closed && j >= L) break;
       const lin = legs[i],
         lout = legs[j % L],
         p = P[j % n];
-      if (p[2] === "rb") continue;
+      if (p[2] === "rb" || p[2] === "x") continue;
       const eIn = lin.s > 0 ? 1 : 0,
         eOut = lout.s > 0 ? 0 : 1,
         S = segEnd(lin.sg, eIn),
@@ -1217,12 +1231,15 @@ function* genWorldSteps() {
   for (const x of thinSet(SV, "x", [2, 8])) road("v", x, SV.Y1 + 1, 716, RW, "city");
   const apRoad = road("h", thinAt(SV, "y", 6), 1060, SV.xs[0] - 1, RW, "city"); // Sandvale Airport road
   // v17 Kingsbridge: elevated-style dual loop round a compact downtown, roundabout interchanges at its corners, five radials, district grids of differing pitch, channel bridges
+  // v64 (James 22 Oct): the four Kingsbridge Loop corners are UK signalised junctions (were roundabouts). NW/NE/SW are
+  // T-junctions, SE too (the Market streets T into the loop either side, as before). Radials stop at the junction box and merge into the
+  // in-line loop leg (one segment through each box), see the kbx merge below.
   mway(
     [
-      [1530, 1530, "rb"],
-      [1705, 1530, "rb"],
-      [1705, 1680, "rb"],
-      [1530, 1680, "rb"],
+      [1530, 1530, "x"],
+      [1705, 1530, "x"],
+      [1705, 1680, "x"],
+      [1530, 1680, "x"],
     ],
     true,
     0,
@@ -1233,7 +1250,7 @@ function* genWorldSteps() {
     [
       [1360, 1380, "rb"],
       [1530, 1380],
-      [1530, 1530, "rb"],
+      [1530, 1530, "x"],
     ],
     false,
     40,
@@ -1242,7 +1259,7 @@ function* genWorldSteps() {
   );
   mway(
     [
-      [1705, 1530, "rb"],
+      [1705, 1530, "x"],
       [1945, 1530],
     ],
     false,
@@ -1252,7 +1269,7 @@ function* genWorldSteps() {
   );
   mway(
     [
-      [1705, 1680, "rb"],
+      [1705, 1680, "x"],
       [1850, 1680],
       [1850, 1945],
     ],
@@ -1263,7 +1280,7 @@ function* genWorldSteps() {
   );
   mway(
     [
-      [1530, 1680, "rb"],
+      [1530, 1680, "x"],
       [1404, 1680],
     ],
     false,
@@ -1715,7 +1732,9 @@ function* genWorldSteps() {
     }
     // ...and any two in-line streets of the same width/type that simply butt end to end become one street (one junction per crossing, not two
     // half-junctions with separate lights)
-    const live = S.filter((q) => !kill.has(q) && q.type !== "hwy" && q.type !== "dual"),
+    const live = S.filter(
+        (q) => !kill.has(q) && q.type !== "hwy" && (q.type !== "dual" || q.kbx), // v64: + Kingsbridge loop legs/radials
+      ),
       byK = new Map();
     for (const q of live) {
       const k = q.dir + q.a + "," + q.w + q.type;
@@ -1788,6 +1807,9 @@ function* genWorldSteps() {
       world.segs = keep;
       world.kbMerged = kill.size;
     }
+    for (const q of world.segs)
+      if (q.kbx && q.type === "dual" && ((q.dir === "h" && q.a === 1677) || (q.dir === "v" && q.a === 1527)))
+        q.name = "Kingsbridge Loop"; // v64: merged loop sides keep the loop's name (radials join them in line)
   }
   buildFlyovers();
   (world.tm = world.tm || []).push(["// segment continuat", (performance.now() - t0) | 0]);
@@ -1961,25 +1983,33 @@ function* genWorldSteps() {
   world.cornerAt = new Int32Array(MW * MH).fill(-1);
   {
     // v36: Albion Airport landside access: forecourt -> west along 716 -> down to the town grid (seg at x346 from y780), laid before junctions so AI + sat nav use it
-    road("v", 410, 692, 715, 4, "town");
-    road("h", 716, 346, 413, 4, "town");
-    road("h", 700, 392, 410, 3, "town"); // v48: no 4-tile stub west of the frontage
-    road("h", 708, 414, 490, 3, "town");
-    road("h", 692, 392, 433, 3, "town"); // v44: frontage moved 3 tiles south, clear of the terminal canopy
-    road("v", 392, 692, 702, 3, "town");
-    road("v", 431, 692, 709, 3, "town"); // v41: arrivals/drop-off frontage loop (real road)
+    // v64 (James 22 Oct): landside rebuilt. Airport Way = x346 north, one curved bend (BEND_CORNERS) east along 716 to the
+    // long-stay ring; the drop-off is a one-way loop (x410 north, 692 east along the terminal kerb, x494 south) joining
+    // Airport Way at two T-junctions; the multi-storey ramp opens straight onto the loop's entry leg; long stay = a ring
+    // (x528 / 696 / x580) round the new east car park, so nothing on the landside is a dead end.
+    road("h", 716, 346, 583, 4, "town").name = "Airport Way";
+    const apL1 = road("v", 410, 692, 715, 3, "town"),
+      apL2 = road("h", 692, 410, 496, 3, "town"),
+      apL3 = road("v", 494, 692, 715, 3, "town");
+    apL1.ow = -1; // one-way northbound
+    apL2.ow = 1; // one-way eastbound (kerb lane = drop-off bays)
+    apL3.ow = 1; // one-way southbound
+    apL1.name = apL2.name = apL3.name = "Departures Loop";
+    road("v", 528, 696, 715, 4, "town").name = "Long Stay";
+    road("h", 696, 528, 583, 4, "town").name = "Long Stay";
+    road("v", 580, 696, 719, 4, "town").name = "Long Stay";
     mbRoads(road); // v45: Sandvale Military Base internal roads + gate avenue
     road("v", MB.av + 14, 357, thinAt(DW, "y", 2) + RW - 1, RW, "town").name = "Sandreach Road"; // v48: links the base road (y353) south to Dustwater Road (was a dead end); offset from the gate T so the junctions stay distinct
     // v39: car park access roads (MSCP ramp, surface parks)
     const tg = world.segs.find((q) => q.dir === "v" && q.a === 346 && q.b0 === 780);
     if (tg) {
-      for (let y = 720; y < 780; y++)
+      for (let y = 716; y < 780; y++)
         for (let k = 0; k < tg.w; k++) {
           const x = tg.a + k;
           set(x, y, water[idx(x, y)] ? T.BRIDGE : T.ROAD);
           world.roadV[idx(x, y)] = tg.id;
         }
-      tg.b0 = 720;
+      tg.b0 = 716; // v64: up into the Airport Way bend
     }
   }
   // v33: re-centre arms that hit a roundabout off-centre: pull the road back and S-bend in on the centre line
@@ -2095,6 +2125,12 @@ function* genWorldSteps() {
     [240, 1100],
     [240, 1154],
     [294, 1154],
+    [346, 716], // v64 Albion Airport Way: one smooth bend above the superstores (was an L-corner junction)
+    [410, 692], // v64 departures loop corners
+    [494, 692],
+    [580, 716], // v64 long-stay ring corners
+    [580, 696],
+    [528, 696],
   ];
   world.bends = [];
   const SIG_ADD = new Set(
@@ -2135,7 +2171,7 @@ function* genWorldSteps() {
       vE = Math.abs(vs.b0 - jy) <= hs.w ? 0 : 1,
       sx = hE ? -1 : 1, // the street runs off east (+1) / west (-1), south (+1) / north (-1)
       sy = vE ? -1 : 1,
-      Rc = hs.type === "res" || vs.type === "res" ? 5 : 6,
+      Rc = (hs.type === "res" || vs.type === "res" ? 5 : 6) + (hs.w % 2 && vs.w % 2 ? 0.5 : 0), // v64: odd widths keep the cut on whole tiles
       P = [jx + vs.w / 2, jy + hs.w / 2];
     const cut = (g, e, to) => {
       const lo = e ? to : g.b0,
@@ -2304,17 +2340,8 @@ function* genWorldSteps() {
     }
   }
   for (const J of world.junctions)
-    if (J.y === 716 && (J.x === 410 || J.x === 346)) J.lights = false; // v36: airport access L-bends are plain corners (no signals / box)
-  for (const J of world.junctions)
-    if (
-      J.x >= 388 &&
-      J.x <= 432 &&
-      J.y >= 688 &&
-      J.y <= 709 &&
-      (J.x === 392 || J.x === 431) &&
-      J.y === 692
-    )
-      J.lights = false; // v42: forecourt corners are plain bends; the T-junctions keep signals
+    if (J.y === 716 && (J.x === 410 || J.x === 494 || J.x === 528))
+      J.lights = J.uk = false; // v64: Albion landside T-junctions are give-way (loop entry/exit, long-stay ring, multi-storey)
   // v65 (James 21 Oct, network audit): the last two signalised 2-arm corners (no side road, no entrance) lose their signals
   for (const J of world.junctions)
     if ((J.x === 470 && J.y === 222) || (J.x === 1715 && J.y === 1697)) J.lights = J.uk = false; // no masts / puffins / box either
@@ -3422,11 +3449,17 @@ function* genWorldSteps() {
         set(x, y, y >= 648 && y <= 678 ? T.GRAVEL : T.CONC);
       }
     } // v37: old pond under the terminal/landside is filled in (layout wins)
-  for (let y = 688; y < 719; y++)
-    for (let x = 350; x < 446; x++) {
-      const t = G[idx(x, y)];
-      if (t !== T.ROAD && t !== T.WATER && t !== T.BRIDGE && !water[idx(x, y)]) set(x, y, T.CONC);
+  // v64: the whole landside apron (terminal front to Airport Way, multi-storey to the long-stay ring) is solid concrete: no sand
+  for (let y = 688; y < 722; y++)
+    for (let x = 345; x < 590; x++) {
+      const i = idx(x, y),
+        t = G[i];
+      if (y >= 720 && x >= 400 && x < 424) continue; // cargo depot gate stays as laid
+      if (t !== T.ROAD && t !== T.WATER && t !== T.BRIDGE && !water[i] && world.roadH[i] === -1 && world.roadV[i] === -1)
+        set(x, y, T.CONC);
     }
+  for (let y = 720; y < 728; y++)
+    for (let x = 424; x < 600; x++) if (G[idx(x, y)] === T.SAND) set(x, y, T.GRASS); // v64: no desert fringe along Airport Way
   world.airports[world.airports.length - 1].albion = {
     x0: 160,
     y0: 470,
@@ -3458,12 +3491,13 @@ function* genWorldSteps() {
         }
     };
     // v42: multi-storey = real open deck: solid wall ring, drivable LOT deck inside, ramp mouth on the east side onto the 700 road
-    fl(354, 692, 34, 22, T.BLDG);
-    fl(355, 693, 32, 20, T.LOT);
-    fl(386, 700, 4, 4, T.ROAD);
+    // v64: moved east against the departures loop's entry leg (x410): the ramp mouth opens straight onto it
+    fl(376, 692, 34, 22, T.BLDG);
+    fl(377, 693, 32, 20, T.LOT);
+    fl(407, 700, 3, 3, T.LOT); // v64: ramp mouth is car-park surface (a driveway onto the loop), not a stub of road
     objs.push({
       kind: "lot",
-      x: 356 * TILE,
+      x: 378 * TILE,
       y: 694 * TILE,
       w: 29 * TILE,
       h: 6 * TILE,
@@ -3472,53 +3506,63 @@ function* genWorldSteps() {
     });
     objs.push({
       kind: "lot",
-      x: 356 * TILE,
+      x: 378 * TILE,
       y: 704.5 * TILE,
       w: 29 * TILE,
       h: 7.5 * TILE,
       seed: 3914,
       ap: "ms2",
     }); // v42b: clear drive aisle y 700..704 straight in from the east ramp
-    // v42: surface parks moved east, clear of the 708 road; they front onto it from the north
-    fl(436, 696, 25, 11, T.LOT);
-    fl(463, 696, 26, 11, T.LOT);
-    objs.push({
-      kind: "lot",
-      x: 436 * TILE,
-      y: 696 * TILE,
-      w: 25 * TILE,
-      h: 11 * TILE,
-      seed: 3912,
-      ap: "surf",
-    });
-    objs.push({
-      kind: "lot",
-      x: 463 * TILE,
-      y: 696 * TILE,
-      w: 26 * TILE,
-      h: 11 * TILE,
-      seed: 3913,
-      ap: "surf2",
-    });
+    // v64: secure car parks. Short stay = the multi-storey + a fenced surface park inside the departures loop; long stay =
+    // a fenced park inside the long-stay ring. Bay blocks are back-to-back double rows (2 x 6 m) with 8 m aisles between
+    // them and round the ends; gates (barrier + booth, airport.js) on the aisles. Lot objects = bay blocks (initParked).
+    fl(415, 697, 78, 18, T.LOT);
+    fl(533, 701, 46, 14, T.LOT);
+    let apSeed = 3912;
+    const bays = (x0, y0, w, h, ap) =>
+      objs.push({ kind: "lot", x: x0 * TILE, y: y0 * TILE, w: w * TILE, h: h * TILE, seed: apSeed++, ap });
+    for (const y of [698, 703, 708]) bays(419, y, 70, 3, "short");
+    for (const y of [702, 707]) bays(537, y, 38, 3, "long");
+    bays(537, 712, 38, 2, "long");
     A.lots = [
-      { x0: 436, x1: 461, y0: 696, y1: 707 },
-      { x0: 463, x1: 489, y0: 696, y1: 707 },
+      {
+        name: "SHORT STAY",
+        x0: 415,
+        x1: 493,
+        y0: 697,
+        y1: 715,
+        gates: [
+          { x: 415, y0: 701, y1: 703, side: -1, kind: "in" },
+          { x: 493, y0: 711, y1: 713, side: 1, kind: "out" },
+        ],
+        ped: { x0: 451, x1: 455 },
+      },
+      {
+        name: "LONG STAY",
+        x0: 533,
+        x1: 579,
+        y0: 701,
+        y1: 715,
+        gates: [
+          { x: 533, y0: 705, y1: 707, side: -1, kind: "in" },
+          { x: 579, y0: 710, y1: 712, side: 1, kind: "out" },
+        ],
+      },
     ];
-    A.ms = { x0: 354, x1: 388, y0: 692, y1: 714 };
+    A.ms = { x0: 376, x1: 410, y0: 692, y1: 714 };
     // footpaths: drop-off kerb + links from both parks to the terminal front door
     for (let y = 689; y < 692; y++)
       for (let x = 360; x < 500; x++) if (G[idx(x, y)] !== T.ROAD) set(x, y, T.WALK); // v44: drop-off plaza between the doors and the frontage road
-    for (let y = 689; y < 700; y++) {
-      if (G[idx(388, y)] !== T.ROAD) set(388, y, T.WALK);
-    }
-    for (let x = 436; x < 489; x++) if (G[idx(x, 695)] !== T.ROAD) set(x, 695, T.WALK);
+    for (let y = 689; y < 716; y++) if (G[idx(374, y)] !== T.ROAD) set(374, y, T.WALK); // v64: footpath down the multi-storey's west side
+    for (let y = 695; y < 697; y++)
+      for (let x = 413; x < 494; x++) if (G[idx(x, y)] !== T.ROAD) set(x, y, T.WALK); // v64: pavement along the short-stay fence
   }
 
   {
     const R_ = world.reserved;
     for (let y = 466; y < 720; y++)
       for (let x = 158; x < 644; x++) {
-        if (y >= 642 && (x < 345 || x >= 525)) continue;
+        if (y >= 642 && (x < 345 || x >= 525) && !(y >= 686 && x >= 345 && x < 590)) continue; // v64: + long stay
         if (G[idx(x, y)] !== T.ROAD && G[idx(x, y)] !== T.BRIDGE) R_[idx(x, y)] = 1;
       }
   } // v37: the Albion airport footprint is off-limits to later depots/shops/services (layout wins)
