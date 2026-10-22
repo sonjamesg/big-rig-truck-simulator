@@ -289,6 +289,7 @@ function czDealerImg(cv, m, col, horiz) {
     const fl = b.querySelector(".stage .floor");
     if (!fl) return;
     const old = fl.querySelector("canvas");
+    if (old && old.classList.contains("tt360")) return; // 360 turntable (turntable.js) owns the stage
     const m = modelById(dealerState.sel),
       col = dealerState.col || career.colors[m.id] || m.cols[0];
     const cv = document.createElement("canvas");
