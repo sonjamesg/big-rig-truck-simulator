@@ -203,6 +203,8 @@ function fogNoise() {
 function fogTex() {
   const hi = typeof gfxHi === "function" ? gfxHi() : true;
   if (FOG.tex && !FOG.dirty && FOG.texHi === hi) return FOG.tex;
+  // v70: newly revealed cells while driving rebuild the (whole-map, blurred) texture at most twice a second
+  if (FOG.tex && FOG.texHi === hi && performance.now() - (FOG.texT || 0) < 500) return FOG.tex;
   const m = document.createElement("canvas");
   m.width = FOG_W;
   m.height = FOG_H;
@@ -229,10 +231,14 @@ function fogTex() {
   FOG.tex = c;
   FOG.texHi = hi;
   FOG.dirty = false;
+  FOG.texT = performance.now();
+  FOG.texV = (FOG.texV || 0) + 1;
   return c;
 }
 // tile -> screen mapping: screen = ox + t*sc
-let FOG_L = null;
+let FOG_L = null,
+  FOG_LK = "",
+  FOG_LT = 0;
 function fogDraw(ox, oy, sc, clip) {
   if (!fogActive()) return;
   const t = fogTex(),
@@ -244,6 +250,18 @@ function fogDraw(ox, oy, sc, clip) {
     L.width = Math.ceil(cw);
     L.height = Math.ceil(ch);
   }
+  // v70: re-compose the fog layer only when the view or the fog texture changed (the drifting cloud texture at ~8 fps)
+  const now = performance.now(),
+    vk = [ox, oy, sc, cx, cy, cw, ch, t.width, FOG.texV || 0].join(",");
+  if (FOG_LK === vk && (!hi || now - FOG_LT < 120)) {
+    ctx.save();
+    ctx.globalAlpha = 0.985;
+    ctx.drawImage(L, 0, 0, cw, ch, cx, cy, cw, ch);
+    ctx.restore();
+    return;
+  }
+  FOG_LK = vk;
+  FOG_LT = now;
   const g = L.getContext("2d");
   g.globalCompositeOperation = "source-over";
   g.clearRect(0, 0, L.width, L.height);

@@ -1450,6 +1450,7 @@ function drawMinimap() {
     sh = h / sc;
   ovDraw(x - (cxT - span / 2) * sc, y - (cyT - sh / 2) * sc, sc, x, y, x + w, y + h);
   ovTick(bigmap.open ? 0 : 2.5);
+  mapPrewarmTick();
   ctx.imageSmoothingEnabled = true;
   drawMapDetail(x - (cxT - span / 2) * sc, y - (cyT - sh / 2) * sc, sc, x, y, x + w, y + h);
   nightMapLayer(x - (cxT - span / 2) * sc, y - (cyT - sh / 2) * sc, sc, x, y, x + w, y + h, true);
@@ -1572,6 +1573,71 @@ function mapChunk(cx, cy, allow) {
   MAPC.built++;
   if (MAPC.order.length > MAPC.max) MAPC.cache.delete(MAPC.order.shift());
   return c;
+}
+// v70 (James 22 Oct): the world map opened slowly (~2 s of blurry / missing detail): every chunk in the first local view
+// was downscaled or even fully rendered on open. mapPrewarm builds those map chunks in the browser's idle time while the
+// map is closed, nearest the truck first (the area the map opens on), so opening is instant.
+const MAPW = { q: null, key: "", n: 0 };
+function mapPrewarmList() {
+  const N = CHUNK / TILE,
+    tx = (truck.x * PPM) / TILE,
+    ty = (truck.y * PPM) / TILE,
+    hw = 150, // tiles each side: the open map's local view (~250 tiles across) plus a margin for a first pan
+    hh = 110,
+    key = Math.floor(tx / N / 3) + "," + Math.floor(ty / N / 3);
+  if (MAPW.q && MAPW.key === key) return MAPW.q;
+  const L = [],
+    cx0 = Math.max(0, Math.floor((tx - hw) / N)),
+    cx1 = Math.min(MW / N - 1, Math.floor((tx + hw) / N)),
+    cy0 = Math.max(0, Math.floor((ty - hh) / N)),
+    cy1 = Math.min(MH / N - 1, Math.floor((ty + hh) / N));
+  for (let cy = cy0; cy <= cy1; cy++) for (let cx = cx0; cx <= cx1; cx++) L.push([cx, cy]);
+  const fx = tx / N,
+    fy = ty / N;
+  L.sort((a, b) => Math.hypot(a[0] + 0.5 - fx, a[1] + 0.5 - fy) - Math.hypot(b[0] + 0.5 - fx, b[1] + 0.5 - fy));
+  MAPW.key = key;
+  return (MAPW.q = L);
+}
+function mapPrewarm(dl) {
+  try {
+    if (started && !bigmap.open && world.ready !== false) {
+      const L = mapPrewarmList();
+      while (L.length && dl.timeRemaining() > 12) {
+        const [cx, cy] = L[0];
+        if (!MAPC.cache.has(cx + "," + cy)) {
+          mapChunk(cx, cy, true);
+          MAPW.n++;
+        }
+        L.shift();
+      }
+    }
+  } catch (e) {}
+  (window.requestIdleCallback || ((f) => setTimeout(() => f({ timeRemaining: () => 14 }), 50)))(mapPrewarm, {
+    timeout: 1000,
+  });
+}
+setTimeout(() => mapPrewarm({ timeRemaining: () => 0 }), 3000);
+// per-frame share (busy pages get no idle time): chunks the game already baked only need a 128 px downscale (cheap, up to
+// ~2 ms a frame); a chunk that has to be rendered from scratch at most once every 8 frames
+function mapPrewarmTick() {
+  if (!started || bigmap.open) return;
+  const L = mapPrewarmList(),
+    t0 = performance.now();
+  MAPW.f = (MAPW.f || 0) + 1;
+  while (L.length && performance.now() - t0 < 2) {
+    const [cx, cy] = L[0],
+      k = cx + "," + cy;
+    if (MAPC.cache.has(k)) {
+      L.shift();
+      continue;
+    }
+    const baked = getChunk(cx, cy, false);
+    if (!baked && MAPW.f % 8) break;
+    mapChunk(cx, cy, true);
+    MAPW.n++;
+    L.shift();
+    if (!baked) break;
+  }
 }
 function drawMapDetail(X0, Y0, z, x0, y0, x1, y1) {
   // X0/Y0: screen pos of tile 0,0; z px per tile; clip rect in screen px
@@ -1741,7 +1807,7 @@ function drawBigMap() {
       ctx.globalAlpha = 1;
     }
   }
-  ovTick(9);
+  ovTick(bigmap.z < 2.2 ? 9 : 3); // v70: the local (detail) view doesn't need the overview sheets
   ovDraw(VW / 2 - bigmap.cx * z, VH / 2 + 10 - bigmap.cy * z, z, 20, 40, VW - 20, VH - 20);
   bigmap.miss =
     z >= 2.2
