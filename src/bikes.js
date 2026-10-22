@@ -214,15 +214,30 @@ function bkFilterAhead(v, lat0, range) {
   }
   return best;
 }
+// v69: metres left to a roundabout entry at the end of the bike's segment (Infinity when the segment doesn't end at one)
+function bkRbLeft(v, sg) {
+  const d = v.plan.dir,
+    rb = sg["rb" + (d > 0 ? 1 : 0)];
+  if (rb == null) return Infinity;
+  const c = (sg.dir === "h" ? v.x : v.y) / M_T;
+  return (d > 0 ? sg.b1 + 1 - c : c - sg.b0) * M_T;
+}
 function bkFilter(v, dt) {
   const sg = world.segs[v.plan.seg];
   if (!sg || nLanes(sg) < 2 || v.bkK) return false;
+  // v69: never filter up a roundabout approach (the flare lanes converge at the give-way / signal line and the bike ended up
+  // on top of the queued car beside it): within 60 m of one, or with the roundabout already on its plan, it rejoins its lane
+  v.bkRb = bkRbLeft(v, sg) < 60 || (v.mk || []).some((m) => m.kind === "rb");
+  if (v.bkRb && v.bkF) {
+    v.bkF = null; // rejoin the lane before the roundabout queue
+    return false;
+  }
   const F = v.bkF;
   v.bkFT = (v.bkFT || 0) - dt;
   if (v.bkFT > 0) return !!F;
   v.bkFT = 0.25;
   if (!F) {
-    if (v.v > 9 || v.ring != null || v.jHeld || v.turnJ || v.filterJ) return false;
+    if (v.v > 9 || v.ring != null || v.jHeld || v.turnJ || v.filterJ || v.bkRb) return false;
     const a = bkFilterAhead(v, -(v.emO || 0), 13);
     if (!a || a.o.v > 4) return false;
     // filter towards the neighbouring lane (offside first, the UK norm), between the two queues
@@ -250,6 +265,21 @@ function bkFilter(v, dt) {
   else F.clr = 0;
   if (F.clr > 1 || timeS - F.t > 60) v.bkF = null;
   return !!v.bkF;
+}
+function bkBlockedAhead(v) {
+  const f = fwd(v.h || 0),
+    r = rgt(v.h || 0),
+    reach = 3.2 + v.v * 0.6;
+  for (const o of traffic.vs) {
+    if (o === v || o.ghostT > 0 || (o.layer | 0) !== (v.layer | 0)) continue;
+    const dx = o.x - v.x,
+      dy = o.y - v.y;
+    if (Math.abs(dx) > 12 || Math.abs(dy) > 12) continue;
+    const al = dx * f[0] + dy * f[1],
+      la = dx * r[0] + dy * r[1];
+    if (al > 0.3 && al < reach + (o.len || 4) / 2 && Math.abs(la) < 1.5) return true;
+  }
+  return false;
 }
 function bkBehindNear(v) {
   const f = fwd(v.h || 0),
