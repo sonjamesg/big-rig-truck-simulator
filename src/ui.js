@@ -184,7 +184,7 @@ function uiInit() {
   });
 }
 function uiBlocking() {
-  return !!career.uiOpen;
+  return !!career.uiOpen || (typeof PM !== "undefined" && PM.on); // v69: pause menu (incl. its Map tab)
 }
 function closeUI() {
   const m = uiRoot && uiRoot.querySelector(".mback,.celebrate");
@@ -212,7 +212,7 @@ function openModal(kind, html, cls) {
   });
   const x = b.querySelector(".x");
   if (x) x.addEventListener("click", closeUI);
-  if (kind === "board" || kind === "bmboard" || kind === "armyboard") uiBoardFit(b.firstChild);
+  if (kind === "board" || kind === "bmboard" || kind === "armyboard" || kind === "pause") uiBoardFit(b.firstChild);
   return b;
 }
 // v50: desktop job boards (normal + Black Market) fill ~88% of the game area: the 916x552 card is zoomed (crisp text, bigger

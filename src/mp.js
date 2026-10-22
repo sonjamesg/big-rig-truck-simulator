@@ -55,7 +55,8 @@ function mpSelfPose() {
     (ind << 2) |
     (input.hand ? 16 : 0) |
     (IND.haz ? 32 : 0) |
-    (typeof HB !== "undefined" && HB.on ? 64 : 0);
+    (typeof HB !== "undefined" && HB.on ? 64 : 0) |
+    (typeof PM !== "undefined" && PM.on ? 128 : 0); // v69: paused (others draw it see-through, no push)
   const P = [
     "p",
     MP.myId,
@@ -625,6 +626,7 @@ function updateMP(dt) {
     mpInterp(p, now - p.off - (MP.delay || MP_DELAY));
     const r = p.cur;
     if (!p.has) continue;
+    if ((r.fl & 128) || (typeof PM !== "undefined" && PM.on)) continue; // v69: paused rigs are ghosts
     const dx = truck.x - r.x,
       dy = truck.y - r.y,
       d = Math.hypot(dx, dy);
@@ -746,8 +748,11 @@ function drawRemotePlayers(vx0, vy0, vx1, vy1) {
     const X = r.x * PPM,
       Y = r.y * PPM;
     if (X < vx0 - 300 || X > vx1 + 300 || Y < vy0 - 300 || Y > vy1 + 300) continue;
-    const cab = mpCab(r.m, r.c);
+    const cab = mpCab(r.m, r.c),
+      pz = (r.fl | 0) & 128; // v69: paused player -> see-through + pause tag
+    if (pz) ctx.globalAlpha = 0.45;
     drawRig(cab.a, cab.sh, r.x, r.y, r.h, r.tr ? mpTrl(r.tr) : null, r.kx, r.ky, r.th, 6);
+    if (pz) ctx.globalAlpha = 1;
     const f = fwd(r.h),
       rt = rgt(r.h),
       fl = r.fl | 0,
@@ -772,13 +777,19 @@ function drawRemotePlayers(vx0, vy0, vx1, vy1) {
     if (ind || hz) indLampsAt(r.x, r.y, r.h, !!r.tr, r.kx, r.ky, r.th, ind, hz);
     ctx.font = "bold 13px system-ui,sans-serif";
     ctx.textAlign = "center";
-    const w = ctx.measureText(p.n).width + 14;
+    const tag = (r.fl | 0) & 128 ? "\u23F8 " + p.n : p.n,
+      w = ctx.measureText(tag).width + 14;
     ctx.fillStyle = "rgba(8,12,20,0.75)";
     ctx.beginPath();
     ctx.roundRect(X - w / 2, Y - 62, w, 20, 10);
     ctx.fill();
-    ctx.fillStyle = "#7fd8ff";
-    ctx.fillText(p.n, X, Y - 48);
+    if ((r.fl | 0) & 128) {
+      ctx.strokeStyle = "rgba(245,184,46,0.8)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    ctx.fillStyle = (r.fl | 0) & 128 ? "#ffd866" : "#7fd8ff";
+    ctx.fillText(tag, X, Y - 48);
   }
 }
 function mpDrawMap(X, Y, labels) {

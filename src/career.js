@@ -709,6 +709,7 @@ function saveGame() {
       own: typeof ownSave === "function" ? ownSave() : null,
       fog: typeof fogSave === "function" ? fogSave() : undefined,
       hist: career.hist || [],
+      stats: career.stats || {},
       jobs: career.jobs.filter((j) => !j.taken).map(jobSer),
       active: a
         ? {
@@ -805,6 +806,7 @@ function loadGame() {
   career.colors = d.colors || {};
   career.tune = d.tune || {};
   career.done = d.done || 0;
+  career.stats = d.stats || {};
   career.earned = d.earned || 0;
   career.boardSeq = Math.max(career.boardSeq, d.boardSeq || 1);
   applyModel(d.cur || "rigger");

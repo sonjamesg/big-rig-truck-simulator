@@ -303,11 +303,13 @@ function mobInit() {
   );
   mobBtn(
     "mJobs",
-    "\u{1F4CB}<small>JOBS</small>",
+    "\u23F8<small>MENU</small>",
     "fn pill",
     act(() => {
-      if (career.uiOpen) closeUI();
-      else openBoard();
+      // v69: phone pause menu (Jobs is its first tab)
+      if (typeof PM !== "undefined" && PM.on) pmClose();
+      else if (career.uiOpen) closeUI();
+      else openPause("jobs");
     }),
   );
   mobBtn(
