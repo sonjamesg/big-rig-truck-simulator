@@ -3447,7 +3447,7 @@ function* genWorldSteps() {
       {
         const t = G[idx(x, y)];
         if (t !== T.ROAD && t !== T.WATER && t !== T.BRIDGE && t !== T.WALK)
-          set(x, y, y >= 648 && y <= 678 ? T.GRAVEL : T.CONC);
+          set(x, y, y >= 669 && y <= 677 ? T.GRAVEL : T.CONC); // v65: only the rail corridor is ballast; the rest of the terminal surround is concrete
       }
     }
   for (let y = 462; y < 662; y++)
@@ -3457,7 +3457,7 @@ function* genWorldSteps() {
       const i = idx(x, y);
       if (water[i] || G[i] === T.WATER) {
         water[i] = 0;
-        set(x, y, y >= 648 && y <= 678 ? T.GRAVEL : T.CONC);
+        set(x, y, y >= 669 && y <= 677 ? T.GRAVEL : T.CONC); // v65: only the rail corridor is ballast; the rest of the terminal surround is concrete
       }
     } // v37: old pond under the terminal/landside is filled in (layout wins)
   // v64: the whole landside apron (terminal front to Airport Way, multi-storey to the long-stay ring) is solid concrete: no sand
