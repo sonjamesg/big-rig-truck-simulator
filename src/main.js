@@ -960,6 +960,7 @@ function ukjxPed(p, ang, pedG) {
   ctx.restore();
 }
 function drawUkjx(o) {
+  return; // v69 (James 22 Oct): pedestrian signal heads removed
   const pedG = sigPedLeft(o.J) > 0,
     night = DN.dark > 0.01 ? DN.sig || (DN.sig = []) : null;
   for (const A of o.arms)

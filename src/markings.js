@@ -262,6 +262,7 @@ function drawLaneArrow(g, kinds) {
 // outward from the box edge, v px lateral (+v = the inbound side). Fresh asphalt over the arm, edge lines stopping short of
 // the crossing, hazard centre line, lane lines (solid 5 m off the stop line), stop line, stud crossing kerb to kerb, long lane
 // arrows, dropped kerbs and red blister tactile paving (L-shaped stem) at both crossing ends
+const UKJ_PEDX = false; // v69: junction pedestrian crossings off
 function drawUkApproach(g, o) {
   const sg = o.sg,
     d = o.d,
@@ -300,8 +301,7 @@ function drawUkApproach(g, o) {
     for (let u = UKJ_U2 + 8; u < Lc; u += 48) q(u, Math.min(Lc, u + 24), -v - 1, -v + 1);
   }
   q(UKJ_US, UKJ_US + 4, 2, HW - 2);
-  for (const u of [UKJ_U1, UKJ_U2 - 4])
-    for (let v = -HW + 1; v < HW - 2; v += 8) q(u, u + 4, v, v + 4);
+  // v69: crossing studs, dropped kerbs and tactile paving removed with the pedestrian crossings
   const ang = Math.atan2(-f[1], -f[0]) + Math.PI / 2;
   for (let i = 0; i < nl && o.lanes[i]; i++) {
     const cr = (laneLat(sg, d, i) + 0.5) * TILE;
@@ -323,7 +323,7 @@ function drawUkApproach(g, o) {
     for (let u = u0 + 1.5; u < u1 - 1; u += 3)
       for (let v = Math.min(a, b) + 1.5; v < Math.max(a, b) - 1; v += 3) q(u, u + 1.4, v, v + 1.4);
   };
-  for (const s of [1, -1]) {
+  for (const s of UKJ_PEDX ? [1, -1] : []) {
     const vk = s * HW,
       v1 = vk + s * 12,
       lo = (a, b) => [Math.min(a, b), Math.max(a, b)];

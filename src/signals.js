@@ -155,8 +155,7 @@ function buildSig(J) {
         stages.push({ kind: "eco", ax, mv: keep });
       }
     }
-  // v53c: UK junctions end every cycle with an all-red pedestrian stage (green man on every crossing, James 19 Oct)
-  if (J.uk && stages.length) stages.push({ kind: "ped", ax: null, mv: [] });
+  // v69 (James 22 Oct): no pedestrian stage any more (pedestrian signals and crossings at junctions removed)
   // left filter arrows alongside any non-conflicting stage
   for (const s of stages) {
     if (s.kind === "ped") continue;
@@ -165,18 +164,21 @@ function buildSig(J) {
       if (s.mv.every((x) => !sigConflict(J, x.m, m))) s.mv.push({ m, filter: false, extra: true });
     }
   }
-  // timings: cycle ~60-90 s
-  for (const s of stages)
+  // timings (v69): green length by the size of the road the stage serves (motorway / dual > city > town > estate / rural);
+  // every stage is followed by amber 3 s + all-red 1 s + red-amber 2 s (UK intergreen)
+  const big = (s) => {
+    const ty = s.ax ? world.segs[s.ax === "h" ? J.hs : J.vs].type : "city";
+    return ty === "hwy" || ty === "dual" ? 1 : ty === "city" ? 0 : ty === "town" ? -1 : -2;
+  };
+  for (const s of stages) {
+    const b = big(s);
     s.g =
       s.kind === "split"
-        ? 13
+        ? 13 + b * 2
         : s.kind === "main"
-          ? stages.length > 2
-            ? 22
-            : 27
-          : s.kind === "ped"
-            ? SIG_PED
-            : 7;
+          ? (stages.length > 2 ? 22 : 27) + b * 3
+          : 7;
+  }
   let t = 0;
   const of = new Map();
   stages.forEach((s, i) => {
@@ -193,6 +195,7 @@ function buildSig(J) {
 const SIG_PED = 9; // green-man seconds; the vehicle intergreen after it (amber + all-red + red/amber, 6 s) clears the crossing
 // seconds of green man left on a UK junction's crossings (0 = red man)
 function sigPedLeft(J) {
+  return 0; // v69: no pedestrian stage
   if (!J.uk) return 0;
   const [S, cur, u] = sigCur(J),
     st = S.stages[cur];

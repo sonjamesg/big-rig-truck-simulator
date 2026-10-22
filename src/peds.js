@@ -69,6 +69,7 @@ const PEDX = { map: null };
 function pedXings() {
   if (PEDX.map) return PEDX.map;
   const M = new Map();
+  if (PEDX.off !== false) return (PEDX.map = M); // v69 (James 22 Oct): no pedestrian crossings at junctions, walkers stay on their own block
   for (const o of world.overhead) {
     if (o.kind !== "ukjx") continue;
     const J = o.J;
