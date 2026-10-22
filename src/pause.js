@@ -222,8 +222,8 @@ function pmBody(tab) {
       ["Trucks owned", String((career.owned || []).length)],
     ];
     const here = [];
-    if (document.getElementById("czGo")) here.push('<span class="chip btn" data-pa="cz">\u{1F3A8} Customise &amp; horns</span>');
-    if (document.getElementById("rpGo")) here.push('<span class="chip btn" data-pa="rp">\u{1F527} Repair</span>');
+    if (document.getElementById("czGo")) here.push('<span class="chip" data-pa="cz">\u{1F3A8} Customise &amp; horns</span>');
+    if (document.getElementById("rpGo")) here.push('<span class="chip" data-pa="rp">\u{1F527} Repair</span>');
     return (
       `<div class="grid2">${rows.map(([k, v]) => `<div class="st"><small>${k.toUpperCase()}</small><b>${pmEsc(v)}</b></div>`).join("")}</div>` +
       (here.length
@@ -242,7 +242,7 @@ function pmBody(tab) {
     if (!L.length) return '<div class="note">You don\u2019t own any property yet. Visit an estate agent, or drive onto a home\u2019s driveway or into a yard that\u2019s for sale.</div>';
     return L.map((p, i) => {
       const ok = typeof fogKnownObj !== "function" || fogKnownObj(p.o);
-      return `<div class="row"><div class="lab">${p.k === "Home" ? "\u{1F3E0}" : "\u{1F3ED}"} ${pmEsc(p.n)}</div><div class="note">${p.k}</div><span class="chip btn${ok ? "" : " off"}" data-pf="${i}">${ok ? "FAST TRAVEL \u203a" : "Visit in person first"}</span></div>`;
+      return `<div class="row"><div class="lab">${p.k === "Home" ? "\u{1F3E0}" : "\u{1F3ED}"} ${pmEsc(p.n)}</div><div class="note">${p.k}</div><span class="chip${ok ? "" : " off"}" data-pf="${i}">${ok ? "FAST TRAVEL \u203a" : "Visit in person first"}</span></div>`;
     }).join("");
   }
   if (tab === "players") {
@@ -250,7 +250,7 @@ function pmBody(tab) {
       return '<div class="note">You\u2019re playing solo. Host or join an online game from the title screen (Exit game in Settings), or open an invite link from a friend.</div>';
     const ps = typeof mpRoster === "function" ? mpRoster() : [];
     return (
-      (MP.code ? `<div class="row"><div class="lab">Invite code</div><div style="font-size:20px;font-weight:900;letter-spacing:2px;color:#ffd866">${pmEsc(MP.code)}</div><span class="chip btn" data-pa="copy">\u{1F4CB} Copy link</span></div>` : "") +
+      (MP.code ? `<div class="row"><div class="lab">Invite code</div><div style="font-size:20px;font-weight:900;letter-spacing:2px;color:#ffd866">${pmEsc(MP.code)}</div><span class="chip" data-pa="copy">\u{1F4CB} Copy link</span></div>` : "") +
       ps.map((p) => `<div class="row"><div class="lab">${p.id === MP.myId ? "\u2B50" : "\u{1F69A}"} ${pmEsc(p.n || "Driver")}</div><div class="note">${p.id === MP.myId ? "You" : MP.players[p.id] && MP.players[p.id].cur && MP.players[p.id].cur.fl & 128 ? "\u23F8 Paused" : "Driving"}</div><div></div></div>`).join("")
     );
   }
@@ -268,10 +268,10 @@ function pmBody(tab) {
     const v = Math.round((SETTINGS.vol ?? 0.7) * 100),
       hi = typeof GFX === "undefined" || GFX.lvl === "high",
       mm = SETTINGS.mm !== false;
-    return `<div class="row"><div class="lab">\u{1F50A} Game volume</div><div class="sl" id="pmVol"><i style="width:${v}%"></i><b style="left:${v}%"></b></div><div class="seg"><span class="chip btn" data-pv="-">\u2212</span><span class="val" id="pmVolV">${v}%</span><span class="chip btn" data-pv="+">+</span></div></div>
-<div class="row"><div class="lab">\u2728 Graphics</div><div class="seg"><span class="chip btn${hi ? " on" : ""}" data-pg="high">High</span><span class="chip btn${hi ? "" : " on"}" data-pg="low">Low</span></div><div></div></div>
+    return `<div class="row"><div class="lab">\u{1F50A} Game volume</div><div class="sl" id="pmVol"><i style="width:${v}%"></i><b style="left:${v}%"></b></div><div class="seg"><span class="chip" data-pv="-">\u2212</span><span class="val" id="pmVolV">${v}%</span><span class="chip" data-pv="+">+</span></div></div>
+<div class="row"><div class="lab">\u2728 Graphics</div><div class="seg"><span class="chip${hi ? " on" : ""}" data-pg="high">High</span><span class="chip${hi ? "" : " on"}" data-pg="low">Low</span></div><div></div></div>
 <div class="row"><div class="lab">\u{1F4CF} Units</div><div class="seg"><span class="chip on">mph</span></div><div></div></div>
-<div class="row"><div class="lab">\u{1F9ED} Minimap</div><div class="seg"><span class="chip btn${mm ? " on" : ""}" data-pm="1">On</span><span class="chip btn${mm ? "" : " on"}" data-pm="0">Off</span></div><div></div></div>`;
+<div class="row"><div class="lab">\u{1F9ED} Minimap</div><div class="seg"><span class="chip${mm ? " on" : ""}" data-pm="1">On</span><span class="chip${mm ? "" : " on"}" data-pm="0">Off</span></div><div></div></div>`;
   }
   return "";
 }
