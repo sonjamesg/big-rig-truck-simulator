@@ -61,20 +61,21 @@ async def main():
       await pg.evaluate("(()=>{POL.chase&&polLose('test');POL.chase=null;window.__camHold=null;cam.zLock=0})()")
     # ---- 4. multi-car chase: rig + trailer driving down a long straight, 5 chasers started in ONE line behind it
     m=await pg.evaluate("""(()=>{let F=null;for(let i=MW*300+5;i<MW*(MH-300)&&!F;i+=13){const x=i%MW,y=(i/MW)|0;if(x<30||x>MW-130)continue;let ok=true;
-        for(let k=-20;k<=95&&ok;k++)for(const j of [-1,0,1])ok=ok&&isRoadT(idx(x+k,y+j));if(ok)F=[x,y]}
+        for(let k=-20;k<=95&&ok;k++)for(const j of [-1,0,1])ok=ok&&isRoadT(idx(x+k,y+j));
+        if(ok&&(world.trailers||[]).some(t=>Math.abs(t.y-(y+.5)*M_T)<30&&t.x>(x-30)*M_T&&t.x<(x+100)*M_T))ok=false;if(ok)F=[x,y]}
       if(!F)return null;const[x,y]=F,T=truck;T.h=1.5708;T.th=T.h;T.v=0;T.x=(x+6)*M_T;T.y=(y+0.5)*M_T;
       const tr=(world.trailers||[]).find(t=>!t.decor&&!t.coupled);if(tr){const k=kingpin(T);tr.x=k[0];tr.y=k[1];tr.th=T.h;couple({tr});}
       WANT.lvl=2;WANT.t=999;WANT.star=timeS;POL.chase=null;POL.aux.length=0;POL.trafCrash=0;POL.polCrash=0;POL.crashes=0;
-      const rear=T.trl?T.trl.x-TRL.rear:T.x-1.2;let n=0;
+      const rear=T.trl?kingpin(T)[0]-TRL.rear:T.x-1.2;let n=0;
       for(let k=0;k<5;k++){const v={kind:'estate',L:4.8,W:1.86,x:0,y:0,h:0,v:14,offX:0,offY:0};v.x=rear-16-k*7;v.y=T.y;v.h=1.5708;polMake(v,polStations()[0]);
         const c={v,offs:[],arrest:false,t:5,siren:null,sp:14,aux:k?1:0,goal:null};if(k)POL.aux.push(c);else POL.chase=c;n++}
       // OBB overlap test (SAT), 0.12 m tolerance
       const box=(x,y,h,L,W)=>({x,y,h,L:L-0.24,W:W-0.24}),ov=(a,b)=>{for(const q of [a,b])for(const ax of [fwd(q.h),rgt(q.h)]){let p=(r)=>{const f=fwd(r.h),g=rgt(r.h);return Math.abs(f[0]*ax[0]+f[1]*ax[1])*r.L/2+Math.abs(g[0]*ax[0]+g[1]*ax[1])*r.W/2};
         const d=Math.abs((a.x-b.x)*ax[0]+(a.y-b.y)*ax[1]);if(d>p(a)+p(b))return false}return true};
       const M=window.__M={frames:0,rig:0,trl:0,pp:0,spread:0,sN:0,spread2:0,maxN:0};
-      (function tick(){if(!window.__M||M.done)return;T.v=13;T.steer=0;M.frames++;const C=[POL.chase,...POL.aux].filter(Boolean);M.maxN=Math.max(M.maxN,C.length);
+      (function tick(){if(!window.__M||M.done){window.__camHold=null;cam.zLock=0;return}T.v=13;T.steer=0;M.frames++;{const f=fwd(T.h);window.__camHold=[(T.x-f[0]*22)*PPM,(T.y-f[1]*22)*PPM];cam.zLock=1.3}const C=[POL.chase,...POL.aux].filter(Boolean);M.maxN=Math.max(M.maxN,C.length);
         const tf=fwd(T.h),cm=(CAB.front+CAB.rear)/2,rb=box(T.x-tf[0]*cm,T.y-tf[1]*cm,T.h,CAB.rear-CAB.front,CAB.w);
-        let tb=null;if(T.trl){const t=T.trl,th=T.th??t.th,f2=fwd(th),tm=(TRL.front+TRL.rear)/2;tb=box(t.x-f2[0]*tm,t.y-f2[1]*tm,th,TRL.rear-TRL.front,TRL.w)}
+        let tb=null;if(T.trl){const kp=kingpin(T),th=T.th,f2=fwd(th),tm=(TRL.front+TRL.rear)/2;tb=box(kp[0]-f2[0]*tm,kp[1]-f2[1]*tm,th,TRL.rear-TRL.front,TRL.w)}
         const B=C.map(c=>{const a=emArt(c.v.polT);return box(c.v.x,c.v.y,c.v.h,a.L,a.W)});
         for(const b of B){if(ov(b,rb))M.rig++;if(tb&&ov(b,tb))M.trl++}
         for(let i=0;i<B.length;i++)for(let j=i+1;j<B.length;j++)if(ov(B[i],B[j]))M.pp++;
@@ -86,8 +87,9 @@ async def main():
     if m:
       for k in range(6):
         await pg.wait_for_timeout(3500); await pg.screenshot(path=f'{OUT3}/chase_{k}.png')
+        print("  t+%.1fs"%(3.5*(k+1)), await pg.evaluate("(()=>[POL.chase,...POL.aux].filter(Boolean).map(c=>[+c.sp.toFixed(1),+Math.hypot(c.v.x-truck.x,c.v.y-truck.y).toFixed(0),+(c.latS||0).toFixed(1),c.rev>0?1:0,c.spin>0?1:0,c.goal?1:0,c.path?1:0]))()"))
       r=await pg.evaluate("""(()=>{const M=__M;M.done=1;return {...M,meanSpread:+(M.spread/Math.max(1,M.sN)).toFixed(2),fracSpread2:+(M.spread2/Math.max(1,M.sN)).toFixed(2),
-        trafCrash:POL.trafCrash||0,polCrash:POL.polCrash||0,crashes:POL.crashes||0,left:[POL.chase,...POL.aux].filter(Boolean).length}})()""")
+        t0:timeS,trafCrash:POL.trafCrash||0,polCrash:POL.polCrash||0,crashes:POL.crashes||0,left:[POL.chase,...POL.aux].filter(Boolean).length}})()""")
       chk("multi: 0 frames police overlapping the truck", r['rig']==0 and r['frames']>100, json.dumps(r))
       chk("multi: 0 frames police overlapping the trailer", r['trl']==0, json.dumps(r))
       chk("multi: 0 frames police overlapping each other (4+ chasers)", r['pp']==0 and r['maxN']>=4, json.dumps(r))

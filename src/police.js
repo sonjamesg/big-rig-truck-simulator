@@ -1134,8 +1134,8 @@ function polChaseAim(c) {
     }
   }
   c.pk = k;
-  const q = P[Math.min(P.length - 1, k + 3)],
-    r = P[Math.min(P.length - 1, k + 4)];
+  const q = P[Math.min(P.length - 1, k + 5)],
+    r = P[Math.min(P.length - 1, k + 6)];
   if (!q) return null;
   const dx = r[0] - q[0],
     dy = r[1] - q[1],
@@ -1159,6 +1159,7 @@ function polLaneTick(c, dt) {
     c.wvT = 2 + Math.random() * 3.5;
     c.lat = POL_SLOTS[c.slot] + (Math.random() - 0.5) * 3.2; // weave
   }
+  c.lat = Math.max(-5.6, Math.min(5.6, c.lat));
   c.latS = (c.latS ?? c.lat) + Math.max(-2.2 * dt, Math.min(2.2 * dt, c.lat - (c.latS ?? c.lat)));
 }
 // largest offset (towards the wanted one) that is still on a road tile and not solid; n = unit right-ish normal
@@ -1250,6 +1251,12 @@ function polReverse(c, dt) {
     c.rp = 0; // re-path straight away
   }
 }
+// traffic + the other chase cars (so chasers see and weave round each other too)
+function polNear(v) {
+  const L = traffic.vs.slice();
+  for (const q of [POL.chase, ...POL.aux]) if (q && q.v !== v) L.push(q.v);
+  return L;
+}
 // drives one chase car (the main POL.chase or a 2-star pursuer); returns "spin" while spinning out, "spun" when a spin ends far away
 function polDriveChase(c, dt) {
   const v = c.v,
@@ -1261,8 +1268,9 @@ function polDriveChase(c, dt) {
   const back =
       (WANT.lvl >= 2 && c.t > 3 ? 2 : P.trl ? 9 : 7) + (c.stag || 0),
     f = fwd(P.trl ? P.th : P.h),
-    rx = P.trl ? P.trl.x - f[0] * TRL.rear : P.x - f[0] * CAB.rear,
-    ry = P.trl ? P.trl.y - f[1] * TRL.rear : P.y - f[1] * CAB.rear,
+    kp = kingpin(P), // the coupled trailer's own x/y are stale while towing: the kingpin is the truth
+    rx = P.trl ? kp[0] - f[0] * TRL.rear : P.x - f[0] * CAB.rear,
+    ry = P.trl ? kp[1] - f[1] * TRL.rear : P.y - f[1] * CAB.rear,
     lo = polLaneOff(c, rx - f[0] * back, ry - f[1] * back, -f[1], f[0]),
     tx = c.goal ? c.goal[0] : rx - f[0] * back - f[1] * lo,
     ty = c.goal ? c.goal[1] : ry - f[1] * back + f[0] * lo,
@@ -1338,7 +1346,7 @@ function polDriveChase(c, dt) {
   const fv0 = fwd(v.h);
   let blk = null,
     bdist = 1e9;
-  for (const o of traffic.vs) {
+  for (const o of polNear(v)) {
     if (o === v) continue;
     const ox = o.x - v.x,
       oy = o.y - v.y,
@@ -1355,17 +1363,25 @@ function polDriveChase(c, dt) {
     c.lat = (c.latS ?? 0) + (blk.lat > 0 ? -3.6 : 3.6); // overtake (incl. the oncoming lane)
     c.wvT = 2.5;
   }
+  c.fol = null;
   if (blk) {
     const r = rgt(v.h),
       sd = blk.lat > 0 ? -1 : 1;
-    dx += (r[0] * sd * 3.5 * (16 - blk.al)) / 4;
-    dy += (r[1] * sd * 3.5 * (16 - blk.al)) / 4;
+    // fellow chaser at about our speed: just follow it (gap held via c.fol) — no hard swerve; faster: pull out past it
+    const kk = blk.o.pol ? (c.sp - Math.abs(blk.o.v || 0) < 3 ? 0 : 0.4) : 1;
+    dx += (r[0] * sd * 3.5 * (16 - blk.al) * kk) / 4;
+    dy += (r[1] * sd * 3.5 * (16 - blk.al) * kk) / 4;
+    const isPol = !!blk.o.pol,
+      cl = c.sp - Math.abs(blk.o.v || 0);
+    // following a fellow chaser: hold a gap instead of ramming it (they still weave out round it)
+    if (isPol) c.fol = Math.abs(blk.o.v || 0) + Math.max(0, blk.al - 6) * 1.3;
     if (blk.al < 3.2) {
-      if (c.sp > 11) {
+      if (cl > (isPol ? 9 : 6)) {
         c.spin = 1.6;
         c.spinD = Math.random() < 0.5 ? -1 : 1;
         POL.crashes = (POL.crashes || 0) + 1;
-        POL.trafCrash = (POL.trafCrash || 0) + 1;
+        if (isPol) POL.polCrash = (POL.polCrash || 0) + 1;
+        else POL.trafCrash = (POL.trafCrash || 0) + 1;
         return "spin";
       }
       c.sp = Math.min(c.sp, Math.abs(blk.o.v || 0));
@@ -1379,7 +1395,8 @@ function polDriveChase(c, dt) {
           : Math.abs(P.v) * 0.6,
     turn = Math.abs(wrapA(Math.atan2(dx, -dy) - v.h)),
     cap = turn > 0.6 ? 9 : turn > 0.3 ? 16 : 40;
-  c.sp += Math.max(-10 * dt, Math.min(5 * dt, Math.min(cap, want) - c.sp));
+  c.sp += Math.max(-10 * dt, Math.min(5 * dt, Math.min(cap, want, c.fol ?? 1e9) - c.sp));
+  c.fol = null;
   if (dP < 7) c.sp = Math.min(c.sp, WANT.lvl >= 2 ? Math.abs(P.v) + 3 : 1);
   if (c.rev > 0) {
     polReverse(c, dt);
@@ -1420,7 +1437,22 @@ function polUpdateChase(dt) {
     v = c.v,
     P = truck,
     dP = Math.hypot(P.x - v.x, P.y - v.y);
-  if (st === "spun") polLose("crashed");
+  if (st === "spun") {
+    // v-pol3: the lead car crashed out; if other chasers are still on you, the nearest takes over the chase
+    if (POL.aux.length) {
+      polEndChase(true);
+      let bi = 0;
+      for (let i = 1; i < POL.aux.length; i++)
+        if (Math.hypot(POL.aux[i].v.x - P.x, POL.aux[i].v.y - P.y) < Math.hypot(POL.aux[bi].v.x - P.x, POL.aux[bi].v.y - P.y)) bi = i;
+      const n = POL.aux.splice(bi, 1)[0];
+      n.aux = 0;
+      n.goal = null;
+      POL.chase = n;
+      POL.lostT = 0;
+      POL.handover = (POL.handover || 0) + 1;
+    } else polLose("crashed");
+    return;
+  }
   if (st) return;
   // losing them
   if (c.sp < 2 && dP > 40 && Math.abs(P.v) > 2) {
@@ -2176,7 +2208,7 @@ function polObst() {
   const L = [];
   for (const o of traffic.vs) L.push([o, o.x, o.y, o.h || 0, o.L || 4.6, o.W || 2]);
   for (const t of world.trailers || []) {
-    if (t === truck.trl) continue;
+    if (t === truck.trl || t.coupled) continue;
     const b = trailerBox(t);
     L.push([t, b.x, b.y, b.h || 0, b.L, b.W + 0.05]);
   }
@@ -2204,7 +2236,8 @@ function polObst() {
       th = truck.th != null ? truck.th : t.th,
       f2 = fwd(th),
       tm = (TRL.front + TRL.rear) / 2;
-    L.push([t, t.x - f2[0] * tm, t.y - f2[1] * tm, th, TRL.rear - TRL.front, TRL.w + 0.1]);
+    const kp = kingpin(truck);
+    L.push([t, kp[0] - f2[0] * tm, kp[1] - f2[1] * tm, th, TRL.rear - TRL.front, TRL.w + 0.1]);
   }
   return L;
 }
@@ -2298,7 +2331,7 @@ function polSep1(c, again) {
           ml = Math.hypot(mtv[0], mtv[1]) || 1,
           // closing speed along the contact normal (side-by-side rubbing at the same speed is not a crash)
           rel = -((vf[0] * c.sp - of[0] * ovs) * mtv[0] + (vf[1] * c.sp - of[1] * ovs) * mtv[1]) / ml;
-        if (rel > 7) {
+        if (rel > (o.pol ? 9 : 6)) {
           c.spin = 1.3;
           c.spinD = Math.random() < 0.5 ? -1 : 1;
           c.sp *= 0.55;
@@ -2309,9 +2342,11 @@ function polSep1(c, again) {
         }
       }
       const f = fwd(v.h),
-        ov = o === truck ? truck.v : o.v || 0,
+        ov = o === truck || o === truck.trl ? truck.v : o.v || 0,
         along = (x - v.x) * f[0] + (y - v.y) * f[1];
-      if (along > 0) c.sp = Math.min(c.sp, Math.max(0, Math.abs(ov) * 0.9));
+      // only a hit from behind (pushed back along our heading) bleeds speed; side-by-side rubbing doesn't (stops a 0.9x cascade)
+      const back = -(mtv[0] * f[0] + mtv[1] * f[1]) / (Math.hypot(mtv[0], mtv[1]) || 1);
+      if (along > 0 && back > 0.6) c.sp = Math.min(c.sp, Math.max(0, Math.abs(ov) * (o.pol ? 1 : 0.9)));
     }
   }
   c.blocked = hit > 0;
