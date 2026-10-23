@@ -337,6 +337,18 @@ const YARD_BRANDS = [
   { name: "Copperline Haulage", mono: "CL", col: "#a8532a", acc: "#ffe2c4", glyph: "bars" },
   { name: "Northwind Carriers", mono: "NW", col: "#4a3a8c", acc: "#bfe3ff", glyph: "peak" },
 ];
+const YD3_PIN = {
+  x0: 112,
+  y0: 1446,
+  // private road rects [x, y, w, h] (tiles): spine north from the rural road, then west along the yard's north side to the gate
+  road: [
+    [136, 1442, 2, 157],
+    [119, 1442, 17, 2],
+  ],
+  sid: [106, 1412, 6, 92], // loop siding corridor (kept clear, never built on)
+  gate: { x: 136, y: 1595 }, // barrier across the mouth (2 tiles wide)
+  xing: [1562, 1581], // spine rows at the level crossing: gravel base (concrete would count as a hard site under the track)
+};
 const YD_H = 24; // up: yard = 15 rows of apron + warehouse strip + rail siding
 function yardSpot(tx, ty, rj, dbg) {
   const OK = [T.GRASS, T.TREE, T.SAND, T.FIELD, T.HEDGE, T.GRAVEL, T.PGRASS, T.ROCK],
@@ -1203,11 +1215,37 @@ function* buildDepotsSteps(objs, R) {
     [250, 800],
     [1150, 1350],
   ]) {
-    if (world.forSale.length >= 3) break;
+    if (world.forSale.length >= 2) break; // v66: Y3 (Copperline) is pinned below, on the west main line by the M1
     const rj = (x, y) =>
       world.forSale.some((o) => Math.abs(o.x0 - x) < 120 && Math.abs(o.y0 - y) < 120);
     const s = findSpot(tx, ty, 20, YD_H, 16, rj) || yardSpot(tx, ty, rj);
     if (!s) continue;
+    mkYard(s);
+  }
+  // v66 Copperline Haulage (Y3) pinned beside the straight west main line (x~105, Ashby side). The freight line passes the
+  // yard's west fence and a straight loop siding (turnouts at both ends) lets the yard train run straight through: no spur.
+  // Access is a single-lane PRIVATE road (concrete, no road segment: AI traffic + sat nav graph never see it) from the
+  // rural road at y1599 north to the gate, with an owner-only barrier at its mouth (owndepot.js ownGateHit).
+  {
+    const x = YD3_PIN.x0,
+      y = YD3_PIN.y0,
+      gap = 2;
+    for (const [rx, ry, rw, rh] of YD3_PIN.road) {
+      clearObjs(rx, ry, rw, rh);
+      fill(rx, ry, rw, rh, T.CONC);
+      for (let j = ry; j < ry + rh; j++) for (let i = rx; i < rx + rw; i++) world.reserved[idx(i, j)] = 1;
+    }
+    fill(136, YD3_PIN.xing[0], 2, YD3_PIN.xing[1] - YD3_PIN.xing[0], T.GRAVEL);
+    const [sx, sy, sw, sh] = YD3_PIN.sid;
+    clearObjs(sx, sy, sw, sh);
+    for (let j = sy; j < sy + sh; j++) for (let i = sx; i < sx + sw; i++) world.reserved[idx(i, j)] = 1;
+    const yd = mkYard([x, y, gap]);
+    yd.thru = 1;
+    yd.proad = YD3_PIN.road.map((r) => r.slice());
+    yd.gate = Object.assign({}, YD3_PIN.gate);
+    yd.navE = { x: (YD3_PIN.gate.x + 1) * M_T, y: (YD3_PIN.gate.y + 2.5) * M_T }; // sat nav target: the mouth on the public road
+  }
+  function mkYard(s) {
     const BR = YARD_BRANDS[world.forSale.length % YARD_BRANDS.length],
       n = BR.name;
     const [x, y, gap] = s;
@@ -1271,6 +1309,7 @@ function* buildDepotsSteps(objs, R) {
     yd.oslot = { x: (x + 3.5) * M_T, y: (y + 6.6) * M_T, w: 7, L: 9 };
     yd.sslot = { x: (x + 3.5) * M_T, y: (y + 12) * M_T, w: 7, L: 10 };
     world.forSale.push(yd);
+    return yd;
   }
   if (typeof svcGen === "function") {
     yield "Building fire, police & hospitals";

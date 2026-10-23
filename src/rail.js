@@ -1816,7 +1816,7 @@ function* railBuildSteps(objs) {
       let g = get(tx, ty),
         k = 0;
       if (g === T.WATER || (g === T.BRIDGE && !roadSegAt(tx, ty))) k = 2;
-      else if (g === T.ROAD || g === T.BRIDGE) {
+      else if (g === T.ROAD || g === T.BRIDGE || (typeof ownPrivAt === "function" && ownPrivAt(tx, ty))) {
         const sg = roadSegAt(tx, ty);
         k = sg && sg.type === "hwy" ? 3 : 1;
       }

@@ -319,8 +319,9 @@ function setRoute(target) {
     if (!target) return null;
   }
   if (target.entrance) {
-    tx = target.entrance.x / M_T;
-    ty = target.entrance.y / M_T;
+    const ne = target.navE || target.entrance; // v66: private-road yards route to the mouth on the public road
+    tx = ne.x / M_T;
+    ty = ne.y / M_T;
     name = target.name;
   } else {
     tx = target.x / M_T;
@@ -907,7 +908,7 @@ BigRig._navDiag = function (target) {
   if (r) return "ok";
   const gen = navGen;
   const A = (i) => navStamp[i] === gen;
-  const e = target.entrance || target,
+  const e = target.navE || target.entrance || target,
     E = navSnap(e.x / M_T, e.y / M_T, 70);
   const seen = new Uint8Array(N),
     s0 = idx(E[0], E[1]);
