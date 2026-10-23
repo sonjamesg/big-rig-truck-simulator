@@ -230,6 +230,8 @@ function nightMapLayer(X0, Y0, z, x0, y0, x1, y1, detail) {
     ctx.globalAlpha = K;
     ctx.imageSmoothingEnabled = z < 1;
     ctx.drawImage(NM.base, X0, Y0, MW * z, MH * z);
+    // v71: the night base is per-tile, so the airport's concrete reads as a flat grey block; lay the (tinted) airport over it
+    if (typeof ovlDraw === "function") ovlDraw(X0, Y0, z, x0, y0, x1, y1, true);
   } else {
     ctx.globalAlpha = K;
     ctx.globalCompositeOperation = "multiply";

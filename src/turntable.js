@@ -307,7 +307,15 @@ function ttDraw(g, cx, cy, k, yaw, pitch, m, col, fit) {
   }
   // front face (x = x0): texture u = z from -zx..zx (viewer facing the front sees +z on their left? mapped geometrically)
   const F = T.F;
-  add(T.front, 0, 0, F.c.width, F.c.height, [D.x0, F.Ht / F.K, F.zx], [D.x0, F.Ht / F.K, -F.zx], [D.x0, 0, F.zx], [-1, 0, 0]);
+  if (D.nose) {
+    // conventional: grille / lights / bumper only bonnet-high at the nose; windscreen, cab front and door mirrors set
+    // back at the bonnet's rear (x = -5.0), split from the same front texture
+    const hb = 2.05,
+      cut = F.Ht - hb * F.K;
+    add(T.front, 0, cut, F.c.width, hb * F.K, [D.x0, hb, F.zx], [D.x0, hb, -F.zx], [D.x0, 0, F.zx], [-1, 0, 0]);
+    add(T.front, 0, 0, F.c.width, cut, [-5.0, F.Ht / F.K, F.zx], [-5.0, F.Ht / F.K, -F.zx], [-5.0, hb, F.zx], [-1, 0, 0]);
+  } else
+    add(T.front, 0, 0, F.c.width, F.c.height, [D.x0, F.Ht / F.K, F.zx], [D.x0, F.Ht / F.K, -F.zx], [D.x0, 0, F.zx], [-1, 0, 0]);
   // cab back (x = xc) and chassis rear (x = x1)
   const B = T.B;
   add(T.back, 0, 0, B.cab.width, B.cab.height, [D.xc, B.Ht / B.K, -B.zx], [D.xc, B.Ht / B.K, B.zx], [D.xc, 0, -B.zx], [1, 0, 0]);
