@@ -1826,8 +1826,9 @@ function stepVeh(v, dt, pbs) {
     }
   if (cands.length) {
     const half = v.W / 2 + 0.35;
-    for (let k = 0; k < 17; k++) {
-      const sd = front + 0.4 + k * 2.5;
+    // v54: fine 0.5 m steps close in (a 2.5 m stride could step over a short car's rear or a corner clip), 2.5 m beyond
+    for (let k = 0; k < 34; k++) {
+      const sd = front + 0.2 + (k < 24 ? k * 0.5 : 12 + (k - 24) * 2.5);
       const p = pathAt(v, sd);
       const px = p[0] + v.offX,
         py = p[1] + v.offY;
@@ -1863,6 +1864,42 @@ function stepVeh(v, dt, pbs) {
               lveh = b.veh || null;
             }
           }
+      }
+    }
+  }
+  // v54: body sweep along our own path out to the stopping distance: catches a stopped/slow car poking into our lane
+  // from another heading (waiting to turn in the junction box, angled in a queue) that the centreline probe misses.
+  if (cands.length && lgap > 0.5) {
+    const reach = Math.min(lgap, (v.v * v.v) / (2 * 3.5) + 6);
+    const f0 = fwd(v.h || 0);
+    const bodyAt = (sd) => {
+      const a = pathAt(v, sd + 0.6),
+        b = pathAt(v, sd - 0.6),
+        c = pathAt(v, sd);
+      return { x: c[0] + v.offX, y: c[1] + v.offY, h: ang(a[0] - b[0], a[1] - b[1]), L: v.L, W: v.W + 0.2 };
+    };
+    const nowB = { x: v.x, y: v.y, h: v.h || 0, L: v.L, W: v.W };
+    const rr = reach + v.L / 2 + 9;
+    const sc = cands.filter(
+      (b) =>
+        !((b.vel || 0) > 1.5 && Math.cos(b.h - v.h) > 0.7) && // moving same-way traffic: the probe above handles it
+        !(b.veh && b.veh.lead === v) && // it is following us
+        (b.x - v.x) * f0[0] + (b.y - v.y) * f0[1] > 0 && // ahead of our centre
+        Math.hypot(b.x - v.x, b.y - v.y) < rr &&
+        !obbMTV(nowB, b), // already touching: never lock up on it
+    );
+    if (sc.length) sweep: for (let d = 0.75; d <= reach; d += 0.75) {
+      const B = bodyAt(v.s + d);
+      for (const b of sc) {
+        if (obbMTV(B, b)) {
+          if (d < lgap) {
+            lgap = d;
+            lvel = Math.max(0, (b.vel || 0) * Math.cos(b.h - v.h));
+            lplayer = !!b.player;
+            lveh = b.veh || null;
+          }
+          break sweep;
+        }
       }
     }
   }
@@ -1933,7 +1970,15 @@ function stepVeh(v, dt, pbs) {
     v.emWant = best;
     if (Math.abs(best - cur) > 0.4 && bg > lgap + 6) lgap = Math.max(lgap, 3.5); // keep rolling while we slide across
   }
-  if (lgap < 1e8) acc = Math.min(acc, idmAcc(v, v0, lgap, lvel));
+  if (lgap < 1e8) {
+    acc = Math.min(acc, idmAcc(v, v0, lgap, lvel));
+    // v54: hard safe-stopping cap (IDM alone can under-brake for a leader that is already stopped): we must be able to stop
+    // within the gap minus a standstill margin at a firm-but-normal 4.5 m/s2, whatever vehicle lengths are involved
+    const gmin = v.heavy ? 2.5 : 2.0,
+      room = lgap - gmin;
+    const vs = room <= 0 ? 0 : lvel + Math.sqrt(2 * 4.5 * room);
+    if (v.v > vs) acc = Math.min(acc, (vs - v.v) / Math.max(dt, 0.05) - 0.5);
+  }
   acc = Math.min(acc, idmAcc(v, v0, 1e9, 0));
   if (typeof indYield === "function") acc = indYield(v, v0, acc);
   if (typeof emYield === "function") acc = emYield(v, acc, dt); // v29: pull over for blue lights
