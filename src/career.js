@@ -477,7 +477,7 @@ function addXP(n) {
 // ---------- truck models
 const modelArtCache = {};
 function modelArt(m, col, hide) {
-  const key = m.id + col + (m.id === "rigger" ? "|" + rigHideKey(hide) : "");
+  const key = m.id + col + (m.id === "rigger" ? "|" + rigHideKey(hide) : hide && hide.exh ? "|e" : "");
   if (modelArtCache[key]) return modelArtCache[key];
   if (m.id === "rigger") return (modelArtCache[key] = rigTopArt(col, hide));
   const st = m.style,
@@ -600,7 +600,7 @@ function modelArt(m, col, hide) {
       g.fill();
     }
   }
-  if (st.stacks) {
+  if (st.stacks && !(hide && hide.exh)) {
     for (const s of [-1, 1]) {
       const sg = g.createRadialGradient(
         X(s * 1.0) - 3,
@@ -621,7 +621,7 @@ function modelArt(m, col, hide) {
       g.arc(X(s * 1.0), Y(cab1 + 0.15), 0.1 * S, 0, 7);
       g.fill();
     }
-  } else
+  } else if (!(hide && hide.exh))
     for (const s of [-1, 1]) {
       g.fillStyle = "#d9dde2";
       g.beginPath();
