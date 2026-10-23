@@ -18,7 +18,7 @@ const MIL_RIG = {
   tank: 720,
   econ: 1.45,
   dur: 0.55, // crash damage multiplier: sturdy
-  style: { roof: "std", nose: 0.9, mil: 1 },
+  style: { roof: "std", nose: 0.9, mil: 1, het: 1 },
   cols: ["#4b5d33", "#6b7448", "#3a4429", "#8a7d55", "#2f3a2a", "#c2b280", "#1f2a33"],
   blurb: "Military-grade 6x6 heavy tractor: huge pulling power, built like a bunker.",
 };
@@ -28,7 +28,7 @@ function milRigArt(col) {
     front = CAB.front - nose,
     S = PPM * ART_SCALE,
     W = Math.ceil((CAB.w + 1.1) * S),
-    H = Math.ceil((CAB.rear + 0.2 - front) * S),
+    H = Math.ceil((CAB.rear + 0.9 - front) * S),
     c = mkCanvas(W, H),
     g = c.getContext("2d"),
     X = (v) => W / 2 + v * S,
@@ -51,14 +51,14 @@ function milRigArt(col) {
   // six chunky off-road tyres (front axle + rear tandem), tread blocks
   const tyre = (cx, cy) => {
     g.fillStyle = "#151614";
-    rr(g, X(cx) - 0.3 * S, Y(cy) - 0.6 * S, 0.6 * S, 1.2 * S, 0.16 * S);
+    rr(g, X(cx) - 0.3 * S, Y(cy) - 0.7 * S, 0.6 * S, 1.4 * S, 0.16 * S);
     g.fill();
     g.fillStyle = "#2b2d29";
-    for (let k = -4; k <= 4; k++) g.fillRect(X(cx) - 0.3 * S, Y(cy) + k * 0.13 * S - 1, 0.6 * S, 2);
+    for (let k = -5; k <= 5; k++) g.fillRect(X(cx) - 0.3 * S, Y(cy) + k * 0.13 * S - 1, 0.6 * S, 2);
     g.fillStyle = "#3c4035";
     g.fillRect(X(cx) - 0.08 * S, Y(cy) - 0.25 * S, 0.16 * S, 0.5 * S);
   };
-  for (const s of [-1, 1]) for (const ay of [-CAB.wheelbase, -0.55, 0.75]) tyre(s * 1.22, ay);
+  for (const s of [-1, 1]) for (const ay of [-5.0, -1.45, -0.05, 1.35]) tyre(s * 1.22, ay); // HET: front, gap, close tri-axle
   // rear mudguards / deck plates over the tandem
   for (const s of [-1, 1]) {
     g.fillStyle = dk;
