@@ -1220,7 +1220,7 @@ function czOpen() {
   const b = openModal(
     "tune",
     `<div class="czh"><button class="czb x" id="czBack" aria-label="Back">\u2039</button><div class="cztl"><h2>TUNE SHOP</h2><small>${esc(m.name)}${CZ.bay ? " \u2022 " + esc(CZ.bay.name) : ""}</small></div><div class="wallet" title="Bank"><span aria-hidden="true">\u{1F437}</span> <b id="czBank"></b></div><button class="czb x" id="czClose" aria-label="Close">\u2715</button></div>
-   <div class="czm"><div class="czt"><div class="czp"><canvas></canvas><span class="vt"></span><span class="vh">drag / right stick / Z X to rotate \u2022 tap or V: top / 360\u00B0</span></div><div class="czs"></div></div>
+   <div class="czm"><div class="czt"><div class="czp"><canvas></canvas><span class="vt"></span><span class="vh">drag / right stick / Z X to rotate \u2022 tap or V: top / 360\u00B0 \u2022 P / Y: pause</span></div><div class="czs"></div></div>
    <div class="czk"><div class="cztabs"></div><div class="czg"></div></div></div>
    <div class="czf"><div style="flex:0 1 38%;min-width:0"><div id="czSelN" style="font-weight:800;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div><div class="msg" id="czMsg"></div></div><button class="btn sel" id="czAct"></button></div>`,
     "tz",
@@ -1235,6 +1235,7 @@ function czOpen() {
   // close (X) = same as DONE: fitted parts are already saved, so just leave the shop
   b.querySelector("#czClose").addEventListener("click", czClose);
   const pv = b.querySelector(".czp");
+  ttPauseBtn(pv);
   pv.addEventListener("pointerdown", (e) => {
     CZ.drag = { x: e.clientX, a: CZ.ang, t: performance.now(), mv: 0 };
     pv.setPointerCapture(e.pointerId);
@@ -1494,7 +1495,7 @@ function czPreview(b) {
     fit = czFitted(m.id, CZ.sel && !CZ.sel.stock ? CZ.sel : null);
   if (CZ.sel && CZ.sel.stock) delete fit[CZ.sel.slot];
   g.clearRect(0, 0, W, H);
-  if (!CZ.drag) CZ.ang += CZ.spin * 0.016;
+  if (!CZ.drag && !TT.paused) CZ.ang += CZ.spin * 0.016;
   const lights = CZ.tab === "lights";
   b.querySelector(".vt").textContent = CZ.view === "top" ? "TOP VIEW" : "360\u00B0 VIEW";
   // turntable
@@ -1570,8 +1571,9 @@ function czPad(g, hit, now, dt) {
     czClose();
     return true;
   }
-  if (hit(3)) {
-    CZ.view = CZ.view === "top" ? "side" : "top";
+  if (hit(3)) ttTogglePause(); // Y: pause / play the 360 spin
+  if (hit(11)) {
+    CZ.view = CZ.view === "top" ? "side" : "top"; // R3: top / 360
   }
   if (hit(4) || hit(5)) {
     const i = CZ_TABS.findIndex((t) => t.id === CZ.tab),

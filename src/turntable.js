@@ -12,8 +12,11 @@ function ttDims(m) {
   const st = m.style || {},
     rig = m.id === "rigger" && typeof RIG !== "undefined";
   const nose = st.nose || 0,
-    roofH = rig ? RIG.cab.roof : st.roof === "high" ? 3.9 : st.roof === "aero" ? 3.6 : 3.2;
+    dr = typeof czWheels === "function" ? czWheels(m).dr : 0, // ride height follows the wheel size
+    roofH = (st.het ? 3.75 : rig ? RIG.cab.roof : st.roof === "high" ? 3.9 : st.roof === "aero" ? 3.6 : 3.2) + dr;
   return {
+    dr,
+    tyre: typeof czWheels === "function" ? 2 * czWheels(m).r : 1.04,
     rig,
     x0: -5.0 - nose,
     nose,
@@ -21,8 +24,8 @@ function ttDims(m) {
     x1: 1.25,
     zw: 1.25,
     roofH,
-    top: rig ? RIG.spoiler.top : roofH,
-    chH: 1.65,
+    top: rig ? RIG.spoiler.top + dr : roofH,
+    chH: 1.65 + dr,
   };
 }
 function ttShade(src, a, tint) {
@@ -36,6 +39,7 @@ function ttShade(src, a, tint) {
 }
 // ---- front face texture (z across, y up) ----
 function ttFront(m, col, fit, D) {
+  if (m.style && m.style.het) return ttFrontHET(m, col, fit, D);
   const L = czLook(m.id, fit),
     hide = typeof rigHide === "function" ? rigHide(fit, L) : {};
   col = L.col || col;
@@ -53,7 +57,7 @@ function ttFront(m, col, fit, D) {
       g.fill();
     };
   // tyres under the bumper
-  for (const s of [-1, 1]) R(s > 0 ? 0.8 : -1.2, 0, s > 0 ? 1.2 : -0.8, 1.04, "#2c2f33", 0.08);
+  for (const s of [-1, 1]) R(s > 0 ? 0.8 : -1.2, 0, s > 0 ? 1.2 : -0.8, D.tyre, "#2c2f33", 0.08);
   // cab front
   const gr = g.createLinearGradient(0, Y(D.roofH), 0, Y(0.45));
   gr.addColorStop(0, shade(col, 1.12));
@@ -183,9 +187,9 @@ function ttBack(m, col, fit, D) {
     Y2 = (y) => c2Ht - y * K;
   for (const s of [-1, 1]) {
     h.fillStyle = "#2c2f33";
-    h.fillRect(X(s > 0 ? 0.74 : -1.26), Y2(1.04), 0.52 * K, 1.04 * K);
+    h.fillRect(X(s > 0 ? 0.74 : -1.26), Y2(D.tyre), 0.52 * K, D.tyre * K);
     h.fillStyle = "rgba(0,0,0,0.4)";
-    h.fillRect(X(s > 0 ? 0.99 : -1.01), Y2(1.04), 0.02 * K, 1.04 * K);
+    h.fillRect(X(s > 0 ? 0.99 : -1.01), Y2(D.tyre), 0.02 * K, D.tyre * K);
     h.fillStyle = "#141517";
     h.fillRect(X(s > 0 ? 0.7 : -1.3), Y2(1.2), 0.6 * K, 0.16 * K);
     if (!L.mud || L.mud) {
@@ -211,7 +215,7 @@ function ttBack(m, col, fit, D) {
   return { cab: c, rear: c2, K, zx, Ht, Ht2: c2Ht };
 }
 function ttTex(m, col, fit) {
-  const key = m.id + "|" + col + "|" + JSON.stringify(fit);
+  const key = m.id + "|" + col + "|" + JSON.stringify(fit) + "|" + (typeof czWS === "function" ? czWS(m.id) : 1);
   if (TT.cache[key]) return TT.cache[key];
   if (++TT.n > 12) {
     TT.cache = {};
@@ -267,22 +271,8 @@ function ttDraw(g, cx, cy, k, yaw, pitch, m, col, fit) {
       Z1 = xr * sn + z * cs;
     return [cx + k * X1, cy - k * (y * cp - Z1 * sp), Z1 * cp + y * sp];
   };
-  // ground shadow: projected footprint, soft
-  g.save();
-  g.filter = "blur(" + Math.round(k * 0.18) + "px)";
-  g.fillStyle = "rgba(0,0,0,0.45)";
-  g.beginPath();
-  [
-    [D.x0, -D.zw],
-    [D.x1, -D.zw],
-    [D.x1, D.zw],
-    [D.x0, D.zw],
-  ].forEach(([x, z], i) => {
-    const p = P(x, 0, z);
-    i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]);
-  });
-  g.fill();
-  g.restore();
+  // soft contact shadow: layered footprint of the whole truck (rotates with it), darkest under the tyres + chassis
+  ttShadow(g, P, D, m);
   const faces = [];
   // face: texture img, source rect (sx,sy,sw,sh), world corners for source (0,0),(sw,0),(0,sh); n = outward normal (for culling)
   const add = (img, sx, sy, sw, sh, p0, p1, p2, n) => {
@@ -310,7 +300,7 @@ function ttDraw(g, cx, cy, k, yaw, pitch, m, col, fit) {
   if (D.nose) {
     // conventional: grille / lights / bumper only bonnet-high at the nose; windscreen, cab front and door mirrors set
     // back at the bonnet's rear (x = -5.0), split from the same front texture
-    const hb = 2.05,
+    const hb = (m.style && m.style.het ? 2.7 : 2.05) + D.dr,
       cut = F.Ht - hb * F.K;
     add(T.front, 0, cut, F.c.width, hb * F.K, [D.x0, hb, F.zx], [D.x0, hb, -F.zx], [D.x0, 0, F.zx], [-1, 0, 0]);
     add(T.front, 0, 0, F.c.width, cut, [-5.0, F.Ht / F.K, F.zx], [-5.0, F.Ht / F.K, -F.zx], [-5.0, hb, F.zx], [-1, 0, 0]);
@@ -346,7 +336,7 @@ function ttDraw(g, cx, cy, k, yaw, pitch, m, col, fit) {
     body = shade((czLook(m.id, fit).col || col), 0.55),
     boxes = [];
   if (D.nose) {
-    boxes.push([D.x0 + 0.08, -5.0, 0.5, 2.05, zi - 0.12, "#202326"]); // bonnet / engine bay
+    boxes.push([D.x0 + 0.08, -5.0, 0.5, (m.style && m.style.het ? 2.65 : 2.05) + D.dr, zi - 0.12, "#202326"]); // bonnet / engine bay
     boxes.push([-5.0, D.xc - 0.04, 0.45, D.roofH - 0.06, zi, body]);
   } else boxes.push([D.x0 + 0.08, D.xc - 0.04, 0.45, D.roofH - 0.06, zi, body]); // cab shell + filled back/underside
   boxes.push([D.xc - 0.1, D.x1 - 0.05, 0.62, D.chH - 0.03, zi - 0.05, "#1d1f22"]); // boxed frame rails + solid deck
@@ -398,6 +388,7 @@ const TTS = { ang: 0.6, drag: null, raf: 0, spin: 0.35 };
 function ttShowroom(cv, getTruck) {
   cancelAnimationFrame(TTS.raf);
   const g = cv.getContext("2d");
+  ttPauseBtn(cv.parentElement);
   cv.style.touchAction = "none";
   cv.addEventListener("pointerdown", (e) => {
     TTS.drag = { x: e.clientX, a: TTS.ang };
@@ -416,7 +407,9 @@ function ttShowroom(cv, getTruck) {
     let rx = 0;
     for (const p of pads) if (p && Math.abs(p.axes[2] || 0) > 0.2) rx = p.axes[2];
     if (rx) TTS.ang += rx * dt * 2.5;
-    else if (!TTS.drag) TTS.ang += TTS.spin * dt;
+    else if (!TTS.drag && !TT.paused) TTS.ang += TTS.spin * dt;
+    for (const p of pads) if (p && p.buttons[3] && p.buttons[3].pressed && !TTS.y) ttTogglePause();
+    TTS.y = pads && [...pads].some((p) => p && p.buttons[3] && p.buttons[3].pressed);
     const r = cv.getBoundingClientRect(),
       dpr = Math.min(2, window.devicePixelRatio || 1),
       W = Math.max(50, Math.round(r.width * dpr)),
@@ -450,3 +443,141 @@ addEventListener("keydown", (e) => {
   if (typeof career === "undefined" || career.uiOpen !== "dealer") return;
   if (e.code === "KeyZ" || e.code === "KeyX") TTS.ang += e.code === "KeyX" ? 0.25 : -0.25;
 });
+
+// HET (M1070-style) front: huge single tyres, high bumper with round lamps, big upright grille block on a short squared
+// bonnet, flat upright windscreen, roof light bar + amber beacon, mirrors on frames
+function ttFrontHET(m, col, fit, D) {
+  const L = czLook(m.id, fit);
+  col = L.col || col;
+  const K = 60,
+    zx = 1.7,
+    dr = D.dr,
+    Wt = Math.ceil(zx * 2 * K),
+    Ht = Math.ceil((D.top + 0.7) * K),
+    c = mkCanvas(Wt, Ht),
+    g = c.getContext("2d"),
+    X = (z) => Wt / 2 + z * K,
+    Y = (y) => Ht - y * K,
+    R = (x0, y0, x1, y1, f, r) => {
+      g.fillStyle = f;
+      rr(g, X(x0), Y(y1), (x1 - x0) * K, (y1 - y0) * K, (r || 0) * K);
+      g.fill();
+    },
+    rw = D.tyre / 2;
+  for (const s of [-1, 1]) {
+    R(s > 0 ? 0.82 : -1.32, 0, s > 0 ? 1.32 : -0.82, 2 * rw, "#161715", 0.15);
+    g.fillStyle = "#2a2c28";
+    for (let k = 0; k < 7; k++) g.fillRect(X(s > 0 ? 0.82 : -1.32), Y(0.12 + k * 0.2 * rw), 0.5 * K, 0.06 * K);
+  }
+  // cab front (set back; drawn on the upper part of the texture)
+  R(-1.25, 2.6 + dr, 1.25, D.roofH, shade(col, 0.95), 0.05);
+  R(-1.12, 2.95 + dr, -0.04, 3.5 + dr, "#1b2a38", 0.03);
+  R(0.04, 2.95 + dr, 1.12, 3.5 + dr, "#1b2a38", 0.03);
+  g.fillStyle = "rgba(160,220,255,0.25)";
+  g.fillRect(X(-1.0), Y(3.45 + dr), 0.3 * K, 0.4 * K);
+  R(-1.15, D.roofH, 1.15, D.roofH + 0.1, "#23251f");
+  for (let k = 0; k < 5; k++) R(-0.9 + k * 0.42, D.roofH + 0.02, -0.76 + k * 0.42, D.roofH + 0.08, "#fff3c4");
+  g.fillStyle = "#ff9a1a";
+  g.beginPath();
+  g.ellipse(X(0.95), Y(D.roofH + 0.12), 0.12 * K, 0.14 * K, 0, Math.PI, 0);
+  g.fill();
+  for (const s of [-1, 1]) {
+    g.strokeStyle = "#1c1d1a";
+    g.lineWidth = 0.05 * K;
+    g.strokeRect(X(s > 0 ? 1.25 : -1.6), Y(3.6 + dr), 0.35 * K, 0.9 * K);
+    R(s > 0 ? 1.42 : -1.58, 2.8 + dr, s > 0 ? 1.58 : -1.42, 3.5 + dr, "#151614", 0.03);
+  }
+  // bonnet face: big upright grille block, high bumper with round lamps
+  R(-1.05, 1.1 + dr, 1.05, 2.7 + dr, shade(col, 0.85), 0.04);
+  R(-0.8, 1.95 + dr, 0.8, 2.62 + dr, "#121311", 0.03);
+  g.fillStyle = shade(col, 0.55);
+  for (let k = 0; k < 6; k++) g.fillRect(X(-0.76), Y(2.02 + dr + k * 0.1), 1.52 * K, 0.03 * K);
+  R(-1.3, 1.15 + dr, 1.3, 1.9 + dr, shade(col, 0.7), 0.04);
+  for (const s of [-1, 1]) {
+    g.fillStyle = "#fff6d0";
+    g.beginPath();
+    g.arc(X(s * 0.95), Y(1.6 + dr), 0.12 * K, 0, 7);
+    g.fill();
+    g.fillStyle = "#f0a020";
+    g.beginPath();
+    g.arc(X(s * 0.95), Y(1.33 + dr), 0.08 * K, 0, 7);
+    g.fill();
+    R(s * 0.45 - 0.08, 1.2 + dr, s * 0.45 + 0.08, 1.4 + dr, "#2b2c28"); // tow shackles
+  }
+  R(-0.3, 1.25 + dr, 0.3, 1.8 + dr, "#1d1e1b");
+  return { c, K, zx, Ht };
+}
+
+function ttShadow(g, P, D, m) {
+  const quad = (x0, x1, z0, z1, a) => {
+    g.fillStyle = "rgba(0,0,0," + a + ")";
+    g.beginPath();
+    [[x0, z0], [x1, z0], [x1, z1], [x0, z1]].forEach(([x, z], i) => {
+      const p = P(x, 0, z);
+      i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]);
+    });
+    g.fill();
+  };
+  g.save();
+  // wide penumbra: 7 growing footprints at low alpha = soft fade at the edges
+  for (let k = 6; k >= 0; k--) {
+    const e = 0.08 + k * 0.11;
+    quad(D.x0 - e, D.x1 + e, -D.zw - e, D.zw + e, 0.055);
+  }
+  // umbra under the chassis
+  quad(D.x0 + 0.3, D.x1 - 0.2, -D.zw + 0.35, D.zw - 0.35, 0.18);
+  // contact patches under every tyre (twins wider)
+  const W = typeof czWheels === "function" ? czWheels(m) : { r: 0.52, ax: [{ x: -3.8 }, { x: 0, tw: 1 }] };
+  for (const a of W.ax)
+    for (const s of [-1, 1]) {
+      const w = a.tw ? 0.62 : 0.4,
+        zc = s * (D.zw - w / 2 + 0.02);
+      for (const [e, al] of [[0.18, 0.12], [0.06, 0.25], [0, 0.35]])
+        quad(a.x - W.r * 0.55 - e, a.x + W.r * 0.55 + e, zc - w / 2 - e, zc + w / 2 + e, al);
+    }
+  g.restore();
+}
+// ---- 360 auto-rotate pause / play (button, Space, pad Y, tap)
+function ttPaused() {
+  return !!TT.paused;
+}
+function ttTogglePause() {
+  TT.paused = !TT.paused;
+  if (!TT.paused && typeof CZ !== "undefined" && !CZ.spin) CZ.spin = 0.25;
+  document.querySelectorAll(".ttpause").forEach((b) => {
+    b.textContent = TT.paused ? "\u25B6" : "\u23F8";
+    b.setAttribute("aria-label", TT.paused ? "Play rotation" : "Pause rotation");
+  });
+}
+function ttPauseBtn(host) {
+  if (!host || host.querySelector(".ttpause")) return;
+  const b = document.createElement("button");
+  b.className = "ttpause";
+  b.type = "button";
+  b.style.cssText = "position:absolute;right:8px;bottom:8px;z-index:3;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(10,14,20,.65);color:#fff;font-size:16px;cursor:pointer;touch-action:manipulation";
+  b.textContent = TT.paused ? "\u25B6" : "\u23F8";
+  b.setAttribute("aria-label", TT.paused ? "Play rotation" : "Pause rotation");
+  b.addEventListener("pointerdown", (e) => e.stopPropagation());
+  b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    ttTogglePause();
+  });
+  if (getComputedStyle(host).position === "static") host.style.position = "relative";
+  host.appendChild(b);
+}
+addEventListener(
+  "keydown",
+  (e) => {
+    if (typeof career === "undefined" || (career.uiOpen !== "tune" && career.uiOpen !== "dealer")) return;
+    // registered before main.js (which swallows every key while a menu is open)
+    if (e.code === "KeyP" && !(typeof czHornFocus === "function" && career.uiOpen === "tune" && czHornFocus())) {
+      e.preventDefault();
+      if (!e.repeat) ttTogglePause();
+    } else if (career.uiOpen === "tune" && CZ.tab === "tyres" && (e.code === "BracketLeft" || e.code === "BracketRight") && typeof wsSet === "function") {
+      const m = modelById(career.cur);
+      wsSet(m.id, czWS(m.id) + (e.code === "BracketRight" ? 0.05 : -0.05));
+      e.preventDefault();
+    }
+  },
+  true,
+);

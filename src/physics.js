@@ -82,7 +82,7 @@ function bodyHits(cx, cy, a, yf, yr, w) {
   return false;
 }
 function hitTest(s) {
-  if (bodyHits(s.x, s.y, s.h, CAB.front + 0.1, CAB.rear - 0.2, CAB.w - 0.2)) return "cab";
+  if (bodyHits(s.x, s.y, s.h, (s.cf || CAB.front) + 0.1, (s.cr || CAB.rear) - 0.2, CAB.w - 0.2)) return "cab";
   const k = kingpin(s);
   if (s.trl && bodyHits(k[0], k[1], s.th, TRL.front + 0.6, TRL.rear - 0.1, TRL.w - 0.2))
     return "trailer";
@@ -328,7 +328,7 @@ function stepTruck(s, inp, dt) {
   if (Math.abs(s.steer) > maxSteer) s.steer = Math.sign(s.steer) * maxSteer;
   // ----- kinematics (bicycle model) + trailer non-holonomic constraint
   const prev = { x: s.x, y: s.y, h: s.h, th: s.th };
-  const om = ((s.v * Math.tan(s.steer)) / CAB.wheelbase) * (s.skid ? 0.22 * (s.grip || 1) : 1);
+  const om = ((s.v * Math.tan(s.steer)) / (s.wb || CAB.wheelbase)) * (s.skid ? 0.22 * (s.grip || 1) : 1);
   const k0 = kingpin(s);
   s.h += om * dt;
   const f = fwd(s.h);
