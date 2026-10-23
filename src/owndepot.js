@@ -829,6 +829,7 @@ function drawOwnDepots(vx0, vy0, vx1, vy1) {
     Tt = TILE,
     dark = typeof DN !== "undefined" ? DN.dark : 0;
   rlDrawExt(vx0, vy0, vx1, vy1, dark);
+  ownPrivDraw(vx0, vy0, vx1, vy1, dark);
   for (const yd of ownYards()) {
     const X0 = yd.x0 * Tt,
       Y0 = yd.y0 * Tt,
@@ -1099,6 +1100,10 @@ function ownDrawBack(yd, X, Y, Tt, dark, own, B, tr) {
     ownBld(yd.hq, yd, X, Y, Tt, dark, "#e6e9ee", "#d5dae0", "DISTRIBUTION HQ", B.col, 2);
     ydLogo(ctx, X(3.5), Y(18.15), 0.45 * Tt, B);
   } else plot(yd.hq);
+  if (yd.thru) {
+    ownThruBack(yd, X, Y, Tt, dark, own);
+    return;
+  }
   // rail siding: ballast, sleepers, rails, buffer stop, tunnel portal on the east fence
   const ry = Y(RAIL_Y),
     S = PPM;
@@ -1209,8 +1214,12 @@ function ownTrain(yd, dt) {
       gy: RAIL_Y,
       box: [0, 0, 0, 0],
     };
-  if (yd.rc === undefined) yd.rc = rlConnect(yd);
+  if (yd.rc === undefined) yd.rc = yd.thru ? rlThru(yd) : rlConnect(yd);
   if (!o) {
+    return;
+  }
+  if (yd.thru) {
+    if (yd.rc) rlThruStep(yd, R, o, dt);
     return;
   }
   if (yd.rc && R.st === "away") {
@@ -1476,6 +1485,7 @@ function rlQ(rc, d) {
   return [P[k - 1][0] + (P[k][0] - P[k - 1][0]) * f, P[k - 1][1] + (P[k][1] - P[k - 1][1]) * f];
 }
 function rlPos(yd, d) {
+  if (yd.rc.thru) return rlThruPos(yd, d);
   const rc = yd.rc,
     Lq = rc.Lq,
     L = RAIL.L,
@@ -1507,6 +1517,7 @@ function rlCars(yd, R) {
 }
 // arc span this train occupies on the main line (for crossings + reservation), or null
 function rlSpan(yd, R) {
+  if (yd.rc.thru) return rlThruSpan(yd, R);
   const rc = yd.rc,
     Lq = rc.Lq,
     L = RAIL.L,
@@ -1588,7 +1599,7 @@ function rlExtSpans() {
   const out = [];
   for (const yd of ownYards()) {
     const R = yd.rt;
-    if (yd.rc && R && (R.st === "main" || R.st === "back" || R.st === "hold")) {
+    if (yd.rc && R && (R.st === "main" || R.st === "back" || R.st === "hold" || R.st === "tin")) {
       const sp = rlSpan(yd, R);
       if (sp) out.push(sp);
     }
@@ -1608,6 +1619,17 @@ function ownSpurP(yd) {
   if (!rc) return null;
   if (yd.spP) return yd.spP;
   const P = railSample(rc.P, 200);
+  if (rc.thru) {
+    for (const p of P) {
+      let d = 1e9;
+      for (let ss = rc.sS - 4; ss <= rc.sN + 4; ss += 1) {
+        const r = railPt(ss, RW_F);
+        d = Math.min(d, Math.hypot(p.x - r[0], p.y - r[1]));
+      }
+      if (d < 3.2) p.k = 5;
+    }
+    return (yd.spP = P);
+  }
   // where the spur runs over the main line's own track bed only redraw the rails, so the main ballast/sleepers show through seamlessly
   const ref = [];
   for (let s = rc.sj - 20; s <= rc.sj + 160; s += 1) ref.push(railPt(s, RW_F));
@@ -1628,7 +1650,7 @@ function rlDrawExt(vx0, vy0, vx1, vy1, dark) {
     railDrawPlain(ctx, ownSpurP(yd), yd.x0 * 7 + yd.y0 + 1, vx0, vy0, vx1, vy1);
     const j = railPt(rc.sj, RW_F),
       j2 = railPt(rc.sj - 12, RW_F),
-      sg = rlPos(yd, rc.Lq - RL_HOLD + 6);
+      sg = rlPos(yd, rc.thru ? rc.Lq - 14 : rc.Lq - RL_HOLD + 6);
     // block signal at the hold point: green when the train holds a reservation / runs, red otherwise
     const R = yd.rt || {},
       go = R.st === "main" || R.st === "back";
@@ -1655,7 +1677,8 @@ function rlDrawExt(vx0, vy0, vx1, vy1, dark) {
       }
     }
     ctx.restore();
-    if (!(R.st === "ext" || R.st === "hold" || R.st === "main" || R.st === "back")) continue;
+    if (!(R.st === "ext" || R.st === "hold" || R.st === "main" || R.st === "back" || (rc.thru && (R.st === "tload" || R.st === "tin"))))
+      continue;
     for (const c of rlCars(yd, R)) {
       if (c.x * S < vx0 - 200 || c.x * S > vx1 + 200 || c.y * S < vy0 - 200 || c.y * S > vy1 + 200)
         continue;
@@ -1733,6 +1756,13 @@ function ownMap(BX, BY, z) {
         ctx.stroke();
       }
     }
+    if (yd.thru) {
+      if (yd.proad) {
+        ctx.fillStyle = "#7f8c8d";
+        for (const [rx, ry, rw, rh] of yd.proad) ctx.fillRect(BX(rx), BY(ry), Math.max(2, rw * z), Math.max(2, rh * z));
+      }
+      continue;
+    }
     const y = BY(yd.y0 + RAIL_Y),
       x0 = BX(yd.x0),
       x1 = BX(yd.x0 + 20);
@@ -1762,4 +1792,248 @@ function ownMap(BX, BY, z) {
     }
   }
   ctx.restore();
+}
+
+// ---- v66 through-siding yard (Copperline, west main line): loop siding beside the freight track, turnouts at both ends,
+// so the yard train pulls straight off the main line, loads at the platform and carries straight on (no spur line).
+function rlThru(yd) {
+  if (typeof RAIL === "undefined" || !RAIL.ready) return undefined;
+  const L = RAIL.L,
+    E = [yd.x0 * M_T, (yd.y0 + yd.h / 2) * M_T];
+  let sm = 0,
+    bd = 1e18;
+  for (let i = 0; i < L; i++) {
+    const d = Math.hypot(RAIL.X[i] - E[0], RAIL.Y[i] - E[1]);
+    if (d < bd) {
+      bd = d;
+      sm = i;
+    }
+  }
+  if (bd > 60) {
+    console.warn("[rl] " + yd.name + ": main line " + Math.round(bd) + " m away - no through siding");
+    return null;
+  }
+  // siding side = the yard side of the freight track; 12 m out from it
+  const a = railPt(sm, RW_F - 12),
+    b = railPt(sm, RW_F + 12),
+    C = [(yd.x0 + 10) * M_T, (yd.y0 + yd.h / 2) * M_T],
+    wS = Math.hypot(a[0] - C[0], a[1] - C[1]) < Math.hypot(b[0] - C[0], b[1] - C[1]) ? RW_F - 12 : RW_F + 12;
+  const HALF = 52, // straight platform half-length (m)
+    TO = 72, // turnout length (m)
+    sA = sm - HALF,
+    sB = sm + HALF,
+    sN = sB + TO + 8,
+    sS = sA - TO - 8; // freight runs -s: enters at sN, leaves at sS
+  const ease = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
+  const P = [];
+  for (let q = sN; q >= sS - 0.01; q -= 2) {
+    const f = q > sB ? ease((sN - 8 - q) / TO) : q < sA ? ease((q - (sS + 8)) / TO) : 1;
+    P.push(railPt(q, RW_F + (wS - RW_F) * f));
+  }
+  const cum = [0];
+  for (let k = 1; k < P.length; k++) cum.push(cum[k - 1] + Math.hypot(P[k][0] - P[k - 1][0], P[k][1] - P[k - 1][1]));
+  const Lq = cum[cum.length - 1];
+  let park = Lq / 2;
+  for (let k = 0; k < P.length; k++)
+    if (sN - k * 2 <= sA + 6) {
+      park = cum[k];
+      break;
+    }
+  let st = null,
+    sb = 1e18;
+  for (const S of RAIL.stations || []) {
+    const d = rlMod(sS - S.s, L);
+    if (d > 2000 && d < sb) {
+      sb = d;
+      st = S;
+    }
+  }
+  console.log("[rl] " + yd.name + ": through siding " + Math.round(Lq) + " m beside the main line at arc " + sm);
+  return {
+    thru: 1,
+    P,
+    cum,
+    Lq,
+    sj: sS,
+    sN,
+    sS,
+    sm,
+    wS,
+    park,
+    Ptot: Lq + L - (sN - sS),
+    dest: st ? st.name : "the main line",
+    ds: sb,
+  };
+}
+function rlThruPos(yd, d) {
+  const rc = yd.rc;
+  d = ((d % rc.Ptot) + rc.Ptot) % rc.Ptot;
+  if (d <= rc.Lq) return rlQ(rc, d);
+  return railPt(rc.sS - (d - rc.Lq), RW_F);
+}
+function rlThruSpan(yd, R) {
+  const rc = yd.rc,
+    m = (d) => ((d % rc.Ptot) + rc.Ptot) % rc.Ptot,
+    h = m(R.d),
+    t = m(R.d - TR_LEN * M_T),
+    onM = (d) => d > rc.Lq;
+  if (!onM(h) && !onM(t)) return null;
+  const arc = (d) => rc.sS - (d - rc.Lq);
+  if (onM(h) && !onM(t)) return [arc(h), rc.sS];
+  if (!onM(h) && onM(t)) return [rc.sN, arc(t) + RAIL.L];
+  return [arc(h), arc(t)];
+}
+function rlThruStep(yd, R, o, dt) {
+  const rc = yd.rc,
+    acc = (vt, a) => {
+      R.v = R.v < vt ? Math.min(vt, R.v + a * dt) : Math.max(vt, R.v - a * 1.5 * dt);
+    };
+  if (!/^(tload|hold|main|tin)$/.test(R.st)) {
+    Object.assign(R, { st: "tload", d: rc.park, v: 0, k: 0, t: 6, x: null, unl: 0, box: [0, 0, 0, 0] });
+  }
+  if (R.st === "tload") {
+    R.t -= dt;
+    if (R.t <= 0) {
+      if ((o.stock || 0) > 0 && R.k < 4) {
+        o.stock--;
+        R.box[R.k++] = YARD_COLS[(Math.random() * 8) | 0];
+        R.t = 6;
+      } else if (R.k >= 4 || R.k > 0) R.st = "hold";
+      else R.t = 6;
+    }
+  } else if (R.st === "hold") {
+    if (rlClear(rc, railTime())) {
+      R.st = "main";
+      R.v = RL_V * 0.6;
+    }
+  } else if (R.st === "main") {
+    acc(R.d > rc.Ptot - 350 ? RL_V : RAIL.vF, 0.9);
+    R.d += R.v * dt;
+    if (!R.unl && R.d > rc.Lq + rc.ds) {
+      R.unl = 1;
+      const n = R.box.filter(Boolean).length;
+      R.box = [0, 0, 0, 0];
+      if (n)
+        toast(ydBrand(yd).name + ": " + n + " container" + (n > 1 ? "s" : "") + " delivered by rail to " + rc.dest);
+    }
+    if (R.d >= rc.Ptot) {
+      R.d -= rc.Ptot;
+      R.st = "tin";
+    }
+  } else if (R.st === "tin") {
+    const rem = rc.park - R.d;
+    acc(Math.min(RL_V, Math.max(0.8, Math.sqrt(2 * 0.7 * Math.max(0, rem)))), 0.9);
+    R.d = Math.min(rc.park, R.d + R.v * dt);
+    if (R.d >= rc.park - 0.01) Object.assign(R, { st: "tload", v: 0, k: 0, t: 6, unl: 0, box: [0, 0, 0, 0] });
+  }
+}
+// loading platform on the west fence (the siding itself is drawn by rlDrawExt from rc.P)
+function ownThruBack(yd, X, Y, Tt, dark, own) {
+  const x = X(-2.2),
+    y0 = Y(1),
+    h = (yd.h - 2) * Tt;
+  ctx.fillStyle = "#9a9ea3";
+  ctx.fillRect(x, y0, 2.2 * Tt, h);
+  ctx.fillStyle = "#f1c40f";
+  ctx.fillRect(x, y0, 0.12 * Tt, h);
+  ctx.fillStyle = "rgba(0,0,0,.25)";
+  for (let t = 1.5; t < yd.h - 1; t += 1.5) ctx.fillRect(x + 0.2 * Tt, Y(t), 1.8 * Tt, 2);
+  ydText("RAIL LOADING", x + 1.1 * Tt, Y(yd.h / 2), Math.round(0.34 * Tt), own ? "#fff" : "rgba(255,255,255,.6)");
+  if (dark > 0.05)
+    for (let t = 3; t < yd.h - 1; t += 6) dnLight(x + 1.1 * Tt, Y(t), 150, "rgba(255,240,205,0.95)", own ? 0.75 : 0.35);
+}
+// ---- private road (single lane, owner only): no road segment, so AI traffic and the public sat nav graph never use it
+function ownPrivAt(tx, ty) {
+  for (const yd of world.forSale || [])
+    if (yd.proad)
+      for (const [rx, ry, rw, rh] of yd.proad) if (tx >= rx && tx < rx + rw && ty >= ry && ty < ry + rh) return yd;
+  return null;
+}
+function ownGateOpen(yd) {
+  if (!ownedYard(yd) || typeof truck === "undefined" || !truck) return false;
+  const g = yd.gate;
+  return Math.hypot(truck.x - (g.x + 1) * M_T, truck.y - (g.y + 0.5) * M_T) < 30;
+}
+function ownGateHit(s, prev) {
+  for (const yd of world.forSale || []) {
+    const g = yd.gate;
+    if (!g || ownedYard(yd)) continue;
+    const gx0 = g.x * M_T - 0.6,
+      gx1 = (g.x + 2) * M_T + 0.6,
+      gy = (g.y + 0.5) * M_T,
+      AW = 1.4;
+    if (Math.abs(s.x - (gx0 + gx1) / 2) > 40 || Math.abs(s.y - gy) > 40) continue;
+    const A = railBodyPts(s),
+      B = railBodyPts(Object.assign({}, s, prev)),
+      inX = (q) => q[0] > gx0 && q[0] < gx1;
+    if (B.some((q) => inX(q) && Math.abs(q[1] - gy) < AW)) return false; // already in the gate: free to back out
+    for (let i = 0; i < A.length; i++)
+      if (inX(A[i]) && Math.abs(A[i][1] - gy) < AW && Math.abs(B[i][1] - gy) >= AW) return true;
+  }
+  return false;
+}
+function ownPrivDraw(vx0, vy0, vx1, vy1, dark) {
+  const Tt = TILE;
+  for (const yd of world.forSale || []) {
+    if (!yd.proad) continue;
+    for (const [rx, ry, rw, rh] of yd.proad) {
+      const X0 = rx * Tt,
+        Y0 = ry * Tt,
+        W = rw * Tt,
+        H = rh * Tt;
+      if (X0 > vx1 + 60 || X0 + W < vx0 - 60 || Y0 > vy1 + 60 || Y0 + H < vy0 - 60) continue;
+      ctx.fillStyle = "#6f7378"; // verge kerb
+      ctx.fillRect(X0, Y0, W, H);
+      const v = rh > rw; // single 4.6 m lane centred, solid white edge lines
+      ctx.fillStyle = "#3a3e43";
+      if (v) ctx.fillRect(X0 + 0.2 * Tt, Y0, W - 0.4 * Tt, H);
+      else ctx.fillRect(X0, Y0 + 0.2 * Tt, W, H - 0.4 * Tt);
+      ctx.fillStyle = "rgba(255,255,255,.85)";
+      if (v) {
+        ctx.fillRect(X0 + 0.3 * Tt, Y0, 3, H);
+        ctx.fillRect(X0 + W - 0.3 * Tt - 3, Y0, 3, H);
+      } else {
+        ctx.fillRect(X0, Y0 + 0.3 * Tt, W, 3);
+        ctx.fillRect(X0, Y0 + H - 0.3 * Tt - 3, W, 3);
+      }
+      if (dark > 0.05)
+        for (let t = 6; t < Math.max(rw, rh); t += 14)
+          dnLight(v ? X0 + W / 2 : X0 + t * Tt, v ? Y0 + t * Tt : Y0 + H / 2, 120, "rgba(255,230,180,0.6)", 0.45);
+    }
+    // owner-only barrier + booth + sign at the mouth
+    const g = yd.gate,
+      gx = g.x * Tt,
+      gy = (g.y + 0.5) * Tt;
+    if (gx > vx1 + 200 || gx < vx0 - 200 || gy > vy1 + 200 || gy < vy0 - 200) continue;
+    const open = ownGateOpen(yd);
+    ctx.save();
+    ctx.fillStyle = "#ecf0f1";
+    ctx.fillRect(gx + 2 * Tt + 4, gy - 0.5 * Tt, 0.8 * Tt, 1.0 * Tt);
+    ctx.fillStyle = "#2c3e50";
+    ctx.fillRect(gx + 2 * Tt + 8, gy - 0.35 * Tt, 0.8 * Tt - 8, 0.3 * Tt);
+    ctx.translate(gx + 2 * Tt, gy);
+    ctx.rotate(open ? -1.35 : 0);
+    for (let k = 0; k < 6; k++) {
+      ctx.fillStyle = k & 1 ? "#fff" : "#e74c3c";
+      ctx.fillRect(-(k + 1) * (2 * Tt) / 6, -4, (2 * Tt) / 6, 8);
+    }
+    ctx.restore();
+    if (dark > 0.05) dnLight(gx + 2.4 * Tt, gy, 110, open ? "rgba(80,255,140,0.9)" : "rgba(255,80,60,0.9)", 0.6);
+    const own = ownedYard(yd);
+    ctx.fillStyle = "#1b2631";
+    ctx.fillRect(gx - 3.6 * Tt, gy - 1.6 * Tt, 3.3 * Tt, 1.1 * Tt);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ydFit("PRIVATE ROAD", gx - 1.95 * Tt, gy - 1.25 * Tt, Math.round(0.3 * Tt), "#fff", 3.1 * Tt, "900 ", "proad1");
+    ydFit(
+      own ? ydBrand(yd).name.toUpperCase() + " ONLY" : "NO PUBLIC ACCESS",
+      gx - 1.95 * Tt,
+      gy - 0.85 * Tt,
+      Math.round(0.22 * Tt),
+      own ? "#9dffbf" : "#ffd08a",
+      3.1 * Tt,
+      "800 ",
+      "proad2",
+    );
+  }
 }

@@ -395,7 +395,8 @@ function stepTruck(s, inp, dt) {
   const hit =
     hitTest(s) ||
     (typeof trafficHitTruck === "function" && trafficHitTruck(s) ? "veh" : null) ||
-    (typeof railBarrierHit === "function" && railBarrierHit(s, prev) ? "barrier" : null);
+    (typeof railBarrierHit === "function" && railBarrierHit(s, prev) ? "barrier" : null) ||
+    (typeof ownGateHit === "function" && ownGateHit(s, prev) ? "barrier" : null);
   if (hit) crashResponse(s, prev, hit, dt);
   if (s.bump > 0) s.bump = Math.max(0, s.bump - dt * 2);
 }
