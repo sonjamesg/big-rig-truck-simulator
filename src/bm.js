@@ -1248,7 +1248,6 @@ function bmSoldierSprite(S) {
 }
 function bmDrawLow(vx0, vy0, vx1, vy1) {
   const A = BM.act;
-  bmStingerDraw();
   bmSmokeDraw();
   bmJeepDraw();
   if (A && A.step === A.m.delStep) {
@@ -1812,6 +1811,6 @@ function bmExtrasUpdate(a, dt) {
   }
   bmJeepUpdate(dt);
   bmSmokeUpdate(dt);
-  bmStingerUpdate();
+  BM.flatT = 0; // v-pol2: spike strips removed from roadblocks
   bmMusicUpdate(a);
 }

@@ -32,6 +32,8 @@ const EMV = { arts: {} };
 // v29 detailed police vehicles (top-down, procedural): saloon / 4x4 SUV / Sprinter-style van, white with crisp blue+yellow battenburg,
 // glass, mirrors, roof POLICE lettering and a red/blue light bar
 const POL_T = ["pol_car", "pol_suv", "pol_van"];
+// v-pol2: redrawn UK police cars (supersampled 3x then downsized): shaded white body, full Battenburg flanks
+// (blue / fluorescent yellow), rear red-yellow chevrons, tinted glass with pillars, slim all-blue LED light bar, roof ID
 function polArt(type) {
   if (EMV.arts[type]) return EMV.arts[type];
   const D = {
@@ -40,122 +42,263 @@ function polArt(type) {
     pol_van: [5.9, 2.06, 0.95, 3.9, 0.15],
   }[type];
   const [L, W, bon, roofL, rear] = D,
-    c = vCanvas(L, W),
+    out = vCanvas(L, W),
+    K = 3,
+    c = mkCanvas(out.width * K, out.height * K),
     g = c.getContext("2d"),
+    S = VS * K,
     cx = c.width / 2,
-    X = (m) => cx + m * VS,
-    Y = (m) => 0.15 * VS + m * VS;
-  g.fillStyle = "#101010";
-  for (const fy of [0.55 + 0.15, L - 1.25])
-    for (const sd of [-1, 1])
-      (rr(g, X((sd * W) / 2 - (sd > 0 ? 0.16 : 0.06)), Y(fy), 0.22 * VS, 0.68 * VS, 2), g.fill()); // tyres
-  g.fillStyle = grad(g, X(-W / 2), X(W / 2), "#f6f6f4");
-  rr(g, X(-W / 2), Y(0), W * VS, L * VS, (type === "pol_van" ? 0.28 : 0.45) * VS);
+    X = (m) => cx + m * S,
+    Y = (m) => 0.15 * S + m * S,
+    van = type === "pol_van",
+    suv = type === "pol_suv",
+    BL = "#1b46b8",
+    YE = "#e4ff1a";
+  const body = (inset, r) => {
+    g.beginPath();
+    const x0 = X(-W / 2 + inset), x1 = X(W / 2 - inset), y0 = Y(inset), y1 = Y(L - inset), n = (van ? 0.3 : 0.55) * S;
+    g.moveTo(x0 + n * 0.6, y0);
+    g.lineTo(x1 - n * 0.6, y0);
+    g.quadraticCurveTo(x1, y0, x1, y0 + n);
+    g.lineTo(x1, y1 - r);
+    g.quadraticCurveTo(x1, y1, x1 - r, y1);
+    g.lineTo(x0 + r, y1);
+    g.quadraticCurveTo(x0, y1, x0, y1 - r);
+    g.lineTo(x0, y0 + n);
+    g.quadraticCurveTo(x0, y0, x0 + n * 0.6, y0);
+    g.closePath();
+  };
+  // tyres peeking out
+  g.fillStyle = "#0d0d0d";
+  for (const fy of [0.7, L - 1.25])
+    for (const sd of [-1, 1]) (rr(g, X(sd > 0 ? W / 2 - 0.2 : -W / 2 - 0.02), Y(fy), 0.22 * S, 0.66 * S, 0.06 * S), g.fill());
+  // body: white with cylindrical side shading
+  const bg = g.createLinearGradient(X(-W / 2), 0, X(W / 2), 0);
+  bg.addColorStop(0, "#9da2a8");
+  bg.addColorStop(0.12, "#e4e6e8");
+  bg.addColorStop(0.42, "#ffffff");
+  bg.addColorStop(0.6, "#f7f8f8");
+  bg.addColorStop(0.88, "#dcdfe2");
+  bg.addColorStop(1, "#8e9399");
+  g.fillStyle = bg;
+  body(0, 0.3 * S);
   g.fill();
-  g.strokeStyle = "rgba(0,0,0,0.55)";
-  g.lineWidth = 1.2;
+  g.strokeStyle = "rgba(20,24,30,0.7)";
+  g.lineWidth = 1.2 * K;
   g.stroke();
-  g.fillStyle = "#2b2f35";
-  g.fillRect(X(-W / 2 + 0.15), Y(0.02), (W - 0.3) * VS, 0.12 * VS);
-  g.fillRect(X(-W / 2 + 0.15), Y(L - 0.14), (W - 0.3) * VS, 0.12 * VS); // bumpers
-  g.fillStyle = "#fff6c8";
-  for (const sd of [-1, 1]) g.fillRect(X(sd * (W / 2 - 0.38) - 0.16), Y(0.05), 0.32 * VS, 0.1 * VS);
-  g.fillStyle = "#d0222a";
-  for (const sd of [-1, 1])
-    g.fillRect(X(sd * (W / 2 - 0.34) - 0.14), Y(L - 0.13), 0.28 * VS, 0.09 * VS); // lamps
-  const ws = bon,
-    r0 = ws + 0.55,
-    r1 = r0 + roofL;
-  g.fillStyle = "#16202b";
-  g.beginPath();
-  g.moveTo(X(-W / 2 + 0.2), Y(r0));
-  g.lineTo(X(-W / 2 + 0.32), Y(ws));
-  g.lineTo(X(W / 2 - 0.32), Y(ws));
-  g.lineTo(X(W / 2 - 0.2), Y(r0));
-  g.closePath();
-  g.fill(); // windscreen
-  g.fillStyle = "rgba(170,210,240,0.35)";
-  g.beginPath();
-  g.moveTo(X(-W / 2 + 0.4), Y(ws + 0.08));
-  g.lineTo(X(W / 2 - 0.5), Y(ws + 0.08));
-  g.lineTo(X(W / 2 - 0.7), Y(ws + 0.25));
-  g.lineTo(X(-W / 2 + 0.45), Y(ws + 0.25));
-  g.fill();
-  g.fillStyle = "#1e2833";
-  for (const sd of [-1, 1])
-    g.fillRect(
-      sd < 0 ? X(-W / 2 + 0.06) : X(W / 2 - 0.2),
-      Y(r0 + 0.05),
-      0.14 * VS,
-      (type === "pol_van" ? 1.0 : roofL - 0.1) * VS,
-    ); // side glass
-  if (rear > 0.3) {
-    g.fillStyle = "#16202b";
-    g.beginPath();
-    g.moveTo(X(-W / 2 + 0.22), Y(r1));
-    g.lineTo(X(W / 2 - 0.22), Y(r1));
-    g.lineTo(X(W / 2 - 0.34), Y(r1 + rear * 0.55));
-    g.lineTo(X(-W / 2 + 0.34), Y(r1 + rear * 0.55));
-    g.fill();
-  }
-  g.fillStyle = "#f2f2ef";
-  rr(g, X(-W / 2 + 0.22), Y(r0), (W - 0.44) * VS, roofL * VS, 3);
-  g.fill();
-  g.strokeStyle = "rgba(0,0,0,0.18)";
-  g.stroke(); // roof
-  g.fillStyle = "#2b2f35";
-  for (const sd of [-1, 1]) {
-    g.beginPath();
-    g.ellipse(X(sd * (W / 2 + 0.07)), Y(ws + 0.25), 0.13 * VS, 0.09 * VS, 0, 0, 7);
-    g.fill();
-  } // mirrors
-  // battenburg: two rows of crisp blue/yellow checks along each flank (below the glass line)
-  const cs = 0.42,
-    y0 = type === "pol_van" ? 0.35 : 0.3,
-    n = Math.floor((L - y0 - 0.25) / cs);
+  // Battenburg flanks: two rows of large blue / fluorescent-yellow blocks, clipped to the body
+  g.save();
+  body(0, 0.3 * S);
+  g.clip();
+  const cs = 0.5,
+    bw = 0.16,
+    y0 = 0.45,
+    n = Math.ceil((L - y0 - 0.2) / cs);
   for (let k = 0; k < n; k++)
     for (const sd of [-1, 1])
       for (let row = 0; row < 2; row++) {
-        g.fillStyle = (k + row) % 2 ? "#1d4fbf" : "#f2e600";
-        const xx = sd < 0 ? X(-W / 2 + 0.02 + row * 0.11) : X(W / 2 - 0.13 - row * 0.11);
-        g.fillRect(xx, Y(y0 + k * cs), 0.11 * VS, cs * VS + 0.4);
+        g.fillStyle = (k + row) % 2 ? BL : YE;
+        const xx = sd < 0 ? X(-W / 2 + row * bw) : X(W / 2 - bw - row * bw);
+        g.fillRect(xx, Y(y0 + k * cs), bw * S + 1, cs * S + 1);
       }
-  g.fillStyle = "#1d4fbf";
-  g.fillRect(X(-W / 2 + 0.22), Y(0.32), (W - 0.44) * VS, 0.07 * VS);
+  // shading over the checks so they wrap round the body
+  const sg = g.createLinearGradient(X(-W / 2), 0, X(W / 2), 0);
+  sg.addColorStop(0, "rgba(0,0,0,0.35)");
+  sg.addColorStop(0.18, "rgba(0,0,0,0)");
+  sg.addColorStop(0.82, "rgba(0,0,0,0)");
+  sg.addColorStop(1, "rgba(0,0,0,0.35)");
+  g.fillStyle = sg;
+  g.fillRect(X(-W / 2), Y(0), W * S, L * S);
+  // front: yellow nose band, rear: red / yellow chevrons on the boot or rear doors
+  g.fillStyle = YE;
+  g.fillRect(X(-W / 2), Y(0), W * S, 0.16 * S);
+  const ry = L - (van ? 0.5 : 0.42);
   g.save();
-  g.translate(X(0), Y(r0 + roofL * 0.62));
+  g.beginPath();
+  g.rect(X(-W / 2), Y(ry), W * S, (L - ry) * S);
+  g.clip();
+  for (let k = -8; k < 8; k++) {
+    g.fillStyle = k % 2 ? "#e0201f" : YE;
+    g.beginPath();
+    const x = X(k * 0.28);
+    g.moveTo(x, Y(ry));
+    g.lineTo(x + 0.28 * S, Y(ry));
+    g.lineTo(x + 0.28 * S + (k < 0 ? -1 : 1) * 0.4 * S, Y(L));
+    g.lineTo(x + (k < 0 ? -1 : 1) * 0.4 * S, Y(L));
+    g.fill();
+  }
+  g.restore();
+  g.restore();
+  // bonnet crease highlights
+  if (!van) {
+    g.strokeStyle = "rgba(255,255,255,0.9)";
+    g.lineWidth = 1 * K;
+    for (const sd of [-1, 1]) {
+      g.beginPath();
+      g.moveTo(X(sd * 0.42), Y(0.25));
+      g.quadraticCurveTo(X(sd * 0.36), Y(bon * 0.6), X(sd * 0.5), Y(bon));
+      g.stroke();
+    }
+    g.strokeStyle = "rgba(0,0,0,0.12)";
+    for (const sd of [-1, 1]) {
+      g.beginPath();
+      g.moveTo(X(sd * 0.47), Y(0.25));
+      g.quadraticCurveTo(X(sd * 0.41), Y(bon * 0.6), X(sd * 0.55), Y(bon));
+      g.stroke();
+    }
+  }
+  // bumpers, headlamps, tail lamps, grille
+  g.fillStyle = "#24282e";
+  rr(g, X(-W / 2 + 0.12), Y(0.0), (W - 0.24) * S, 0.1 * S, 0.04 * S);
+  g.fill();
+  rr(g, X(-W / 2 + 0.12), Y(L - 0.1), (W - 0.24) * S, 0.1 * S, 0.04 * S);
+  g.fill();
+  for (const sd of [-1, 1]) {
+    const hg = g.createLinearGradient(0, Y(0.04), 0, Y(0.22));
+    hg.addColorStop(0, "#ffffff");
+    hg.addColorStop(1, "#a9c4dc");
+    g.fillStyle = hg;
+    g.beginPath();
+    const hx = X(sd * (W / 2 - 0.42));
+    g.ellipse(hx, Y(0.13), 0.26 * S, 0.08 * S, sd * 0.12, 0, 7);
+    g.fill();
+    g.fillStyle = "#c2161c";
+    rr(g, X(sd > 0 ? W / 2 - 0.5 : -W / 2 + 0.16), Y(L - 0.17), 0.34 * S, 0.1 * S, 0.03 * S);
+    g.fill();
+    g.fillStyle = "#ff9a1f"; // indicators
+    g.fillRect(X(sd > 0 ? W / 2 - 0.18 : -W / 2 + 0.1), Y(0.08), 0.08 * S, 0.12 * S);
+  }
+  // glass: windscreen, side windows with pillars, rear screen
+  const ws = bon,
+    r0 = ws + (van ? 0.45 : 0.55),
+    r1 = r0 + roofL;
+  const gl = (y0, y1) => {
+    const gg = g.createLinearGradient(0, Y(y0), 0, Y(y1));
+    gg.addColorStop(0, "#3c5670");
+    gg.addColorStop(0.5, "#15202c");
+    gg.addColorStop(1, "#0b1118");
+    return gg;
+  };
+  g.fillStyle = gl(ws, r0);
+  g.beginPath();
+  g.moveTo(X(-W / 2 + 0.17), Y(r0));
+  g.quadraticCurveTo(X(-W / 2 + 0.2), Y(ws + 0.05), X(-W / 2 + 0.34), Y(ws));
+  g.quadraticCurveTo(X(0), Y(ws - 0.08), X(W / 2 - 0.34), Y(ws));
+  g.quadraticCurveTo(X(W / 2 - 0.2), Y(ws + 0.05), X(W / 2 - 0.17), Y(r0));
+  g.closePath();
+  g.fill();
+  g.fillStyle = "rgba(200,225,245,0.28)"; // reflection streak
+  g.beginPath();
+  g.moveTo(X(-W / 2 + 0.45), Y(ws + 0.06));
+  g.lineTo(X(-0.05), Y(ws + 0.03));
+  g.lineTo(X(-0.35), Y(r0 - 0.05));
+  g.lineTo(X(-W / 2 + 0.3), Y(r0 - 0.05));
+  g.fill();
+  for (const sd of [-1, 1]) {
+    g.fillStyle = "#121a24";
+    const sx = sd < 0 ? X(-W / 2 + 0.08) : X(W / 2 - 0.22);
+    g.fillRect(sx, Y(r0), 0.14 * S, (van ? 1.0 : roofL) * S);
+    g.fillStyle = "#f1f2f3"; // B pillar
+    if (!van) g.fillRect(sx, Y(r0 + roofL * 0.47), 0.14 * S, 0.12 * S);
+  }
+  if (rear > 0.3) {
+    g.fillStyle = gl(r1 + rear * 0.6, r1);
+    g.beginPath();
+    g.moveTo(X(-W / 2 + 0.2), Y(r1));
+    g.lineTo(X(W / 2 - 0.2), Y(r1));
+    g.quadraticCurveTo(X(W / 2 - 0.3), Y(r1 + rear * 0.55), X(W / 2 - 0.38), Y(r1 + rear * 0.58));
+    g.lineTo(X(-W / 2 + 0.38), Y(r1 + rear * 0.58));
+    g.quadraticCurveTo(X(-W / 2 + 0.3), Y(r1 + rear * 0.55), X(-W / 2 + 0.2), Y(r1));
+    g.fill();
+  }
+  // roof panel, slight dome shading
+  const rg = g.createLinearGradient(X(-W / 2 + 0.22), 0, X(W / 2 - 0.22), 0);
+  rg.addColorStop(0, "#d9dcdf");
+  rg.addColorStop(0.5, "#ffffff");
+  rg.addColorStop(1, "#d3d6da");
+  g.fillStyle = rg;
+  rr(g, X(-W / 2 + 0.22), Y(r0), (W - 0.44) * S, roofL * S, 0.12 * S);
+  g.fill();
+  g.strokeStyle = "rgba(0,0,0,0.22)";
+  g.lineWidth = 0.8 * K;
+  g.stroke();
+  if (suv) {
+    g.fillStyle = "#2a2e34"; // roof rails
+    for (const sd of [-1, 1]) g.fillRect(X(sd * (W / 2 - 0.36) - 0.04), Y(r0 + 0.15), 0.08 * S, (roofL - 0.3) * S);
+  }
+  if (van) {
+    g.strokeStyle = "rgba(0,0,0,0.16)";
+    g.lineWidth = 0.8 * K;
+    for (let k = 1; k < 5; k++) {
+      g.beginPath();
+      g.moveTo(X(-W / 2 + 0.34), Y(r0 + 0.4 + (k * (roofL - 0.4)) / 5));
+      g.lineTo(X(W / 2 - 0.34), Y(r0 + 0.4 + (k * (roofL - 0.4)) / 5));
+      g.stroke();
+    }
+    g.fillStyle = "#c9ccd0";
+    rr(g, X(-0.3), Y(r0 + roofL * 0.55), 0.6 * S, 0.5 * S, 0.06 * S);
+    g.fill(); // roof vent
+    g.strokeStyle = "rgba(0,0,0,0.35)"; // rear door split
+    g.beginPath();
+    g.moveTo(X(0), Y(L - 0.5));
+    g.lineTo(X(0), Y(L - 0.1));
+    g.stroke();
+  }
+  // roof ID (read from the air) + POLICE on the bonnet (reads right way up from the front)
+  g.save();
+  g.translate(X(0), Y(r0 + roofL * (van ? 0.3 : 0.68)));
   g.rotate(Math.PI);
-  g.fillStyle = "#14204a";
-  g.font = "900 " + Math.round(0.4 * VS) + "px Arial Black,Arial";
+  g.fillStyle = "#111";
+  g.font = "900 " + Math.round(0.42 * S) + "px Arial Black,Arial";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.fillText({ pol_car: "Q21", pol_suv: "X04", pol_van: "V17" }[type], 0, 0);
+  g.restore();
+  g.save();
+  g.translate(X(0), Y(bon * 0.55));
+  g.fillStyle = BL;
+  g.font = "900 " + Math.round(0.26 * S) + "px Arial Black,Arial";
   g.textAlign = "center";
   g.textBaseline = "middle";
   g.fillText("POLICE", 0, 0);
   g.restore();
-  if (type === "pol_van") {
-    g.strokeStyle = "rgba(0,0,0,0.2)";
-    g.lineWidth = 1;
-    for (let k = 1; k < 4; k++) {
-      g.beginPath();
-      g.moveTo(X(-W / 2 + 0.3), Y(r0 + (k * roofL) / 4));
-      g.lineTo(X(W / 2 - 0.3), Y(r0 + (k * roofL) / 4));
-      g.stroke();
-    }
+  // mirrors (body colour, black backs)
+  for (const sd of [-1, 1]) {
+    g.fillStyle = "#1c1f24";
+    g.beginPath();
+    g.ellipse(X(sd * (W / 2 + 0.06)), Y(ws + 0.22), 0.14 * S, 0.08 * S, sd * 0.3, 0, 7);
+    g.fill();
   }
+  // slim LED light bar: black housing, blue lenses both ends, clear centre
   const by = r0 + 0.12;
-  g.fillStyle = "#1a1a1a";
-  rr(g, X(-W / 2 + 0.3), Y(by), (W - 0.6) * VS, 0.3 * VS, 2);
+  g.fillStyle = "#121314";
+  rr(g, X(-W / 2 + 0.28), Y(by), (W - 0.56) * S, 0.28 * S, 0.1 * S);
   g.fill();
-  g.fillStyle = "#7a1d22";
-  g.fillRect(X(-W / 2 + 0.36), Y(by) + 2, (W / 2 - 0.42) * VS, 0.3 * VS - 4);
-  g.fillStyle = "#1f3a8a";
-  g.fillRect(X(0.06), Y(by) + 2, (W / 2 - 0.42) * VS, 0.3 * VS - 4);
+  const lw = (W - 0.7) / 2;
+  for (const sd of [-1, 1]) {
+    const lx = sd < 0 ? X(-W / 2 + 0.34) : X(0.06),
+      lg = g.createLinearGradient(0, Y(by), 0, Y(by + 0.28));
+    lg.addColorStop(0, "#3d6cff");
+    lg.addColorStop(1, "#122d8a");
+    g.fillStyle = lg;
+    rr(g, lx, Y(by + 0.04), (lw - 0.06) * S, 0.2 * S, 0.06 * S);
+    g.fill();
+  }
+  g.fillStyle = "#e8eef5";
+  g.fillRect(X(-0.06), Y(by + 0.05), 0.12 * S, 0.18 * S);
+  g.fillStyle = "rgba(255,255,255,0.35)";
+  g.fillRect(X(-W / 2 + 0.36), Y(by + 0.05), (W - 0.72) * S, 0.04 * S);
+  // downsample (smooth edges) into the normal 16 px/m sprite
+  const o = out.getContext("2d");
+  o.imageSmoothingEnabled = true;
+  o.imageSmoothingQuality = "high";
+  o.drawImage(c, 0, 0, out.width, out.height);
   const a = {
-    body: { c, sh: shadowOf(c) },
+    body: { c: out, sh: shadowOf(out) },
     L,
     W,
-    kind: type === "pol_van" ? "van" : "estate",
+    kind: van ? "van" : "estate",
     bar: L / 2 - by - 0.15,
-    rb: true,
   };
   return (EMV.arts[type] = a);
 }
@@ -999,6 +1142,80 @@ function polChaseAim(c) {
     l = Math.hypot(dx, dy) || 1;
   return [q[0] - (dy / l) * 1.4, q[1] + (dx / l) * 1.4];
 } // keep-left lane-ish
+// v-pol2: chase cars are solid against buildings / scenery (they used to slide straight through blocks)
+function polBodyHit(v, x, y, h, sgn) {
+  const f = fwd(h),
+    r = rgt(h),
+    L = (v.L || 4.6) / 2,
+    W = (v.W || 1.9) / 2 - 0.1;
+  for (const a of sgn > 0 ? [L, L * 0.4] : [-L, -L * 0.4])
+    for (const b of [-W, 0, W]) if (solidAtM(x + f[0] * a + r[0] * b, y + f[1] * a + r[1] * b)) return true;
+  return false;
+}
+function polMove(c, ds) {
+  const v = c.v,
+    f = fwd(v.h),
+    nx = v.x + f[0] * ds,
+    ny = v.y + f[1] * ds;
+  c.wall = false;
+  if (!polBodyHit(v, nx, ny, v.h, ds >= 0 ? 1 : -1)) {
+    v.x = nx;
+    v.y = ny;
+    return true;
+  }
+  // slide along the wall on one axis if possible
+  if (!polBodyHit(v, nx, v.y, v.h, ds >= 0 ? 1 : -1)) v.x = nx;
+  else if (!polBodyHit(v, v.x, ny, v.h, ds >= 0 ? 1 : -1)) v.y = ny;
+  else {
+    c.wall = true;
+    POL.wallHits = (POL.wallHits || 0) + 1;
+  }
+  c.sp *= 0.4;
+  return false;
+}
+function polStartReverse(c) {
+  const v = c.v,
+    f = fwd(v.h),
+    r = rgt(v.h);
+  // which front corner is blocked? reverse so the nose swings away from it
+  let lb = 0,
+    rb = 0;
+  for (let a = 1; a <= 6; a++) {
+    if (solidAtM(v.x + f[0] * a * 1.2 - r[0] * 2, v.y + f[1] * a * 1.2 - r[1] * 2)) lb++;
+    if (solidAtM(v.x + f[0] * a * 1.2 + r[0] * 2, v.y + f[1] * a * 1.2 + r[1] * 2)) rb++;
+  }
+  for (const o of traffic.vs) {
+    if (o === v) continue;
+    const ox = o.x - v.x,
+      oy = o.y - v.y;
+    if (ox * ox + oy * oy > 100) continue;
+    if (ox * f[0] + oy * f[1] < 0) continue;
+    if (ox * r[0] + oy * r[1] > 0) rb++;
+    else lb++;
+  }
+  c.revSd = lb > rb ? 1 : rb > lb ? -1 : (c.revSd || 1) * -1; // +1: nose turns right
+  c.rev = 1.5;
+  c.noGo = 0;
+  c.revN = (c.revN || 0) + 1;
+  POL.reverses = (POL.reverses || 0) + 1;
+  if (c.revN <= 4) c.stuckT = 0;
+}
+function polReverse(c, dt) {
+  const v = c.v;
+  c.rev -= dt;
+  c.sp += Math.max(-8 * dt, Math.min(8 * dt, -4.5 - c.sp));
+  // reversing with the wheels turned: nose swings toward revSd, the tail goes the other way
+  v.steer = -0.45 * c.revSd;
+  v.h += c.revSd * Math.min(1, Math.abs(c.sp) / 3) * 0.9 * dt;
+  if (!polMove(c, c.sp * dt)) c.rev = Math.min(c.rev, 0.1); // backed into something too
+  v.v = c.sp;
+  if (c.rev <= 0) {
+    c.rev = 0;
+    c.sp = 0;
+    v.steer = 0;
+    c.rp = 0; // re-path straight away
+  }
+}
 // drives one chase car (the main POL.chase or a 2-star pursuer); returns "spin" while spinning out, "spun" when a spin ends far away
 function polDriveChase(c, dt) {
   const v = c.v,
@@ -1023,7 +1240,7 @@ function polDriveChase(c, dt) {
   }
   c.rp = (c.rp || 0) - dt;
   let aim = null;
-  const direct = Math.hypot(tx - v.x, ty - v.y) < 28;
+  const direct = Math.hypot(tx - v.x, ty - v.y) < 28 && polRay(v.x, v.y, tx, ty);
   if (!direct) {
     if (c.rp <= 0) {
       c.rp = 0.5;
@@ -1055,6 +1272,14 @@ function polDriveChase(c, dt) {
         break;
       }
     }
+  }
+  // v-pol2: no road path and no clear line -> never aim straight through buildings; follow the rig's own track instead
+  if (!aim && !polRay(v.x, v.y, tx, ty) && c.trail && c.trail.length) {
+    for (let q = c.trail.length - 1; q >= 0; q--)
+      if (polRay(v.x, v.y, c.trail[q][0], c.trail[q][1])) {
+        aim = c.trail[q];
+        break;
+      }
   }
   if (!aim) aim = [tx, ty];
   let dx = aim[0] - v.x,
@@ -1101,14 +1326,23 @@ function polDriveChase(c, dt) {
     cap = turn > 0.6 ? 9 : turn > 0.3 ? 16 : 40;
   c.sp += Math.max(-10 * dt, Math.min(5 * dt, Math.min(cap, want) - c.sp));
   if (dP < 7) c.sp = Math.min(c.sp, WANT.lvl >= 2 ? Math.abs(P.v) + 3 : 1);
-  if (Math.hypot(dx, dy) > 1.2) {
-    const th = Math.atan2(dx, -dy);
-    v.h += Math.max(-2.8 * dt, Math.min(2.8 * dt, wrapA(th - v.h)));
+  if (c.rev > 0) {
+    polReverse(c, dt);
+  } else {
+    if (Math.hypot(dx, dy) > 1.2) {
+      const th = Math.atan2(dx, -dy);
+      v.h += Math.max(-2.8 * dt, Math.min(2.8 * dt, wrapA(th - v.h)));
+    }
+    polMove(c, c.sp * dt);
+    v.v = c.sp;
+    // stuck: nose in a wall / scenery, or barely moving while it wants to go -> reverse out with steering
+    const prog = Math.hypot(v.x - (c.lx ?? v.x), v.y - (c.ly ?? v.y));
+    c.lx = v.x;
+    c.ly = v.y;
+    if (c.wall || (want > 4 && prog < 0.6 * dt && dP > 9)) c.noGo = (c.noGo || 0) + dt;
+    else c.noGo = Math.max(0, (c.noGo || 0) - dt * 2);
+    if (c.noGo > (c.wall ? 0.35 : 1.2)) polStartReverse(c);
   }
-  const fv = fwd(v.h);
-  v.x += fv[0] * c.sp * dt;
-  v.y += fv[1] * c.sp * dt;
-  v.v = c.sp;
   polSep(c);
   if (c.siren) {
     c.siren.set(emSirenVol(v.x, v.y, v));

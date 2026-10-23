@@ -230,8 +230,19 @@ function rbCands() {
       out.push([truck.x + f[0] * D, truck.y + f[1] * D, f[0], f[1]]);
   return out;
 }
+// v-pol2: far fewer roadblocks: max RB_MAX per wanted spell, none in the first RB_FIRST s of 2 stars, RB_COOL s apart, 40% chance per window
+const RB_MAX = 2,
+  RB_FIRST = 40,
+  RB_COOL = 120;
 function rbTry() {
   if (RB.list.length || timeS < RB.cool) return;
+  if (WANT.star !== RB.ep) {
+    RB.ep = WANT.star;
+    RB.epN = 0;
+    RB.cool = Math.max(RB.cool, timeS + RB_FIRST);
+    return;
+  }
+  if ((RB.epN || 0) >= RB_MAX) return;
   RB.tryT = (RB.tryT || 0) - 1;
   if (RB.tryT > 0) return;
   RB.tryT = 20; // every ~20 frames
@@ -246,6 +257,7 @@ function rbTry() {
     if (B) {
       RB.list.push(B);
       RB.made++;
+      RB.epN = (RB.epN || 0) + 1;
       return;
     }
   }
@@ -352,7 +364,7 @@ function rbRemove(B) {
   }
   RB.list.splice(RB.list.indexOf(B), 1);
   RB.removed++;
-  RB.cool = timeS + 25;
+  RB.cool = timeS + RB_COOL * (Math.random() < 0.4 ? 1 : 1.8);
 }
 function rbUpdate() {
   for (const B of RB.list.slice()) {
