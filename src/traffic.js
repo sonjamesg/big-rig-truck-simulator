@@ -1818,7 +1818,8 @@ function stepVeh(v, dt, pbs) {
       if (!a) continue;
       for (const b of a) {
         if (b.veh === v) continue;
-        if (v.ghostT > 0 && !b.player) continue;
+        // v54: a nose-to-nose ghost only passes through the car it is locked with, never the queue ahead of it
+        if (v.ghostT > 0 && !b.player && !(v.ghostOnly && b.veh !== v.ghostOnly)) continue;
         if (Math.abs(b.x - v.x) > 48 || Math.abs(b.y - v.y) > 48) continue;
         if (foApart(v.layer, v.x, v.y, b.lay, b.x, b.y)) continue;
         cands.push(b);
@@ -2018,6 +2019,7 @@ function stepVeh(v, dt, pbs) {
   // head of the queue has been stood for over a minute) — never just because we are queued behind a red light (v24: cars were driving into each other)
   if (v.stopT > 7 && !lplayer && lgap < 6 && queueLocked(v) && !rbQueued(v)) {
     v.ghostT = 2.5;
+    v.ghostOnly = null;
     v.stopT = 0;
   }
   // nose-to-nose in a junction (e.g. two opposing right-turners whose rigs swept into each other): after ~4 s the lower id ghosts through
@@ -2043,12 +2045,14 @@ function stepVeh(v, dt, pbs) {
       )
         continue;
       v.ghostT = 3;
+      v.ghostOnly = o;
       v.stopT = 0;
       traffic.jUnlock = (traffic.jUnlock || 0) + 1;
       break;
     }
   }
   if (v.ghostT > 0) v.ghostT -= dt;
+  if (!(v.ghostT > 0)) v.ghostOnly = null;
   if (v.shakeT <= 0 && (v.offX || v.offY)) {
     // recovery: a forward shove is simply absorbed as progress along the path (never slide back into whoever hit us);
     // sideways displacement steers back into lane while driving (faster with speed), slowly when stood still
