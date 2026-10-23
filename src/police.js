@@ -1158,7 +1158,9 @@ function polMove(c, ds) {
     nx = v.x + f[0] * ds,
     ny = v.y + f[1] * ds;
   c.wall = false;
-  if (!polBodyHit(v, nx, ny, v.h, ds >= 0 ? 1 : -1)) {
+  // already overlapping (spawned / pushed into scenery): let it drive out rather than trap it
+  const inside = polBodyHit(v, v.x, v.y, v.h, 1) && polBodyHit(v, v.x, v.y, v.h, -1);
+  if (inside || !polBodyHit(v, nx, ny, v.h, ds >= 0 ? 1 : -1)) {
     v.x = nx;
     v.y = ny;
     return true;
@@ -1331,7 +1333,8 @@ function polDriveChase(c, dt) {
   } else {
     if (Math.hypot(dx, dy) > 1.2) {
       const th = Math.atan2(dx, -dy);
-      v.h += Math.max(-2.8 * dt, Math.min(2.8 * dt, wrapA(th - v.h)));
+      const tr = 2.8 * dt * Math.min(1, (Math.abs(c.sp) + 0.4) / 5); // v-pol2: no turning on the spot
+      v.h += Math.max(-tr, Math.min(tr, wrapA(th - v.h)));
     }
     polMove(c, c.sp * dt);
     v.v = c.sp;
