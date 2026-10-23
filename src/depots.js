@@ -1268,7 +1268,12 @@ function* buildDepotsSteps(objs, R) {
       const i = k % MW,
         j = (k / MW) | 0;
       clearObjs(i, j, 1, 1);
-      set(i, j, j >= YD3_PIN.xing[0] && j < YD3_PIN.xing[1] ? T.GRAVEL : T.CONC);
+      // only tiles under the tarmac get a hard surface; the outer footprint keeps its grass/rock (reserved) so no square
+      // concrete fringe shows round the bends
+      let dm = 9;
+      for (const q of PP) dm = Math.min(dm, Math.hypot(i + 0.5 - q[0], j + 0.5 - q[1]));
+      if (dm <= YD3_PIN.half - 0.4) set(i, j, j >= YD3_PIN.xing[0] && j < YD3_PIN.xing[1] ? T.GRAVEL : T.CONC);
+      else if (get(i, j) === T.TREE || get(i, j) === T.HEDGE) set(i, j, T.GRASS);
       world.reserved[k] = 1;
     }
     const [sx, sy, sw, sh] = YD3_PIN.sid;

@@ -2015,7 +2015,7 @@ function ownPrivDraw(vx0, vy0, vx1, vy1, dark) {
       ctx.moveTo(ex, cy);
       ctx.lineTo(ex, ry * Tt);
       ctx.lineTo(cx, ry * Tt);
-      ctx.arc(cx, cy, fr * Tt, Math.PI / 2, sd < 0 ? 0 : Math.PI, sd > 0);
+      ctx.arc(cx, cy, fr * Tt, Math.PI / 2, sd < 0 ? 0 : Math.PI, sd < 0);
       ctx.fill();
     }
     path();
