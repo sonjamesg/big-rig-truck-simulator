@@ -1274,3 +1274,97 @@ function ltgLights(add) {
     for (let u = 12; u < LTG.W; u += 26) add(ltgX(u), ltgY(v), 230, "fl");
   add(ltgX(192), ltgY(50), 160, "fl");
 }
+
+// ---------------------------------------------------------------- learner trailers (static decoration, not jobs)
+// Parked reversed into reverse bays 2, 5, 10 and 13 against the training dock (rear to the dock face at v 20, nose
+// south), so bays in between stay free for practice and the spine road / coupling stands / town are untouched.
+// Runtime-only (kept OUT of world.trailers / the map data): LTG.trl is spliced into world.trailers only for the duration
+// of the parked-trailer draw, hit test, AI obstacle hash and the two maps, so they draw, collide and show as map dots
+// like any parked trailer. decor: never coupleable (coupleCandidate skips), local: never MP-synced.
+const LTG_TRL_BAYS = [
+  [1, "curtain"],
+  [4, "box"],
+  [9, "curtain"],
+  [12, "box"],
+];
+function ltgTrailerArt(kind) {
+  const key = "ltgL" + kind;
+  if (traffic.arts[key]) return traffic.arts[key];
+  const base = trailerArt(kind, "#f4f4f0", kind === "box" ? "KINGSBRIDGE LGV" : "");
+  const c = document.createElement("canvas");
+  c.width = base.c.width;
+  c.height = base.c.height;
+  const g = c.getContext("2d");
+  g.drawImage(base.c, 0, 0);
+  const cx = c.width / 2,
+    X = (m) => cx + m * VS,
+    Y = (m) => 0.15 * VS + m * VS,
+    W = TRL_W,
+    L = TRL_LEN;
+  // school livery: white body, orange + yellow side bands, roof title
+  g.fillStyle = "#e8590c";
+  g.fillRect(X(-W / 2), Y(0.3), 0.32 * VS, (L - 0.6) * VS);
+  g.fillRect(X(W / 2 - 0.32), Y(0.3), 0.32 * VS, (L - 0.6) * VS);
+  g.fillStyle = "#ffd23f";
+  g.fillRect(X(-W / 2 + 0.32), Y(0.3), 0.12 * VS, (L - 0.6) * VS);
+  g.fillRect(X(W / 2 - 0.44), Y(0.3), 0.12 * VS, (L - 0.6) * VS);
+  if (kind !== "box") {
+    g.save();
+    g.translate(X(0), Y(L / 2));
+    g.rotate(Math.PI / 2);
+    g.fillStyle = "#e8590c";
+    g.font = `900 ${0.62 * VS}px Arial Black,Arial`;
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText("KINGSBRIDGE LGV TRAINING", 0, 0);
+    g.restore();
+  }
+  // L plates front and rear (and mid roof so they read from above)
+  ltgPlate(g, X(0), Y(0.75), 0.95 * VS);
+  ltgPlate(g, X(0), Y(L - 0.75), 0.95 * VS);
+  return (traffic.arts[key] = { c, sh: base.sh });
+}
+function ltgTrailers() {
+  const out = [];
+  const dockY = ltgTY(20) * M_T;
+  for (const [k, kind] of LTG_TRL_BAYS) {
+    const u = 8 + k * 2.6 + 0.7, // bay centre (lines at u-0.6 .. u+2.0)
+      tr = makeTrailer(kind, () => 0.5, {
+        decor: true,
+        local: true,
+        cargo: "Training load",
+        logo: "KINGSBRIDGE LGV",
+        col: "#f4f4f0",
+      });
+    tr.typeName = "Learner " + tr.typeName.toLowerCase();
+    tr.art = ltgTrailerArt(kind);
+    tr.th = Math.PI; // nose south, rear against the dock
+    tr.x = ltgTX(u) * M_T;
+    tr.y = dockY + 0.4 + TRL_LEN / 2 + TRL_KP_TO_CENTRE;
+    out.push(tr);
+  }
+  return out;
+}
+function ltgWithTrl(fn) {
+  return function () {
+    if (!world || !world.trailers || !world.ready) return fn.apply(this, arguments);
+    if (!LTG.trl) LTG.trl = ltgTrailers();
+    const W = world.trailers;
+    for (const t of LTG.trl) W.push(t);
+    try {
+      return fn.apply(this, arguments);
+    } finally {
+      for (const t of LTG.trl) {
+        const i = W.lastIndexOf(t);
+        if (i >= 0) W.splice(i, 1);
+      }
+    }
+  };
+}
+setTimeout(() => {
+  drawParkedTrailers = ltgWithTrl(drawParkedTrailers);
+  trailerHitTest = ltgWithTrl(trailerHitTest);
+  updateTraffic = ltgWithTrl(updateTraffic);
+  drawMinimap = ltgWithTrl(drawMinimap);
+  drawBigMap = ltgWithTrl(drawBigMap);
+}, 0);

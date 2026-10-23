@@ -1455,7 +1455,7 @@ function coupleCandidate() {
   const k = kingpin(s);
   let best = null;
   for (const tr of world.trailers) {
-    if (tr.coupled) continue;
+    if (tr.coupled || tr.decor) continue;
     const d = Math.hypot(tr.x - k[0], tr.y - k[1]);
     if (d > 28) continue;
     if (!best || d < best.d) best = { tr, d, a: wrapA(s.h - tr.th) };
