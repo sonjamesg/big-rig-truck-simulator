@@ -340,15 +340,43 @@ const YARD_BRANDS = [
 const YD3_PIN = {
   x0: 112,
   y0: 1446,
-  // private road rects [x, y, w, h] (tiles): spine north from the rural road, then west along the yard's north side to the gate
-  road: [
-    [136, 1442, 2, 157],
-    [119, 1442, 17, 2],
+  // private road centreline (tiles): mouth on the rural road (T-junction, give way) north up the spine, R6 bend west
+  // along the yard's north side, R3 bend south into the gate access. Two 4 m lanes (in + out), centre line.
+  path: [
+    ["L", 137, 1599.4],
+    ["L", 137, 1449],
+    ["A", 131, 1449, 6, 0, -Math.PI / 2],
+    ["L", 125, 1443],
+    ["A", 125, 1446, 3, -Math.PI / 2, -Math.PI],
+    ["L", 122, 1446.2],
   ],
+  half: 1, // half width (tiles) = 4 m lanes
   sid: [106, 1412, 6, 92], // loop siding corridor (kept clear, never built on)
   gate: { x: 136, y: 1595 }, // barrier across the mouth (2 tiles wide)
   xing: [1562, 1581], // spine rows at the level crossing: gravel base (concrete would count as a hard site under the track)
 };
+// polyline (tiles) from a path spec: ["L", x, y] line-to, ["A", cx, cy, r, a0, a1] arc (radians, screen y down)
+function ownPPath(spec) {
+  const P = [];
+  for (const e of spec) {
+    if (e[0] === "L") {
+      const b = [e[1], e[2]];
+      if (P.length) {
+        const a = P[P.length - 1],
+          n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.5));
+        for (let k = 1; k <= n; k++) P.push([a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n]);
+      } else P.push(b);
+    } else {
+      const [, cx, cy, r, a0, a1] = e,
+        n = Math.max(4, Math.ceil((Math.abs(a1 - a0) * r) / 0.4));
+      for (let k = P.length ? 1 : 0; k <= n; k++) {
+        const t = a0 + ((a1 - a0) * k) / n;
+        P.push([cx + Math.cos(t) * r, cy + Math.sin(t) * r]);
+      }
+    }
+  }
+  return P;
+}
 const YD_H = 24; // up: yard = 15 rows of apron + warehouse strip + rail siding
 function yardSpot(tx, ty, rj, dbg) {
   const OK = [T.GRASS, T.TREE, T.SAND, T.FIELD, T.HEDGE, T.GRAVEL, T.PGRASS, T.ROCK],
@@ -1230,18 +1258,27 @@ function* buildDepotsSteps(objs, R) {
     const x = YD3_PIN.x0,
       y = YD3_PIN.y0,
       gap = 2;
-    for (const [rx, ry, rw, rh] of YD3_PIN.road) {
-      clearObjs(rx, ry, rw, rh);
-      fill(rx, ry, rw, rh, T.CONC);
-      for (let j = ry; j < ry + rh; j++) for (let i = rx; i < rx + rw; i++) world.reserved[idx(i, j)] = 1;
+    const PP = ownPPath(YD3_PIN.path),
+      PT = new Set();
+    for (const q of PP)
+      for (let j = Math.floor(q[1] - 2); j <= q[1] + 2; j++)
+        for (let i = Math.floor(q[0] - 2); i <= q[0] + 2; i++)
+          if (Math.hypot(i + 0.5 - q[0], j + 0.5 - q[1]) <= YD3_PIN.half + 0.4 && get(i, j) !== T.ROAD) PT.add(idx(i, j));
+    for (const k of PT) {
+      const i = k % MW,
+        j = (k / MW) | 0;
+      clearObjs(i, j, 1, 1);
+      set(i, j, j >= YD3_PIN.xing[0] && j < YD3_PIN.xing[1] ? T.GRAVEL : T.CONC);
+      world.reserved[k] = 1;
     }
-    fill(136, YD3_PIN.xing[0], 2, YD3_PIN.xing[1] - YD3_PIN.xing[0], T.GRAVEL);
     const [sx, sy, sw, sh] = YD3_PIN.sid;
     clearObjs(sx, sy, sw, sh);
     for (let j = sy; j < sy + sh; j++) for (let i = sx; i < sx + sw; i++) world.reserved[idx(i, j)] = 1;
     const yd = mkYard([x, y, gap]);
     yd.thru = 1;
-    yd.proad = YD3_PIN.road.map((r) => r.slice());
+    yd.ppath = PP;
+    yd.ptiles = [...PT].sort((a, b) => a - b);
+    yd.phalf = YD3_PIN.half;
     yd.gate = Object.assign({}, YD3_PIN.gate);
     yd.navE = { x: (YD3_PIN.gate.x + 1) * M_T, y: (YD3_PIN.gate.y + 2.5) * M_T }; // sat nav target: the mouth on the public road
   }

@@ -1757,9 +1757,12 @@ function ownMap(BX, BY, z) {
       }
     }
     if (yd.thru) {
-      if (yd.proad) {
-        ctx.fillStyle = "#7f8c8d";
-        for (const [rx, ry, rw, rh] of yd.proad) ctx.fillRect(BX(rx), BY(ry), Math.max(2, rw * z), Math.max(2, rh * z));
+      if (yd.ppath) {
+        ctx.strokeStyle = "#7f8c8d";
+        ctx.lineWidth = Math.max(2, 2 * yd.phalf * z);
+        ctx.beginPath();
+        yd.ppath.forEach((q, k) => (k ? ctx.lineTo(BX(q[0]), BY(q[1])) : ctx.moveTo(BX(q[0]), BY(q[1]))));
+        ctx.stroke();
       }
       continue;
     }
@@ -1944,9 +1947,12 @@ function ownThruBack(yd, X, Y, Tt, dark, own) {
 }
 // ---- private road (single lane, owner only): no road segment, so AI traffic and the public sat nav graph never use it
 function ownPrivAt(tx, ty) {
+  const k = ty * MW + tx;
   for (const yd of world.forSale || [])
-    if (yd.proad)
-      for (const [rx, ry, rw, rh] of yd.proad) if (tx >= rx && tx < rx + rw && ty >= ry && ty < ry + rh) return yd;
+    if (yd.ptiles) {
+      if (!yd._pset) yd._pset = new Set(yd.ptiles);
+      if (yd._pset.has(k)) return yd;
+    }
   return null;
 }
 function ownGateOpen(yd) {
@@ -1975,31 +1981,80 @@ function ownGateHit(s, prev) {
 function ownPrivDraw(vx0, vy0, vx1, vy1, dark) {
   const Tt = TILE;
   for (const yd of world.forSale || []) {
-    if (!yd.proad) continue;
-    for (const [rx, ry, rw, rh] of yd.proad) {
-      const X0 = rx * Tt,
-        Y0 = ry * Tt,
-        W = rw * Tt,
-        H = rh * Tt;
-      if (X0 > vx1 + 60 || X0 + W < vx0 - 60 || Y0 > vy1 + 60 || Y0 + H < vy0 - 60) continue;
-      ctx.fillStyle = "#6f7378"; // verge kerb
-      ctx.fillRect(X0, Y0, W, H);
-      const v = rh > rw; // single 4.6 m lane centred, solid white edge lines
-      ctx.fillStyle = "#3a3e43";
-      if (v) ctx.fillRect(X0 + 0.2 * Tt, Y0, W - 0.4 * Tt, H);
-      else ctx.fillRect(X0, Y0 + 0.2 * Tt, W, H - 0.4 * Tt);
-      ctx.fillStyle = "rgba(255,255,255,.85)";
-      if (v) {
-        ctx.fillRect(X0 + 0.3 * Tt, Y0, 3, H);
-        ctx.fillRect(X0 + W - 0.3 * Tt - 3, Y0, 3, H);
-      } else {
-        ctx.fillRect(X0, Y0 + 0.3 * Tt, W, 3);
-        ctx.fillRect(X0, Y0 + H - 0.3 * Tt - 3, W, 3);
-      }
-      if (dark > 0.05)
-        for (let t = 6; t < Math.max(rw, rh); t += 14)
-          dnLight(v ? X0 + W / 2 : X0 + t * Tt, v ? Y0 + t * Tt : Y0 + H / 2, 120, "rgba(255,230,180,0.6)", 0.45);
+    if (!yd.ppath) continue;
+    const P = yd.ppath,
+      hw = yd.phalf * Tt;
+    let x0 = 1e9,
+      y0 = 1e9,
+      x1 = -1e9,
+      y1 = -1e9;
+    for (const q of P) {
+      x0 = Math.min(x0, q[0]);
+      y0 = Math.min(y0, q[1]);
+      x1 = Math.max(x1, q[0]);
+      y1 = Math.max(y1, q[1]);
     }
+    if (x0 * Tt > vx1 + 200 || x1 * Tt < vx0 - 200 || y0 * Tt > vy1 + 200 || y1 * Tt < vy0 - 200) continue;
+    const path = () => {
+      ctx.beginPath();
+      P.forEach((q, k) => (k ? ctx.lineTo(q[0] * Tt, q[1] * Tt) : ctx.moveTo(q[0] * Tt, q[1] * Tt)));
+    };
+    ctx.save();
+    ctx.lineJoin = "round";
+    ctx.lineCap = "butt";
+    // T-junction bellmouth on the rural road: kerb fillets either side of the mouth
+    const m = P[0],
+      ry = Math.round(m[1] - 0.4), // rural road's north edge (tile row)
+      fr = 1.6;
+    ctx.fillStyle = "#3a3e43";
+    for (const sd of [-1, 1]) {
+      const ex = (m[0] + sd * yd.phalf) * Tt,
+        cx = ex + sd * fr * Tt,
+        cy = (ry - fr) * Tt;
+      ctx.beginPath();
+      ctx.moveTo(ex, cy);
+      ctx.lineTo(ex, ry * Tt);
+      ctx.lineTo(cx, ry * Tt);
+      ctx.arc(cx, cy, fr * Tt, Math.PI / 2, sd < 0 ? 0 : Math.PI, sd > 0);
+      ctx.fill();
+    }
+    path();
+    ctx.strokeStyle = "#6f7378"; // kerb / verge
+    ctx.lineWidth = 2 * hw + 0.35 * Tt;
+    ctx.stroke();
+    ctx.strokeStyle = "#3a3e43"; // tarmac
+    ctx.lineWidth = 2 * hw;
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,.85)"; // solid edge lines
+    ctx.lineWidth = 2 * hw - 0.25 * Tt;
+    ctx.stroke();
+    ctx.strokeStyle = "#3a3e43";
+    ctx.lineWidth = 2 * hw - 0.25 * Tt - 6;
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,.9)"; // centre line (one lane in, one out)
+    ctx.lineWidth = 3;
+    ctx.setLineDash([0.75 * Tt, 1.25 * Tt]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // give way at the mouth: double dashed line across the out lane (left/east lane heading south) + triangle
+    ctx.fillStyle = "rgba(255,255,255,.92)";
+    for (let t = 0; t < yd.phalf * Tt - 4; t += 10) {
+      ctx.fillRect(m[0] * Tt + 2 + t, (ry - 0.35) * Tt, 6, 3);
+      ctx.fillRect(m[0] * Tt + 2 + t, (ry - 0.6) * Tt, 6, 3);
+    }
+    const tgx = (m[0] + yd.phalf / 2) * Tt,
+      tgy = (ry - 2.2) * Tt;
+    ctx.beginPath();
+    ctx.moveTo(tgx - 0.32 * Tt, tgy - 0.6 * Tt);
+    ctx.lineTo(tgx + 0.32 * Tt, tgy - 0.6 * Tt);
+    ctx.lineTo(tgx, tgy + 0.6 * Tt);
+    ctx.closePath();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(255,255,255,.92)";
+    ctx.stroke();
+    if (dark > 0.05)
+      for (let k = 6; k < P.length; k += 28) dnLight(P[k][0] * Tt, P[k][1] * Tt, 120, "rgba(255,230,180,0.6)", 0.45);
+    ctx.restore();
     // owner-only barrier + booth + sign at the mouth
     const g = yd.gate,
       gx = g.x * Tt,

@@ -5,13 +5,17 @@ import asyncio, json, os, sys
 from playwright.async_api import async_playwright
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECS = int(sys.argv[1]) if len(sys.argv) > 1 else 90
-STATIC = r"""(()=>{ const W=world, Y=W.forSale.find(y=>y.proad), F=[];
+STATIC = r"""(()=>{ const W=world, Y=W.forSale.find(y=>y.ppath), F=[];
  if(!Y) return {fail:['no private-road yard']};
- let segT=0, roadT=0; for(const [rx,ry,rw,rh] of Y.proad) for(let j=ry;j<ry+rh;j++) for(let i=rx;i<rx+rw;i++){ const k=idx(i,j); if(W.roadH[k]!==-1||W.roadV[k]!==-1) segT++; if(isRoadT(k)) roadT++; }
+ let segT=0, roadT=0; for(const k of Y.ptiles){ if(W.roadH[k]!==-1||W.roadV[k]!==-1) segT++; if(isRoadT(k)) roadT++; }
  if(segT) F.push('private road tiles in a road segment: '+segT); if(roadT) F.push('private road tiles in sat nav graph: '+roadT);
  // connected: spine reaches the public road at the mouth and the gate spur reaches the yard access
  const g=Y.gate, below=idx(g.x, g.y+4); if(!(W.roadH[below]>=0||W.roadV[below]>=0)) F.push('mouth not on a public road');
- const sp=Y.proad[1]; if(!(sp[0]<=Y.x0+7 && sp[1]+sp[3]===Y.y0-2)) F.push('gate spur does not reach the yard access');
+ const E=Y.ppath[Y.ppath.length-1]; if(!(Math.abs(E[0]-(Y.x0+10))<1.5 && Math.abs(E[1]-Y.y0)<1)) F.push('road does not reach the yard access');
+ // bends: no square corner - heading changes <= 12 deg per 0.5 tile step; full width (2 lanes) at every sample
+ let kink=0, narrow=0; const P=Y.ppath; for(let k=2;k<P.length;k++){ const a=Math.atan2(P[k-1][1]-P[k-2][1],P[k-1][0]-P[k-2][0]), b=Math.atan2(P[k][1]-P[k-1][1],P[k][0]-P[k-1][0]); let d=Math.abs(b-a); if(d>Math.PI) d=2*Math.PI-d; if(d>0.21) kink++; }
+ for(const q of P){ for(const o of [-0.7,0,0.7]) for(const w of [[1,0],[0,1]]){ const i=Math.floor(q[0]+w[0]*o), j=Math.floor(q[1]+w[1]*o); if(!ownPrivAt(i,j)&&get(i,j)!==T.ROAD&&!(i>=Y.x0-1&&i<Y.x0+Y.w+1&&j>=Y.y0-2&&j<Y.y0+Y.h)) {narrow++; if(!window.__nw) window.__nw=[]; __nw.push([i,j]);} } }
+ if(kink) F.push('square/kinked corner samples: '+kink); if(narrow) F.push('road narrower than 2 lanes at '+narrow+' samples '+JSON.stringify(__nw.slice(0,4)));
  // sat nav for the owner targets the mouth and finds a route
  const n=navSnap(Y.navE.x/M_T, Y.navE.y/M_T, 6); if(!n) F.push('navE not on a public road');
  ownTrain(Y,0.05); const rc=Y.rc; if(!rc||!rc.thru) F.push('no through siding');
@@ -31,7 +35,7 @@ async def main():
         await pg.keyboard.press("Enter"); await pg.wait_for_timeout(800)
         r = await pg.evaluate(STATIC)
         # soak: park the player at the mouth so traffic simulates here; sample every AI vehicle 4x a second
-        await pg.evaluate("""(()=>{const Y=world.forSale.find(y=>y.proad),tk=__bigrig.truck; tk.x=(Y.gate.x-14)*M_T; tk.y=(Y.gate.y+4.5)*M_T; tk.v=0;
+        await pg.evaluate("""(()=>{const Y=world.forSale.find(y=>y.ppath),tk=__bigrig.truck; tk.x=(Y.gate.x-14)*M_T; tk.y=(Y.gate.y+4.5)*M_T; tk.v=0;
           window.__pr={n:0,in:0,ids:new Set(),ex:[]}; window.__pi=setInterval(()=>{ for(const v of __bigrig.traffic.vs){ if(v.parked) continue; __pr.ids.add(v.id); __pr.n++;
             const Q=ownPrivAt(Math.floor(v.x/M_T),Math.floor(v.y/M_T)); if(Q){__pr.in++; if(__pr.ex.length<5) __pr.ex.push([v.id,Math.round(v.x/M_T),Math.round(v.y/M_T)]);} } },250);})()""")
         await pg.wait_for_timeout(SECS * 1000)
