@@ -755,8 +755,8 @@ function drawLorry() {
   // front wheels (steered)
   const f = fwd(s.h),
     r = rgt(s.h);
-  const fx = s.x + f[0] * CAB.wheelbase,
-    fy = s.y + f[1] * CAB.wheelbase;
+  const fx = s.x + f[0] * (s.wb || CAB.wheelbase),
+    fy = s.y + f[1] * (s.wb || CAB.wheelbase);
   for (const sd of [-1, 1]) {
     ctx.save();
     ctx.translate((fx + r[0] * sd * 1.12) * PPM, (fy + r[1] * sd * 1.12) * PPM);

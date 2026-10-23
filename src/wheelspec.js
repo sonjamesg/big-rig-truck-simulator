@@ -261,18 +261,9 @@ let WS_N = 0;
       const lift = Wh.dr * K;
       // original body, lifted to the new ride height
       sideOrig(g2, OX, OY - lift, K, m, col, fit || {});
-      // remove the old 1.0 m wheels (and, on the conventional trucks, the misplaced ones)
-      g2.globalCompositeOperation = "destination-out";
-      for (const ax of [-3.8, 0]) {
-        g2.beginPath();
-        g2.arc(X(ax), Y(0.5 + Wh.dr), 0.54 * K, 0, 7);
-        g2.fill();
-      }
-      g2.fillRect(0, Y(-0.02), W, H); // old baked shadow below ground
-      g2.globalCompositeOperation = "source-over";
-      const cl = shade(L.col || col, 0.55);
+      let mods = null;
       if (Wh.mil) {
-        // mods = pixels the fitted parts add on top of the stock render; keep them over the new body
+        // mods = pixels the fitted parts add over the stock render (diffed before any erasing: no seams)
         const st = mkCanvas(W, H),
           sg = st.getContext("2d");
         sideOrig(sg, OX, OY - lift, K, m, col, {});
@@ -281,8 +272,20 @@ let WS_N = 0;
           d = a.data;
         for (let i = 0; i < d.length; i += 4)
           if (Math.abs(d[i] - b[i]) + Math.abs(d[i + 1] - b[i + 1]) + Math.abs(d[i + 2] - b[i + 2]) + Math.abs(d[i + 3] - b[i + 3]) < 12) d[i + 3] = 0;
-        const mods = mkCanvas(W, H);
+        mods = mkCanvas(W, H);
         mods.getContext("2d").putImageData(a, 0, 0);
+      }
+      // remove the old 1.0 m wheels (and, on the conventional trucks, the misplaced ones)
+      g2.globalCompositeOperation = "destination-out";
+      for (const ax of [-3.8, 0]) {
+        g2.beginPath();
+        g2.arc(X(ax), Y(0.5 + Wh.dr), 0.54 * K, 0, 7);
+        g2.fill();
+      }
+      g2.fillRect(0, Y(Wh.dr + 0.22), W, H); // old baked shadow + wheel bottoms (lifted band): no pale smudge
+      g2.globalCompositeOperation = "source-over";
+      const cl = shade(L.col || col, 0.55);
+      if (Wh.mil) {
         g2.clearRect(0, 0, W, H);
         milBody(g2, X, Y, L.col || col, Wh, K);
         g2.drawImage(mods, 0, 0);
@@ -396,16 +399,26 @@ function wsSet(mid, v) {
     }
     return p0(g, hit, now, dt);
   };
-  addEventListener(
-    "keydown",
-    (e) => {
-      if (typeof career === "undefined" || career.uiOpen !== "tune" || CZ.tab !== "tyres") return;
-      if (e.code === "BracketLeft" || e.code === "BracketRight") {
-        const m = modelById(career.cur);
-        wsSet(m.id, czWS(m.id) + (e.code === "BracketRight" ? 0.05 : -0.05));
-        e.preventDefault();
-      }
-    },
-    true,
-  );
 })();
+
+// per-truck driving geometry (origin = rear axle / tandem centre = kingpin): wheelbase, body front + rear for collisions
+const WS_GEOM = {
+  northline: { wb: 5.45, cf: -6.6, cr: 1.3 },
+  titan: { wb: 5.85, cf: -7.0, cr: 1.3 },
+  bastion: { wb: 5.0, cf: -6.3, cr: 2.1 },
+};
+function wsGeom(id) {
+  const g = WS_GEOM[id] || { wb: CAB.wheelbase, cf: CAB.front, cr: CAB.rear };
+  truck.wb = g.wb;
+  truck.cf = g.cf;
+  truck.cr = g.cr;
+}
+(function () {
+  const a0 = applyModel;
+  applyModel = function (id, col) {
+    const r = a0(id, col);
+    wsGeom(career.cur);
+    return r;
+  };
+})();
+if (typeof truck !== "undefined" && typeof career !== "undefined" && career.cur) wsGeom(career.cur);

@@ -2284,7 +2284,7 @@ function railBodyPts(s) {
   const pts = [],
     f = fwd(s.h),
     r = rgt(s.h);
-  for (const ly of [CAB.front, 0, CAB.rear])
+  for (const ly of [truck.cf || CAB.front, 0, truck.cr || CAB.rear])
     for (const lx of [-CAB.w / 2, CAB.w / 2])
       pts.push([s.x - f[0] * ly + r[0] * lx, s.y - f[1] * ly + r[1] * lx]);
   if (s.trl) {

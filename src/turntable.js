@@ -16,6 +16,7 @@ function ttDims(m) {
     roofH = (st.het ? 3.75 : rig ? RIG.cab.roof : st.roof === "high" ? 3.9 : st.roof === "aero" ? 3.6 : 3.2) + dr;
   return {
     dr,
+    tyre: typeof czWheels === "function" ? 2 * czWheels(m).r : 1.04,
     rig,
     x0: -5.0 - nose,
     nose,
@@ -56,7 +57,7 @@ function ttFront(m, col, fit, D) {
       g.fill();
     };
   // tyres under the bumper
-  for (const s of [-1, 1]) R(s > 0 ? 0.8 : -1.2, 0, s > 0 ? 1.2 : -0.8, 1.04, "#2c2f33", 0.08);
+  for (const s of [-1, 1]) R(s > 0 ? 0.8 : -1.2, 0, s > 0 ? 1.2 : -0.8, D.tyre, "#2c2f33", 0.08);
   // cab front
   const gr = g.createLinearGradient(0, Y(D.roofH), 0, Y(0.45));
   gr.addColorStop(0, shade(col, 1.12));
@@ -186,9 +187,9 @@ function ttBack(m, col, fit, D) {
     Y2 = (y) => c2Ht - y * K;
   for (const s of [-1, 1]) {
     h.fillStyle = "#2c2f33";
-    h.fillRect(X(s > 0 ? 0.74 : -1.26), Y2(1.04), 0.52 * K, 1.04 * K);
+    h.fillRect(X(s > 0 ? 0.74 : -1.26), Y2(D.tyre), 0.52 * K, D.tyre * K);
     h.fillStyle = "rgba(0,0,0,0.4)";
-    h.fillRect(X(s > 0 ? 0.99 : -1.01), Y2(1.04), 0.02 * K, 1.04 * K);
+    h.fillRect(X(s > 0 ? 0.99 : -1.01), Y2(D.tyre), 0.02 * K, D.tyre * K);
     h.fillStyle = "#141517";
     h.fillRect(X(s > 0 ? 0.7 : -1.3), Y2(1.2), 0.6 * K, 0.16 * K);
     if (!L.mud || L.mud) {
@@ -270,22 +271,8 @@ function ttDraw(g, cx, cy, k, yaw, pitch, m, col, fit) {
       Z1 = xr * sn + z * cs;
     return [cx + k * X1, cy - k * (y * cp - Z1 * sp), Z1 * cp + y * sp];
   };
-  // ground shadow: projected footprint, soft
-  g.save();
-  g.filter = "blur(" + Math.round(k * 0.18) + "px)";
-  g.fillStyle = "rgba(0,0,0,0.45)";
-  g.beginPath();
-  [
-    [D.x0, -D.zw],
-    [D.x1, -D.zw],
-    [D.x1, D.zw],
-    [D.x0, D.zw],
-  ].forEach(([x, z], i) => {
-    const p = P(x, 0, z);
-    i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]);
-  });
-  g.fill();
-  g.restore();
+  // soft contact shadow: layered footprint of the whole truck (rotates with it), darkest under the tyres + chassis
+  ttShadow(g, P, D, m);
   const faces = [];
   // face: texture img, source rect (sx,sy,sw,sh), world corners for source (0,0),(sw,0),(0,sh); n = outward normal (for culling)
   const add = (img, sx, sy, sw, sh, p0, p1, p2, n) => {
@@ -401,6 +388,7 @@ const TTS = { ang: 0.6, drag: null, raf: 0, spin: 0.35 };
 function ttShowroom(cv, getTruck) {
   cancelAnimationFrame(TTS.raf);
   const g = cv.getContext("2d");
+  ttPauseBtn(cv.parentElement);
   cv.style.touchAction = "none";
   cv.addEventListener("pointerdown", (e) => {
     TTS.drag = { x: e.clientX, a: TTS.ang };
@@ -419,7 +407,9 @@ function ttShowroom(cv, getTruck) {
     let rx = 0;
     for (const p of pads) if (p && Math.abs(p.axes[2] || 0) > 0.2) rx = p.axes[2];
     if (rx) TTS.ang += rx * dt * 2.5;
-    else if (!TTS.drag) TTS.ang += TTS.spin * dt;
+    else if (!TTS.drag && !TT.paused) TTS.ang += TTS.spin * dt;
+    for (const p of pads) if (p && p.buttons[3] && p.buttons[3].pressed && !TTS.y) ttTogglePause();
+    TTS.y = pads && [...pads].some((p) => p && p.buttons[3] && p.buttons[3].pressed);
     const r = cv.getBoundingClientRect(),
       dpr = Math.min(2, window.devicePixelRatio || 1),
       W = Math.max(50, Math.round(r.width * dpr)),
@@ -473,7 +463,7 @@ function ttFrontHET(m, col, fit, D) {
       rr(g, X(x0), Y(y1), (x1 - x0) * K, (y1 - y0) * K, (r || 0) * K);
       g.fill();
     },
-    rw = 0.7 * ((typeof czWS === "function" && czWS(m.id)) || 1);
+    rw = D.tyre / 2;
   for (const s of [-1, 1]) {
     R(s > 0 ? 0.82 : -1.32, 0, s > 0 ? 1.32 : -0.82, 2 * rw, "#161715", 0.15);
     g.fillStyle = "#2a2c28";
@@ -517,3 +507,77 @@ function ttFrontHET(m, col, fit, D) {
   R(-0.3, 1.25 + dr, 0.3, 1.8 + dr, "#1d1e1b");
   return { c, K, zx, Ht };
 }
+
+function ttShadow(g, P, D, m) {
+  const quad = (x0, x1, z0, z1, a) => {
+    g.fillStyle = "rgba(0,0,0," + a + ")";
+    g.beginPath();
+    [[x0, z0], [x1, z0], [x1, z1], [x0, z1]].forEach(([x, z], i) => {
+      const p = P(x, 0, z);
+      i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]);
+    });
+    g.fill();
+  };
+  g.save();
+  // wide penumbra: 7 growing footprints at low alpha = soft fade at the edges
+  for (let k = 6; k >= 0; k--) {
+    const e = 0.08 + k * 0.11;
+    quad(D.x0 - e, D.x1 + e, -D.zw - e, D.zw + e, 0.055);
+  }
+  // umbra under the chassis
+  quad(D.x0 + 0.3, D.x1 - 0.2, -D.zw + 0.35, D.zw - 0.35, 0.18);
+  // contact patches under every tyre (twins wider)
+  const W = typeof czWheels === "function" ? czWheels(m) : { r: 0.52, ax: [{ x: -3.8 }, { x: 0, tw: 1 }] };
+  for (const a of W.ax)
+    for (const s of [-1, 1]) {
+      const w = a.tw ? 0.62 : 0.4,
+        zc = s * (D.zw - w / 2 + 0.02);
+      for (const [e, al] of [[0.18, 0.12], [0.06, 0.25], [0, 0.35]])
+        quad(a.x - W.r * 0.55 - e, a.x + W.r * 0.55 + e, zc - w / 2 - e, zc + w / 2 + e, al);
+    }
+  g.restore();
+}
+// ---- 360 auto-rotate pause / play (button, Space, pad Y, tap)
+function ttPaused() {
+  return !!TT.paused;
+}
+function ttTogglePause() {
+  TT.paused = !TT.paused;
+  if (!TT.paused && typeof CZ !== "undefined" && !CZ.spin) CZ.spin = 0.25;
+  document.querySelectorAll(".ttpause").forEach((b) => {
+    b.textContent = TT.paused ? "\u25B6" : "\u23F8";
+    b.setAttribute("aria-label", TT.paused ? "Play rotation" : "Pause rotation");
+  });
+}
+function ttPauseBtn(host) {
+  if (!host || host.querySelector(".ttpause")) return;
+  const b = document.createElement("button");
+  b.className = "ttpause";
+  b.type = "button";
+  b.style.cssText = "position:absolute;right:8px;bottom:8px;z-index:3;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(10,14,20,.65);color:#fff;font-size:16px;cursor:pointer;touch-action:manipulation";
+  b.textContent = TT.paused ? "\u25B6" : "\u23F8";
+  b.setAttribute("aria-label", TT.paused ? "Play rotation" : "Pause rotation");
+  b.addEventListener("pointerdown", (e) => e.stopPropagation());
+  b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    ttTogglePause();
+  });
+  if (getComputedStyle(host).position === "static") host.style.position = "relative";
+  host.appendChild(b);
+}
+addEventListener(
+  "keydown",
+  (e) => {
+    if (typeof career === "undefined" || (career.uiOpen !== "tune" && career.uiOpen !== "dealer")) return;
+    // registered before main.js (which swallows every key while a menu is open)
+    if (e.code === "KeyP" && !(typeof czHornFocus === "function" && career.uiOpen === "tune" && czHornFocus())) {
+      e.preventDefault();
+      if (!e.repeat) ttTogglePause();
+    } else if (career.uiOpen === "tune" && CZ.tab === "tyres" && (e.code === "BracketLeft" || e.code === "BracketRight") && typeof wsSet === "function") {
+      const m = modelById(career.cur);
+      wsSet(m.id, czWS(m.id) + (e.code === "BracketRight" ? 0.05 : -0.05));
+      e.preventDefault();
+    }
+  },
+  true,
+);
