@@ -11,10 +11,10 @@
 {
   const ma0 = modelArt,
     cache = {};
-  modelArt = function (m, col) {
-    const key = m.id + "|" + col;
+  modelArt = function (m, col, hide) {
+    const key = m.id + "|" + col + "|" + (typeof rigHideKey === "function" ? rigHideKey(hide) : "");
     if (cache[key]) return cache[key];
-    const B = ma0(m, col),
+    const B = ma0(m, col, hide),
       c = mkCanvas(B.W, B.H),
       g = c.getContext("2d");
     g.drawImage(B.c, 0, 0);

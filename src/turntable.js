@@ -320,7 +320,11 @@ function ttDraw(g, cx, cy, k, yaw, pitch, m, col, fit) {
     zA = A.W / 2 / S;
   const xa0 = (0 - A.oy) / S,
     xa1 = (A.H - A.oy) / S;
-  add(T.top, 0, 0, A.W, ay(D.xc), [xa0, D.roofH, -zA], [xa0, D.roofH, zA], [D.xc, D.top, -zA], [0, 1, 0]); // sloped to follow the spoiler
+  if (D.nose) {
+    // long-nose: bonnet top (art front .. windscreen at -5.0) sits low, cab roof from -5.0 back
+    add(T.top, 0, 0, A.W, ay(-5.0), [xa0, 2.1, -zA], [xa0, 2.1, zA], [-5.0, 2.45, -zA], [0, 1, 0]);
+    add(T.top, 0, ay(-5.0), A.W, ay(D.xc) - ay(-5.0), [-5.0, D.roofH, -zA], [-5.0, D.roofH, zA], [D.xc, D.top, -zA], [0, 1, 0]);
+  } else add(T.top, 0, 0, A.W, ay(D.xc), [xa0, D.roofH, -zA], [xa0, D.roofH, zA], [D.xc, D.top, -zA], [0, 1, 0]); // sloped to follow the spoiler
   add(T.top, 0, ay(D.xc), A.W, A.H - ay(D.xc), [D.xc, D.chH, -zA], [D.xc, D.chH, zA], [xa1, D.chH, -zA], [0, 1, 0]);
   // painter: far faces first; back-facing side/front faces are still drawn (they show through cut-outs) but first
   faces.sort((a, b) => (a.facing > 0) - (b.facing > 0) || a.d - b.d);

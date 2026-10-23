@@ -276,8 +276,9 @@ CZ_PARTS.push(
       const len = 0.6 + tk.lv * 0.28,
         sides = tk.lv >= 3 ? [-1, 1] : [1];
       for (const s of sides) {
-        const x = X(s * 1.12),
-          y0 = Y(-2.35),
+        const M = czMount(m),
+          x = X(s * M.tankZ),
+          y0 = Y(M.rail[0] + 0.05),
           gr = g.createLinearGradient(x - 0.2 * S, 0, x + 0.2 * S, 0);
         const c =
           tk.lv >= 4
@@ -410,27 +411,29 @@ CZ_PARTS.push(
     // exhaust: stacks behind the cab (style) / pipe diameter from the performance system
     const es = L.exs || (ex ? "chrome" : null);
     if (es) {
-      const dia = 0.21 + (ex ? ex.lv * 0.04 : 0);
+      const M = czMount(m),
+        dia = 0.21 + (ex ? ex.lv * 0.04 : 0);
       const col = es === "black" ? ["#111", "#555"] : ["#8d959e", "#ffffff"];
       if (es === "side") {
         for (const s of [-1, 1]) {
-          const gr = g.createLinearGradient(X(s * 1.3) - dia * S, 0, X(s * 1.3) + dia * S, 0);
+          const pz = M.half - dia * 0.7,
+            gr = g.createLinearGradient(X(s * pz) - dia * S, 0, X(s * pz) + dia * S, 0);
           gr.addColorStop(0, "#7d858e");
           gr.addColorStop(0.5, "#fff");
           gr.addColorStop(1, "#7d858e");
           g.fillStyle = gr;
-          rr(g, X(s * 1.3) - dia * S * 0.7, Y(-3.5), dia * 1.4 * S, 1.6 * S, dia * 0.7 * S);
+          rr(g, X(s * pz) - dia * S * 0.7, Y(M.cabRear), dia * 1.4 * S, 1.6 * S, dia * 0.7 * S);
           g.fill();
           g.fillStyle = "#111";
           g.beginPath();
-          g.arc(X(s * 1.3), Y(-1.95), dia * 0.5 * S, 0, 7);
+          g.arc(X(s * pz), Y(M.cabRear + 1.45), dia * 0.5 * S, 0, 7);
           g.fill();
         }
       } else
         for (const s of [-1, 1]) {
-          const cx = X(s * 1.12),
-            cy = Y(-2.45),
-            r = dia * S * (es === "tall" ? 1.15 : 1);
+          const r = dia * S * (es === "tall" ? 1.15 : 1),
+            cx = X(s * Math.min(M.stackZ, M.half - r / S - 0.02)),
+            cy = Y(Math.max(M.stackY, M.cabRear + r / S + 0.04));
           const gr = g.createRadialGradient(cx - r * 0.3, cy - r * 0.3, 1, cx, cy, r);
           gr.addColorStop(0, col[1]);
           gr.addColorStop(1, col[0]);
@@ -471,8 +474,8 @@ CZ_PARTS.push(
     const X = (v) => cx + v * sc,
       Y = (v) => cy - v * sc,
       L = czLook(m.id, fit),
-      st = m.style || {},
-      roofH = st.roof === "high" ? 3.9 : st.roof === "aero" ? 3.6 : 3.2;
+      M = czMount(m),
+      roofH = M.roof;
     const sus = czPart(fit.sus),
       tk = czPart(fit.tnk),
       ex = czPart(fit.exh),
@@ -490,31 +493,32 @@ CZ_PARTS.push(
       gr.addColorStop(0, "#fff");
       gr.addColorStop(1, tk.lv >= 2 ? "#8e969f" : "#2b2f34");
       g.fillStyle = gr;
-      rr(g, X(-2.35), Y(1.3), len * sc, 0.62 * sc, 0.25 * sc);
+      rr(g, X(M.rail[0] + 0.05), Y(1.3), len * sc, 0.62 * sc, 0.25 * sc);
       g.fill();
     }
     const es = m.id === "rigger" ? null : L.exs || (ex ? "chrome" : null);
     if (es && es !== "side") {
       const h = es === "tall" ? roofH + 1.0 : roofH + 0.6,
         w = (0.18 + (ex ? ex.lv * 0.035 : 0)) * sc;
-      const gr = g.createLinearGradient(X(-2.5), 0, X(-2.5) + w, 0);
+      const sx = M.stackX,
+        gr = g.createLinearGradient(X(sx), 0, X(sx) + w, 0);
       gr.addColorStop(0, es === "black" ? "#111" : "#9aa2ab");
       gr.addColorStop(0.5, es === "black" ? "#555" : "#fff");
       gr.addColorStop(1, es === "black" ? "#111" : "#7d858e");
       g.fillStyle = gr;
-      g.fillRect(X(-2.5), Y(h), w, (h - 1.1) * sc);
+      g.fillRect(X(sx), Y(h), w, (h - 1.1) * sc);
       if (es === "flame") {
         g.fillStyle = "#ff7b00";
         g.beginPath();
-        g.moveTo(X(-2.5), Y(h));
-        g.quadraticCurveTo(X(-2.4), Y(h + 0.7), X(-2.2), Y(h + 0.9));
-        g.quadraticCurveTo(X(-2.35), Y(h + 0.3), X(-2.5) + w, Y(h));
+        g.moveTo(X(sx), Y(h));
+        g.quadraticCurveTo(X(sx + 0.1), Y(h + 0.7), X(sx + 0.3), Y(h + 0.9));
+        g.quadraticCurveTo(X(sx + 0.15), Y(h + 0.3), X(sx) + w, Y(h));
         g.fill();
       }
     }
     if (es === "side") {
       g.fillStyle = "#e6eaee";
-      rr(g, X(-3.5), Y(1.25), 1.6 * sc, 0.22 * sc, 0.1 * sc);
+      rr(g, X(M.rail[0]), Y(0.72), 1.6 * sc, 0.22 * sc, 0.1 * sc);
       g.fill();
     }
     if (ar) {

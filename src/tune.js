@@ -282,6 +282,30 @@ function czFitted(mid, ov) {
   if (ov) f[ov.slot] = ov.id;
   return f;
 }
+// Mod mount points per truck model (metres, same frame as the art: x across (+ right), y along (front -), side h up).
+// Every customiser overlay positions itself from these so add-ons sit on each body (tests/mod_fit_test.py checks it).
+function czMount(m) {
+  const st = (m && m.style) || {},
+    rig = m && m.id === "rigger" && typeof RIG !== "undefined";
+  const half = CAB.w / 2,
+    cabRear = rig ? RIG.cab.topRear : st.roof === "high" ? -2.25 : -2.55, // top view cab back edge
+    sideRear = rig ? RIG.cab.x1 : -2.4, // side view cab back
+    roof = rig ? RIG.cab.roof : st.roof === "high" ? 3.9 : st.roof === "aero" ? 3.6 : 3.2;
+  return {
+    half, // body half width: nothing but mirrors / glow may pass it
+    cab0: -5.0,
+    front: -5.0 - (st.nose || 0),
+    cabRear,
+    sideRear,
+    roof,
+    roofTop: rig ? RIG.spoiler.top : roof, // highest fixed body point
+    stackZ: rig ? RIG.exhaust.z : 0.98, // vertical stacks: centre across
+    stackY: cabRear + 0.32, // ... and along (just behind the cab)
+    stackX: sideRear + 0.05, // side view x of the stack
+    tankZ: half - 0.2, // fuel tank centre across
+    rail: [sideRear, -0.62], // between cab back and drive wheels: skirts / tanks / side pipes
+  };
+}
 function czLook(mid, fit) {
   const L = {};
   for (const k in fit) {
@@ -720,7 +744,7 @@ function czSide(g, cx, cy, sc, m, col, fit) {
         g.fillRect(X(-5 + i * 0.185), Y(1.6 + j * 0.18), 0.185 * sc, 0.18 * sc);
       }
   }
-  if (st.stacks) {
+  if (st.stacks && !rigHide(fit, L).exh) {
     g.fillStyle = "#c9ced4";
     g.fillRect(X(cb + 0.05), Y(roofH + 0.6), 0.22 * sc, (roofH - 0.4) * sc);
   }
