@@ -1530,7 +1530,7 @@ function drawObject(g, o) {
       g.beginPath();
       g.ellipse(o.x + o.r * 0.35, o.y + o.r * 0.35, o.r, o.r * 0.75, 0.3, 0, 7);
       g.fill();
-      const base = o.basalt ? "#1a181d" : o.desert ? "#a0745a" : "#8a8a84";
+      const base = o.basalt || (!o.desert && world.inVolc && world.inVolc(o.x / TILE, o.y / TILE)) ? "#1a181d" : o.desert ? "#a0745a" : "#8a8a84";
       for (let k = 0; k < 3; k++) {
         const ox = (r() - 0.5) * o.r,
           oy = (r() - 0.5) * o.r * 0.6,

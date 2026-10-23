@@ -118,7 +118,7 @@ function volcanoBake() {
   let gr = g.createRadialGradient(cx, cy, 0, cx, cy, RR);
   gr.addColorStop(0, "#1c1a1e");
   gr.addColorStop(0.8, "#0d0c0f");
-  gr.addColorStop(0.95, "rgba(13,12,15,0.6)");
+  gr.addColorStop(0.95, "#0d0c0f");
   gr.addColorStop(1, "rgba(13,12,15,0)");
   g.fillStyle = gr;
   g.fillRect(0, 0, C.width, C.height);
@@ -212,22 +212,6 @@ function volcanoBake() {
   }
   const MS = mk(2 * E * 2);
   MS.getContext("2d").drawImage(C, 0, 0, MS.width, MS.height);
-  const P = mk(64),
-    pg = P.getContext("2d");
-  gr = pg.createRadialGradient(32, 32, 0, 32, 32, 32);
-  gr.addColorStop(0, "rgba(255,255,255,1)");
-  gr.addColorStop(1, "rgba(255,255,255,0)");
-  pg.fillStyle = gr;
-  pg.fillRect(0, 0, 64, 64);
-  const tint = (col) => {
-    const c = mk(64),
-      q = c.getContext("2d");
-    q.drawImage(P, 0, 0);
-    q.globalCompositeOperation = "source-in";
-    q.fillStyle = col;
-    q.fillRect(0, 0, 64, 64);
-    return c;
-  };
   const embers = [];
   for (let k = 0; k < 200; k++) {
     const q = segs[(R() * segs.length) | 0];
@@ -242,8 +226,7 @@ function volcanoBake() {
     for (let k = 0; k < segs.length; k += 3) lavaClear = Math.min(lavaClear, Math.hypot(segs[k][2] - x, segs[k][3] - y));
   }
   Object.assign(VOLCANO, {
-    ready: true, V, CR, LMAX, E, S, ox, oy, C, NG, MS, smokeDay: tint("#6e6e74"), smokeNight: tint("#a0583a"),
-    embers, segs: segs.length, frags: frags.length, dmin, lavaClear,
+    ready: true, V, CR, LMAX, E, S, ox, oy, C, NG, MS, embers, segs: segs.length, frags: frags.length, dmin, lavaClear,
   });
   return true;
 }
@@ -271,17 +254,35 @@ function volcanoCore(g, s, t, X, Y) {
   g.fill();
 }
 function volcanoSmoke(g, s, t, X, Y, n, night) {
-  const spr = night ? VOLCANO.smokeNight : VOLCANO.smokeDay,
-    cr = VOLCANO.V.cr;
+  g.save(); // earlier passes can leave globalAlpha / composite mode changed
+  g.globalAlpha = 1;
+  g.globalCompositeOperation = "source-over";
+  // radial-gradient puffs drawn in device pixels (huge world-space gradients came out near-invisible)
+  const m = g.getTransform();
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  const cr = VOLCANO.V.cr;
   for (let i = 0; i < n; i++) {
     const life = (t * 0.06 + i / n) % 1,
-      r = (cr * 0.9 + life * 50) * s;
-    const dx = life * 110 * s + Math.sin(i * 1.7 + t * 0.4) * 7 * s,
-      dy = -life * 36 * s + Math.cos(i * 2.3) * 9 * s;
-    g.globalAlpha = (1 - life) * (night ? 0.4 : 0.5);
-    g.drawImage(spr, X + dx - r, Y + dy - r, 2 * r, 2 * r);
+      r = (cr * 0.8 + life * 38) * s;
+    const px = X + life * 110 * s + Math.sin(i * 1.7 + t * 0.4) * 7 * s,
+      py = Y - life * 36 * s + Math.cos(i * 2.3) * 9 * s;
+    const a = Math.min(0.85, (Math.pow(1 - life, 0.6) * (night ? 0.6 : 0.8) * 16) / Math.max(n, 8)),
+      k = 1 - life;
+    const c = night
+      ? `rgba(${(70 + 100 * k) | 0},${(35 + 25 * k) | 0},30,${a})`
+      : `rgba(${(60 + life * 100) | 0},${(60 + life * 100) | 0},${(66 + life * 100) | 0},${a})`;
+    const qx = m.a * px + m.c * py + m.e,
+      qy = m.b * px + m.d * py + m.f,
+      qr = r * Math.hypot(m.a, m.b);
+    const gr = g.createRadialGradient(qx, qy, 0, qx, qy, qr);
+    gr.addColorStop(0, c);
+    gr.addColorStop(1, "rgba(80,80,85,0)");
+    g.fillStyle = gr;
+    g.beginPath();
+    g.arc(qx, qy, qr, 0, 7);
+    g.fill();
   }
-  g.globalAlpha = 1;
+  g.restore();
 }
 function volcanoDraw(vx0, vy0, vx1, vy1) {
   if (!volcanoVisible(vx0, vy0, vx1, vy1, 70) || !volcanoBake()) return;
@@ -301,19 +302,27 @@ function volcanoDraw(vx0, vy0, vx1, vy1) {
     ctx.fillStyle = `rgba(255,${(200 + 55 * b) | 0},${(120 * b) | 0},${b})`;
     ctx.fillRect(e[0] * TILE - 3, e[1] * TILE - 3, 6, 6);
   }
-  volcanoSmoke(ctx, TILE, t, X, Y, low ? 6 : 14, volcanoNightK());
+  ctx.restore();
 }
 function volcanoNight(vx0, vy0, vx1, vy1) {
-  if (!volcanoNightK() || !volcanoVisible(vx0, vy0, vx1, vy1, 70) || !volcanoBake()) return;
+  // late layer (after the night pass): smoke above trees/vehicles, plus the crisp night glow
+  if (!volcanoVisible(vx0, vy0, vx1, vy1, 120) || !volcanoBake()) return;
+  if (!volcanoNightK()) {
+    volcanoSmoke(ctx, TILE, performance.now() / 1000, world.volcano.x * TILE, world.volcano.y * TILE, volcanoLow() ? 8 : 22, 0);
+    return;
+  }
   const K = VOLCANO,
     V = K.V,
     t = performance.now() / 1000;
-  ctx.save(); // plain source-over at alpha 1 (sheet is pre-faded): "lighter"/globalAlpha on this big sheet cost ~0.3-0.6 s/frame on software canvases
+  ctx.save();
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = "source-over"; // plain source-over at alpha 1 (sheet is pre-faded): "lighter"/globalAlpha on this big sheet cost ~0.3-0.6 s/frame on software canvases
   ctx.drawImage(K.NG, K.ox * TILE, K.oy * TILE, 2 * K.E * TILE, 2 * K.E * TILE);
   ctx.globalAlpha = 1;
   const X = V.x * TILE,
     Y = V.y * TILE;
   volcanoCore(ctx, TILE, t, X, Y);
+  volcanoSmoke(ctx, TILE, t, X, Y, volcanoLow() ? 8 : 22, 1);
   ctx.restore();
 }
 // maps: X0/Y0 = screen position of tile (0,0), z = screen px per tile, clip box x0..y1

@@ -621,7 +621,7 @@ function* genWorldSteps() {
         const dx = x - h.x,
           dy = y - h.y;
         if (Math.abs(dx) > h.r * 1.2 || Math.abs(dy) > h.r * 1.2) continue;
-        if (Math.hypot(dx, dy) < h.r * (h.volcano ? 0.97 + 0.04 * vnoise(x, y, 40) : 0.82 + 0.3 * vnoise(x, y, 40))) t = T.ROCK;
+        if (Math.hypot(dx, dy) < h.r * (h.volcano ? 0.92 + 0.03 * vnoise(x, y, 40) : 0.82 + 0.3 * vnoise(x, y, 40))) t = T.ROCK;
       }
       G[i] = t;
     }

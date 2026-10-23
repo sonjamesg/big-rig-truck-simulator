@@ -8,7 +8,7 @@ JS = r"""(()=>{ volcanoBake(); const K=VOLCANO,V=K.V,G=world.ground; let grey=0,
  for(let y=V.y-V.r-4;y<V.y+V.r+4;y++)for(let x=V.x-V.r-4;x<V.x+V.r+4;x++){const t=G[y*MW+x];
    if(t===T.ROCK){ if(world.inVolc(x,y)) bas++; else if(Math.hypot(x-V.x,y-V.y)<V.r+8) grey++; } }
  let greyRocks=0; for(const o of world.objects){ const d=Math.hypot(o.x/TILE-V.x,o.y/TILE-V.y); if(d>V.r) continue;
-   if(o.kind==='rock'&&!o.basalt) greyRocks++; if(o.kind==='tree'&&world.inVolc(o.x/TILE,o.y/TILE)&&G[((o.y/TILE)|0)*MW+((o.x/TILE)|0)]===T.ROCK) trees++; }
+   if(o.kind==='rock'&&!o.basalt&&!(world.inVolc(o.x/TILE,o.y/TILE)&&!o.desert)) greyRocks++; if(o.kind==='tree'&&world.inVolc(o.x/TILE,o.y/TILE)&&G[((o.y/TILE)|0)*MW+((o.x/TILE)|0)]===T.ROCK) trees++; }
  const t=(n,f)=>{const a=performance.now(); for(let i=0;i<n;i++) f(); return (performance.now()-a)/n;};
  const vx0=V.x*TILE-600,vy0=V.y*TILE-400,vr=[vx0,vy0,vx0+1200,vy0+800];
  GFX.lvl='high'; const hi=t(40,()=>volcanoDraw(...vr)); gameT=23; const ni=t(40,()=>volcanoNight(...vr));
