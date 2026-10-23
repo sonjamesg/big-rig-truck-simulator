@@ -320,7 +320,11 @@ function ttDraw(g, cx, cy, k, yaw, pitch, m, col, fit) {
     xa1 = (A.H - A.oy) / S;
   if (D.nose) {
     // long-nose: bonnet top (art front .. windscreen at -5.0) sits low, cab roof from -5.0 back
-    add(T.top, 0, 0, A.W, ay(-5.0), [xa0, 2.1, -zA], [xa0, 2.1, zA], [-5.0, 2.45, -zA], [0, 1, 0]);
+    // HET (Bastion): flat bonnet flush with the top of the front face and the engine box (one solid bonnet, no gap)
+    const het = m.style && m.style.het,
+      hf = het ? 2.7 + D.dr : 2.1,
+      hr = het ? 2.7 + D.dr : 2.45;
+    add(T.top, 0, 0, A.W, ay(-5.0), [xa0, hf, -zA], [xa0, hf, zA], [-5.0, hr, -zA], [0, 1, 0]);
     add(T.top, 0, ay(-5.0), A.W, ay(D.xc) - ay(-5.0), [-5.0, D.roofH, -zA], [-5.0, D.roofH, zA], [D.xc, D.top, -zA], [0, 1, 0]);
   } else add(T.top, 0, 0, A.W, ay(D.xc), [xa0, D.roofH, -zA], [xa0, D.roofH, zA], [D.xc, D.top, -zA], [0, 1, 0]); // sloped to follow the spoiler
   add(T.top, 0, ay(D.xc), A.W, A.H - ay(D.xc), [D.xc, D.chH, -zA], [D.xc, D.chH, zA], [xa1, D.chH, -zA], [0, 1, 0]);
@@ -336,7 +340,7 @@ function ttDraw(g, cx, cy, k, yaw, pitch, m, col, fit) {
     body = shade((czLook(m.id, fit).col || col), 0.55),
     boxes = [];
   if (D.nose) {
-    boxes.push([D.x0 + 0.08, -5.0, 0.5, (m.style && m.style.het ? 2.65 : 2.05) + D.dr, zi - 0.12, "#202326"]); // bonnet / engine bay
+    boxes.push([D.x0 + 0.04, -5.0, 0.5, (m.style && m.style.het ? 2.68 : 2.05) + D.dr, m.style && m.style.het ? zi : zi - 0.12, m.style && m.style.het ? body : "#202326"]); // bonnet / engine bay
     boxes.push([-5.0, D.xc - 0.04, 0.45, D.roofH - 0.06, zi, body]);
   } else boxes.push([D.x0 + 0.08, D.xc - 0.04, 0.45, D.roofH - 0.06, zi, body]); // cab shell + filled back/underside
   boxes.push([D.xc - 0.1, D.x1 - 0.05, 0.62, D.chH - 0.03, zi - 0.05, "#1d1f22"]); // boxed frame rails + solid deck
