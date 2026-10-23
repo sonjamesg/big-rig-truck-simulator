@@ -163,9 +163,13 @@ const cE = (x) => 880 + 55 * Math.sin(x / 210 + 1) + 20 * Math.sin(x / 70); // S
 const cEh = (x) => 34 + 12 * Math.sin(x / 130);
 const riverX = (y) => 1150 + 50 * Math.sin(y / 120) + 15 * Math.sin(y / 37);
 const MTN = { x: 290, y: 1600, r: 230, name: "Mount Greyfell" };
+// Mount Cinder: active volcano east of Fenwick (was an unnamed rock hill r95). Rounded basalt cone kept 3+ tiles inside
+// the nearest road/rail (87 tiles from the crater); drawn by volcano.js (cone, lava, smoke) over black basalt ground.
+const VOLC = { x: 1720, y: 1130, r: 84, cr: 15, name: "Mount Cinder", volcano: true };
+const inVolc = (x, y) => Math.hypot(x - VOLC.x, y - VOLC.y) < VOLC.r + 3;
 const HILLS = [
   MTN,
-  { x: 1720, y: 1130, r: 95 },
+  VOLC,
   { x: 830, y: 1640, r: 70 },
   { x: 1030, y: 620, r: 85, desert: true },
   { x: 1250, y: 470, r: 55, desert: true },
@@ -182,6 +186,8 @@ function forestD(x, y) {
 }
 world.regionAt = regionAt;
 world.hills = HILLS;
+world.volcano = VOLC;
+world.inVolc = inVolc;
 world.isDesert = isDesert;
 // ===================== v24 UK ROUNDABOUT GEOMETRY (clockwise, drive on the left) =====================
 // Every arm flares into the ring through two asphalt fillets (circles tangent to the road edge and the ring),
@@ -615,7 +621,7 @@ function* genWorldSteps() {
         const dx = x - h.x,
           dy = y - h.y;
         if (Math.abs(dx) > h.r * 1.2 || Math.abs(dy) > h.r * 1.2) continue;
-        if (Math.hypot(dx, dy) < h.r * (0.82 + 0.3 * vnoise(x, y, 40))) t = T.ROCK;
+        if (Math.hypot(dx, dy) < h.r * (h.volcano ? 0.97 + 0.04 * vnoise(x, y, 40) : 0.82 + 0.3 * vnoise(x, y, 40))) t = T.ROCK;
       }
       G[i] = t;
     }
@@ -3819,13 +3825,15 @@ function* genWorldSteps() {
             seed: (h * 1e9) | 0,
           });
       } else if (t === T.ROCK) {
-        if (h < 0.05)
+        const bas = inVolc(x, y); // volcano: black basalt boulders, no trees on the cone
+        if (h < 0.05 || (bas && h > 0.96))
           objs.push({
             kind: "rock",
             x: (x + 0.5) * TILE,
             y: (y + 0.5) * TILE,
             r: 10 + hash2(x + 1, y) * 26,
             seed: (h * 1e9) | 0,
+            ...(bas ? { basalt: true } : {}),
           });
         else if (h > 0.96)
           tree((x + 0.5) * TILE, (y + 0.5) * TILE, 8 + hash2(x, y + 1) * 6, true, 1);
@@ -4206,6 +4214,7 @@ function* genWorldSteps() {
     ["Ashby", 270, 1130],
     ["Wendwood", 520, 890],
     ["Mount Greyfell", MTN.x, MTN.y - 40],
+    ["Mount Cinder", VOLC.x, VOLC.y - VOLC.r - 6],
     ["River Moor", riverX(1500) + 30, 1500],
     ["Albion Airport", 400, 560],
     ["Sandvale Military Base", 1260, 250],

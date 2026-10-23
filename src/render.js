@@ -315,6 +315,14 @@ function makeTextures() {
   variants("island", (g, r) => {
     grassBase(g, r, "#629a42", ["#5d9440", "#68a046", "#5a8f3d"], 85, 0);
   });
+  variants("basalt", (g, r) => {
+    // Mount Cinder: near-black basalt / obsidian
+    g.fillStyle = "#141216";
+    g.fillRect(0, 0, 32, 32);
+    for (let k = 0; k < 3; k++)
+      blob(g, r() * 32, r() * 32, 6 + r() * 8, 5 + r() * 6, r() < 0.5 ? "rgba(120,115,140,0.08)" : "rgba(0,0,0,0.25)");
+    speckle(g, 32, 32, ["#1c1a1f", "#0c0b0d", "#24212a", "#070608"], 240, r);
+  });
   variants("rock", (g, r) => {
     g.fillStyle = "#8e8b84";
     g.fillRect(0, 0, 32, 32);
@@ -1522,7 +1530,7 @@ function drawObject(g, o) {
       g.beginPath();
       g.ellipse(o.x + o.r * 0.35, o.y + o.r * 0.35, o.r, o.r * 0.75, 0.3, 0, 7);
       g.fill();
-      const base = o.desert ? "#a0745a" : "#8a8a84";
+      const base = o.basalt ? "#1a181d" : o.desert ? "#a0745a" : "#8a8a84";
       for (let k = 0; k < 3; k++) {
         const ox = (r() - 0.5) * o.r,
           oy = (r() - 0.5) * o.r * 0.6,
@@ -1725,7 +1733,7 @@ function renderChunk(cx, cy) {
           break;
         }
         case T.ROCK:
-          g.drawImage(TEX.rock[v], px, py);
+          g.drawImage(world.inVolc && world.inVolc(tx, ty) ? TEX.basalt[v] : TEX.rock[v], px, py);
           break;
         case T.WALK:
           g.drawImage(TEX.walk[v], px, py);
@@ -1792,9 +1800,10 @@ function renderChunk(cx, cy) {
         if (L(get(tx + 1, ty))) g.fillRect(px + 29, py, 3, 32);
       }
       if (
-        t === T.ROCK ||
+        !(world.inVolc && world.inVolc(tx, ty)) &&
+        (t === T.ROCK ||
         (t === T.ROAD && world.under[idx(tx, ty)] === T.ROCK) ||
-        (t === T.TREE && nearHill(tx, ty))
+        (t === T.TREE && nearHill(tx, ty)))
       ) {
         const e = hillElev(tx, ty);
         if (e > 0) {
@@ -2405,6 +2414,7 @@ function makeMinimap() {
       const t = G[i];
       let c3 = col[t] || [0, 0, 0];
       if (t === T.SAND && world.des[i]) c3 = DES;
+      if (t === T.ROCK && world.inVolc && world.inVolc(x, y)) c3 = [22, 20, 25];
       if (t === T.GRASS) {
         const f = world.fd[i] / 255;
         if (f > 0.6) c3 = [(GR[0] * 0.7) | 0, (GR[1] * 0.78) | 0, (GR[2] * 0.7) | 0];

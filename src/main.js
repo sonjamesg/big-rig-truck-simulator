@@ -638,6 +638,7 @@ function draw() {
   drawNavWorld();
   drawCareerWorld(vx0, vy0, vx1, vy1);
   ltgDraw(vx0, vy0, vx1, vy1);
+  volcanoDraw(vx0, vy0, vx1, vy1);
   drawParkedTrailers(vx0, vy0, vx1, vy1);
   hlDrawPads(vx0, vy0, vx1, vy1);
   drawCrashLow(vx0, vy0, vx1, vy1);
@@ -671,6 +672,7 @@ function draw() {
   hlDrawNight(vx0, vy0, vx1, vy1);
   drawStreetLamps(vx0, vy0, vx1, vy1);
   drawSigNight();
+  volcanoNight(vx0, vy0, vx1, vy1);
   drawPortNight(vx0, vy0, vx1, vy1);
   if (typeof ptYardCounter === "function") ptYardCounter(vx0, vy0, vx1, vy1);
   ctx.setTransform(RSF, 0, 0, RSF, 0, 0);
@@ -1449,6 +1451,7 @@ function drawMinimap() {
   mapPrewarmTick();
   ctx.imageSmoothingEnabled = true;
   drawMapDetail(x - (cxT - span / 2) * sc, y - (cyT - sh / 2) * sc, sc, x, y, x + w, y + h);
+  volcanoMap(x - (cxT - span / 2) * sc, y - (cyT - sh / 2) * sc, sc, x, y, x + w, y + h);
   nightMapLayer(x - (cxT - span / 2) * sc, y - (cyT - sh / 2) * sc, sc, x, y, x + w, y + h, true);
   navLine(
     (m) => x + (m / 4 - (cxT - span / 2)) * sc,
@@ -1817,6 +1820,7 @@ function drawBigMap() {
           VH - 20,
         )
       : 0;
+  volcanoMap(VW / 2 - bigmap.cx * z, VH / 2 + 10 - bigmap.cy * z, z, 20, 40, VW - 20, VH - 20);
   nightMapLayer(
     VW / 2 - bigmap.cx * z,
     VH / 2 + 10 - bigmap.cy * z,
