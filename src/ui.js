@@ -724,7 +724,7 @@ function renderDealer(stageOnly) {
          `<div class="st"><div class="l"><span>${s[0]}</span><b>${s[1]}</b></div><div class="b"><i style="width:${Math.max(6, Math.min(100, s[2] * 100))}%"></i></div></div>`,
      )
      .join("")}</div>
-   <div class="cols">${m.cols.map((c) => `<div class="sw ${c === col ? "on" : ""}" data-c="${c}" style="background:${c}"></div>`).join("")}</div>
+   ${own ? `<div class="cols" style="display:flex;align-items:center;gap:8px;font-size:12px;opacity:.85">${career.cur === m.id && typeof czOpen === "function" ? '<button class="btn" id="repaint">\u{1F3A8} Repaint in the paint shop</button>' : "<span>\u{1F3A8} Drive this truck, then repaint it in the paint shop</span>"}</div>` : `<div class="cols">${m.cols.map((c) => `<div class="sw ${c === col ? "on" : ""}" data-c="${c}" style="background:${c}"></div>`).join("")}</div>`}
    <div class="buyrow"><div class="price">${own ? "Owned" : money(m.price)}</div>${own ? (career.cur === m.id && col === (career.colors[m.id] || m.cols[0]) ? '<button class="btn ghost bigbuy" disabled>\u2713 Currently driving</button>' : `<button class="btn g bigbuy" id="use">${career.cur === m.id ? "Apply colour" : "DRIVE THIS TRUCK"}</button>`) : truck.money < m.price ? `<div class="need"><b>\u{1F512} Need ${money(m.price - truck.money)} more</b><span>You have ${money(truck.money)} in the bank \u2022 earn it by delivering</span></div>` : `<button class="btn bigbuy" id="buy">BUY \u2022 ${money(m.price)}</button>`}</div>`;
   if (tt360)
     ttShowroom(stg.querySelector(".floor canvas"), () => {
@@ -742,6 +742,13 @@ function renderDealer(stageOnly) {
       renderDealer();
     }),
   );
+  const rp = stg.querySelector("#repaint");
+  if (rp)
+    rp.addEventListener("click", () => {
+      closeUI();
+      CZ.tab = "paint";
+      setTimeout(() => czOpen(), 60);
+    });
   const bu = stg.querySelector("#buy");
   if (bu) bu.addEventListener("click", () => buyTruck(m.id, col));
   const us = stg.querySelector("#use");
