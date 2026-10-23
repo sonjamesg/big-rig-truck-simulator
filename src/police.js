@@ -1144,7 +1144,7 @@ function polChaseAim(c) {
   return [q[0] - (dy / l) * o, q[1] + (dx / l) * o];
 } // v-pol3: per-car lane offset (was a fixed 1.4 m keep-left line shared by every chaser)
 // ---------- v-pol3: each chaser drives its own line: slot offset across the road, weaves every few s, pulls out to overtake
-const POL_SLOTS = [1.4, -1.9, 4.6, -4.9, 0.2, 3.0, -3.3];
+const POL_SLOTS = [1.6, -2.4, 5.0, -5.4, 0, 3.4, -3.8];
 function polLaneTick(c, dt) {
   if (c.slot == null) {
     const used = new Set([POL.chase, ...POL.aux].filter((q) => q && q !== c && q.slot != null).map((q) => q.slot));
@@ -1309,7 +1309,15 @@ function polDriveChase(c, dt) {
     for (let q = k; q < c.trail.length; q++) {
       const t = c.trail[q];
       if (Math.hypot(t[0] - v.x, t[1] - v.y) > 6) {
-        aim = t;
+        const t2 = c.trail[Math.min(c.trail.length - 1, q + 1)],
+          tq = c.trail[Math.max(0, q - 1)],
+          ex = t2[0] - tq[0],
+          ey = t2[1] - tq[1],
+          el = Math.hypot(ex, ey);
+        if (el > 0.5) {
+          const o = polLaneOff(c, t[0], t[1], -ey / el, ex / el);
+          aim = [t[0] - (ey / el) * o, t[1] + (ex / el) * o];
+        } else aim = t;
         break;
       }
     }
@@ -1887,6 +1895,7 @@ setTimeout(() => {
   drawTraffic = function (vx0, vy0, vx1, vy1) {
     const r = dt0.apply(this, arguments);
     try {
+      polSepAll();
       drawPolice(vx0, vy0, vx1, vy1);
       if (typeof drawAmbulance === "function") drawAmbulance(vx0, vy0, vx1, vy1);
     } catch (e) {
@@ -2181,7 +2190,11 @@ function polObst() {
         if (a) for (const o of a) L.push([o, o.x, o.y, o.h || 0, o.L || 4.4, o.W || 1.9]);
       }
   } // parked cars are solid too
-  for (const c of [POL.chase, ...POL.aux]) if (c) L.push([c.v, c.v.x, c.v.y, c.v.h || 0, 4.6, 2]);
+  for (const c of [POL.chase, ...POL.aux])
+    if (c) {
+      const a = c.v.polT ? emArt(c.v.polT) : c.v;
+      L.push([c.v, c.v.x, c.v.y, c.v.h || 0, a.L || 4.6, a.W || 1.9]);
+    }
   // v-pol3: rig bodies at their real centres (truck.x = rear axle, trailer x = kingpin) — police used to slide under them
   const tf = fwd(truck.h),
     cm = (CAB.front + CAB.rear) / 2;
@@ -2228,35 +2241,63 @@ function polSegD(a, b) {
   }
   return best;
 }
+function polMTV(ax, ay, ah, aL, aW, bx, by, bh, bL, bW) {
+  let best = 1e9,
+    bv = null;
+  const dx = ax - bx,
+    dy = ay - by;
+  for (const ax2 of [fwd(ah), rgt(ah), fwd(bh), rgt(bh)]) {
+    const pr = (h, L, W) => {
+      const f = fwd(h),
+        r = rgt(h);
+      return (Math.abs(f[0] * ax2[0] + f[1] * ax2[1]) * L) / 2 + (Math.abs(r[0] * ax2[0] + r[1] * ax2[1]) * W) / 2;
+    };
+    const d = dx * ax2[0] + dy * ax2[1],
+      o = pr(ah, aL, aW) + pr(bh, bL, bW) - Math.abs(d);
+    if (o <= 0) return null;
+    if (o < best) {
+      best = o;
+      const s = d >= 0 ? 1 : -1;
+      bv = [ax2[0] * o * s, ax2[1] * o * s];
+    }
+  }
+  return bv;
+}
+// v-pol3: last pass right before drawing (after the rig has moved this frame) so nothing is ever drawn overlapping
+function polSepAll() {
+  for (let k = 0; k < 2; k++) for (const c of [POL.chase, ...POL.aux]) if (c && c.v) polSep1(c, true);
+}
 function polSep(c) {
   polSep1(c);
   if (c.blocked) polSep1(c, true); // second pass: pushes out of one body can push into another
 }
 function polSep1(c, again) {
   const v = c.v;
-  const me = polCaps(v.x, v.y, v.h, (v.L || 4.6) - 2);
+  const pa = v.polT ? emArt(v.polT) : v,
+    mL = pa.L || v.L || 4.6,
+    mW = pa.W || v.W || 1.9;
   let hit = 0;
   for (const [o, x, y, h, len, w] of polObst()) {
     if (o === v || Math.abs(x - v.x) > 18 || Math.abs(y - v.y) > 18) continue;
-    const ob = polCaps(x, y, h, Math.max(0.1, len - w)),
-      [d, nx, ny] = polSegD(me, ob),
-      need = (w + (v.W || 2)) / 2 + 0.15;
-    if (d < need) {
-      const l = Math.hypot(nx, ny) || 1,
-        k = need - d;
-      v.x += (nx / l) * k;
-      v.y += (ny / l) * k;
-      me[0] += (nx / l) * k;
-      me[1] += (ny / l) * k;
-      me[2] += (nx / l) * k;
-      me[3] += (ny / l) * k;
+    // v-pol3: exact rectangle vs rectangle (SAT) with a 0.15 m skin; push out along the minimum axis
+    const mtv = polMTV(v.x, v.y, v.h, mL + 0.3, mW + 0.3, x, y, h, len, w);
+    if (mtv) {
+      const shared = o.pol && [POL.chase, ...POL.aux].some((q) => q && q.v === o) ? 0.5 : 1; // chaser pairs: split the push
+      v.x += mtv[0] * shared;
+      v.y += mtv[1] * shared;
+      if (shared < 1) {
+        o.x -= mtv[0] * 0.5;
+        o.y -= mtv[1] * 0.5;
+      }
       hit++;
       // v-pol3: a real hit with civilian traffic or another chaser at speed -> this car spins out (may crash out of the chase)
       if (!again && o !== truck && o !== truck.trl && !(c.spin > 0)) {
         const of = fwd(h),
           ovs = o.v || 0,
           vf = fwd(v.h),
-          rel = Math.hypot(vf[0] * c.sp - of[0] * ovs, vf[1] * c.sp - of[1] * ovs);
+          ml = Math.hypot(mtv[0], mtv[1]) || 1,
+          // closing speed along the contact normal (side-by-side rubbing at the same speed is not a crash)
+          rel = -((vf[0] * c.sp - of[0] * ovs) * mtv[0] + (vf[1] * c.sp - of[1] * ovs) * mtv[1]) / ml;
         if (rel > 7) {
           c.spin = 1.3;
           c.spinD = Math.random() < 0.5 ? -1 : 1;
