@@ -1219,7 +1219,7 @@ function czOpen() {
   CZ.tab = CZ.tab || "engine";
   const b = openModal(
     "tune",
-    `<div class="czh"><button class="czb x" id="czBack" aria-label="Back">\u2039</button><div class="cztl"><h2>TUNE SHOP</h2><small>${esc(m.name)}${CZ.bay ? " \u2022 " + esc(CZ.bay.name) : ""}</small></div><div class="wallet" title="Bank"><span aria-hidden="true">\u{1F437}</span> <b id="czBank"></b></div><button class="czb x" aria-label="Close">\u2715</button></div>
+    `<div class="czh"><button class="czb x" id="czBack" aria-label="Back">\u2039</button><div class="cztl"><h2>TUNE SHOP</h2><small>${esc(m.name)}${CZ.bay ? " \u2022 " + esc(CZ.bay.name) : ""}</small></div><div class="wallet" title="Bank"><span aria-hidden="true">\u{1F437}</span> <b id="czBank"></b></div><button class="czb x" id="czClose" aria-label="Close">\u2715</button></div>
    <div class="czm"><div class="czt"><div class="czp"><canvas></canvas><span class="vt"></span><span class="vh">drag / right stick / Z X to rotate \u2022 tap or V: top / 360\u00B0</span></div><div class="czs"></div></div>
    <div class="czk"><div class="cztabs"></div><div class="czg"></div></div></div>
    <div class="czf"><div style="flex:0 1 38%;min-width:0"><div id="czSelN" style="font-weight:800;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div><div class="msg" id="czMsg"></div></div><button class="btn sel" id="czAct"></button></div>`,
@@ -1232,6 +1232,8 @@ function czOpen() {
     } else closeUI();
   });
   b.querySelector("#czAct").addEventListener("click", czAction);
+  // close (X) = same as DONE: fitted parts are already saved, so just leave the shop
+  b.querySelector("#czClose").addEventListener("click", czClose);
   const pv = b.querySelector(".czp");
   pv.addEventListener("pointerdown", (e) => {
     CZ.drag = { x: e.clientX, a: CZ.ang, t: performance.now(), mv: 0 };
@@ -1445,6 +1447,10 @@ function czStatsHTML(b, m) {
     })
     .join("");
 }
+function czClose() {
+  CZ.sel = null;
+  if (career.uiOpen === "tune") closeUI();
+}
 function czAction() {
   const m = modelById(career.cur),
     p = CZ.sel;
@@ -1560,6 +1566,10 @@ function czPad(g, hit, now, dt) {
     CZ.ang += rx * dt * 2.5;
     CZ.spin = 0;
   }
+  if (hit(1)) {
+    czClose();
+    return true;
+  }
   if (hit(3)) {
     CZ.view = CZ.view === "top" ? "side" : "top";
   }
@@ -1600,7 +1610,8 @@ addEventListener(
       CZ.view = CZ.view === "top" ? "side" : "top";
     } else if (k === "Escape") {
       e.preventDefault();
-      closeUI();
+      e.stopImmediatePropagation(); // else the global Esc handler sees no UI open and opens the pause/job board
+      czClose();
     }
   },
   true,
