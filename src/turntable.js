@@ -326,12 +326,53 @@ function ttDraw(g, cx, cy, k, yaw, pitch, m, col, fit) {
     add(T.top, 0, ay(-5.0), A.W, ay(D.xc) - ay(-5.0), [-5.0, D.roofH, -zA], [-5.0, D.roofH, zA], [D.xc, D.top, -zA], [0, 1, 0]);
   } else add(T.top, 0, 0, A.W, ay(D.xc), [xa0, D.roofH, -zA], [xa0, D.roofH, zA], [D.xc, D.top, -zA], [0, 1, 0]); // sloped to follow the spoiler
   add(T.top, 0, ay(D.xc), A.W, A.H - ay(D.xc), [D.xc, D.chH, -zA], [D.xc, D.chH, zA], [xa1, D.chH, -zA], [0, 1, 0]);
-  // painter: far faces first; back-facing side/front faces are still drawn (they show through cut-outs) but first
+  // painter: far faces first; back-facing side faces are drawn (the far wheels peek under the frame), then the solid
+  // inner volumes (cab shell, bonnet, boxed frame + deck, undercarriage), then the near faces. The volumes sit just
+  // inside the textured hull, so every cut-out in a near face (between the wheels, cab-to-fifth-wheel gap, under the
+  // rails) shows solid body instead of the far side / background.
   faces.sort((a, b) => (a.facing > 0) - (b.facing > 0) || a.d - b.d);
-  for (const f of faces) {
-    if (f.facing <= 0 && f.img !== T.sideL && f.img !== T.sideR) continue;
+  const far = faces.filter((f) => f.facing <= 0 && (f.img === T.sideL || f.img === T.sideR)),
+    near = faces.filter((f) => f.facing > 0);
+  for (const f of far) ttFace(g, f);
+  const zi = zw - 0.06,
+    body = shade((czLook(m.id, fit).col || col), 0.55),
+    boxes = [];
+  if (D.nose) {
+    boxes.push([D.x0 + 0.08, -5.0, 0.5, 2.05, zi - 0.12, "#202326"]); // bonnet / engine bay
+    boxes.push([-5.0, D.xc - 0.04, 0.45, D.roofH - 0.06, zi, body]);
+  } else boxes.push([D.x0 + 0.08, D.xc - 0.04, 0.45, D.roofH - 0.06, zi, body]); // cab shell + filled back/underside
+  boxes.push([D.xc - 0.1, D.x1 - 0.05, 0.62, D.chH - 0.03, zi - 0.05, "#1d1f22"]); // boxed frame rails + solid deck
+  boxes.push([D.x0 + 0.3, D.x1 - 0.15, 0.2, 0.7, zi - 0.1, "#141517"]); // undercarriage / axles block
+  boxes.sort((a, b) => P((a[0] + a[1]) / 2, 1, 0)[2] - P((b[0] + b[1]) / 2, 1, 0)[2]);
+  for (const b of boxes) ttBox(g, P, b);
+  for (const f of near) ttFace(g, f);
+}
+// solid box [x0,x1,y0,y1,halfwidth,colour]: only the faces turned to the camera (convex), lit like the textures
+function ttBox(g, P, [x0, x1, y0, y1, h, c]) {
+  const F = [
+    [[x0, y0, -h], [x1, y0, -h], [x1, y1, -h], [x0, y1, -h], [0, 0, -1], 1],
+    [[x0, y0, h], [x0, y1, h], [x1, y1, h], [x1, y0, h], [0, 0, 1], 0.72],
+    [[x0, y0, -h], [x0, y1, -h], [x0, y1, h], [x0, y0, h], [-1, 0, 0], 0.9],
+    [[x1, y0, -h], [x1, y0, h], [x1, y1, h], [x1, y1, -h], [1, 0, 0], 0.65],
+    [[x0, y1, -h], [x1, y1, -h], [x1, y1, h], [x0, y1, h], [0, 1, 0], 1.1],
+  ];
+  for (const [a, b, d, e, n, l] of F) {
+    const q = [a, b, d, e].map((p) => P(...p)),
+      qn = P(a[0] + n[0], a[1] + n[1], a[2] + n[2]);
+    if (qn[2] - q[0][2] <= 1e-6) continue;
+    g.fillStyle = shade(c, l);
+    g.beginPath();
+    q.forEach((p, i) => (i ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1])));
+    g.closePath();
+    g.fill();
+    g.strokeStyle = g.fillStyle; // seal anti-alias seams between faces
+    g.lineWidth = 1;
+    g.stroke();
+  }
+}
+function ttFace(g, f) {
+  {
     g.save();
-    g.globalAlpha = f.facing <= 0 ? 0.9 : 1;
     g.transform(
       (f.q1[0] - f.q0[0]) / f.sw,
       (f.q1[1] - f.q0[1]) / f.sw,
