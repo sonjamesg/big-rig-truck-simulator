@@ -644,3 +644,12 @@ function j103Kinematic() {
   if (!J3.on) return;
   for (const v of traffic.vs) if (v.pol || v.polT || !v.mk || !v.mk.length) { v.j3L = j3track(v, v.x, v.y); v.layer = v.j3L; }
 }
+// ===== Placing the blueprint at another site =====
+// 1. Pick a straight E-W motorway segment (world.segs[id].dir === "h") and a rural segment that meets it at an at-grade
+//    junction (world.junctions entry with hs = motorway id, vs = rural id), with ~70 tiles of clear ground either side.
+// 2. Set the site entry: { name, mw: <motorway seg id>, rural: <rural seg id>, cx: <junction x tile>, heading: "h",
+//    ruralSide: 1 (rural road leaves south) or -1 (north), arms: any of "ebOff","ebOn","wbOff","wbOn",
+//    services: optional forecourt to shift off the ring {x0,x1,y0,y1,shift,spur} }.
+// 3. Everything else (deck span, ring, slips, tapers, kerbs, give-way lines, lamps, AI paths, sat nav lower nodes,
+//    deck zone, player / police levels) is derived from those numbers. Run tests/j103_test.py (reads world.j103).
+// Limits: one active site at a time (J3_SITES[0]); E-W motorways only.
