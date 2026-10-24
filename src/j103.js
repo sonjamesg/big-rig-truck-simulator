@@ -1,26 +1,46 @@
 /**
- * @file j103.js — J103 grade-separated motorway junction (James 24 Oct): the motorway (seg 58) carries straight on over a
- * give-way roundabout on a bridge deck (x 886-916); four slip roads and the rural road (seg 145) join the 2-lane ring.
+ * @file j103.js — BLUEPRINT for a grade-separated motorway junction (first site: J103, James 24 Oct): the motorway carries
+ * straight on over a give-way roundabout on a bridge deck; up to four slip roads and a rural road join the 2-lane ring.
  * No traffic lights. UK clockwise ring, left-hand driving. Lower layer = ring / slips (layer 0), deck = motorway (layer 1).
  * Built at load (j103Build from main.js) on top of the baked map; AI paths (j103Plan from traffic.js planPiece),
  * sat nav two levels (satnav.js navAStar virtual under-deck nodes), player / police layers, chunk art, live deck pass.
  */
-const J3 = {
-  cx: 901, cy: 100, RO: 11, RI: 7, X0: 886, X1: 916, DY0: 96.2, DY1: 103.8,
-  Rout: 10, Rin: 8, // circulating lane radii (outer / inner)
-  zone: [884, 918, 94.5, 105.5], // tiles: deck interaction zone (two layers)
-  ZID: 250, on: false, J: null, rb: null,
-};
-{
-  const E = J3.RO - 1.6, P = (th, R) => [J3.cx + R * Math.cos((th * Math.PI) / 180), J3.cy + R * Math.sin((th * Math.PI) / 180)];
-  // cubic slips (tiles), from the approved mock-up. ring: 1 = slip ends at the ring (off-slip), 0 = starts at it (on-slip)
-  J3.slips = {
-    ebOff: { b: [[835, 96.0], [862, 96.0], [884, 91], P(210, E)], ring: 1, mouth: 210, d: 1 },
-    ebOn: { b: [P(330, E), [918, 91], [940, 96.0], [967, 96.0]], ring: 0, mouth: 330, d: 1 },
-    wbOff: { b: [[967, 104.0], [940, 104.0], [918, 109], P(30, E)], ring: 1, mouth: 30, d: -1 },
-    wbOn: { b: [P(150, E), [884, 109], [862, 104.0], [835, 104.0]], ring: 0, mouth: 150, d: -1 },
+// ===== BLUEPRINT =====
+// A grade-separated "motorway over roundabout" junction is fully described by these parameters; every coordinate below is
+// derived from them (nothing J103-specific in the code). Place another one with J3_SITES.push({...}) before load, see
+// docs at the bottom of this file. Supported: straight E-W ("h") motorway segment, rural arm leaving south (+1) or north (-1).
+const J3_SITES = [
+  { name: "J103", mw: 58, rural: 145, cx: 901, heading: "h", ruralSide: 1, arms: ["ebOff", "ebOn", "wbOff", "wbOn"],
+    services: { x0: 906, x1: 926, y0: 102, y1: 116, shift: 11, spur: true } },
+];
+const J3_BP = { RO: 11, RI: 7, Rout: 10, Rin: 8, deckHalf: 15, slipReach: 66, slipMid: 39, slipKnee: 17, slipOut: 9, ZID: 250 };
+const J3 = { on: false, J: null, rb: null };
+// derive the geometry for a site (tiles). mwA/mwW = motorway segment lateral start / width
+function j3setup(site) {
+  const B = J3_BP, mw = world.segs[site.mw], ru = world.segs[site.rural];
+  if (!mw || mw.dir !== "h" || site.heading !== "h") throw new Error("j103 blueprint: only E-W motorways supported");
+  const cx = site.cx, top = mw.a, bot = mw.a + mw.w, cy = mw.a + mw.w / 2, rs = site.ruralSide || 1;
+  Object.assign(J3, B, { site, mw: site.mw, ruralId: site.rural, cx, cy, top, bot, rs,
+    X0: cx - B.deckHalf, X1: cx + B.deckHalf, DY0: top - 0.8, DY1: bot + 0.8,
+    zone: [cx - B.deckHalf - 2, cx + B.deckHalf + 2, top - 2.5, bot + 2.5],
+    rx: ru.a + ru.w / 2, // rural road centre line
+    navBox: [cx - 41, cx + 44, top - 13, bot + 23], far: [cx - 29, cx + 29],
+    art: [cx - 91, cx + 91, top - 13, bot + 37] });
+  const E = B.RO - 1.6, P = (th, R) => [cx + R * Math.cos((th * Math.PI) / 180), cy + R * Math.sin((th * Math.PI) / 180)];
+  const yN = top - 0.85, yS = bot + 0.85; // parallel diverge / merge lanes sit flush against the motorway edge (overlap -> no gap)
+  const R0 = cx - B.slipReach, R1 = cx + B.slipReach, M0 = cx - B.slipMid, M1 = cx + B.slipMid, K0 = cx - B.slipKnee, K1 = cx + B.slipKnee;
+  const all = {
+    ebOff: { b: [[R0, yN], [M0, yN], [K0, top - 6], P(210, E)], ring: 1, mouth: 210, d: 1 },
+    ebOn: { b: [P(330, E), [K1, top - 6], [M1, yN], [R1, yN]], ring: 0, mouth: 330, d: 1 },
+    wbOff: { b: [[R1, yS], [M1, yS], [K1, bot + 6], P(30, E)], ring: 1, mouth: 30, d: -1 },
+    wbOn: { b: [P(150, E), [K0, bot + 6], [M0, yS], [R0, yS]], ring: 0, mouth: 150, d: -1 },
   };
-  J3.rural = { b: [[901, 135], [901, 125], [901, 118], [901, 100 + E]], mouth: 90 };
+  J3.slips = {};
+  for (const k of site.arms || Object.keys(all)) J3.slips[k] = all[k];
+  const rm = rs > 0 ? 90 : 270;
+  J3.rural = { b: [[J3.rx, cy + rs * 36], [J3.rx, cy + rs * 25], [J3.rx, cy + rs * 17], P(rm, E)], ring: 1, mouth: rm, wide: 2.0 };
+  J3.ruralEnd = cy + rs * (B.RO + 2); // the rural segment now starts here
+  J3.mouths = Object.values(J3.slips).map((q) => q.mouth).concat([rm]);
 }
 function j3bz(b, t) {
   const u = 1 - t;
@@ -32,6 +52,7 @@ function j3samp(b, n) {
   return o;
 }
 const j3r = (p) => Math.hypot(p[0] - J3.cx, p[1] - J3.cy);
+function j3arms() { return Object.values(J3.slips).concat([J3.rural]); }
 const j3inZone = (x, y) => x >= J3.zone[0] && x <= J3.zone[1] && y >= J3.zone[2] && y <= J3.zone[3];
 // tarmac half-width of a slip at parameter t (widened flared mouth at the ring end, ~2.1 m lane -> +2.2 tiles)
 function j3hw(sl, t, base) {
@@ -42,15 +63,23 @@ function j3hw(sl, t, base) {
 function j3onLower(x, y) {
   const r = Math.hypot(x - J3.cx, y - J3.cy);
   if (r <= J3.RO && r >= J3.RI) return true;
-  if (x >= 900 && x < 902 && y >= 100 && y <= 136) return r >= J3.RI;
-  if (x >= 902 && x <= 907.2 && y >= 118.3 && y <= 120.4) return true;
-  for (const k in J3.slips) {
-    const sl = J3.slips[k], S = sl.S;
+  if (Math.abs(x - J3.rx) < 1 && (y - J3.cy) * J3.rs >= 0 && Math.abs(y - J3.cy) <= 36) return r >= J3.RI;
+  if (J3.spur && x >= J3.spur[0] && x <= J3.spur[2] && y >= J3.spur[1] && y <= J3.spur[3]) return true;
+  for (const sl of j3arms()) {
+    const t = j3taper(sl);
+    if (t) {
+      const lo = Math.min(t.x0, t.x1, t.xm), hi = Math.max(t.x0, t.x1, t.xm);
+      if (x >= lo && x <= hi && (y - t.edge) * (t.outer - t.edge) >= 0) {
+        const past = (x - t.x0) * (t.x1 - t.x0) > 0, k = past ? 1 - Math.abs(x - t.x0) / Math.abs(t.x1 - t.x0) : 1;
+        if (Math.abs(y - t.edge) <= Math.abs(t.outer - t.edge) * k) return true;
+      }
+    }
+    const S = sl.S;
     for (let i = 0; i < S.length - 1; i++) {
       const a = S[i], b = S[i + 1], ex = b[0] - a[0], ey = b[1] - a[1], l2 = ex * ex + ey * ey || 1;
       const u = Math.max(0, Math.min(1, ((x - a[0]) * ex + (y - a[1]) * ey) / l2));
       const d = Math.hypot(x - a[0] - ex * u, y - a[1] - ey * u);
-      if (d <= j3hw(sl, (i + u) / (S.length - 1), 2.1)) return true;
+      if (d <= j3hw(sl, (i + u) / (S.length - 1), sl.wide || 2.1)) return true;
     }
   }
   return false;
@@ -58,24 +87,27 @@ function j3onLower(x, y) {
 
 // ---------------- build (once, after the baked map is loaded) ----------------
 function j103Build() {
-  if (J3.on || !world.segs || !world.segs[58] || !world.segs[145]) return;
-  const J = (world.junctions || []).find((j) => j.hs === 58 && j.vs === 145);
+  if (J3.on || !world.segs) return;
+  const site = J3_SITES[0];
+  if (!site || !world.segs[site.mw] || !world.segs[site.rural]) return;
+  j3setup(site);
+  const J = (world.junctions || []).find((j) => j.hs === site.mw && j.vs === site.rural);
   if (!J) return;
   J3.J = J;
   J.gs = true;
   J.lights = false;
   for (const k in J.appr) J.appr[k].lights = false;
   world.overhead = world.overhead.filter((o) => !(o.kind === "mast" && o.J === J)); // signal gantries gone
-  for (const k in J3.slips) J3.slips[k].S = j3samp(J3.slips[k].b, 80);
+  for (const q of j3arms()) q.S = j3samp(q.b, 80);
   // pseudo roundabout for the give-way logic in traffic.js (not in world.rbs: no arms, no generator paint)
   J3.rb = { cx: J3.cx, cy: J3.cy, rin: J3.RI, rout: J3.RO, arms: [], id: 900 + J.id, j103: true };
   // 1) Old Desert Road Fuel (NORTHGAS + HGV DIESEL) moves 11 tiles south, off the ring, onto its own spur
-  const DX0 = 906, DX1 = 926, DY0 = 102, DY1 = 116, SH = 11;
-  const f = (world.fuel || []).find((o) => o.x / M_T > DX0 && o.x / M_T < DX1 && o.y / M_T > DY0 && o.y / M_T < DY1);
+  const sv = site.services, DX0 = sv ? sv.x0 : 0, DX1 = sv ? sv.x1 : 0, DY0 = sv ? sv.y0 : 0, DY1 = sv ? sv.y1 : 0, SH = sv ? sv.shift : 0;
+  const f = sv && (world.fuel || []).find((o) => o.x / M_T > DX0 && o.x / M_T < DX1 && o.y / M_T > DY0 && o.y / M_T < DY1);
   if (f) {
     const keep = [];
-    for (let y = DY1; y >= 103; y--)
-      for (let x = 907; x < 925; x++) {
+    for (let y = DY1; y >= DY0 + 1; y--)
+      for (let x = DX0 + 1; x < DX1 - 1; x++) {
         const i = idx(x, y), t = G[i];
         if (t === T.CONC || t === T.PUMP || t === T.BLDG) keep.push([x, y, t, world.reserved ? world.reserved[i] : 0]);
       }
@@ -102,38 +134,39 @@ function j103Build() {
     for (const b of f.hgv || []) { b.y0 += m; b.y1 += m; }
     for (const s of f.spots || []) s.y += m;
     f.j103 = 1;
+    if (sv.spur) J3.spur = [J3.rx + 1, f.y / M_T - 2.7, f.x0 !== undefined ? f.x0 / M_T + 0.2 : DX0 + 1.2, f.y / M_T - 0.6];
     J3.fuel = f;
   }
   // 2) lower-level tiles: ring, slips, rural mouth, services spur. Fully covered tiles become road (-2, no rb mask)
   const N = MW * MH;
   const lo = (J3.lo = new Uint8Array(N));
-  const s145 = world.segs[145];
-  for (let ty = 84; ty <= 137; ty++)
-    for (let tx = 812; tx <= 990; tx++) {
+  const s145 = world.segs[J3.ruralId], A = J3.art, onRu = (tx, ty) => tx >= s145.a && tx < s145.a + s145.w && (ty + 0.5 - J3.ruralEnd) * J3.rs > 0;
+  for (let ty = A[2]; ty <= A[3]; ty++)
+    for (let tx = A[0]; tx <= A[1]; tx++) {
       const i = idx(tx, ty);
-      if (world.roadH[i] === 58) continue;
+      if (world.roadH[i] === J3.mw) continue;
       let n = 0;
       for (const [ox, oy] of [[0.5, 0.5], [0.05, 0.05], [0.95, 0.05], [0.05, 0.95], [0.95, 0.95]]) if (j3onLower(tx + ox, ty + oy)) n++;
       const r = Math.hypot(tx + 0.5 - J3.cx, ty + 0.5 - J3.cy);
-      if (j3onLower(tx + 0.5, ty + 0.5) && !(tx >= 900 && tx < 902 && ty > 112)) {
+      if (j3onLower(tx + 0.5, ty + 0.5) && !onRu(tx, ty)) {
         lo[i] = 1;
         G[i] = T.ROAD;
         world.roadH[i] = world.roadV[i] = -2;
         if (world.rbMask) world.rbMask[i] = 0;
-      } else if (tx >= 900 && tx < 902 && ty > 112) lo[i] = 1; // the rural road itself (seg 145)
+      } else if (onRu(tx, ty)) lo[i] = 1; // the rural road itself
       else if (r < J3.RI - 0.3) {
         G[i] = T.ISLAND;
         world.roadH[i] = world.roadV[i] = -1;
-      } else if (n > 0 && (world.roadV[i] === 145 || world.roadH[i] === 145 || G[i] === T.ROAD)) {
+      } else if (n > 0 && (world.roadV[i] === J3.ruralId || world.roadH[i] === J3.ruralId || G[i] === T.ROAD)) {
         G[i] = T.SAND;
         world.roadH[i] = world.roadV[i] = -1;
-      } else if (world.roadV[i] === 145 && ty <= 112) {
+      } else if (world.roadV[i] === J3.ruralId && !onRu(tx, ty)) {
         G[i] = T.SAND;
         world.roadH[i] = world.roadV[i] = -1;
       }
       if (n > 0 && lo[i] !== 1 && G[i] === T.CONC) G[i] = T.SAND;
     }
-  s145.b0 = 113; // rural road now starts at the ring mouth
+  if (J3.rs > 0) s145.b0 = Math.ceil(J3.ruralEnd); else s145.b1 = Math.floor(J3.ruralEnd) - 1; // rural road now starts at the ring mouth
   // 3) two layers under the deck: foZ zone + sat nav virtual lower nodes on motorway tiles the ring passes under
   if (!world.foZ) world.foZ = new Uint8Array(N);
   J3.vr = [];
@@ -142,7 +175,7 @@ function j103Build() {
     for (let tx = J3.zone[0]; tx <= J3.zone[1]; tx++) {
       const i = idx(tx, ty);
       if (!world.foZ[i]) world.foZ[i] = J3.ZID;
-      if (world.roadH[i] === 58) {
+      if (world.roadH[i] === J3.mw) {
         const r = Math.hypot(tx + 0.5 - J3.cx, ty + 0.5 - J3.cy);
         if (r >= J3.RI - 0.2 && r <= J3.RO + 0.2) {
           J3.vmap.set(i, N + J3.vr.length);
@@ -152,6 +185,7 @@ function j103Build() {
     }
   if (world.chunkObjs && typeof worldChunkIndex === "function") worldChunkIndex(world.objects);
   if (typeof chunkCache !== "undefined") chunkCache.clear();
+  if (typeof chunkLo !== "undefined") chunkLo.clear(); // zoomed-out copies too (phones): no stale pre-junction ground
   J3.on = true;
   world.j103 = J3;
 }
@@ -160,14 +194,15 @@ function j103Build() {
 // returns the node to step to from node i (real or virtual) in direction d, or -1. Called by navAStar for nodes in the J103 box.
 function j3NavBox(t) {
   const x = t % MW, y = (t / MW) | 0;
-  return x >= 860 && x <= 945 && y >= 84 && y <= 126;
+  const B = J3.navBox;
+  return x >= B[0] && x <= B[1] && y >= B[2] && y <= B[3];
 }
 function j3NavStep(i, d) {
   const N = MW * MH, V = i >= N;
   const ri = V ? J3.vr[i - N] : i, j = ri + d, vert = Math.abs(d) === MW;
   if (j < 0 || j >= N) return -1;
-  const mw = (t) => world.roadH[t] === 58, lo = (t) => J3.lo[t] === 1;
-  const xj = j % MW, far = xj < 872 || xj > 930;
+  const mw = (t) => world.roadH[t] === J3.mw, lo = (t) => J3.lo[t] === 1;
+  const xj = j % MW, far = xj < J3.far[0] || xj > J3.far[1];
   if (V) {
     if (!vert) return -1;
     if (J3.vmap.has(j)) return J3.vmap.get(j);
@@ -254,21 +289,22 @@ function j3after(v, mv, d1, R, aOut) {
 }
 function j103Plan(v, r, sg, d, J, o) {
   const P = v.plan;
-  let opts = o.opts.filter((q) => q[0] === "S" || (q[1] && (q[1].id === 58 || q[1].id === 145)));
+  let opts = o.opts.filter((q) => q[0] === "S" || (q[1] && (q[1].id === J3.mw || q[1].id === J3.ruralId)));
   if (!opts.length) return false;
   let tw = 0;
   for (const q of opts) tw += q[3];
   let x = r() * tw, ch = opts[0];
   for (const q of opts) { x -= q[3]; if (x <= 0) { ch = q; break; } }
   if (v.gk && typeof ptPickExit === "function") {
-    const k = ptPickExit(v, opts.map((q) => q[0] === "S" ? lanePt(sg, d, P.lane, tProbeA(sg, (d > 0 ? 918 : 884) + d * 6)) : q[1].id === 145 ? lanePt(q[1], 1, 0, 125) : lanePt(q[1], q[2], 0, q[2] > 0 ? 990 : 812)));
+    const k = ptPickExit(v, opts.map((q) => q[0] === "S" ? lanePt(sg, d, P.lane, tProbeA(sg, (d > 0 ? J3.X1 + 2 : J3.X0 - 2) + d * 6)) : q[1].id === J3.ruralId ? lanePt(q[1], J3.rs, 0, J3.cy + J3.rs * 25) : lanePt(q[1], q[2], 0, J3.cx + q[2] * 89)));
     if (k >= 0) ch = opts[k];
   }
-  if (sg.id === 58) {
-    const dv = d > 0 ? 835 : 967; // diverge (start of the off-slip's parallel lane)
+  if (sg.id === J3.mw) {
+    const dv = d > 0 ? J3.cx - J3.slipReach : J3.cx + J3.slipReach; // diverge (start of the off-slip's parallel lane)
     const need = P.lane * 13 + 12; // tiles needed to reach the kerb lane and taper out
     const xT = d > 0 ? Math.max(dv + 6, P.pos + need) : Math.min(dv - 6, P.pos - need);
-    const late = d > 0 ? xT > 853 : xT < 949;
+    const sl0 = d > 0 ? J3.slips.ebOff : J3.slips.wbOff;
+    const late = !sl0 || (d > 0 ? xT > J3.cx - 48 : xT < J3.cx + 48);
     if (J3.dbg) J3.dbg.push([v.id, d, P.pos | 0, ch[0], late]);
     if (ch[0] !== "S" && late) ch = opts.find((q) => q[0] === "S") || ch;
     if (ch[0] === "S") {
@@ -317,24 +353,28 @@ function j103Plan(v, r, sg, d, J, o) {
     const en = j3enter(v, A, j3unit(A2, A), sl.mouth, R);
     const mv = j3ringMove(v, en, aOut, R, "j103:" + (d > 0 ? "ebOff" : "wbOff"));
     const d1 = mv.d1;
-    // exit south onto the rural road (southbound lane x 901.5)
-    const s145 = world.segs[145], q = lanePt(s145, 1, 0, 115);
-    j3cubic(v, j3ringPt(aOut, R), j3tan(aOut), [q[0] / M_T, q[1] / M_T], [0, 1]);
+    // exit onto the rural road
+    const s145 = world.segs[J3.ruralId], ePos = J3.cy + J3.rs * 15, q = lanePt(s145, J3.rs, 0, ePos);
+    j3cubic(v, j3ringPt(aOut, R), j3tan(aOut), [q[0] / M_T, q[1] / M_T], [0, J3.rs]);
     j3after(v, mv, d1, R, aOut);
-    P.seg = 145; P.dir = 1; P.lane = 0; P.pos = 115;
+    P.seg = J3.ruralId; P.dir = J3.rs; P.lane = 0; P.pos = ePos;
     return true;
   }
   // from the rural road (northbound): give way at the south mouth, round, up the on-slip, merge onto the motorway
-  if (sg.id === 145 && d < 0) {
-    const tgt = ch[1] && ch[1].id === 58 ? ch[2] : r() < 0.5 ? 1 : -1;
+  if (sg.id === J3.ruralId && d === -J3.rs) {
+    let tgt = ch[1] && ch[1].id === J3.mw ? ch[2] : r() < 0.5 ? 1 : -1;
+    if (!(tgt > 0 ? J3.slips.ebOn : J3.slips.wbOn)) tgt = -tgt;
     const sl = tgt > 0 ? J3.slips.ebOn : J3.slips.wbOn;
-    let p = lanePt(sg, d, P.lane, 115);
+    if (!sl) return false;
+    let p = lanePt(sg, d, P.lane, J3.cy + J3.rs * 15);
     pathLine(v, p[0], p[1]);
     const A = [p[0] / M_T, p[1] / M_T];
     const aOut = (sl.mouth * Math.PI) / 180 - 0.34;
-    const aJ0 = (90 * Math.PI) / 180 + 0.34;
+    const aJ0 = (J3.rural.mouth * Math.PI) / 180 + 0.34;
     const R = mod2pi(aOut - aJ0) > 3.0 ? J3.Rin : J3.Rout;
-    const en = j3enter(v, A, [0, -1], 90, R);
+    // straight up to the mouth, then the tangential entry (keeps lorry trailers on the flared tarmac)
+    { const pm = [A[0], J3.cy + J3.rs * (J3.RO + 1.2)]; pathLine(v, pm[0] * M_T, pm[1] * M_T); A[1] = pm[1]; }
+    const en = j3enter(v, A, [0, -J3.rs], J3.rural.mouth, R);
     const mv = j3ringMove(v, en, aOut, R, "j103:rural");
     const d1 = mv.d1;
     const tB = j3tAt(sl, J3.RO + 3.2), B = j3bz(sl.b, tB), B2 = j3bz(sl.b, Math.min(1, tB + 0.02));
@@ -342,13 +382,13 @@ function j103Plan(v, r, sg, d, J, o) {
     j3after(v, mv, d1, R, aOut);
     j3follow(v, sl.S, tB, 1);
     // merge: slip end -> motorway kerb lane over 16 tiles, giving way to lane-0 traffic
-    const m58 = world.segs[58], E0 = sl.b[3][0], q0 = lanePt(m58, tgt, 0, E0 + tgt * 16);
+    const m58 = world.segs[J3.mw], E0 = sl.b[3][0], q0 = lanePt(m58, tgt, 0, E0 + tgt * 16);
     const y0 = sl.b[3][1], y1 = q0[1] / M_T, n = 32;
     const dM = pathEnd(v);
     for (let k = 1; k <= n; k++) { const t = k / n, e = t * t * (3 - 2 * t); pathPush(v, (E0 + tgt * 16 * t) * M_T, (y0 + (y1 - y0) * e) * M_T); }
     v.mk.push({ kind: "jm", d: dM + 6 * M_T, dEnd: pathEnd(v), dir: tgt, ax: (E0 + tgt * 9) * M_T, ly: y1 * M_T });
     v.mk.push({ kind: "sig", d0: dM - 20, d1: pathEnd(v), side: 1 });
-    P.seg = 58; P.dir = tgt; P.lane = 0; P.pos = E0 + tgt * 16;
+    P.seg = J3.mw; P.dir = tgt; P.lane = 0; P.pos = E0 + tgt * 16;
     return true;
   }
   return false;
@@ -358,6 +398,7 @@ function j103MouthBusy(v, m) {
   const a = m.ang - 0.52, M = j3ringPt(a, J3.RO - 1), mx = M[0] * M_T, my = M[1] * M_T, R2 = (5.5 * M_T) ** 2;
   for (const o of traffic.vs) {
     if (o === v || o.ring !== J3.rb) continue;
+    if (v.stopT > 20 && o.v < 0.3 && o.stopT > 20) continue; // long mutual wait: a parked-up ring vehicle no longer blocks
     for (const p of o.trl ? [o, o.trl] : [o]) if ((p.x - mx) ** 2 + (p.y - my) ** 2 < R2) return true;
   }
   return false;
@@ -390,7 +431,7 @@ function j3track(o, x, y) {
   if (!inb(tx, ty)) return 0;
   const i = idx(tx, ty);
   if (world.foZ[i] === J3.ZID) return o.j3From === "mw" ? 1 : 0;
-  o.j3From = world.roadH[i] === 58 ? "mw" : "lo";
+  o.j3From = world.roadH[i] === J3.mw ? "mw" : "lo";
   return 0;
 }
 function j103PlayerLayer(s) {
@@ -417,33 +458,50 @@ const J3C = { TAR: "#4a4c50", KERB: "#e9e7df", LINE: "#f4f2ea" };
 function j3path(g, S) { g.beginPath(); g.moveTo(S[0][0], S[0][1]); for (let i = 1; i < S.length; i++) g.lineTo(S[i][0], S[i][1]); }
 function j3paintSlip(g, sl, base, col, extra) {
   const S = sl.S, n = S.length - 1;
-  g.strokeStyle = col; g.lineCap = "round";
+  g.strokeStyle = col;
   for (let i = 0; i < n; i++) {
+    // butt caps at the motorway end (the slip meets the motorway edge square, no rounded nose), round elsewhere
+    g.lineCap = (sl.ring ? i === 0 : i === n - 1) ? "butt" : "round";
     g.lineWidth = 2 * j3hw(sl, (i + 0.5) / n, base) + extra;
     g.beginPath(); g.moveTo(S[i][0], S[i][1]); g.lineTo(S[i + 1][0], S[i + 1][1]); g.stroke();
   }
 }
+// diverge / merge tapers: a wedge of tarmac from the slip's parallel lane into the motorway edge, so the two are one surface
+function j3taper(sl) {
+  if (sl === J3.rural) return null;
+  const mEnd = sl.ring ? sl.b[0] : sl.b[3], dirOut = sl.ring ? -sl.d : sl.d; // pointing away from the junction
+  const edge = mEnd[1] < J3.cy ? J3.top + 0.25 : J3.bot - 0.25, outer = mEnd[1] < J3.cy ? mEnd[1] - 1.05 : mEnd[1] + 1.05;
+  const x0 = mEnd[0], x1 = mEnd[0] + dirOut * 16, xm = J3.cx - (J3.cx - x0) * 0.62; // xm: where the slip has left the edge
+  return { x0, x1, xm, edge, outer, y: mEnd[1] };
+}
 // lower level (tiles units, g already transformed so 1 unit = 1 tile)
 function j3drawLower(g) {
   const { cx, cy, RO, RI } = J3, TAR = J3C.TAR;
-  const sl = Object.values(J3.slips);
-  // services spur + rural road (kerb, tarmac)
-  g.fillStyle = J3C.KERB; g.fillRect(901.8, 118.1, 5.5, 2.5); g.fillRect(899.82, cy + RO - 2, 2.36, 136 - cy - RO + 2);
-  for (const s of sl) j3paintSlip(g, s, 2.1, J3C.KERB, 0.35);
-  g.fillStyle = TAR; g.fillRect(901.9, 118.3, 5.4, 2.1); g.fillRect(900, cy + RO - 2, 2, 136 - cy - RO + 2);
-  // rural flare
-  g.beginPath(); g.moveTo(899.2, cy + RO + 2.2); g.quadraticCurveTo(900, cy + RO + 0.4, 898.5, cy + RO - 0.6); g.lineTo(903.5, cy + RO - 0.6); g.quadraticCurveTo(902, cy + RO + 0.4, 902.8, cy + RO + 2.2); g.closePath(); g.fill();
-  for (const s of sl) j3paintSlip(g, s, 2.1, TAR, 0);
+  const sl = j3arms();
+  const sp = J3.spur;
+  // kerbs, then tarmac
+  g.fillStyle = J3C.KERB;
+  if (sp) g.fillRect(sp[0] - 0.2, sp[1] - 0.2, sp[2] - sp[0] + 0.4, sp[3] - sp[1] + 0.4);
+  for (const s of sl) j3paintSlip(g, s, s.wide || 2.1, J3C.KERB, 0.35);
+  g.fillStyle = TAR;
+  if (sp) g.fillRect(sp[0] - 0.6, sp[1], sp[2] - sp[0] + 0.6, sp[3] - sp[1]);
+  for (const s of sl) j3paintSlip(g, s, s.wide || 2.1, TAR, 0);
+  // tapers: slip lane + wedge down to the motorway edge
+  for (const s of sl) {
+    const t = j3taper(s); if (!t) continue;
+    g.fillStyle = TAR; g.beginPath(); g.moveTo(t.x1, t.edge); g.lineTo(t.x0, t.outer); g.lineTo(t.xm, t.outer); g.lineTo(t.xm, t.edge); g.closePath(); g.fill();
+    g.strokeStyle = J3C.LINE; g.lineWidth = 0.1; g.beginPath(); g.moveTo(t.x1, t.edge + (t.outer - t.edge) * 0.08); g.lineTo(t.x0, t.outer + (t.edge - t.outer) * 0.12); g.lineTo(t.xm, t.outer + (t.edge - t.outer) * 0.12); g.stroke();
+    // dashed lane line between the motorway kerb lane and the slip lane
+    g.setLineDash([0.6, 0.6]); g.beginPath(); g.moveTo(t.x0, t.edge); g.lineTo(t.xm, t.edge); g.stroke(); g.setLineDash([]);
+  }
   g.beginPath(); g.arc(cx, cy, RO + 0.12, 0, 7); g.fillStyle = J3C.KERB; g.fill();
-  // re-tarmac the mouths over the kerb ring so joins are continuous
-  for (const s of sl) j3paintSlip(g, s, 2.1, TAR, 0);
+  for (const s of sl) j3paintSlip(g, s, s.wide || 2.1, TAR, 0); // re-tarmac the mouths over the kerb ring (continuous joins)
   g.fillStyle = TAR; g.beginPath(); g.arc(cx, cy, RO, 0, 7); g.fill();
-  g.fillRect(900, cy + RO - 1.5, 2, 3);
   // kerb arcs between the mouths
-  const mouths = [210, 330, 30, 150, 90], gap = 12;
+  const gap = 12;
   g.strokeStyle = J3C.KERB; g.lineWidth = 0.14;
   for (let th = 0; th < 360; th += 1) {
-    if (mouths.some((m) => Math.abs(((th - m + 540) % 360) - 180) < gap)) continue;
+    if (J3.mouths.some((m) => Math.abs(((th - m + 540) % 360) - 180) < gap)) continue;
     g.beginPath(); g.arc(cx, cy, RO - 0.07, (th * Math.PI) / 180, ((th + 1.05) * Math.PI) / 180); g.stroke();
   }
   // edge lines along the slips (stop at the ring)
@@ -451,54 +509,54 @@ function j3drawLower(g) {
   for (const s of sl) for (const side of [1, -1]) {
     const S = s.S, n = S.length - 1; let st = false; g.beginPath();
     for (let i = 0; i <= n; i++) {
-      const a = S[Math.max(0, i - 1)], b = S[Math.min(n, i + 1)], u = j3unit(a, b), w = j3hw(s, i / n, 2.1) - 0.25;
+      const a = S[Math.max(0, i - 1)], b = S[Math.min(n, i + 1)], u = j3unit(a, b), w = j3hw(s, i / n, s.wide || 2.1) - 0.25;
       const x = S[i][0] - u[1] * w * side, y = S[i][1] + u[0] * w * side;
       if (Math.hypot(x - cx, y - cy) < RO + 0.4) { if (st) break; continue; }
       st ? g.lineTo(x, y) : g.moveTo(x, y); st = true;
     }
     g.stroke();
   }
-  // lane divider on the ring and the island
   g.setLineDash([0.9, 0.7]); g.beginPath(); g.arc(cx, cy, (RO + RI) / 2, 0, 7); g.stroke(); g.setLineDash([]);
   g.fillStyle = "#5f8f45"; g.beginPath(); g.arc(cx, cy, RI, 0, 7); g.fill(); g.strokeStyle = "#d9d6cc"; g.lineWidth = 0.35; g.stroke();
   g.fillStyle = "#6fa052"; for (let i = 0; i < 9; i++) { const a = i * 0.7, d = 2 + ((i * 37) % 4); g.beginPath(); g.arc(cx + d * Math.cos(a), cy + d * Math.sin(a), 0.9, 0, 7); g.fill(); }
   // rural centre line, give-way double dashed lines across each entry (UK: give way to traffic from the right)
-  g.strokeStyle = J3C.LINE; g.lineWidth = 0.1; g.setLineDash([0.8, 0.8]); g.beginPath(); g.moveTo(901, 136); g.lineTo(901, cy + RO + 1.5); g.stroke(); g.setLineDash([]);
+  const rs = J3.rs, rEnd = cy + rs * 36;
+  g.strokeStyle = J3C.LINE; g.lineWidth = 0.1; g.setLineDash([0.8, 0.8]); g.beginPath(); g.moveTo(J3.rx, rEnd); g.lineTo(J3.rx, cy + rs * (RO + 3)); g.stroke(); g.setLineDash([]);
   g.lineWidth = 0.13; g.setLineDash([0.4, 0.3]);
-  for (const [th, h0, h1] of [[210, -10, 10], [30, -10, 10], [90, 0, 9]])
+  const entries = sl.filter((q) => q.ring).map((q) => (q === J3.rural ? [q.mouth, rs > 0 ? 0 : -9, rs > 0 ? 9 : 0] : [q.mouth, -10, 10]));
+  for (const [th, h0, h1] of entries)
     for (const R of [RO + 0.15, RO + 0.5]) { g.beginPath(); g.arc(cx, cy, R, ((th + h0) * Math.PI) / 180, ((th + h1) * Math.PI) / 180); g.stroke(); }
   g.setLineDash([]);
-  // GIVE WAY triangles on the off-slips and the rural road approach
-  g.fillStyle = J3C.LINE;
-  for (const s of [J3.slips.ebOff, J3.slips.wbOff]) {
-    const t = j3tAt(s, RO + 4.5), p = j3bz(s.b, t), q = j3bz(s.b, t + 0.01), u = j3unit(p, q);
-    j3tri(g, p, u);
+  for (const s of sl) if (s.ring && s !== J3.rural) {
+    const t = j3tAt(s, RO + 4.5), p = j3bz(s.b, t), q = j3bz(s.b, t + 0.01);
+    j3tri(g, p, j3unit(p, q));
   }
-  j3tri(g, [900.5, cy + RO + 3.5], [0, -1]);
+  j3tri(g, [J3.rx - 0.5 * rs, cy + rs * (RO + 3.5)], [0, -rs]);
 }
 function j3tri(g, p, u) {
   g.save(); g.translate(p[0], p[1]); g.rotate(Math.atan2(u[1], u[0]));
   g.beginPath(); g.moveTo(0.7, 0); g.lineTo(-0.9, -0.55); g.lineTo(-0.9, 0.55); g.closePath();
   g.lineWidth = 0.09; g.strokeStyle = J3C.LINE; g.stroke(); g.restore();
 }
-// motorway deck (tiles units): slab, lanes, central reservation, parapets, abutments
+// motorway deck (tiles units): slab, lanes, central reservation, parapets, abutments - from the motorway segment's own width
 function j3drawDeck(g, shadow) {
-  const { X0, X1 } = J3, y0 = 96.6, y1 = 103.4;
-  if (shadow) { g.fillStyle = "rgba(10,12,20,0.36)"; g.fillRect(X0 + 0.4, 97.6, X1 - X0, 7.4); }
-  g.fillStyle = "#3d3f43"; g.fillRect(X0, y0, X1 - X0, y1 - y0);
-  g.fillStyle = "#55575a"; g.fillRect(X0, 99.7, X1 - X0, 0.6);
-  g.fillStyle = "#e8c440"; g.fillRect(X0, 99.55, X1 - X0, 0.08); g.fillRect(X0, 100.37, X1 - X0, 0.08);
-  g.fillStyle = "#f2f2ee"; g.fillRect(X0, 96.85, X1 - X0, 0.08); g.fillRect(X0, 103.07, X1 - X0, 0.08);
-  for (const y of [97.95, 98.95, 101.0, 102.0]) for (let x = X0; x < X1; x += 2.2) g.fillRect(x, y, 1.1, 0.07);
-  g.fillStyle = "#b9b8b2"; g.fillRect(X0, 96.2, X1 - X0, 0.45); g.fillRect(X0, 103.35, X1 - X0, 0.45);
-  g.fillStyle = "#8d8c87"; g.fillRect(X0, 99.85, X1 - X0, 0.3);
-  g.fillStyle = "#77766f"; for (const x of [X0, X1 - 0.6]) g.fillRect(x, 96.0, 0.6, 8.0);
+  const { X0, X1, top, bot, cy } = J3, W = X1 - X0, nl = Math.floor((bot - top) / 2);
+  if (shadow) { g.fillStyle = "rgba(10,12,20,0.36)"; g.fillRect(X0 + 0.4, top + 0.6, W, bot - top + 1.4); }
+  g.fillStyle = "#3d3f43"; g.fillRect(X0, top - 0.4, W, bot - top + 0.8);
+  g.fillStyle = "#55575a"; g.fillRect(X0, cy - 0.3, W, 0.6);
+  g.fillStyle = "#e8c440"; g.fillRect(X0, cy - 0.45, W, 0.08); g.fillRect(X0, cy + 0.37, W, 0.08);
+  g.fillStyle = "#f2f2ee"; g.fillRect(X0, top - 0.15, W, 0.08); g.fillRect(X0, bot + 0.07, W, 0.08);
+  for (let k = 1; k < nl; k++) for (const y of [top + k, bot - k]) for (let x = X0; x < X1; x += 2.2) g.fillRect(x, y - 0.035, 1.1, 0.07);
+  g.fillStyle = "#b9b8b2"; g.fillRect(X0, top - 0.8, W, 0.45); g.fillRect(X0, bot + 0.35, W, 0.45);
+  g.fillStyle = "#8d8c87"; g.fillRect(X0, cy - 0.15, W, 0.3);
+  g.fillStyle = "#77766f"; for (const x of [X0, X1 - 0.6]) g.fillRect(x, top - 1, 0.6, bot - top + 2);
 }
 // chunk pass: lower level + deck baked into each chunk that overlaps
 function j3chunk(c, cx, cy) {
   if (!J3.on) return;
   const x0 = (cx * CHUNK) / TILE, y0 = (cy * CHUNK) / TILE, n = CHUNK / TILE;
-  if (x0 > 992 || x0 + n < 810 || y0 > 140 || y0 + n < 84) return;
+  const A = J3.art;
+  if (x0 > A[1] + 2 || x0 + n < A[0] - 2 || y0 > A[3] + 2 || y0 + n < A[2] - 2) return;
   const g = c.getContext("2d");
   g.save(); g.setTransform(TILE, 0, 0, TILE, -x0 * TILE, -y0 * TILE);
   j3drawLower(g); j3drawDeck(g, true);
@@ -507,8 +565,8 @@ function j3chunk(c, cx, cy) {
 // live pass (in drawTraffic between the lower and upper traffic): deck over the lower vehicles, their faint outlines on top
 function j3deckCanvas() {
   if (J3.dc) return J3.dc;
-  const W = (J3.X1 - J3.X0 + 1) * TILE, H = 9 * TILE, c = mkCanvas(W, H), g = c.getContext("2d");
-  g.setTransform(TILE, 0, 0, TILE, -(J3.X0 - 0.5) * TILE, -95.5 * TILE);
+  const W = (J3.X1 - J3.X0 + 1) * TILE, H = (J3.bot - J3.top + 3) * TILE, c = mkCanvas(W, H), g = c.getContext("2d");
+  g.setTransform(TILE, 0, 0, TILE, -(J3.X0 - 0.5) * TILE, -(J3.top - 1.5) * TILE);
   j3drawDeck(g, false);
   return (J3.dc = c);
 }
@@ -520,8 +578,8 @@ function j3poly(B) { ctx.beginPath(); ctx.moveTo(B[0][0], B[0][1]); for (let i =
 function j3underDeck(x, y) { const X = x / M_T, Y = y / M_T; return X > J3.X0 - 1 && X < J3.X1 + 1 && Y > J3.DY0 - 1.5 && Y < J3.DY1 + 1.5; }
 function j103DrawDeck(vx0, vy0, vx1, vy1) {
   if (!J3.on) return;
-  if (J3.X1 * TILE < vx0 || J3.X0 * TILE > vx1 || 104 * TILE < vy0 || 96 * TILE > vy1) return;
-  ctx.drawImage(j3deckCanvas(), (J3.X0 - 0.5) * TILE, 95.5 * TILE);
+  if (J3.X1 * TILE < vx0 || J3.X0 * TILE > vx1 || (J3.bot + 1) * TILE < vy0 || (J3.top - 1) * TILE > vy1) return;
+  ctx.drawImage(j3deckCanvas(), (J3.X0 - 0.5) * TILE, (J3.top - 1.5) * TILE);
   ctx.save(); ctx.setLineDash([0.3 * TILE, 0.25 * TILE]); ctx.lineWidth = 0.1 * TILE; ctx.strokeStyle = "rgba(255,255,255,0.35)";
   for (const v of traffic.vs) {
     if (v.layer || !j3underDeck(v.x, v.y)) continue;
@@ -546,7 +604,7 @@ function j103DrawPlayerUnder() {
   if (!all.some((B) => B.some((p) => j3underDeck(p[0] / PPM, p[1] / PPM)))) return;
   ctx.save();
   ctx.beginPath(); ctx.rect((J3.X0) * TILE, J3.DY0 * TILE, (J3.X1 - J3.X0) * TILE, (J3.DY1 - J3.DY0) * TILE); ctx.clip();
-  ctx.drawImage(j3deckCanvas(), (J3.X0 - 0.5) * TILE, 95.5 * TILE);
+  ctx.drawImage(j3deckCanvas(), (J3.X0 - 0.5) * TILE, (J3.top - 1.5) * TILE);
   for (const B of all) { j3poly(B); ctx.fillStyle = "rgba(255,210,60,0.16)"; ctx.fill(); }
   ctx.setLineDash([0.35 * TILE, 0.25 * TILE]); ctx.lineWidth = 0.16 * TILE; ctx.strokeStyle = "#ffd23c";
   for (const B of all) { j3poly(B); ctx.stroke(); }
@@ -558,16 +616,15 @@ function j103Lamps() {
   const o = [];
   for (let th = 0; th < 360; th += 40) {
     const a = (th * Math.PI) / 180, p = j3ringPt(a, J3.RO + 0.9);
-    if (p[1] > 95 && p[1] < 105) continue;
-    if ([210, 330, 30, 150, 90].some((m) => Math.abs(((th - m + 540) % 360) - 180) < 16)) continue;
+    if (p[1] > J3.top - 2 && p[1] < J3.bot + 2) continue;
+    if (J3.mouths.some((m) => Math.abs(((th - m + 540) % 360) - 180) < 16)) continue;
     o.push([p[0], p[1], -Math.cos(a), -Math.sin(a)]);
   }
-  for (const k in J3.slips) {
-    const s = J3.slips[k];
+  for (const s of Object.values(J3.slips)) {
     for (const t of [0.25, 0.5, 0.75]) {
       const p = j3bz(s.b, t), q = j3bz(s.b, t + 0.01), u = j3unit(p, q), w = j3hw(s, t, 2.1) + 0.8;
       let n = [-u[1], u[0]];
-      if ((p[1] - 100) * n[1] < 0) n = [-n[0], -n[1]];
+      if ((p[1] - J3.cy) * n[1] < 0) n = [-n[0], -n[1]];
       o.push([p[0] + n[0] * w, p[1] + n[1] * w, -n[0], -n[1]]);
     }
   }
