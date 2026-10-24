@@ -36,7 +36,7 @@ function tugInit(P) {
       [6, vB - hs * 24, H],
       [6, vB - hs * 28.6, H],
     ];
-  P.tugLane = 11; // tugs run along the basin clear of the berthed ships
+  P.tugLane = 12.5; // tugs run along the basin clear of the berthed ships (tug 1 a lane further out)
   P.tugBerth.forEach((b, i) =>
     P.tugs.push({ i, u: b[0], v: b[1], h: b[2], st: "idle", ship: null, wp: [], spd: 0, line: 0 }),
   );
@@ -94,6 +94,14 @@ function tugSteer(t, tu, tv, dt, vmax) {
   return d;
 }
 function tugBlocked(P, t, ships) {
+  // keep station behind the other tug when both are on the same track
+  for (const q of P.tugs)
+    if (q !== t && q.i < t.i && (q.st === t.st || q.st === "idle")) {
+      const du = q.u - t.u,
+        dv = q.v - t.v,
+        d = Math.hypot(du, dv);
+      if (d < 5 && du * Math.cos(t.h) + dv * Math.sin(t.h) > 0) return true;
+    }
   // yield: don't sail into a ship's path (look 3 tiles ahead)
   const nu = t.u + Math.cos(t.h) * 3,
     nv = t.v + Math.sin(t.h) * 3;
@@ -107,8 +115,7 @@ function tugBlocked(P, t, ships) {
 function updateTugs(P, dt, ships) {
   if (!P.ph || !P.shG) return;
   if (!P.tugs) tugInit(P);
-  const lane = P.tugLane,
-    byK = new Map(ships.map((o) => [o.k, o]));
+  const byK = new Map(ships.map((o) => [o.k, o]));
   P.tugJobs = P.tugJobs || 0;
   // call the tugs for the ship about to sail from berth B
   for (const o of ships) {
@@ -123,9 +130,10 @@ function updateTugs(P, dt, ships) {
       const sl = tugSlot(P, o, t.i);
       t.ship = o.k;
       t.st = "out";
+      const ln = P.tugLane + 2.6 * t.i;
       t.wp = [
-        [lane, t.v],
-        [lane, sl.v],
+        [ln, t.v],
+        [ln, sl.v],
       ];
     }
   }
@@ -231,11 +239,12 @@ function tugHomeWp(P, t) {
     }
   }
   for (let s = best - 4; s > 0; s -= 4) wp.push(polyAt(q, s));
-  const so = P.ph[5];
-  wp.push([so.b[0], so.b[1]]);
+  const so = P.ph[5],
+    ln = P.tugLane + 2.6 * t.i;
+  wp.push([so.b[0] + 1, so.b[1]]);
   const b = P.tugBerth[t.i];
-  wp.push([P.tugLane, so.b[1]]);
-  wp.push([P.tugLane, b[1]]);
+  wp.push([ln, so.b[1]]);
+  wp.push([ln, b[1]]);
   return wp;
 }
 function tugVis(P, t, vx0, vy0, vx1, vy1) {
