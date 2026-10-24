@@ -113,7 +113,7 @@ function updateTugs(P, dt, ships) {
   // call the tugs for the ship about to sail from berth B
   for (const o of ships) {
     if (o.anch || !o.s || o.s.tugs) continue;
-    const near = (o.pose.k === "dockB" && P.shG[1] - o.tl < 75) || o.gate === P.shG[1];
+    const near = (o.pose.k === "dockB" && P.gOut - o.tl < 75) || o.gate === P.gOut;
     if (!near) continue;
     const free = P.tugs.filter((t) => t.st === "idle");
     if (free.length < P.tugs.length) continue; // both tugs work each departure

@@ -1694,7 +1694,8 @@ function portCfg(P) {
   P.tB0 = ph[4].t0;
   P.tB1 = ph[5].t0;
   // v60: hold points (ships wait here until the path ahead is clear): leaving berth A, leaving berth B (also needs its tugs)
-  P.shG = [ph[3].t0, ph[5].t0];
+  P.shG = [ph[1].t0, ph[3].t0, ph[5].t0]; // holding spot in the channel off berth A, leaving berth A, leaving berth B
+  P.gOut = ph[5].t0;
   P.tOut = ph[6].t0;
   {
     const q = ph[6],
@@ -1942,7 +1943,13 @@ function portShips(P, t) {
       });
       continue;
     }
-    const ss = s || shipState(P, k, tl);
+    let ss = s;
+    if (!ss) {
+      // already under way when we first see it (game start): the hold points it has passed were cleared on the timetable
+      ss = shipState(P, k, tl);
+      ss.ok = {};
+      if (P.shG) for (const g of P.shG) if (tl > g) ss.ok[g] = 1;
+    }
     if (ss.gone || (P.shGone && P.shGone.has(k))) continue;
     let gate = null;
     if (P.shG)
@@ -1988,7 +1995,7 @@ function shipPred(P, j, dt) {
 }
 function shipMarg(P, tl) {
   // a departing ship carries its tugs: wider beside it while coming off the berth, longer fore and aft while towed
-  const tow = tl >= P.shG[1] - 1 && tl < P.tRel;
+  const tow = tl >= P.gOut - 1 && tl < P.tRel;
   return [tow ? 7 : 1.2, tow && tl < P.tOut + 30 ? 8 : 1.2];
 }
 function shipClear(P, o, t0, ships) {
@@ -2048,7 +2055,7 @@ function portShipHold(P, ships) {
     }
     if (o.gate == null) continue;
     const g = o.gate;
-    if (g === P.shG[1] && typeof tugReady === "function" && !tugReady(P, o)) continue;
+    if (g === P.gOut && typeof tugReady === "function" && !tugReady(P, o)) continue;
     if (shipClear(P, o, g, ships)) {
       (o.s.ok || (o.s.ok = {}))[g] = 1;
       o.gate = null;
