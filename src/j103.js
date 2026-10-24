@@ -582,3 +582,8 @@ function j103Lamps() {
     return c;
   };
 }
+// police / emergency cars driven without route markers: level from where they entered the deck zone
+function j103Kinematic() {
+  if (!J3.on) return;
+  for (const v of traffic.vs) if (v.pol || v.polT || !v.mk || !v.mk.length) { v.j3L = j3track(v, v.x, v.y); v.layer = v.j3L; }
+}

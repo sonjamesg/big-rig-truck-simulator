@@ -1594,6 +1594,7 @@ function updateTraffic(dt) {
   const n = Math.ceil(dt / 0.034),
     h = dt / n;
   for (let st = 0; st < n; st++) for (const v of traffic.vs) stepVeh(v, h, pbs);
+  if (typeof j103Kinematic === "function") j103Kinematic(); // J103: level for marker-less (police / emergency) vehicles
   updatePeds(dt);
 }
 function stepVeh(v, dt, pbs) {
