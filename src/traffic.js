@@ -1153,6 +1153,7 @@ function spawnVehicle(x, y, force, opt) {
     if (along > a - 3 && along < b + 3) return null;
   }
   if (along < sg.b0 + 2 || along > sg.b1 - 1) return null;
+  if (sg.id === 58 && world.j103 && along > J3.X0 - 6 && along < J3.X1 + 6) return null; // J103: never spawn on the deck (its layer comes from the junction plan)
   if (segDeadEnd(sg)) return null; // v26: never spawn onto a road that leads nowhere
   if (sg.mil && mbFull()) return null; // v45: base traffic capped (MB_CAP military vehicles in total)
   const dir = sg.ow ? sg.ow : opt && opt.dir ? opt.dir : r() < 0.5 ? 1 : -1, // v64: one-way roads (sg.ow)

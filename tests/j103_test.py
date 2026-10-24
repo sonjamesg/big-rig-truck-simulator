@@ -33,7 +33,7 @@ JS=r"""(async ([SIM,MAXS])=>{ const w=__bigrig.world, J3=w.j103, t=truck, out={}
  const oh=window.trafficHitTruck; window.trafficHitTruck=()=>false;
  traffic.vs.length=0; t.x=870*M_T; t.y=124*M_T; t.v=0; t.trl=null; t.foLay=0;
  const inA=(v)=>{const X=v.x/M_T,Y=v.y/M_T; return X>800&&X<1000&&Y>84&&Y<138;};
- const res={coll:0,collList:[],gwViol:0,gwList:[],moves:{},merges:0,mergeViol:0,maxStop:0,stuckIds:[],under:0,layerBad:0,upperSeen:0,lowerSeen:0,spawned:0};
+ const res={coll:0,collList:[],gwViol:0,gwList:[],moves:{},merges:0,mergeViol:0,maxStop:0,stuckIds:[],under:0,layerBad:0,lb:[],upperSeen:0,lowerSeen:0,spawned:0};
  const pairs=new Set(), stopAcc=new Map(), mergeWatch=[]; const dt=1/30, N=SIM*60/dt; let sp=0;
  const s58=w.segs[58], s145=w.segs[145];
  for(let k=0;k<N;k++){ timeS+=dt;
@@ -49,7 +49,7 @@ JS=r"""(async ([SIM,MAXS])=>{ const w=__bigrig.world, J3=w.j103, t=truck, out={}
        if(m.kind==='jm'&&!m._x&&f>=m.d){ m._x=1; res.merges++; mergeWatch.push([v,timeS+2]); } }
      if(v.layer) res.upperSeen++; else res.lowerSeen++;
      { const X=v.x/M_T,Y=v.y/M_T, ud=X>J3.X0&&X<J3.X1&&Y>97&&Y<103, onRing=v.ring===J3.rb||v.mk.some(m=>m.kind==='ring'&&v.s>m.d0&&v.s<m.d1), horiz=Math.abs(Math.cos(v.h))<0.2;
-       if(ud&&!onRing&&horiz&&!v.layer) res.layerBad++; if(onRing&&v.layer) res.layerBad++; }
+       if(ud&&!onRing&&horiz&&!v.layer){ res.layerBad++; if(res.lb.length<6) res.lb.push(['lo',v.id,+X.toFixed(1),+Y.toFixed(1),v.mk.map(m=>m.kind).join(','),v.cr?1:0]); } if(onRing&&v.layer){ res.layerBad++; if(res.lb.length<6) res.lb.push(['hi',v.id,+X.toFixed(1),+Y.toFixed(1)]); } }
      const st=v.v<0.2&&!v.parked?(stopAcc.get(v)||0)+dt:0; stopAcc.set(v,st); if(st>res.maxStop) res.maxStop=st; if(st>MAXS&&!res.stuckIds.some(s=>s[0]===v.id)&&res.stuckIds.length<6) res.stuckIds.push([v.id,+(v.x/M_T).toFixed(1),+(v.y/M_T).toFixed(1)]); }
    for(let i=0;i<vs.length;i++) for(let j=i+1;j<vs.length;j++){ const a=vs[i],b=vs[j]; if(a.parked||b.parked||Math.abs(a.x-b.x)>25||Math.abs(a.y-b.y)>25) continue;
      let hit=false; for(const p of boxesOf(a)) for(const q of boxesOf(b)) if(obbMTV(p,q)) hit=true; if(!hit) continue; const key=a.id+'-'+b.id; if(pairs.has(key)) continue; pairs.add(key);
