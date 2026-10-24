@@ -963,6 +963,56 @@ function slBuild() {
         );
     }
   }
+  // v81: estate roads that are plain road tiles (no seg / curve, e.g. cul-de-sacs between homes): walk the kerbs in
+  // residential cells, a post on the pavement every 9 tiles (36 m), alternating kerbs, straight stretches only,
+  // never within 5 tiles of another lamp or inside a junction box
+  {
+    const near = new Set();
+    const mark = (l) => near.add(Math.floor(l.px / TILE / 5) + "," + Math.floor(l.py / TILE / 5));
+    out.forEach(mark);
+    const clear = (tx, ty) => {
+      const X = Math.floor(tx / 5),
+        Y = Math.floor(ty / 5);
+      for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (near.has(X + i + "," + (Y + j))) return false;
+      return true;
+    };
+    const R = (x, y) => inb(x, y) && G[idx(x, y)] === T.ROAD,
+      W = (x, y) => inb(x, y) && G[idx(x, y)] === T.WALK;
+    const cells = [...resC].map((k) => k.split(",").map(Number)).sort((p, q) => p[1] - q[1] || p[0] - q[0]);
+    for (const [cx6, cy6] of cells)
+      for (let y = cy6 * 6; y < cy6 * 6 + 6; y++)
+        for (let x = cx6 * 6; x < cx6 * 6 + 6; x++) {
+          if (!R(x, y) || slZone(x, y) === 0 || inJ(x, y)) continue;
+          const n0 = out.length;
+          // horizontal road: kerb above (WALK at y-1) or below (WALK at y+1)
+          if (x % 9 === 0 && R(x - 1, y) && R(x + 1, y) && R(x - 2, y) && R(x + 2, y)) {
+            const top = (x / 9) & 1;
+            if (top && W(x, y - 1) && clear(x, y - 1)) put(x + 0.5, y, 0, 1);
+            else if (!top && W(x, y + 1) && clear(x, y + 1)) put(x + 0.5, y + 1, 0, -1);
+          } else if (y % 9 === 0 && R(x, y - 1) && R(x, y + 1) && R(x, y - 2) && R(x, y + 2)) {
+            const lf = (y / 9) & 1;
+            if (lf && W(x - 1, y) && clear(x - 1, y)) put(x, y + 0.5, 1, 0);
+            else if (!lf && W(x + 1, y) && clear(x + 1, y)) put(x + 1, y + 0.5, -1, 0);
+          }
+          for (let k = n0; k < out.length; k++) mark(out[k]);
+        }
+    // estate footways (houses facing a pedestrian path, no road): lamp on the path's upper / left edge every 9 tiles
+    const roadNear = (x, y) => {
+      for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) if (R(x + i, y + j)) return true;
+      return false;
+    };
+    for (const [cx6, cy6] of cells)
+      for (let y = cy6 * 6; y < cy6 * 6 + 6; y++)
+        for (let x = cx6 * 6; x < cx6 * 6 + 6; x++) {
+          if (!W(x, y) || slZone(x, y) === 0 || roadNear(x, y)) continue;
+          const n0 = out.length;
+          if (x % 9 === 0 && !W(x, y - 1) && W(x, y + 1) && W(x - 2, y) && W(x + 2, y) && clear(x, y))
+            put(x + 0.5, y + 0.45, 0, 1);
+          else if (y % 9 === 0 && !W(x - 1, y) && W(x + 1, y) && W(x, y - 2) && W(x, y + 2) && clear(x, y))
+            put(x + 0.45, y + 0.5, 1, 0);
+          for (let k = n0; k < out.length; k++) mark(out[k]);
+        }
+  }
   // rural junctions + roundabouts: a lamp on each corner / around the ring
   for (const J of world.junctions) {
     const z = slZone(J.x + J.w / 2, J.y + J.h / 2);
