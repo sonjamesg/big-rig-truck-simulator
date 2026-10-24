@@ -11,7 +11,7 @@ STATIC=r"""(()=>{ const W=world, S=W.segs, bad=[]; let nJ=0,nT=0,nC=0;
   const isR=(x,y)=>onTarmacT(x+0.5,y+0.5);
   for(const J of W.junctions){ nJ++;
     for(let y=J.y;y<J.y+J.h;y++) for(let x=J.x;x<J.x+J.w;x++) if(!isR(x,y)) bad.push({J:J.id,why:'box-gap',x,y});
-    for(const sg of [S[J.hs],S[J.vs]]) for(const d of [-1,1]){ const o=jOptions(J,sg,d); const ap=J.appr&&J.appr[sg.id+':'+d];
+    for(const sg of [S[J.hs],S[J.vs]]) for(const d of [-1,1]){ if(J.gs&&sg.id===J.vs) continue; /* J103: minor arm replaced by the slip roundabout (tests/j103_test.py) */ const o=jOptions(J,sg,d); const ap=J.appr&&J.appr[sg.id+':'+d];
       const has= d>0? sg.b0<o.stop-0.5 : sg.b1+1>o.stop+0.5; if(!has) continue;
       for(let k=1;k<=Math.min(3,Math.abs(d>0?o.stop-sg.b0:sg.b1+1-o.stop));k++) for(let c=sg.a;c<sg.a+sg.w;c++){ const u=d>0?o.stop-k:o.stop+k-1; const x=sg.dir==='h'?u:c, y=sg.dir==='h'?c:u; if(!isR(x,y)) bad.push({J:J.id,why:'mouth-gap',x,y}); }
       if(ap&&ap.lanes){ const mv=o.opts.map(q=>q[0]); for(let l=0;l<ap.lanes.length;l++) for(const ch of ap.lanes[l]) if(mv.indexOf(ch)<0) bad.push({J:J.id,why:'arrow-illegal',key:sg.id+':'+d,lane:l,lanes:ap.lanes,mv});
