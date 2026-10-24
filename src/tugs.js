@@ -322,8 +322,8 @@ function drawTugs(P, vx0, vy0, vx1, vy1) {
     // stern fender block
     ctx.fillRect(-L / 2 - 3.5, -W * 0.32, 3, W * 0.64);
     // deck (dark grey steel), bulwark edge
-    tugHull(L - 5, W - 5);
-    ctx.fillStyle = "#4a4f55";
+    tugHull(L - 9, W - 9);
+    ctx.fillStyle = "#555b62";
     ctx.fill();
     ctx.strokeStyle = "#c9302c";
     ctx.lineWidth = 1;
