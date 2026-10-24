@@ -2310,8 +2310,10 @@ function polSep1(c, again) {
     mL = pa.L || v.L || 4.6,
     mW = pa.W || v.W || 1.9;
   let hit = 0;
+  if (typeof j103PolUpdate === "function") j103PolUpdate();
   for (const [o, x, y, h, len, w] of polObst()) {
     if (o === v || Math.abs(x - v.x) > 18 || Math.abs(y - v.y) > 18) continue;
+    if (typeof j103Apart === "function" && j103Apart(v, o, x, y)) continue; // J103: deck vs ring
     // v-pol3: exact rectangle vs rectangle (SAT) with a 0.15 m skin; push out along the minimum axis
     const mtv = polMTV(v.x, v.y, v.h, mL + 0.3, mW + 0.3, x, y, h, len, w);
     if (mtv) {

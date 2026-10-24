@@ -638,6 +638,7 @@ function planPiece(v, r) {
       }
     } else if (je <= P.pos + 0.01) J = j;
   }
+  if (J && J.gs && typeof j103Plan === "function" && j103Plan(v, r, sg, d, J, jOptions(J, sg, d))) return true; // J103 slips + ring
   if (J) {
     const o = jOptions(J, sg, d),
       ap = J.appr && J.appr[sg.id + ":" + d],
@@ -1333,6 +1334,7 @@ function playerBoxes() {
 // v20 flyovers: the player's layer is set by the road they drove into the flyover zone from (curve deck = upper, straight road = lower)
 function foPlayerLayer(s) {
   if (!world.foZ) return;
+  if (typeof j103PlayerLayer === "function" && j103PlayerLayer(s)) return; // J103: motorway deck over the ring
   const tx = Math.floor(s.x / M_T),
     ty = Math.floor(s.y / M_T);
   if (!inb(tx, ty)) return;
@@ -1704,7 +1706,7 @@ function stepVeh(v, dt, pbs) {
           if (!busy) {
             const t = truck,
               dr = Math.hypot(t.x - m.rb.cx * M_T, t.y - m.rb.cy * M_T);
-            if (dr < (m.rb.rout + 1) * M_T && Math.abs(t.v) > 0.8) {
+            if (dr < (m.rb.rout + 1) * M_T && Math.abs(t.v) > 0.8 && !(m.rb.j103 && t.foLay)) {
               const a = Math.atan2(t.y - m.rb.cy * M_T, t.x - m.rb.cx * M_T),
                 df = mod2pi(m.ang - a);
               if (df < 1.6 && df > 0.05) busy = true;
@@ -1742,6 +1744,7 @@ function stepVeh(v, dt, pbs) {
                 break;
               }
             } // one car per entry at a time: side-by-side lanes never squeeze onto the ring together
+          if (!busy && m.rb.j103 && j103MouthBusy(v, m)) busy = true; // J103: nothing (moving or not) in the mouth
           if (!busy && m.ex && rbExitBlocked(v, m.ex)) busy = true; // v25: don't enter the ring while our exit is queued back to the ring (no gridlock)
           if (!busy) {
             if (gap < 2.5) {
@@ -1754,6 +1757,9 @@ function stepVeh(v, dt, pbs) {
       }
       if (!stop && m.turn && gap < 8 && !m.go && turnSweepBlocked(v, m)) stop = true; // v25: hold the turn while a stopped car sits in our swept path
       if (stop) acc = Math.min(acc, idmAcc(v, v0, Math.max(0.1, gap), 0));
+    } else if (m.kind === "jm") {
+      const a = j103Merge(v, m, front, v0); // J103 on-slip merge
+      if (a !== null) acc = Math.min(acc, a);
     } else if (m.kind === "rbx" && !m.go) {
       // v63d: leaving from an inner ring lane: hold short of the exit while a car in an outer lane is about to pass it
       const gap = m.d - front;
@@ -2338,5 +2344,6 @@ function drawTraffic(vx0, vy0, vx1, vy1) {
   };
   drawL(lo);
   if (typeof drawFlyovers === "function") drawFlyovers(vx0, vy0, vx1, vy1);
+  if (typeof j103DrawDeck === "function") j103DrawDeck(vx0, vy0, vx1, vy1);
   if (hi.length) drawL(hi);
 }

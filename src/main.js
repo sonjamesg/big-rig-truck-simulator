@@ -268,6 +268,7 @@ async function boot() {
   });
   tim[cur] = performance.now() - curT;
   world.loadMs = performance.now() - tb;
+  if (typeof j103Build === "function") j103Build(); // J103 grade-separated junction (j103.js)
   if (typeof rbApprFix === "function") rbApprFix(); // v51 roundabout approach lanes: left / ahead / right on 3 lanes
   world.ready = true;
   window.__bigrig.loadStages = tim;
@@ -650,6 +651,7 @@ function draw() {
   if (typeof drawParkedTrucks === "function") drawParkedTrucks(vx0, vy0, vx1, vy1);
   drawBreakdown();
   drawLorry();
+  if (typeof j103DrawPlayerUnder === "function") j103DrawPlayerUnder();
   if (
     !truck.foLay &&
     world.foZ &&

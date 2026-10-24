@@ -1015,6 +1015,7 @@ function slBuild() {
   }
   // rural junctions + roundabouts: a lamp on each corner / around the ring
   for (const J of world.junctions) {
+    if (J.gs) continue; // J103: lamps come from j103Lamps
     const z = slZone(J.x + J.w / 2, J.y + J.h / 2);
     const hs = world.segs[J.hs],
       vs = world.segs[J.vs];
@@ -1029,6 +1030,7 @@ function slBuild() {
       put(cx + dx * 0.35, cy + dy * 0.35, -dx * k, -dy * k);
     }
   }
+  if (typeof j103Lamps === "function") for (const [x, y, dx, dy] of j103Lamps()) put(x, y, dx, dy);
   for (const rb of world.rbs || []) {
     for (let q = 0; q < 6; q++) {
       const a = (q * Math.PI) / 3 + 0.3,

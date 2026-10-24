@@ -107,19 +107,26 @@ function navSnapTruck() {
   return best;
 }
 function navAStar(sx, sy, gx, gy) {
-  const N = MW * MH;
-  if (!navG) {
-    navG = new Float32Array(N);
-    navStamp = new Int32Array(N);
-    navFrom = new Int32Array(N);
-    navClosed = new Int32Array(N);
+  const N = MW * MH,
+    J3N = world.j103 && world.j103.on ? world.j103 : null, // J103: virtual lower nodes under the motorway deck
+    NT = N + (J3N ? J3N.vr.length : 0);
+  if (!navG || navG.length < NT) {
+    navG = new Float32Array(NT);
+    navStamp = new Int32Array(NT);
+    navFrom = new Int32Array(NT);
+    navClosed = new Int32Array(NT);
+    navUp = new Uint8Array(NT);
   }
-  if (!navUp) navUp = new Uint8Array(N);
+  if (!navUp) navUp = new Uint8Array(NT);
+  const tInfo = (t) => (t >= N ? ["rb", 0.8, 8] : navTileInfo(t));
   const FF = world.foF;
   const gen = ++navGen,
     S = idx(sx, sy),
     Gl = idx(gx, gy);
-  const hx = (i) => (Math.abs((i % MW) - gx) + Math.abs(((i / MW) | 0) - gy)) * 0.9;
+  const hx = (i0) => {
+    const i = i0 >= N ? j3NavReal(i0) : i0;
+    return (Math.abs((i % MW) - gx) + Math.abs(((i / MW) | 0) - gy)) * 0.9;
+  };
   let hp = [],
     hf = [];
   const push = (i, f) => {
@@ -184,10 +191,24 @@ function navAStar(sx, sy, gx, gy) {
       return null;
     }
     const gi = navG[i],
-      ci = (navTileInfo(i) || NAV_OFF)[1]; // v50: a start tile on tarmac but off every segment (curve mouth) no longer throws
+      ci = (tInfo(i) || NAV_OFF)[1]; // v50: a start tile on tarmac but off every segment (curve mouth) no longer throws
+    const inJ3 = J3N && (i >= N || j3NavBox(i));
     for (const d of [1, -1, MW, -MW]) {
       let j = i + d,
         k = 1;
+      if (inJ3) {
+        j = j3NavStep(i, d);
+        if (j < 0 || (j < N && !isRoadT(j))) continue;
+        const nc = gi + (ci + tInfo(j)[1]) * 0.5;
+        if (navClosed[j] !== gen && (navStamp[j] !== gen || nc < navG[j])) {
+          navStamp[j] = gen;
+          navG[j] = nc;
+          navFrom[j] = i;
+          navUp[j] = 0;
+          push(j, nc + hx(j));
+        }
+        continue;
+      }
       if (j < 0 || j >= N) continue;
       // small gaps (roundabout aprons, junction mouths drawn as kerb/grass): hop up to 5 tiles straight across
       if (!isRoadT(j)) {
@@ -223,7 +244,7 @@ function navAStar(sx, sy, gx, gy) {
   NAV.lastIt = it;
   if (navStamp[Gl] !== gen) return null;
   const rp = [];
-  for (let i = Gl; i !== -1; i = navFrom[i]) rp.push(i);
+  for (let i = Gl; i !== -1; i = navFrom[i]) rp.push(i >= N ? j3NavReal(i) : i);
   rp.reverse();
   const path = [rp[0]];
   for (let k = 1; k < rp.length; k++) {
