@@ -854,8 +854,18 @@ function slBuild() {
         return true;
     return false;
   };
+  // v81 (James 24 Oct): residential streets (houses / driveways within ~24 m) get UK estate lamps every 9 tiles (36 m),
+  // alternating sides, even outside the town zones; coarse 6-tile cell set so the test is a few Set lookups
+  const resC = new Set();
+  for (const o of world.objects)
+    if ((o.kind === "bldg" && o.style === "house") || o.kind === "drive")
+      for (let y = Math.floor(o.y / TILE / 6) - 1; y <= Math.floor((o.y + o.h) / TILE / 6) + 1; y++)
+        for (let x = Math.floor(o.x / TILE / 6) - 1; x <= Math.floor((o.x + o.w) / TILE / 6) + 1; x++)
+          resC.add(x + "," + y);
+  const resNear = (tx, ty) => resC.has(Math.floor(tx / 6) + "," + Math.floor(ty / 6));
   for (const sg of world.segs || []) {
-    if (!sg || sg.b1 === undefined || sg.type === "dirt" || sg.type === "lane") continue;
+    if (!sg || sg.b1 === undefined || sg.type === "dirt") continue;
+    if (sg.type === "lane" && !resNear(sg.dir === "h" ? (sg.b0 + sg.b1) / 2 : sg.a, sg.dir === "h" ? sg.a : (sg.b0 + sg.b1) / 2)) continue;
     const hwy = sg.type === "hwy",
       mw = sg.type === "hwy" || sg.type === "dual";
     for (let a = sg.b0 + 1, n = 0; a < sg.b1; a++) {
@@ -865,8 +875,9 @@ function slBuild() {
         onB =
           inb(Math.floor(cx), Math.floor(cy)) &&
           G[idx(Math.floor(cx), Math.floor(cy))] === T.BRIDGE;
-      if (z === 2 && !mw && !onB && !sg.mil) continue;
-      const sp = sg.mil ? 6 : onB ? 6 : z === 0 ? 5 : mw && z === 2 ? 10 : 12;
+      const res = z > 0 && !mw && resNear(cx, cy);
+      if (z === 2 && !mw && !onB && !sg.mil && !res) continue;
+      const sp = sg.mil ? 6 : onB ? 6 : z === 0 ? 5 : res ? 9 : mw && z === 2 ? 10 : 12;
       if ((a - sg.b0) % sp !== 0 || inJ(Math.floor(cx), Math.floor(cy))) continue;
       n++;
       if (onB) {
@@ -926,12 +937,13 @@ function slBuild() {
           ? G[idx(Math.floor(B[0]), Math.floor(B[1]))]
           : 0,
         onB = bt === T.BRIDGE;
-      const z = slZone(B[0], B[1]);
-      if (z === 2 && !mw && !onB) {
+      const z = slZone(B[0], B[1]),
+        res = z > 0 && !mw && resNear(B[0], B[1]);
+      if (z === 2 && !mw && !onB && !res) {
         acc = 0;
         continue;
       }
-      const sp = onB ? 6 : z === 0 ? 5 : mw && z === 2 ? 10 : 12;
+      const sp = onB ? 6 : z === 0 ? 5 : res ? 9 : mw && z === 2 ? 10 : 12;
       if (acc < sp) continue;
       acc = 0;
       n++;
