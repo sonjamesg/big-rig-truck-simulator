@@ -435,7 +435,8 @@ function drawNight(vx0, vy0, vx1, vy1, z) {
       const o = l.o;
       ctx.globalAlpha = 0.75 * K;
       ctx.fillStyle = "#ffd27a"; // v51: cyber towers no longer get always-on cyan strips, just lit windows
-      for (const w of l.hideWin ? [] : l.win) {
+      // v80 (James 24 Oct): no fake roof/footprint window dots at night; only the 3D walls carry lit windows
+      for (const w of []) {
         if (!w[2] || hh > w[3]) continue;
         // whole screen pixels: no sub-pixel shimmer while the camera pans
         ctx.fillRect(

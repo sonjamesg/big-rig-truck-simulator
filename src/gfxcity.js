@@ -350,7 +350,8 @@ function gcRoofLive(vx0, vy0, vx1, vy1, z) {
   ctx.save();
   ctx.setTransform(RSF, 0, 0, RSF, 0, 0);
   const S = (x, y) => [(x - vx0) * z, (y - vy0) * z];
-  if (K > 0.05) {
+  // v80 (James 24 Oct): no lit pink / cyan / amber skylight squares on roofs at night
+  if (false) {
     ctx.globalCompositeOperation = "lighter";
     for (const o of B)
       for (const s of o.gcRB.sk) {
