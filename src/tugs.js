@@ -131,7 +131,7 @@ function updateTugs(P, dt, ships) {
   }
   for (const t of P.tugs) {
     const o = t.ship != null ? byK.get(t.ship) : null;
-    if ((t.st === "out" || t.st === "tow") && !o) {
+    if ((t.st === "out" || t.st === "tow" || t.st === "clear") && !o) {
       t.st = "home";
       t.ship = null;
       t.wp = tugHomeWp(P, t);
@@ -173,10 +173,32 @@ function updateTugs(P, dt, ships) {
       t.av = sl.av;
       t.line = 1;
       if (o.tl >= P.tRel) {
-        t.st = "home";
-        t.ship = null;
+        // let go, sheer off to the side of the channel and wait for the ship to pass before heading home
+        t.st = "clear";
         t.rel = (t.rel || 0) + 1;
-        t.wp = tugHomeWp(P, t);
+        const c = Math.cos(o.pose.h),
+          sn = Math.sin(o.pose.h);
+        let best = null;
+        for (const sd of [1, -1])
+          for (const d of [9, 11, 7]) {
+            const pu = t.u - sn * sd * d + c * (t.i ? -4 : 2),
+              pv = t.v + c * sd * d + sn * (t.i ? -4 : 2);
+            if (!best && tugFits(P, pu, pv, 2)) best = [pu, pv];
+          }
+        t.wp = [best || [t.u - sn * 9, t.v + c * 9]];
+      }
+    } else if (t.st === "clear") {
+      t.line = Math.max(0, t.line - dt * 0.5);
+      if (t.wp.length) {
+        if (tugSteer(t, t.wp[0][0], t.wp[0][1], dt, 1.6) < 0.6) t.wp.shift();
+      } else {
+        t.spd = 0;
+        const gone = !o || Math.hypot(o.pose.u - t.u, o.pose.v - t.v) > SHIP.L * 0.5 + 12;
+        if (gone) {
+          t.st = "home";
+          t.ship = null;
+          t.wp = tugHomeWp(P, t);
+        }
       }
     } else if (t.st === "home") {
       t.line = Math.max(0, t.line - dt * 0.5);
