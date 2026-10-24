@@ -24,6 +24,11 @@ JS=r"""(async ([SIM,MAXS])=>{ const w=__bigrig.world, J3=w.j103, t=truck, out={}
  out.connected={}; for(const k in ends){ const [x,y]=ends[k]; let ok=false; for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++) if(seen.has((x+dx)*4096+y+dy)) ok=true; out.connected[k]=ok; }
  out.underDeckRing=J3.vr.length; let mwBroken=0; for(let x=860;x<945;x++) for(let y=97;y<103;y++) if(w.roadH[idx(x,y)]!==58) mwBroken++; out.mwBroken=mwBroken;
  out.servicesY=J3.fuel?J3.fuel.y/M_T:null; let fuelOnRing=0; for(let y=103;y<126;y++) for(let x=905;x<926;x++){ const i=idx(x,y); if((G[i]===T.CONC||G[i]===T.PUMP||G[i]===T.BLDG)&&Math.hypot(x+.5-901,y+.5-100)<12.5) fuelOnRing++; } out.fuelOnRing=fuelOnRing;
+ // contact: continuous tarmac (tile + exact geometry) from each slip's parallel lane to the motorway kerb lane, and from the rural road into the ring
+ out.contact={}; const tar=(x,y)=>onTarmacT(x,y)&&(w.roadH[idx(Math.floor(x),Math.floor(y))]===J3.mw||j3onLower(x,y));
+ for(const k in J3.slips){ const sl=J3.slips[k], e=sl.ring?sl.b[0]:sl.b[3], lane=e[1]<J3.cy?J3.top+0.5:J3.bot-0.5; let bad=0,n=0;
+   for(let f=0.03;f<=0.3;f+=0.03){ const x=e[0]+(J3.cx-e[0])*f; for(let y=Math.min(e[1],lane);y<=Math.max(e[1],lane);y+=0.1){ n++; if(!tar(x,y)) bad++; } } out.contact[k]={n,bad}; }
+ { let bad=0,n=0; for(let y=J3.ruralEnd+6;(y-(J3.cy+J3.rs*(J3.RO-0.5)))*J3.rs>0;y-=0.1*J3.rs) for(const dx of [-0.7,0,0.7]){ n++; if(!tar(J3.rx+dx,y)) bad++; } out.contact.rural={n,bad}; }
  out.lights=J3.J.lights; out.masts=w.overhead.filter(o=>o.kind==='mast'&&o.J===J3.J).length;
  const R=(a,b)=>{ const S=navSnap(a[0],a[1],4),Gg=navSnap(b[0],b[1],4); const p=navAStar(S[0],S[1],Gg[0],Gg[1]); if(!p) return {ok:false};
    let snap=0; for(let k=1;k<p.length;k++){ const A=p[k-1],B=p[k],x=A%MW; const ma=w.roadH[A]===58,mb=w.roadH[B]===58,la=J3.lo[A],lb=J3.lo[B];
@@ -69,6 +74,8 @@ async def main():
     if 'fatal' in r: print('FAIL',r['fatal']); sys.exit(1)
     a=r['ai']; nv=r['nav']; fails=[]
     if not all(r['connected'].values()): fails.append('lower road not continuous: %s'%r['connected'])
+    for k,c in r['contact'].items():
+      if c['bad']: fails.append('gap at %s join: %d/%d samples off tarmac'%(k,c['bad'],c['n']))
     if r['mwBroken']: fails.append('motorway tiles broken under the deck')
     if r['fuelOnRing']: fails.append('services still on the ring')
     if r['lights'] or r['masts']: fails.append('traffic lights still at J103')
