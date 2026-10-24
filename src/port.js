@@ -658,6 +658,7 @@ function drawPortLow(vx0, vy0, vx1, vy1) {
     ctx.save();
     if (P.brg.length) portClipBridges(P);
     for (const o of ships) if (o.s && portShipVis(P, o, vx0, vy0, vx1, vy1)) drawShip(P, o);
+    if (typeof drawTugs === "function") drawTugs(P, vx0, vy0, vx1, vy1);
     if (typeof DN !== "undefined" && DN.dark > 0.05)
       for (const o of ships)
         if (o.s && portShipVis(P, o, vx0, vy0, vx1, vy1)) {
@@ -1090,6 +1091,7 @@ function drawPortNight(vx0, vy0, vx1, vy1) {
   for (const P of portList())
     for (const o of P.cur ? P.cur.ships : [])
       if (o.s && portShipVis(P, o, vx0, vy0, vx1, vy1)) shipNight(P, o, K);
+  if (typeof tugNight === "function" && K > 0.02) for (const P of portList()) tugNight(P, K, vx0, vy0, vx1, vy1);
   ctx.globalAlpha = 1;
 }
 function shipNight(P, o, K) {
@@ -1691,6 +1693,15 @@ function portCfg(P) {
   P.tA1 = ph[3].t0;
   P.tB0 = ph[4].t0;
   P.tB1 = ph[5].t0;
+  // v60: hold points (ships wait here until the path ahead is clear): leaving berth A, leaving berth B (also needs its tugs)
+  P.shG = [ph[3].t0, ph[5].t0];
+  P.tOut = ph[6].t0;
+  {
+    const q = ph[6],
+      aL = Math.PI * 8 + 8,
+      g = Math.min(0.95, Math.pow(Math.min(1, (aL + 34) / q.len), 1 / 1.7));
+    P.tRel = q.t0 + g * q.dur; // tugs let go at the harbour mouth
+  }
   // cranes: 2 on the unload berth, the rest on the export berth; each works one half of the single row of boxes
   // v32: exactly ONE import crane (berth A) and ONE export crane (berth B)
   if (P.cranes.length > 2) P.cranes = [P.cranes[0], P.cranes[P.cranes.length - 1]];
@@ -1931,29 +1942,118 @@ function portShips(P, t) {
       });
       continue;
     }
-    o.push({ k, tl, raw, pose: shipPose(P, tl) });
+    const ss = s || shipState(P, k, tl);
+    if (ss.gone || (P.shGone && P.shGone.has(k))) continue;
+    let gate = null;
+    if (P.shG)
+      for (const g of P.shG)
+        if (tl > g && !(ss.ok && ss.ok[g])) {
+          tl = g;
+          ss.delay = raw - g;
+          gate = g;
+          break;
+        }
+    o.push({ k, tl, raw, gate, pose: shipPose(P, tl) });
   }
   return o;
 }
-function portShipHold(P, ships) {
-  const inD = P.ph[0].dur,
-    side = P.ph[1].dur;
-  for (const o of ships) {
-    if (!o.anch) continue;
-    let hold = false;
+// v60: oriented-rectangle overlap (hull footprints), margins in tiles
+function shipOBB(p, ml, mw) {
+  return { u: p.u, v: p.v, c: Math.cos(p.h), s: Math.sin(p.h), a: SHIP.L / 2 + ml, b: SHIP.W / 2 + mw };
+}
+function obbHit(A, B) {
+  const ax = [
+    [A.c, A.s],
+    [-A.s, A.c],
+    [B.c, B.s],
+    [-B.s, B.c],
+  ];
+  const du = B.u - A.u,
+    dv = B.v - A.v;
+  for (const [x, y] of ax) {
+    const ra = A.a * Math.abs(A.c * x + A.s * y) + A.b * Math.abs(-A.s * x + A.c * y),
+      rb = B.a * Math.abs(B.c * x + B.s * y) + B.b * Math.abs(-B.s * x + B.c * y);
+    if (Math.abs(du * x + dv * y) > ra + rb) return false;
+  }
+  return true;
+}
+// predicted pose of ship j dt seconds ahead (it stops at its next hold point; held ships stay put)
+function shipPred(P, j, dt) {
+  if (j.anch) return j.pose;
+  if (j.gate != null) return j.pose;
+  let t = j.tl + dt;
+  for (const g of P.shG) if (j.tl <= g && t > g && !(j.s && j.s.ok && j.s.ok[g])) t = g;
+  if (t >= P.Ltot) return null;
+  return shipPose(P, t);
+}
+function shipMarg(P, tl) {
+  // a departing ship carries its tugs: wider beside it while coming off the berth, longer fore and aft while towed
+  const tow = tl >= P.shG[1] - 1 && tl < P.tRel;
+  return [tow ? 7 : 1.2, tow && tl < P.tOut + 30 ? 8 : 1.2];
+}
+function shipClear(P, o, t0, ships) {
+  let next = P.Ltot;
+  for (const g of P.shG) if (g > t0 + 0.01) { next = g; break; }
+  const H = Math.min(700, next - t0 + 2);
+  for (let dt = 0; dt <= H; dt += 2) {
+    const tl = Math.min(t0 + dt, next);
+    if (tl >= P.Ltot) break;
+    const m = shipMarg(P, tl),
+      A = shipOBB(shipPose(P, tl), m[0], m[1]);
     for (const j of ships) {
-      if (j === o || j.anch) continue;
-      const tj = j.tl;
-      if (tj + inD < P.tA1 + 10) hold = true; // berth A still occupied when we would arrive
-      if (tj + inD - 160 < P.tB1 + 220 && tj + inD + side > P.tB1 - 10) hold = true;
-    } // an earlier ship would be leaving berth B as we pass
-    for (const j of ships) if (j.anch && j.k < o.k) hold = true; // first come, first served at the anchorage
-    const s = shipState(P, o.k, 0);
-    s.delay = o.raw;
-    if (!hold) {
-      s.rel = 1;
-      P.maxDelay = Math.max(P.maxDelay || 0, s.delay);
+      if (j === o || (j.s && j.s.gone)) continue;
+      const pj = shipPred(P, j, dt);
+      if (!pj) continue;
+      const mj = j.anch ? [1.2, 1.2] : shipMarg(P, Math.min(j.tl + dt, P.Ltot)),
+        B = shipOBB(pj, mj[0], mj[1]);
+      if (obbHit(A, B)) return false;
     }
+  }
+  return true;
+}
+function portShipHold(P, ships) {
+  for (const o of ships) if (!o.s) o.s = shipState(P, o.k, o.tl);
+  // first frame: ships already under way when the game starts must not be on a collision course
+  // ships already under way when the game starts (or when the clock jumps) must not be on a collision course
+  {
+    const kept = ships.filter((o) => o.s.seen || o.anch);
+    for (const o of ships.slice().sort((a, b) => a.k - b.k)) {
+      if (o.s.seen || o.anch) continue;
+      if (!shipClear(P, o, o.tl, kept)) {
+        o.s.gone = 1;
+        (P.shGone || (P.shGone = new Set())).add(o.k);
+        continue;
+      }
+      o.s.seen = 1;
+      kept.push(o);
+    }
+    for (let i = ships.length - 1; i >= 0; i--) if (ships[i].s.gone) ships.splice(i, 1);
+  }
+  const order = ships.slice().sort((a, b) => a.k - b.k);
+  for (const o of order) {
+    if (o.anch) {
+      let hold = false;
+      for (const j of ships) if (j.anch && j.k < o.k) hold = true; // first come, first served at the anchorage
+      const s = o.s;
+      s.delay = o.raw;
+      if (!hold && shipClear(P, o, 0, ships)) {
+        s.rel = 1;
+        s.seen = 1;
+        o.anch = 0;
+        o.tl = 0;
+        o.pose = shipPose(P, 0);
+        P.maxDelay = Math.max(P.maxDelay || 0, s.delay);
+      }
+      continue;
+    }
+    if (o.gate == null) continue;
+    const g = o.gate;
+    if (g === P.shG[1] && typeof tugReady === "function" && !tugReady(P, o)) continue;
+    if (shipClear(P, o, g, ships)) {
+      (o.s.ok || (o.s.ok = {}))[g] = 1;
+      o.gate = null;
+      P.maxDelay = Math.max(P.maxDelay || 0, o.s.delay);
+    } else P.maxDelay = Math.max(P.maxDelay || 0, o.s.delay);
   }
 }
 const SHIP_HULL = ["#1f4e79", "#7b241c", "#145a32", "#4a235a", "#2c3e50", "#6e2c00"];
@@ -2063,6 +2163,7 @@ function updatePortLogistics(P, dt, t) {
   }
   for (const k of P.sh.keys()) if (!ships.some((o) => o.k === k)) P.sh.delete(k);
   P.cur = { ships, shA, shB };
+  if (typeof updateTugs === "function") updateTugs(P, dt, ships);
   if (shB && P.ex + P.exRes < SHIP.N) {
     P.ex = SHIP.N - P.exRes;
   }
