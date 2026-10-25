@@ -109,7 +109,7 @@ function navSnapTruck() {
 function navAStar(sx, sy, gx, gy) {
   const N = MW * MH,
     J3N = world.j103 && world.j103.on ? world.j103 : null, // J103: virtual lower nodes under the motorway deck
-    NT = N + (J3N ? J3N.vr.length : 0);
+    NT = N + (J3N ? j3NavTotal() : 0);
   if (!navG || navG.length < NT) {
     navG = new Float32Array(NT);
     navStamp = new Int32Array(NT);

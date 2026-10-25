@@ -25,7 +25,7 @@ JS=r"""(async ([SIM,MAXS])=>{ const w=__bigrig.world, J3=w.j103, t=truck, out={}
  out.underDeckRing=J3.vr.length; let mwBroken=0; for(let x=860;x<945;x++) for(let y=97;y<103;y++) if(w.roadH[idx(x,y)]!==58) mwBroken++; out.mwBroken=mwBroken;
  out.servicesY=J3.fuel?J3.fuel.y/M_T:null; let fuelOnRing=0; for(let y=103;y<126;y++) for(let x=905;x<926;x++){ const i=idx(x,y); if((G[i]===T.CONC||G[i]===T.PUMP||G[i]===T.BLDG)&&Math.hypot(x+.5-901,y+.5-100)<12.5) fuelOnRing++; } out.fuelOnRing=fuelOnRing;
  // contact: continuous tarmac (tile + exact geometry) from each slip's parallel lane to the motorway kerb lane, and from the rural road into the ring
- out.contact={}; const tar=(x,y)=>onTarmacT(x,y)&&(w.roadH[idx(Math.floor(x),Math.floor(y))]===J3.mw||j3onLower(x,y));
+ out.contact={}; const tar=(x,y)=>onTarmacT(x,y)&&(w.roadH[idx(Math.floor(x),Math.floor(y))]===J3.mw||j3onLowerAt(J3,x,y));
  for(const k in J3.slips){ const sl=J3.slips[k], e=sl.ring?sl.b[0]:sl.b[3], lane=e[1]<J3.cy?J3.top+0.5:J3.bot-0.5; let bad=0,n=0;
    for(let f=0.03;f<=0.3;f+=0.03){ const x=e[0]+(J3.cx-e[0])*f; for(let y=Math.min(e[1],lane);y<=Math.max(e[1],lane);y+=0.1){ n++; if(!tar(x,y)) bad++; } } out.contact[k]={n,bad}; }
  { let bad=0,n=0; for(let y=J3.ruralEnd+6;(y-(J3.cy+J3.rs*(J3.RO-0.5)))*J3.rs>0;y-=0.1*J3.rs) for(const dx of [-0.7,0,0.7]){ n++; if(!tar(J3.rx+dx,y)) bad++; } out.contact.rural={n,bad}; }

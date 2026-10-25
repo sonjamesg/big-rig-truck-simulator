@@ -639,6 +639,7 @@ function planPiece(v, r) {
     } else if (je <= P.pos + 0.01) J = j;
   }
   if (J && J.gs && typeof j103Plan === "function" && j103Plan(v, r, sg, d, J, jOptions(J, sg, d))) return true; // J103 slips + ring
+  if (!J && typeof j103SegEnd === "function" && j103SegEnd(v, r, sg, d)) return true; // East: grade-separated former roundabout
   if (J) {
     const o = jOptions(J, sg, d),
       ap = J.appr && J.appr[sg.id + ":" + d],
@@ -1153,7 +1154,7 @@ function spawnVehicle(x, y, force, opt) {
     if (along > a - 3 && along < b + 3) return null;
   }
   if (along < sg.b0 + 2 || along > sg.b1 - 1) return null;
-  if (world.j103 && sg.id === J3.mw && along > J3.X0 - 6 && along < J3.X1 + 6) return null; // J103: never spawn on the deck (its layer comes from the junction plan)
+  if (typeof j103NoSpawn === "function" && j103NoSpawn(sg, along)) return null; // J103: never spawn on the deck (its layer comes from the junction plan)
   if (segDeadEnd(sg)) return null; // v26: never spawn onto a road that leads nowhere
   if (sg.mil && mbFull()) return null; // v45: base traffic capped (MB_CAP military vehicles in total)
   const dir = sg.ow ? sg.ow : opt && opt.dir ? opt.dir : r() < 0.5 ? 1 : -1, // v64: one-way roads (sg.ow)

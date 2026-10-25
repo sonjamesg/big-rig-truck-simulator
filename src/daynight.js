@@ -1032,6 +1032,7 @@ function slBuild() {
   }
   if (typeof j103Lamps === "function") for (const [x, y, dx, dy] of j103Lamps()) put(x, y, dx, dy);
   for (const rb of world.rbs || []) {
+    if (rb.dead) continue;
     for (let q = 0; q < 6; q++) {
       const a = (q * Math.PI) / 3 + 0.3,
         c = Math.cos(a),

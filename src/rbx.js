@@ -162,6 +162,7 @@ function rbIsland(g, rb, X, Y, S, seed) {
 function rbSigHeads(vx0, vy0, vx1, vy1) {
   if (!RBSIG.on) return;
   for (const rb of world.rbs || []) {
+    if (rb.dead) continue; // retired (grade-separated) roundabout
     const X = rb.cx * TILE,
       Y = rb.cy * TILE,
       E = (rb.rout + 8) * TILE;
@@ -209,6 +210,7 @@ setTimeout(() => {
   siteLights = function (add) {
     if (sl) sl.apply(this, arguments);
     for (const rb of world.rbs || []) {
+      if (rb.dead) continue;
       const X = rb.cx * TILE,
         Y = rb.cy * TILE;
       add(X, Y, rb.rin * TILE * 1.1, "fl");
