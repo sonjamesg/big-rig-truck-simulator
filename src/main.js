@@ -1587,8 +1587,8 @@ function mapPrewarmList() {
   const N = CHUNK / TILE,
     tx = (truck.x * PPM) / TILE,
     ty = (truck.y * PPM) / TILE,
-    hw = 150, // tiles each side: the open map's local view (~250 tiles across) plus a margin for a first pan
-    hh = 110,
+    hw = LOWMEM ? 90 : 150, // tiles each side: the open map's local view (~250 tiles across) plus a margin for a first pan
+    hh = LOWMEM ? 90 : 110, // (kept well under MAPC.max so prewarm never evicts its own chunks)
     key = Math.floor(tx / N / 3) + "," + Math.floor(ty / N / 3);
   if (MAPW.q && MAPW.key === key) return MAPW.q;
   const L = [],
@@ -1825,8 +1825,12 @@ function drawBigMap() {
   }
   ovTick(bigmap.z < 2.2 ? 9 : 3); // v70: the local (detail) view doesn't need the overview sheets
   ovDraw(VW / 2 - bigmap.cx * z, VH / 2 + 10 - bigmap.cy * z, z, 20, 40, VW - 20, VH - 20);
+  // detail chunks only when the visible set fits comfortably in the LRU (otherwise it would thrash: render, evict, repeat)
+  const nVis = Math.ceil((VW - 40) / (16 * z) + 1) * Math.ceil((VH - 60) / (16 * z) + 1),
+    detail = z >= 2.2 && nVis <= MAPC.max * 0.7;
+  bigmap.detail = detail;
   bigmap.miss =
-    z >= 2.2
+    detail
       ? drawMapDetail(
           VW / 2 - bigmap.cx * z,
           VH / 2 + 10 - bigmap.cy * z,
@@ -1846,7 +1850,7 @@ function drawBigMap() {
     40,
     VW - 20,
     VH - 20,
-    z >= 2.2,
+    detail,
   );
   const BX = (t) => VW / 2 + (t - bigmap.cx) * z,
     BY = (t) => VH / 2 + 10 + (t - bigmap.cy) * z;

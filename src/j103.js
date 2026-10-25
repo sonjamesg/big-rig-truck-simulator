@@ -117,7 +117,8 @@ function j3onLower(x, y) {
         if (Math.abs(y - t.edge) <= Math.abs(t.outer - t.edge) * k) return true;
       }
     }
-    const S = sl.S;
+    const S = sl.S, bb = sl.bb || (sl.bb = j3bbox(sl));
+    if (x < bb[0] || x > bb[1] || y < bb[2] || y > bb[3]) continue;
     for (let i = 0; i < S.length - 1; i++) {
       const a = S[i], b = S[i + 1], ex = b[0] - a[0], ey = b[1] - a[1], l2 = ex * ex + ey * ey || 1;
       const u = Math.max(0, Math.min(1, ((x - a[0]) * ex + (y - a[1]) * ey) / l2));
@@ -129,12 +130,18 @@ function j3onLower(x, y) {
 }
 // tests / tools: j3onLower for a given site context
 function j3onLowerAt(c, x, y) { J3 = c; return j3onLower(x, y); }
+function j3bbox(sl) {
+  const m = (sl.wide || 2.1) / 2 + 1.2; let b = [1e9, -1e9, 1e9, -1e9];
+  for (const p of sl.S) b = [Math.min(b[0], p[0] - m), Math.max(b[1], p[0] + m), Math.min(b[2], p[1] - m), Math.max(b[3], p[1] + m)];
+  return b;
+}
 // world-tile version
 const j3onLowerW = (x, y) => { const p = j3L([x, y]); return j3onLower(p[0], p[1]); };
 
 // ---------------- build (once, after the baked map is loaded) ----------------
 function j103Build() {
   if (J3S.length || !world.segs) return;
+  const t0 = performance.now();
   for (const site of J3_SITES) {
     try { j3buildSite(site); } catch (e) { console.warn("j103 site " + site.name + ": " + e.message); }
   }
@@ -145,6 +152,7 @@ function j103Build() {
   if (typeof chunkCache !== "undefined") chunkCache.clear();
   if (typeof chunkLo !== "undefined") chunkLo.clear(); // zoomed-out copies too (phones): no stale pre-junction ground
   world.j3s = J3S;
+  world.j3ms = Math.round(performance.now() - t0);
   world.j103 = J3S[0] || null;
   J3 = J3S[0] || J3;
 }
@@ -242,7 +250,6 @@ function j3buildSite(site) {
   }
   // 2) sea fill: wherever the junction (ring, slips, tapers, deck + 4 tiles of verge) would sit in water, make land, and
   //    smooth the new shoreline (per row: running max over +-6 rows, +3 tiles) so it reads as a reclaimed embankment
-  if (site.landFill) j3landFill();
   // 3) lower-level tiles: ring, slips, arm mouth, services spur. Fully covered tiles become road (-2, no rb mask)
   const lo = (J3.lo = new Uint8Array(N));
   const AW = J3.artW;
@@ -278,9 +285,18 @@ function j3buildSite(site) {
         world.roadH[i] = world.roadV[i] = -1;
       }
       if (n > 0 && lo[i] !== 1 && G[i] === T.CONC) G[i] = T.SAND;
-      if (lo[i] === 1 && site.rbOld != null) for (const o of world.objects) if (!o._dead && (o.kind === "scrub" || o.kind === "rock" || o.kind === "cactus" || o.kind === "tree" || o.kind === "hedge") && Math.floor(o.x / TILE) === tx && Math.floor(o.y / TILE) === ty) o._dead = true;
     }
-  if (site.rbOld != null) world.objects = world.objects.filter((o) => !o._dead);
+  // loose scenery on the new tarmac goes (one pass over the objects; was once per lower tile -> the 98 % load hang)
+  if (site.rbOld != null) {
+    const veg = new Set(["scrub", "rock", "cactus", "tree", "hedge"]);
+    world.objects = world.objects.filter((o) => {
+      if (!veg.has(o.kind)) return true;
+      const tx = Math.floor(o.x / TILE), ty = Math.floor(o.y / TILE);
+      return !(inb(tx, ty) && lo[idx(tx, ty)] === 1);
+    });
+  }
+  // sea fill (after the lower tiles exist): every water tile within 5 tiles of the junction becomes land, smoothed per row
+  if (site.landFill) j3landFill();
   if (armSide > 0) ru.b0 = Math.ceil(endA); else ru.b1 = Math.floor(endA) - 1; // the arm now starts at the ring mouth
   // 4) two layers under the deck: foZ zone + sat nav virtual lower nodes on main-road tiles the ring passes under
   if (!world.foZ) world.foZ = new Uint8Array(N);
@@ -306,38 +322,35 @@ function j3buildSite(site) {
   J3.on = true;
   J3S.push(J3);
 }
-// sea -> land around a site (world tiles); keeps a smooth shoreline. Records the filled tiles in J3.fill (tests / shots)
+// sea -> land around a site (world tiles); keeps a smooth shoreline. Uses the lower-tile mask (J3.lo) + the main road band,
+// dilated by 5 tiles, so it is cheap (was per-tile geometry sampling). Records the filled tiles in J3.fill (tests / shots)
 function j3landFill() {
-  const AW = J3.artW, pad = 5, need = new Map(); // row -> [minX, maxX] of tiles that must be land
-  const isLand = (p) => {
-    if (j3onLower(p[0], p[1])) return true;
-    // deck / main road band and the arm, plus verge
-    if (p[0] >= J3.cx - J3_BP.slipReach - 20 && p[0] <= J3.cx + J3_BP.slipReach + 20 && p[1] >= J3.top - 1 && p[1] <= J3.bot + 1) return true;
-    return false;
-  };
-  for (let ty = Math.floor(AW[2]) - pad; ty <= Math.ceil(AW[3]) + pad; ty++)
-    for (let tx = Math.floor(AW[0]) - pad; tx <= Math.ceil(AW[1]) + pad; tx++) {
-      if (!inb(tx, ty) || G[idx(tx, ty)] !== T.WATER) continue;
-      let hit = false;
-      for (let dy = -pad; dy <= pad && !hit; dy++) for (let dx = -pad; dx <= pad && !hit; dx++) if (isLand(j3L([tx + 0.5 + dx, ty + 0.5 + dy]))) hit = true;
-      if (!hit) continue;
-      const r = need.get(ty) || [1e9, -1e9];
-      r[0] = Math.min(r[0], tx); r[1] = Math.max(r[1], tx);
-      need.set(ty, r);
+  const AW = J3.artW, pad = 5, need = new Map(), lo = J3.lo;
+  const x0 = Math.max(0, Math.floor(AW[0]) - pad), x1 = Math.min(MW - 1, Math.ceil(AW[1]) + pad);
+  const y0 = Math.max(0, Math.floor(AW[2]) - pad), y1 = Math.min(MH - 1, Math.ceil(AW[3]) + pad);
+  const src = (tx, ty) => { const i = idx(tx, ty); if (lo[i] === 1) return true; if (!j3isMw(i)) return false; const p = j3L([tx + 0.5, ty + 0.5]); return Math.abs(p[0] - J3.cx) < J3_BP.slipReach + 20; };
+  for (let ty = y0; ty <= y1; ty++)
+    for (let tx = x0; tx <= x1; tx++) {
+      if (!src(tx, ty)) continue;
+      for (let dy = -pad; dy <= pad; dy++) {
+        const y = ty + dy; if (y < 0 || y >= MH) continue;
+        const r = need.get(y) || [1e9, -1e9];
+        r[0] = Math.min(r[0], tx - pad); r[1] = Math.max(r[1], tx + pad);
+        need.set(y, r);
+      }
     }
-  const rows = [...need.keys()].sort((a, b) => a - b), fill = [];
-  for (const ty of rows) {
-    // smooth: running max of the needed extent over +-6 rows, then +3 tiles, tapering at the ends
-    let hi = -1e9, lo = 1e9;
-    for (let d = -6; d <= 6; d++) { const r = need.get(ty + d); if (r) { hi = Math.max(hi, r[1] + 3 - Math.abs(d) * 0.25); lo = Math.min(lo, r[0] - 3 + Math.abs(d) * 0.25); } }
-    for (let tx = Math.floor(lo); tx <= Math.ceil(hi); tx++) {
-      if (!inb(tx, ty)) continue;
+  const fill = [];
+  for (const ty of [...need.keys()].sort((a, b) => a - b)) {
+    let hi = -1e9, lo2 = 1e9;
+    for (let d = -6; d <= 6; d++) { const r = need.get(ty + d); if (r) { hi = Math.max(hi, r[1] - Math.abs(d) * 0.25); lo2 = Math.min(lo2, r[0] + Math.abs(d) * 0.25); } }
+    for (let tx = Math.max(0, Math.floor(lo2)); tx <= Math.min(MW - 1, Math.ceil(hi)); tx++) {
       const i = idx(tx, ty);
       if (G[i] === T.WATER) { G[i] = T.SAND; fill.push(i); }
     }
   }
   J3.fill = fill;
 }
+
 // ---------------- sat nav: virtual under-deck nodes ----------------
 // virtual node ids: N + site.vbase + k. navAStar asks j3NavBox for real nodes, j3NavStep for the step in direction d.
 function j3NavTotal() { let n = 0; for (const c of J3S) n += c.vr.length; return n; }

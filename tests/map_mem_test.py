@@ -3,13 +3,13 @@ and a desktop profile: open the map, zoom right out, FORCE the overview to finis
 2 px/tile sheets; phone: no sheets, MINIMAP path), switch to night (night map built), pan the corners, zoom back in.
 Measures every canvas the game holds (all canvases ever created are tracked; live = width > 0 and still referenced by a
 cache) and the peak. FAILS if a page error / crash happens, the desktop overview did not actually build, or retained canvas
-memory is over the cap (retained: phone 130 / desktop 260 MB; all live canvases incl. garbage: phone 220 / desktop 320 MB).
+memory is over the cap (retained: 130 MB; all live canvases incl. garbage: 200 MB, phone and desktop; desktop default = no overview sheets).
 Baseline before the fix (6c58bfe): live canvas peak 661 MB (phone) / 640 MB (desktop) while the overview built.
 Usage: python3 tests/map_mem_test.py index.html [phone|desktop|both]"""
 import asyncio,sys,json,os
 from playwright.async_api import async_playwright
 HTML=os.path.abspath(sys.argv[1] if len(sys.argv)>1 else 'index.html'); MODE=sys.argv[2] if len(sys.argv)>2 else 'both'
-CAP={'phone':130,'desktop':260}; LIVECAP={'phone':220,'desktop':320} # MB: retained by caches / all live canvases incl. not-yet-GC'd
+CAP={'phone':130,'desktop':130}; LIVECAP={'phone':200,'desktop':200} # MB: retained by caches / all live canvases incl. not-yet-GC'd
 INIT=r"""(()=>{ const ce=Document.prototype.createElement; window.__cvs=[]; Document.prototype.createElement=function(t){ const e=ce.apply(this,arguments); if(String(t).toLowerCase()==='canvas'&&window.__cvs.length<200000) window.__cvs.push(new WeakRef(e)); return e; }; })()"""
 JS=r"""(async()=>{ const out={}; const MB=(px)=>Math.round(px*4/1e5)/10;
  const fr=(k)=>new Promise(r=>{let i=0;const f=()=>{if(++i>=k)r();else requestAnimationFrame(f)};requestAnimationFrame(f);});
@@ -37,7 +37,7 @@ async def run(p,prof):
   ctx=await (b.new_context(viewport={'width':412,'height':915},device_scale_factor=2.6,is_mobile=True,has_touch=True) if prof=='phone' else b.new_context(viewport={'width':1280,'height':800}))
   await ctx.add_init_script(INIT)
   pg=await ctx.new_page(); errs=[]; pg.on('pageerror',lambda e: errs.append(str(e)[:300])); pg.on('crash',lambda: errs.append('PAGE CRASHED'))
-  await pg.goto('file://'+HTML+('' if prof=='phone' else '?lowmem=0')); await pg.wait_for_function('window.__bigrig&&__bigrig.world&&__bigrig.world.ready',timeout=300000)
+  await pg.goto('file://'+HTML); await pg.wait_for_function('window.__bigrig&&__bigrig.world&&__bigrig.world.ready',timeout=300000)
   await pg.keyboard.press('Enter'); await pg.mouse.click(200,500); await pg.wait_for_timeout(1500)
   try: r=await pg.evaluate(JS)
   except Exception as e: r={'exc':str(e)[:400]}
@@ -49,7 +49,7 @@ async def main():
       r=await run(p,prof); res[prof]=r; print(prof,json.dumps(r))
       if 'exc' in r or r['errs']: fails.append('%s: errors %s %s'%(prof,r.get('exc'),r['errs'][:3])); continue
       if prof=='phone' and not r['LOWMEM']: fails.append('phone profile did not get LOWMEM')
-      if prof=='desktop' and r['ovBuilt'][0]<r['ovBuilt'][1]: fails.append('desktop overview not fully built %s'%r['ovBuilt'])
+      if r['MEMCAP'].get('ov') and r['ovBuilt'][0]<r['ovBuilt'][1]: fails.append('overview sheets enabled but not built %s'%r['ovBuilt'])
       if r['peakHeld']>CAP[prof]: fails.append('%s retained canvas %.1f MB > cap %d MB'%(prof,r['peakHeld'],CAP[prof]))
       if r['peakLive']>LIVECAP[prof]: fails.append('%s live canvas peak %.1f MB > cap %d MB (churn)'%(prof,r['peakLive'],LIVECAP[prof]))
       if not r['zFinite']: fails.append('%s map centre/zoom not finite'%prof)

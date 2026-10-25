@@ -24,10 +24,14 @@ const LOWMEM = (() => {
     return false;
   }
 })();
-const MEMCAP = LOWMEM ? { chunk: 48, lo: 220, mapc: 220, ov: false } : { chunk: 90, lo: 700, mapc: 700, ov: true };
+// Map LOD for EVERY device (James 25 Oct): zoomed out = the 1 px/tile MINIMAP (no 16k-chunk overview sheets); zoomed in =
+// 8 px/tile detail chunks for the visible area only, in a bounded LRU. ?mapov=1 (or ?lowmem=0) brings back the old 2 px/tile
+// overview sheets.
+const MAPOV = /[?&](mapov=1|lowmem=0)/.test((typeof location !== "undefined" && location.search) || "");
+const MEMCAP = LOWMEM ? { chunk: 48, lo: 220, mapc: 360, ov: MAPOV } : { chunk: 90, lo: 400, mapc: 480, ov: MAPOV };
 const FREEQ = [];
 function freeCanvasLater(c) {
-  if (!c || !LOWMEM) return;
+  if (!c) return;
   FREEQ.push(c);
   if (FREEQ.length === 1)
     setTimeout(() => {
