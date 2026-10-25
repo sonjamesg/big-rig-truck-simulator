@@ -10,6 +10,30 @@
 // road types drawn without a white centre line (the road audit reports these as unmarked); v48: none
 const RD_NOCENTRE = new Set();
 // ===================== TEXTURES & CHUNK RENDERING =====================
+// ---- canvas memory caps (James 25 Oct: the zoomed-out M map crashed phone browsers). Phones / tablets (coarse pointer) or
+// devices reporting <= 4 GB get LOWMEM: smaller chunk LRUs, no 2 px/tile overview sheets (the 1 px/tile MINIMAP is drawn
+// instead), and evicted cache canvases are released (width 0) a tick later so Safari / Chrome free the backing store now
+// instead of at some later GC. ?lowmem=1 / ?lowmem=0 forces it (tests).
+const LOWMEM = (() => {
+  try {
+    const q = /[?&]lowmem=([01])/.exec(location.search || "");
+    if (q) return q[1] === "1";
+    const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+    return !!(coarse || (navigator.deviceMemory && navigator.deviceMemory <= 4));
+  } catch (e) {
+    return false;
+  }
+})();
+const MEMCAP = LOWMEM ? { chunk: 48, lo: 220, mapc: 220, ov: false } : { chunk: 90, lo: 700, mapc: 700, ov: true };
+const FREEQ = [];
+function freeCanvasLater(c) {
+  if (!c || !LOWMEM) return;
+  FREEQ.push(c);
+  if (FREEQ.length === 1)
+    setTimeout(() => {
+      for (const k of FREEQ.splice(0)) if (!k.__keep) { k.width = 0; k.height = 0; }
+    }, 0);
+}
 function mkCanvas(w, h) {
   const c = document.createElement("canvas");
   c.width = w;
@@ -2311,7 +2335,11 @@ function getChunk(cx, cy, allowRender) {
   if (!allowRender) return null; // LRU: a hit moves to the back
   c = renderChunk(cx, cy);
   chunkCache.set(k, c);
-  while (chunkCache.size > 90) chunkCache.delete(chunkCache.keys().next().value);
+  while (chunkCache.size > MEMCAP.chunk) {
+    const k0 = chunkCache.keys().next().value;
+    freeCanvasLater(chunkCache.get(k0));
+    chunkCache.delete(k0);
+  }
   return c;
 }
 // zoomed-out LOD: 128px copies of chunks with their own big LRU, so a wide fly-cam view never evicts what is on screen (was: FIFO 90 < visible → flicker)
@@ -2333,7 +2361,11 @@ function getChunkLo(cx, cy, allowRender) {
   g.imageSmoothingQuality = "high";
   g.drawImage(f, 0, 0, CHUNK_LO, CHUNK_LO);
   chunkLo.set(k, c);
-  while (chunkLo.size > 700) chunkLo.delete(chunkLo.keys().next().value);
+  while (chunkLo.size > MEMCAP.lo) {
+    const k0 = chunkLo.keys().next().value;
+    freeCanvasLater(chunkLo.get(k0));
+    chunkLo.delete(k0);
+  }
   return c;
 }
 // ---- minimap

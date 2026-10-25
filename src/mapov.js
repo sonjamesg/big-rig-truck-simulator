@@ -8,7 +8,7 @@
 // ---- map overview: the M map + minimap are drawn from the real game chunks (same renderer as the world / fly-mode LOD),
 // downscaled to 2 px per tile into persistent sheets that are never evicted (no flicker). Built progressively near the
 // view first; anything not yet built falls back to the per-tile MINIMAP image underneath (same coordinates).
-const OV = { px: 2, sheetT: 512, sheets: [], done: null, n: 0, total: 0, fx: -1, fy: -1, r: 0 };
+const OV = { px: MEMCAP.ov ? 2 : 1, sheetT: 512, sheets: [], done: null, n: 0, total: 0, fx: -1, fy: -1, r: 0 };
 function ovInit() {
   if (OV.done) return;
   const NC = MW / (CHUNK / TILE);
@@ -52,7 +52,8 @@ function ovBuild(cx, cy) {
   OV.done[k] = 1;
   OV.n++;
   const N = CHUNK / TILE,
-    src = chunkCache.get(cx + "," + cy) || chunkLo.get(cx + "," + cy) || renderChunk(cx, cy);
+    cached = chunkCache.get(cx + "," + cy) || chunkLo.get(cx + "," + cy),
+    src = cached || renderChunk(cx, cy);
   const tx = cx * N,
     ty = cy * N,
     si = Math.floor(tx / OV.sheetT),
@@ -64,11 +65,13 @@ function ovBuild(cx, cy) {
   g.imageSmoothingQuality = "high";
   const d = N * OV.px;
   g.drawImage(src, (tx - si * OV.sheetT) * OV.px, (ty - sj * OV.sheetT) * OV.px, d, d);
+  if (!cached) { src.width = 0; src.height = 0; } // a one-off 512 px render just for the sheet: release its 1 MB backing now
   ovlInit(); // overview: airport etc. come from the box overlays (ovlDraw), not per-chunk passes
   return true;
 }
 // build a few chunks per frame, spiralling out from the focus (map centre when open, truck otherwise)
 function ovTick(ms) {
+  if (!MEMCAP.ov) return; // LOWMEM: no overview sheets at all; ovDraw uses the 1 px/tile MINIMAP (already in memory)
   if (!MINIMAP || typeof chunkCache === "undefined") return;
   ovInit();
   if (OV.n >= OV.total) return;
@@ -110,6 +113,7 @@ function ovDraw(X0, Y0, z, x0, y0, x1, y1) {
   if (!Number.isFinite(X0) || !Number.isFinite(Y0) || !(z > 0) || !Number.isFinite(z)) return;
   if (!OV.done) {
     ctx.drawImage(MINIMAP, X0, Y0, MW * z, MH * z);
+    if (!MEMCAP.ov) ovlDraw(X0, Y0, z, x0, y0, x1, y1);
     return;
   }
   const T = OV.sheetT;

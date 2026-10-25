@@ -1552,7 +1552,7 @@ function drawMinimap() {
 const bigmap = { open: false, z: 2.4, cx: 0, cy: 0, drag: null };
 // v9: the map is drawn from the SAME renderer as the world. Zoomed in, it uses downscaled game chunks (exact roads, kerb radii,
 // roundabouts, curves, bridges, buildings); zoomed out, the per-tile ground image (1 px = 1 tile, same coordinates).
-const MAPC = { cache: new Map(), order: [], px: 128, max: 700, budget: 7, built: 0 };
+const MAPC = { cache: new Map(), order: [], px: 128, max: MEMCAP.mapc, budget: 7, built: 0 };
 function mapChunk(cx, cy, allow) {
   const k = cx + "," + cy;
   let c = MAPC.cache.get(k);
@@ -1572,7 +1572,11 @@ function mapChunk(cx, cy, allow) {
   MAPC.cache.set(k, c);
   MAPC.order.push(k);
   MAPC.built++;
-  if (MAPC.order.length > MAPC.max) MAPC.cache.delete(MAPC.order.shift());
+  if (MAPC.order.length > MAPC.max) {
+    const k0 = MAPC.order.shift();
+    freeCanvasLater(MAPC.cache.get(k0));
+    MAPC.cache.delete(k0);
+  }
   return c;
 }
 // v70 (James 22 Oct): the world map opened slowly (~2 s of blurry / missing detail): every chunk in the first local view
