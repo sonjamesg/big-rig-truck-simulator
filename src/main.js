@@ -1559,12 +1559,19 @@ function mapChunk(cx, cy, allow) {
   if (c) return c;
   const gc = getChunk(cx, cy, false);
   if (!gc && !allow) return null;
+  if (!gc && LOWMEM) {
+    // phones: at most one full 512 px chunk render per frame for the map (each is a 1 MB canvas until it is freed)
+    const f = typeof frameNo !== "undefined" ? frameNo : Math.floor(performance.now() / 16);
+    if (MAPC.rf === f) return null;
+    MAPC.rf = f;
+  }
   const src = gc || renderChunk(cx, cy);
   c = mkCanvas(MAPC.px, MAPC.px);
   const g = c.getContext("2d");
   g.imageSmoothingEnabled = true;
   g.imageSmoothingQuality = "high";
   g.drawImage(src, 0, 0, MAPC.px, MAPC.px);
+  if (!gc) { src.width = 0; src.height = 0; } // a one-off render just for the map: release its 1 MB backing now
   if (typeof ovlPaint === "function") {
     const N = CHUNK / TILE;
     ovlPaint(g, 0, 0, cx * N, cy * N, N, N, MAPC.px / N);
@@ -1733,6 +1740,7 @@ function openMap() {
     return;
   }
   bigmap.open = true;
+  mapOpenTrim();
   bigmap.openedAt = performance.now();
   mapFull(true);
   bigmap.z = bigmap.zt = bigmap.saved || LOCAL_Z;
@@ -1744,6 +1752,18 @@ function closeMap() {
   if (bigmap.open) bigmap.saved = bigmap.zt || bigmap.z;
   bigmap.open = false;
   mapFull(false);
+  if (LOWMEM && typeof nmFree === "function") nmFree();
+}
+// LOWMEM (phones): while the map covers the screen the world chunks are not drawn, so drop all but a few of them (40+ MB)
+function mapOpenTrim() {
+  if (!LOWMEM) return;
+  while (chunkCache.size > 6) {
+    const k = chunkCache.keys().next().value;
+    freeCanvasLater(chunkCache.get(k));
+    chunkCache.delete(k);
+  }
+  for (const c of chunkLo.values()) freeCanvasLater(c);
+  chunkLo.clear();
 }
 const MAPBTN = [
   ["+", () => mapZoomTo(bigmap.zt * 1.6)],
@@ -1827,7 +1847,12 @@ function drawBigMap() {
   ovDraw(VW / 2 - bigmap.cx * z, VH / 2 + 10 - bigmap.cy * z, z, 20, 40, VW - 20, VH - 20);
   // detail chunks only when the visible set fits comfortably in the LRU (otherwise it would thrash: render, evict, repeat)
   const nVis = Math.ceil((VW - 40) / (16 * z) + 1) * Math.ceil((VH - 60) / (16 * z) + 1),
-    detail = z >= 2.2 && nVis <= MAPC.max * 0.7;
+    detail = z >= 2.2 && nVis <= MAPC.max * 0.7,
+    pv = Math.hypot(bigmap.cx - (bigmap.pcx ?? bigmap.cx), bigmap.cy - (bigmap.pcy ?? bigmap.cy)) * z; // pan speed, px / frame
+  bigmap.pcx = bigmap.cx;
+  bigmap.pcy = bigmap.cy;
+  // fast pan: draw only detail chunks already built (no new renders); the low-detail map shows underneath
+  MAPC.budget = pv > 12 ? 0 : LOWMEM ? 3 : 7;
   bigmap.detail = detail;
   bigmap.miss =
     detail

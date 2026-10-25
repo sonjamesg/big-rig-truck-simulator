@@ -28,7 +28,7 @@ const LOWMEM = (() => {
 // 8 px/tile detail chunks for the visible area only, in a bounded LRU. ?mapov=1 (or ?lowmem=0) brings back the old 2 px/tile
 // overview sheets.
 const MAPOV = /[?&](mapov=1|lowmem=0)/.test((typeof location !== "undefined" && location.search) || "");
-const MEMCAP = LOWMEM ? { chunk: 48, lo: 220, mapc: 360, ov: MAPOV } : { chunk: 90, lo: 400, mapc: 480, ov: MAPOV };
+const MEMCAP = LOWMEM ? { chunk: 48, lo: 220, mapc: 240, ov: MAPOV } : { chunk: 90, lo: 400, mapc: 480, ov: MAPOV };
 const FREEQ = [];
 function freeCanvasLater(c) {
   if (!c) return;

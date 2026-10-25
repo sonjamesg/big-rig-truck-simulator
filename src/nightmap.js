@@ -72,10 +72,9 @@ function nmBuild() {
     bg = bc.getContext("2d"),
     bi = bg.createImageData(W, H),
     b = bi.data;
-  const lc = mkCanvas(W, H),
-    lg = lc.getContext("2d"),
-    li = lg.createImageData(W, H),
-    l = li.data;
+  // NM.lit (lights-only layer) was built but never drawn: 16 MB canvas + 16 MB ImageData for nothing (phones Aw-Snapped).
+  // Writes into a 0-length typed array are no-ops, so the loop below stays as it was.
+  const l = new Uint8ClampedArray(0);
   const C = {
     [T.GRASS]: [16, 24, 22],
     [T.PGRASS]: [18, 28, 24],
@@ -206,9 +205,8 @@ function nmBuild() {
       }
   } catch (e) {}
   bg.putImageData(bi, 0, 0);
-  lg.putImageData(li, 0, 0);
   NM.base = bc;
-  NM.lit = lc;
+  NM.lit = null;
   NM.spr = dnSprite
     ? dnSprite(32, [
         [0, "rgba(255,236,190,1)"],
@@ -218,9 +216,19 @@ function nmBuild() {
     : null;
 }
 // Night overlay for a map view. X0/Y0 = screen px of tile 0,0, z = px per tile, clip rect in screen px. detail = zoomed-in chunks underneath.
+// LOWMEM: the night map (16 MB) is dropped when the map closes / it is day, so day and night are never both resident
+function nmFree() {
+  if (!NM.base) return;
+  NM.base.width = NM.base.height = 0;
+  NM.base = null;
+  if (NM.glow) { NM.glow.width = NM.glow.height = 0; NM.glow = null; }
+}
 function nightMapLayer(X0, Y0, z, x0, y0, x1, y1, detail) {
   const K = nmK();
-  if (K < 0.01) return;
+  if (K < 0.01) {
+    if (LOWMEM) nmFree();
+    return;
+  }
   nmBuild();
   ctx.save();
   ctx.beginPath();
