@@ -8,7 +8,8 @@
 // ===================== v31 ROUNDABOUTS: 3-lane spiral markings, signalised entries, landscaped lit island =====================
 // Entries are signal-controlled in turn (like big UK roundabouts): each arm gets ~9 s green, amber, then a short all-red; the give-way
 // check still runs on green so nothing pulls out into circulating traffic. Circulating traffic is never held (no stop lines on the circle).
-const RBSIG = { on: true, G: 13, A: 2, R: 1.5 };
+const RBSIG = { on: false, // James 25 Oct: every roundabout is give-way only (no signals)
+  G: 13, A: 2, R: 1.5 };
 function rbArmKey(a) {
   return a.seg + ":" + a.side;
 }
