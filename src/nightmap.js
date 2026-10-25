@@ -13,7 +13,8 @@ function nmK() {
   return typeof DN === "undefined" ? 0 : Math.min(1, DN.dark * 1.08);
 }
 function nmBuild() {
-  if (NM.base) return;
+  if (NM.built) return;
+  NM.built = 1;
   const W = MW,
     H = MH,
     D = new Float32Array((W >> 3) * (H >> 3)),
@@ -68,10 +69,12 @@ function nmBuild() {
   }
   gg.putImageData(gi, 0, 0);
   NM.glow = gc;
-  const bc = mkCanvas(W, H),
-    bg = bc.getContext("2d"),
-    bi = bg.createImageData(W, H),
-    b = bi.data;
+  // LOWMEM (phones): no 2048 px night base (16 MB canvas + 16 MB ImageData at map open, the night Aw-Snap path); the day
+  // map is tinted instead (nightMapLayer). Writes into the 0-length array below are no-ops.
+  const bc = LOWMEM ? null : mkCanvas(W, H),
+    bg = bc && bc.getContext("2d"),
+    bi = bg ? bg.createImageData(W, H) : null,
+    b = bi ? bi.data : new Uint8ClampedArray(0);
   // NM.lit (lights-only layer) was built but never drawn: 16 MB canvas + 16 MB ImageData for nothing (phones Aw-Snapped).
   // Writes into a 0-length typed array are no-ops, so the loop below stays as it was.
   const l = new Uint8ClampedArray(0);
@@ -204,7 +207,7 @@ function nmBuild() {
         L.push(tx, ty);
       }
   } catch (e) {}
-  bg.putImageData(bi, 0, 0);
+  if (bg) bg.putImageData(bi, 0, 0);
   NM.base = bc;
   NM.lit = null;
   NM.spr = dnSprite
@@ -218,8 +221,9 @@ function nmBuild() {
 // Night overlay for a map view. X0/Y0 = screen px of tile 0,0, z = px per tile, clip rect in screen px. detail = zoomed-in chunks underneath.
 // LOWMEM: the night map (16 MB) is dropped when the map closes / it is day, so day and night are never both resident
 function nmFree() {
-  if (!NM.base) return;
-  NM.base.width = NM.base.height = 0;
+  if (!NM.built) return;
+  NM.built = 0;
+  if (NM.base) NM.base.width = NM.base.height = 0;
   NM.base = null;
   if (NM.glow) { NM.glow.width = NM.glow.height = 0; NM.glow = null; }
 }
@@ -234,7 +238,17 @@ function nightMapLayer(X0, Y0, z, x0, y0, x1, y1, detail) {
   ctx.beginPath();
   ctx.rect(x0, y0, x1 - x0, y1 - y0);
   ctx.clip();
-  if (!detail) {
+  if (!detail && !NM.base) {
+    // LOWMEM: darken the day map underneath (no separate night base image)
+    ctx.globalAlpha = K;
+    ctx.globalCompositeOperation = "multiply";
+    ctx.fillStyle = "rgb(70,82,128)";
+    ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 0.3 * K;
+    ctx.fillStyle = "rgb(4,8,22)";
+    ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+  } else if (!detail) {
     ctx.globalAlpha = K;
     ctx.imageSmoothingEnabled = z < 1;
     ctx.drawImage(NM.base, X0, Y0, MW * z, MH * z);
