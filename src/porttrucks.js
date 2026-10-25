@@ -368,6 +368,11 @@ function updatePortTrucks(dt) {
     const T = PTRUCK.list[k],
       P = T.P;
     T.t += dt;
+    // v73: fleet parked in a yard with no AI route (owndepot.js ownParkFleet): static; gone if the yard is sold
+    if (T.parked) {
+      if (!ownedYard(T.home)) PTRUCK.list.splice(k, 1);
+      continue;
+    }
     if (T.st === "road") {
       const v = T.v;
       if (!traffic.vs.includes(v)) {

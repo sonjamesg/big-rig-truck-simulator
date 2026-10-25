@@ -231,7 +231,13 @@ function updateOwnDepots(dt) {
     if (have < need && PTRUCK.t > (yd.spawnT || 0)) {
       yd.spawnT = PTRUCK.t + 6;
       const g = ptDepotGeo(yd);
-      if (!g) continue;
+      if (!g) {
+        // v73: the moved Copperline yard (thru, private access road with no road segment) has no AI route in or out, so its
+        // fleet never spawned and nothing showed on the map (James 25 Oct "where's my trucks at my yard"). Until the private
+        // road is routable, park the fleet in the yard's bays: drawn in the yard and as truck icons on the world map.
+        if (yd.thru) ownParkFleet(yd, need);
+        continue;
+      }
       const P = portList()
         .filter((P) => P.ready && P.lpath)
         .sort(
@@ -250,6 +256,16 @@ function updateOwnDepots(dt) {
           break;
         }
     }
+  }
+}
+function ownParkFleet(yd, need) {
+  const mine = PTRUCK.list.filter((T) => T.home === yd);
+  const bays = (yd.bays || []).filter((b) => !mine.some((T) => T.bay === b));
+  for (let n = mine.length; n < need && bays.length; n++) {
+    const b = bays.shift(),
+      h = b.th || 0;
+    PTRUCK.list.push({ P: null, st: "depot", ph: "park", parked: 1, box: null, t: 0, id: "own" + yd.id + n, home: yd, bay: b,
+      x: b.kx, y: b.ky, h, th: h, ax: b.kx - Math.cos(h) * 10.5, ay: b.ky - Math.sin(h) * 10.5, dp: null });
   }
 }
 // up: mission for a company truck leaving its yard empty: a container terminal (docks) or another depot / container yard.
