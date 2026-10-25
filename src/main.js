@@ -1676,6 +1676,15 @@ function mapFitZ() {
 }
 const LOCAL_Z = (VW - 40) / 250; // ~1 km (250 tiles) across
 function mapClamp() {
+  // v-crash (James 25 Oct): a NaN / Infinity centre or zoom (pinch with zero spread, resize mid-gesture) used to stick
+  // forever and throw every frame in the overview builder -> the map froze / the tab died. Reset anything non-finite.
+  const zf = mapFitZ();
+  if (!Number.isFinite(bigmap.z) || bigmap.z <= 0) bigmap.z = zf;
+  if (!Number.isFinite(bigmap.zt) || bigmap.zt <= 0) bigmap.zt = bigmap.z;
+  bigmap.z = Math.max(zf, Math.min(14, bigmap.z));
+  bigmap.zt = Math.max(zf, Math.min(14, bigmap.zt));
+  if (!Number.isFinite(bigmap.cx)) bigmap.cx = Number.isFinite(truck.x) ? (truck.x * PPM) / TILE : MW / 2;
+  if (!Number.isFinite(bigmap.cy)) bigmap.cy = Number.isFinite(truck.y) ? (truck.y * PPM) / TILE : MH / 2;
   bigmap.cx = Math.max(0, Math.min(MW, bigmap.cx));
   bigmap.cy = Math.max(0, Math.min(MH, bigmap.cy));
 } // v26: free pan; any point of the world can reach the screen centre (ocean beyond the edge)
@@ -1686,6 +1695,8 @@ function mapCentreTruck() {
   mapClamp();
 }
 function mapZoomTo(zt, mx, my) {
+  if (!Number.isFinite(zt) || zt <= 0) return;
+  if (mx !== undefined && !(Number.isFinite(mx) && Number.isFinite(my))) mx = my = undefined;
   bigmap.zt = Math.max(mapFitZ(), Math.min(14, zt));
   bigmap.anchor = mx === undefined ? [VW / 2, VH / 2 + 10] : [mx, my];
 }
@@ -1694,8 +1705,8 @@ function mapFull(on) {
   const c = document.getElementById("game");
   document.body.classList.toggle("mapo", on);
   if (on) {
-    VW = Math.round(innerWidth * 1.6);
-    VH = Math.round(innerHeight * 1.6);
+    VW = Math.max(320, Math.min(4096, Math.round(innerWidth * 1.6) || VW0)); // never a 0 / huge backing store
+    VH = Math.max(240, Math.min(4096, Math.round(innerHeight * 1.6) || VH0));
   } else {
     VW = VW0;
     VH = VH0;
@@ -1781,7 +1792,7 @@ function drawBigMap() {
     if (Math.abs(zt - z0) > 1e-4) {
       let z1 = z0 + (zt - z0) * 0.22;
       if (Math.abs(zt - z1) < zt * 0.004) z1 = zt;
-      const a = bigmap.anchor || [VW / 2, VH / 2 + 10];
+      const a = bigmap.anchor && Number.isFinite(bigmap.anchor[0]) && Number.isFinite(bigmap.anchor[1]) ? bigmap.anchor : [VW / 2, VH / 2 + 10];
       const wx = bigmap.cx + (a[0] - VW / 2) / z0,
         wy = bigmap.cy + (a[1] - VH / 2 - 10) / z0;
       bigmap.z = z1;
@@ -2524,6 +2535,7 @@ cv.addEventListener(
         my = (a[1] + b[1]) / 2,
         d = Math.hypot(a[0] - b[0], a[1] - b[1]);
       const z = Math.max(mapFitZ(), Math.min(14, (pin.z * d) / pin.d));
+      if (!Number.isFinite(z) || !Number.isFinite(mx) || !Number.isFinite(my)) return;
       bigmap.z = bigmap.zt = z;
       bigmap.anchor = null;
       bigmap.cx = pin.wx - (mx - VW / 2) / z;

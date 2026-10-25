@@ -24,6 +24,7 @@ function ovInit() {
 }
 function ovSheet(i, j) {
   const s = OV.sheets[j * OV.sw + i];
+  if (!s) return null; // out of range (guard: never throw inside the render loop)
   if (!s.c) {
     s.c = mkCanvas(OV.sheetT * OV.px, OV.sheetT * OV.px);
     const g = s.c.getContext("2d");
@@ -45,6 +46,7 @@ function ovSheet(i, j) {
   return s;
 }
 function ovBuild(cx, cy) {
+  if (!(cx >= 0 && cy >= 0 && cx < OV.nc && cy < OV.total / OV.nc)) return false;
   const k = cy * OV.nc + cx;
   if (OV.done[k]) return false;
   OV.done[k] = 1;
@@ -55,8 +57,9 @@ function ovBuild(cx, cy) {
     ty = cy * N,
     si = Math.floor(tx / OV.sheetT),
     sj = Math.floor(ty / OV.sheetT);
-  const s = ovSheet(si, sj),
-    g = s.c.getContext("2d");
+  const s = ovSheet(si, sj);
+  if (!s) return true;
+  const g = s.c.getContext("2d");
   g.imageSmoothingEnabled = true;
   g.imageSmoothingQuality = "high";
   const d = N * OV.px;
@@ -72,6 +75,7 @@ function ovTick(ms) {
   const N = CHUNK / TILE,
     fxT = bigmap.open ? bigmap.cx : (truck.x * PPM) / TILE,
     fyT = bigmap.open ? bigmap.cy : (truck.y * PPM) / TILE;
+  if (!Number.isFinite(fxT) || !Number.isFinite(fyT)) return;
   const fx = Math.max(0, Math.min(OV.nc - 1, Math.floor(fxT / N))),
     fy = Math.max(0, Math.min(OV.total / OV.nc - 1, Math.floor(fyT / N)));
   if (fx !== OV.fx || fy !== OV.fy) {
@@ -103,6 +107,7 @@ function ovTick(ms) {
 }
 // draw the overview: X0/Y0 = screen px of tile (0,0), z = px per tile; clip rect x0..x1/y0..y1
 function ovDraw(X0, Y0, z, x0, y0, x1, y1) {
+  if (!Number.isFinite(X0) || !Number.isFinite(Y0) || !(z > 0) || !Number.isFinite(z)) return;
   if (!OV.done) {
     ctx.drawImage(MINIMAP, X0, Y0, MW * z, MH * z);
     return;
