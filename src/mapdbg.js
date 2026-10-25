@@ -10,12 +10,16 @@
 const MDBG = (() => {
   const KEY = "bigrig.mapdbg", ON = "bigrig.mapdbg.on", BUILD = "__BUILD_ID__";
   let on = false;
+  const S0 = { hud: false };
   try {
     const q = /[?&]mapdbg=([01])/.exec(location.search || "");
     if (q) localStorage.setItem(ON, q[1]);
     on = localStorage.getItem(ON) === "1";
+    // staging: crash logging (not the HUD) is always on so crashes are reported automatically; ?mapdbg=0 still turns it off
+    S0.hud = on;
+    if (!on && /staging/.test(location.pathname) && localStorage.getItem(ON) !== "0") on = true;
   } catch (e) {}
-  const S = { on, buf: [], errs: [], act: "load", open: false, t0: Date.now(), hud: null, live: [] };
+  const S = { showHud: S0.hud, on, buf: [], errs: [], act: "load", open: false, t0: Date.now(), hud: null, live: [] };
   if (!on) return S;
   // track canvases created from now on (WeakRef: never keeps one alive)
   try {
@@ -28,6 +32,23 @@ const MDBG = (() => {
       }
       return e;
     };
+  } catch (e) {}
+  // log every big canvas allocation (>= 0.5 MB) with where it came from, so a spike in the log can be traced to its code
+  S.big = [];
+  try {
+    const d = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, "height");
+    Object.defineProperty(HTMLCanvasElement.prototype, "height", {
+      configurable: true, enumerable: d.enumerable, get: d.get,
+      set(v) {
+        d.set.call(this, v);
+        const b = this.width * this.height * 4;
+        if (b >= 524288) {
+          const st = (new Error().stack || "").split("\n").slice(2, 5).map((l) => l.trim().replace(/^at /, "").replace(/\(?(https?|file):[^)]*\//, "").slice(0, 70)).join(" < ");
+          S.big.push([Date.now() - S.t0, this.width + "x" + this.height, st, S.open ? 1 : 0]);
+          if (S.big.length > 40) S.big.shift();
+        }
+      },
+    });
   } catch (e) {}
   const MB = (px) => Math.round((px * 4) / 1e5) / 10;
   const px = (c) => (c && c.width ? c.width * c.height : 0);
@@ -60,6 +81,7 @@ const MDBG = (() => {
       mapc: typeof MAPC !== "undefined" ? MAPC.cache.size : -1, cc: typeof chunkCache !== "undefined" ? chunkCache.size : -1,
       lo: typeof chunkLo !== "undefined" ? chunkLo.size : -1, nm: typeof NM !== "undefined" ? (NM.base ? 2 : NM.built ? 1 : 0) : -1,
       cvHeld: c.held, cvLive: c.live, cvN: c.n,
+      mainPx: typeof cv !== "undefined" ? cv.width + "x" + cv.height : "", gpuMB: Math.round((c.held + (typeof cv !== "undefined" ? MB(px(cv)) * 2 : 0)) * 10) / 10,
       heap: pm ? Math.round(pm.usedJSHeapSize / 1e6) : -1, lim: pm ? Math.round(pm.jsHeapSizeLimit / 1e6) : -1,
     };
     S.lcx = b.cx; S.lcy = b.cy;
@@ -76,7 +98,7 @@ const MDBG = (() => {
   }
   function save(why) {
     try {
-      localStorage.setItem(KEY, JSON.stringify({ v: 1, why, at: new Date().toISOString(), open: S.open, clean: !S.open, hdr: header(), errs: S.errs.slice(-20), buf: S.buf }));
+      localStorage.setItem(KEY, JSON.stringify({ v: 1, why, at: new Date().toISOString(), open: S.open, clean: !S.open, hdr: header(), errs: S.errs.slice(-20), big: S.big, buf: S.buf }));
     } catch (e) {}
   }
   // ---- previous run: unclean exit while the map was open?
@@ -108,19 +130,54 @@ const MDBG = (() => {
     mk("Dismiss", () => { el.remove(); try { localStorage.removeItem(KEY + ".crash"); } catch (e) {} });
     document.body.appendChild(el);
   }
-  const showPrev = () => { if (prev && prev.buf && prev.buf.length) banner(prev); };
+  // ---- automatic crash report (Supabase table crash_reports via the insert-only report_crash RPC; publishable key only)
+  const SENT = KEY + ".sent";
+  function scrub(t) {
+    return t.replace(/eyJ[\w-]{8,}\.[\w-]+\.[\w-]+/g, "[jwt]").replace(/sb_(secret|publishable)_[\w-]+/g, "[key]")
+      .replace(/("(?:access_token|refresh_token|token|password|apikey|authorization)"\s*:\s*)"[^"]*"/gi, '$1"[redacted]"');
+  }
+  function toast(msg, ok) {
+    const t = document.createElement("div");
+    t.textContent = msg;
+    S.lastToast = msg;
+    t.style.cssText = "position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:99999;padding:8px 14px;border-radius:8px;font:600 13px system-ui;color:#fff;pointer-events:none;background:" + (ok ? "#1d6b35" : "#7a2020");
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 4000);
+  }
+  async function report(d) {
+    const rid = (d.hdr && d.hdr.build) + "-" + d.at;
+    try { if ((localStorage.getItem(SENT) || "").split(",").includes(rid)) return; } catch (e) {}
+    if (typeof ACC === "undefined" || !ACC.url) return;
+    let ok = false;
+    try {
+      const body = scrub(JSON.stringify({ p: Object.assign({ rid, page: location.origin + location.pathname }, d) }));
+      const r = await fetch(ACC.url + "/rest/v1/rpc/report_crash", {
+        method: "POST", headers: { "Content-Type": "application/json", apikey: ACC.key, Authorization: "Bearer " + ACC.key }, body,
+      });
+      ok = r.ok;
+    } catch (e) {}
+    if (ok) try { localStorage.setItem(SENT, ((localStorage.getItem(SENT) || "").split(",").slice(-20).concat(rid)).join(",")); } catch (e) {}
+    toast(ok ? "Crash report sent" : "Crash report failed to send (Copy log still works)", ok);
+  }
+  S.report = report;
+  const showPrev = () => {
+    if (!(prev && prev.buf && prev.buf.length)) return;
+    if (prev.open) report(prev);
+    if (S.showHud) banner(prev);
+  };
   if (document.body) setTimeout(showPrev, 1500); else addEventListener("DOMContentLoaded", () => setTimeout(showPrev, 1500));
   S.prev = prev;
   S.copyPrev = () => prev && copy(text(prev));
   // ---- live HUD
   function hud(o) {
+    if (!S.showHud || !o) return;
     if (!S.hud) {
       S.hud = document.createElement("div");
       S.hud.style.cssText = "position:fixed;left:4px;bottom:4px;z-index:99998;background:#000c;color:#7dff9a;font:11px/1.25 ui-monospace,monospace;padding:4px 6px;border-radius:6px;pointer-events:none;white-space:pre";
       document.body.appendChild(S.hud);
     }
     S.hud.style.display = S.open ? "block" : "none";
-    S.hud.textContent = `MAPDBG heap ${o.heap}/${o.lim}MB  canvas held ${o.cvHeld} live ${o.cvLive}MB (${o.cvN})\nz ${o.z} ${o.det ? "SHARP" : "low"} ${o.night > 0.01 ? "NIGHT" : "day"} nm${o.nm} pv ${o.pv}  mapc ${o.mapc} cc ${o.cc} lo ${o.lo}  ${o.a}`;
+    S.hud.textContent = `MAPDBG heap ${o.heap}/${o.lim}MB  canvas held ${o.cvHeld} live ${o.cvLive}MB (${o.cvN}) gpu~${o.gpuMB}MB\nz ${o.z} ${o.det ? "SHARP" : "low"} ${o.night > 0.01 ? "NIGHT" : "day"} nm${o.nm} pv ${o.pv}  mapc ${o.mapc} cc ${o.cc} lo ${o.lo}  ${o.a}`;
   }
   // ---- hooks
   const err = (m) => { S.errs.push([Date.now() - S.t0, String(m).slice(0, 300)]); if (S.errs.length > 50) S.errs.shift(); if (S.open) { sample("err"); save("error"); } };

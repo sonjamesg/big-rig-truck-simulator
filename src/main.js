@@ -590,6 +590,16 @@ function frame(ts) {
   requestAnimationFrame(frame);
 }
 function draw() {
+  // LOWMEM (phones): the map covers the screen, so don't draw the world under it at all. Drawing it kept rebuilding
+  // world chunk canvases (6 -> 25 on open, ~20 MB) while the map was up (James's phone crash log, 25 Oct).
+  if (LOWMEM && bigmap.open) {
+    ctx.setTransform(RSF, 0, 0, RSF, 0, 0);
+    ctx.fillStyle = "#06090f";
+    ctx.fillRect(0, 0, VW, VH);
+    drawBigMap();
+    drawPadMapCursor();
+    return;
+  }
   const z = cam.z;
   const sx = (Math.random() - 0.5) * cam.shake,
     sy = (Math.random() - 0.5) * cam.shake;
@@ -1757,7 +1767,7 @@ function closeMap() {
 // LOWMEM (phones): while the map covers the screen the world chunks are not drawn, so drop all but a few of them (40+ MB)
 function mapOpenTrim() {
   if (!LOWMEM) return;
-  while (chunkCache.size > 6) {
+  while (chunkCache.size > 0) {
     const k = chunkCache.keys().next().value;
     freeCanvasLater(chunkCache.get(k));
     chunkCache.delete(k);
@@ -1854,6 +1864,12 @@ function drawBigMap() {
   // fast pan: draw only detail chunks already built (no new renders); the low-detail map shows underneath
   MAPC.budget = pv > 12 ? 0 : LOWMEM ? 3 : 7;
   bigmap.detail = detail;
+  // LOWMEM, zoomed out: only the overview image is drawn, so hold no detail-map chunk canvases at all
+  if (LOWMEM && !detail && bigmap.z < 1.5 && MAPC.cache.size) {
+    for (const c of MAPC.cache.values()) freeCanvasLater(c);
+    MAPC.cache.clear();
+    if (MAPC.order) MAPC.order.length = 0;
+  }
   bigmap.miss =
     detail
       ? drawMapDetail(

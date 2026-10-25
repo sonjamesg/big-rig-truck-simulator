@@ -332,7 +332,24 @@ function volcanoMap(X0, Y0, z, x0, y0, x1, y1) {
   const X = X0 + V.x * z,
     Y = Y0 + V.y * z,
     r = (V.r + 6) * z;
-  if (X + r < x0 || X - r > x1 || Y + r < y0 || Y - r > y1 || !volcanoBake()) return;
+  if (X + r < x0 || X - r > x1 || Y + r < y0 || Y - r > y1) return;
+  // LOWMEM (phones): the map must not trigger the volcano sprite bake (a burst of big canvases, ~12 MB, the moment it
+  // scrolls into view - matches the spike right before James's map crash). Draw a cheap vector cone instead.
+  if (LOWMEM && !VOLCANO.ready) {
+    ctx.save();
+    const g = ctx.createRadialGradient(X, Y, 0, X, Y, r);
+    g.addColorStop(0, "#ff7a1a");
+    g.addColorStop(0.18, "#8a3a1c");
+    g.addColorStop(0.55, "#4a3a32");
+    g.addColorStop(1, "rgba(60,52,46,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(X, Y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+  if (!volcanoBake()) return;
   const K = VOLCANO;
   ctx.save();
   ctx.beginPath();
