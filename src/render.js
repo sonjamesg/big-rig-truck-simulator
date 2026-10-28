@@ -370,7 +370,7 @@ function makeTextures() {
     if (r() < 0.4) blob(g, r() * 32, r() * 32, 3, 2.5, "rgba(110,130,70,0.22)"); // lichen
   });
   variants("water", (g, r) => {
-    g.fillStyle = "#2f6fb3";
+    g.fillStyle = "#1f6a9e"; // v75 SoT-style deep teal-blue (shallows tinted per tile in renderChunk)
     g.fillRect(0, 0, 32, 32);
     for (let k = 0; k < 3; k++)
       blob(
@@ -1704,6 +1704,92 @@ function drawObject(g, o) {
       break;
   }
 }
+// ---- v75 Sea of Thieves-ish coast: shallow turquoise by distance to land, soft foam + wave crest rings
+// parallel to the shore, sandy beach strip on natural land touching sea. All baked into the cached chunk
+// (no extra canvases / bitmaps), cost is a small ring scan per water tile at chunk build only.
+const isLandT = (u) => u !== T.WATER && u !== T.BRIDGE;
+const BEACHABLE = (u) => u === T.GRASS || u === T.SAND || u === T.FIELD || u === T.PGRASS || u === T.TREE;
+function shoreDist(tx, ty) {
+  for (let r = 1; r <= 4; r++)
+    for (let k = -r; k <= r; k++)
+      if (
+        isLandT(get(tx + k, ty - r)) ||
+        isLandT(get(tx + k, ty + r)) ||
+        isLandT(get(tx - r, ty + k)) ||
+        isLandT(get(tx + r, ty + k))
+      )
+        return r;
+  return 5;
+}
+const SHALLOW = [null, "rgba(64,214,205,0.62)", "rgba(52,190,196,0.42)", "rgba(40,160,186,0.26)", "rgba(34,130,176,0.13)"];
+function waterShade(g, tx, ty, px, py) {
+  const d = shoreDist(tx, ty);
+  if (d >= 5) {
+    if (!inb(tx, ty)) {
+      g.fillStyle = "rgba(10,40,80,0.18)"; // open ocean beyond the map edge reads deeper
+      g.fillRect(px, py, 32, 32);
+    }
+    return;
+  }
+  g.fillStyle = SHALLOW[d];
+  g.fillRect(px, py, 32, 32);
+  const L = (dx, dy) => isLandT(get(tx + dx, ty + dy));
+  const n = L(0, -1), s = L(0, 1), w = L(-1, 0), e = L(1, 0);
+  if (d === 1) {
+    // surf: soft foam fading out from the sand
+    const f = (x, y, ww, hh, a) => {
+      g.fillStyle = "rgba(240,252,250," + a + ")";
+      g.fillRect(x, y, ww, hh);
+    };
+    if (n) { f(px, py, 32, 3, 0.7); f(px, py + 3, 32, 3, 0.3); }
+    if (s) { f(px, py + 29, 32, 3, 0.7); f(px, py + 26, 32, 3, 0.3); }
+    if (w) { f(px, py, 3, 32, 0.7); f(px + 3, py, 3, 32, 0.3); }
+    if (e) { f(px + 29, py, 3, 32, 0.7); f(px + 26, py, 3, 32, 0.3); }
+  }
+  // wave crests: broken white lines running parallel to the nearest shore at rings 1-3
+  if (d <= 3) {
+    const h = hash2(tx * 3 + 7, ty * 5 + 1);
+    const a = d === 1 ? 0.5 : d === 2 ? 0.34 : 0.2;
+    g.strokeStyle = "rgba(235,250,255," + a + ")";
+    g.lineWidth = d === 1 ? 1.6 : 1.2;
+    const off = 10 + ((h * 12) | 0);
+    // pick axis from which side the land is closer on
+    let horiz = true;
+    if (!n && !s && (w || e)) horiz = false;
+    else if (!(n || s || w || e)) {
+      const lv = isLandT(get(tx, ty - d)) || isLandT(get(tx, ty + d));
+      horiz = lv;
+    }
+    g.beginPath();
+    if (horiz) {
+      const y = py + off, x0 = px + ((h * 97) % 1) * 8;
+      g.moveTo(x0, y);
+      g.quadraticCurveTo(x0 + 8, y - 2.5, x0 + 16, y);
+      g.quadraticCurveTo(x0 + 20, y + 1.5, x0 + 22, y);
+    } else {
+      const x = px + off, y0 = py + ((h * 97) % 1) * 8;
+      g.moveTo(x, y0);
+      g.quadraticCurveTo(x - 2.5, y0 + 8, x, y0 + 16);
+      g.quadraticCurveTo(x + 1.5, y0 + 20, x, y0 + 22);
+    }
+    g.stroke();
+  }
+}
+function beachEdge(g, tx, ty, px, py) {
+  const W = (dx, dy) => get(tx + dx, ty + dy) === T.WATER;
+  const n = W(0, -1), s = W(0, 1), w = W(-1, 0), e = W(1, 0);
+  if (!(n || s || w || e)) return;
+  const band = (x, y, ww, hh, c) => {
+    g.fillStyle = c;
+    g.fillRect(x, y, ww, hh);
+  };
+  // dry sand (wide) -> wet sand (narrow) at the waterline
+  const D = "#e2cf9c", M = "rgba(226,207,156,0.55)", Wt = "#b99f6e";
+  if (n) { band(px, py + 12, 32, 6, M); band(px, py + 4, 32, 8, D); band(px, py, 32, 4, Wt); }
+  if (s) { band(px, py + 14, 32, 6, M); band(px, py + 20, 32, 8, D); band(px, py + 28, 32, 4, Wt); }
+  if (w) { band(px + 12, py, 6, 32, M); band(px + 4, py, 8, 32, D); band(px, py, 4, 32, Wt); }
+  if (e) { band(px + 14, py, 6, 32, M); band(px + 20, py, 8, 32, D); band(px + 28, py, 4, 32, Wt); }
+}
 // ---- chunk cache
 const chunkCache = new Map();
 let chunkOrder = [];
@@ -1721,6 +1807,7 @@ function renderChunk(cx, cy) {
         py = j * TILE;
       if (!inb(tx, ty)) {
         g.drawImage(TEX.water[0], px, py);
+        waterShade(g, tx, ty, px, py);
         continue;
       }
       const t = G[idx(tx, ty)],
@@ -1819,14 +1906,8 @@ function renderChunk(cx, cy) {
         if (get(tx + 1, ty) === T.ROAD) g.fillRect(px + 30, py, 2, 32);
         if (get(tx - 1, ty) === T.ROAD) g.fillRect(px, py, 2, 32);
       }
-      if (t === T.WATER) {
-        g.fillStyle = "rgba(220,240,255,0.45)";
-        const L = (u) => u !== T.WATER && u !== T.BRIDGE;
-        if (L(get(tx, ty - 1))) g.fillRect(px, py, 32, 3);
-        if (L(get(tx, ty + 1))) g.fillRect(px, py + 29, 32, 3);
-        if (L(get(tx - 1, ty))) g.fillRect(px, py, 3, 32);
-        if (L(get(tx + 1, ty))) g.fillRect(px + 29, py, 3, 32);
-      }
+      if (t === T.WATER) waterShade(g, tx, ty, px, py);
+      else if (BEACHABLE(t)) beachEdge(g, tx, ty, px, py);
       if (
         !(world.inVolc && world.inVolc(tx, ty)) &&
         (t === T.ROCK ||
