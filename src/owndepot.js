@@ -247,6 +247,21 @@ function updateOwnDepots(dt) {
         )[0];
       if (!P) continue;
       const T = { P, st: "new", box: null, t: 0, id: "own" + yd.id + have, home: yd };
+      // v74: a new fleet truck starts in one of the yard's bays and drives out through the gate (private road included),
+      // then picks its job at the road like any returning truck. Falls back to a road spawn if no bay is free.
+      const bay = yd.bays && yd.bays.length && ptBay(yd);
+      if (bay) {
+        const D = ptDepotPath(T, { x: g.S[0], y: g.S[1], h: 0 }, g, bay),
+          q = ptPose(D.outP, 0);
+        Object.assign(T, { st: "depot", ph: "out", s: 0, dp: D, dest: yd, outG: g, pick: 0, tgt: "depot", mT0: PTRUCK.t, rtEst: 600 });
+        T.x = q[0];
+        T.y = q[1];
+        T.h = q[2];
+        T.mis = "leaving the yard";
+        artic(T, q[0], q[1], q[2], 10.5);
+        PTRUCK.list.push(T);
+        continue;
+      }
       ownMission(T);
       const gl = T.tgt === "port" ? ptGateGoal(T.P) : T.dest,
         d0 = ptExitDir(g, gl) || 1; // v52: leave the yard facing the pickup
@@ -1974,6 +1989,14 @@ function ownPrivAt(tx, ty) {
 function ownGateOpen(yd) {
   if (!ownedYard(yd) || typeof truck === "undefined" || !truck) return false;
   const g = yd.gate;
+  // v74: the barrier lifts for the yard's own fleet trucks too
+  if (typeof PTRUCK !== "undefined")
+    for (const T of PTRUCK.list) {
+      if (T.home !== yd) continue;
+      const x = T.v ? T.v.x : T.x,
+        y = T.v ? T.v.y : T.y;
+      if (x != null && Math.hypot(x - (g.x + 1) * M_T, y - (g.y + 0.5) * M_T) < 30) return true;
+    }
   return Math.hypot(truck.x - (g.x + 1) * M_T, truck.y - (g.y + 0.5) * M_T) < 30;
 }
 function ownGateHit(s, prev) {

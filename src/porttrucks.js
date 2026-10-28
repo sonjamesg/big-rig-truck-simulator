@@ -106,6 +106,7 @@ function ptDest(T) {
 function ptDepotGeo(d) {
   if (d._ptg !== undefined) return d._ptg;
   d._ptg = null;
+  if (d.ppath && d.navE) return (d._ptg = ptPrivGeo(d));
   const e = d.entrance,
     s = navSnap(e.x / M_T, e.y / M_T, 10);
   if (!s) return null;
@@ -126,6 +127,42 @@ function ptDepotGeo(d) {
   const along = (sg.dir === "h" ? s[0] : s[1]) + 0.5,
     G = [e.x + dx * 8, e.y + dy * 8];
   return (d._ptg = { sg, S, E: [e.x, e.y], d: [dx, dy], along, G });
+}
+// v74: private-road yard (Copperline Y3): the public end is the mouth (navE); the private road itself is driven as a
+// scripted leg (g.vin in / g.vout out, keep-left lane offset) so fleet trucks really leave and return through the gate.
+function ptPrivGeo(d) {
+  const e = d.navE,
+    s = navSnap(e.x / M_T, e.y / M_T, 10);
+  if (!s) return null;
+  const i = idx(s[0], s[1]);
+  const sid = world.roadH[i] >= 0 ? world.roadH[i] : world.roadV[i];
+  if (sid < 0) return null;
+  const sg = world.segs[sid],
+    along = (sg.dir === "h" ? s[0] : s[1]) + 0.5,
+    pa = lanePt(sg, 1, 0, along),
+    pb = lanePt(sg, -1, 0, along),
+    S = [(pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2];
+  const C = d.ppath.filter((q, k) => k % 4 === 0 || k === d.ppath.length - 1).map((q) => [q[0] * M_T, q[1] * M_T]);
+  const lane = (pts) =>
+    pts.map((q, k) => {
+      const a = pts[Math.max(0, k - 1)],
+        b = pts[Math.min(pts.length - 1, k + 1)],
+        dx = b[0] - a[0],
+        dy = b[1] - a[1],
+        l = Math.hypot(dx, dy) || 1;
+      return [q[0] + (dy / l) * 2, q[1] - (dx / l) * 2]; // UK: keep left (left of travel, screen y down)
+    });
+  const vin = lane(C),
+    vout = lane(C.slice().reverse());
+  const n = C.length,
+    a = C[n - 2],
+    b = C[n - 1],
+    l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1,
+    dE = [(b[0] - a[0]) / l, (b[1] - a[1]) / l],
+    m0 = C[0],
+    m1 = C[Math.min(3, n - 1)],
+    ml = Math.hypot(m1[0] - m0[0], m1[1] - m0[1]) || 1;
+  return { sg, S, E: [b[0] + dE[0] * 3, b[1] + dE[1] * 3], d: [(m1[0] - m0[0]) / ml, (m1[1] - m0[1]) / ml], dE, along, G: b, vin, vout };
 }
 function ptPoly(pts) {
   for (let it = 0; it < 4; it++) {
@@ -174,6 +211,7 @@ function ptDepotPath(T, v, g, bay) {
     k,
     [k[0] + f[0] * 5, k[1] + f[1] * 5],
     [g.S[0] + d[0] * 4, g.S[1] + d[1] * 4],
+    ...(g.vin || []),
     E,
     [row[0] - r[0] * s0 * 7, row[1] - r[1] * s0 * 7],
     [row[0] + r[0] * s0 * 4, row[1] + r[1] * s0 * 4],
@@ -197,7 +235,7 @@ function ptDepotPath(T, v, g, bay) {
     K,
     [K[0] + u[0] * 8, K[1] + u[1] * 8],
     [row[0] + u[0] * 2 - r[0] * s0 * 4, row[1] + u[1] * 2 - r[1] * s0 * 4],
-    [E[0] + d[0] * 2, E[1] + d[1] * 2],
+    ...(g.vout ? g.vout : [[E[0] + d[0] * 2, E[1] + d[1] * 2]]),
     [g.S[0] + d[0] * 3, g.S[1] + d[1] * 3],
     [X[0] - dv[0] * 5, X[1] - dv[1] * 5],
     X,
@@ -546,7 +584,7 @@ function updatePortTrucks(dt) {
           mv = Math.max(
             0,
             Math.min(
-              dt * Math.min(6, 0.8 + left * 0.5),
+              dt * Math.min(D.inP.len > 200 ? 11 : 6, 0.8 + left * 0.5),
               left,
               pa < 6 ? Math.max(0, (pa - 3) * dt) : 1e9,
             ),
@@ -649,7 +687,7 @@ function updatePortTrucks(dt) {
         const pa = ptAhead(T, 6),
           mv = Math.max(
             0,
-            Math.min(dt * Math.min(6, 1 + T.s * 0.4), pa < 6 ? Math.max(0, (pa - 3) * dt) : 1e9),
+            Math.min(dt * Math.min(D.outP.len > 200 ? 11 : 6, 1 + T.s * 0.4), pa < 6 ? Math.max(0, (pa - 3) * dt) : 1e9),
           ),
           end = D.outP.len;
         if (T.s + mv >= end - 0.05) {
@@ -658,8 +696,12 @@ function updatePortTrucks(dt) {
           // used to re-roll the mission every frame, flip the depot and crash on a null port destination
           const g = T.outG || (T.outG = ptDepotGeo(T.dest));
           if (T.wl) {
-            if (!ptLaneOK(T.P)) continue;
+            T.wlT = (T.wlT || 0) + dt;
+            // v74: a company truck doesn't sit in its yard for ever waiting on a full port lane: after 12 s it sets off
+            // anyway (it queues on the approach like a player would)
+            if (!ptLaneOK(T.P) && !(T.home && T.wlT > 12)) continue;
             T.wl = 0;
+            T.wlT = 0;
           } else if (!T.nxt) {
             T.nxt = 1;
             T.outW = 0;
@@ -916,15 +958,33 @@ function ptPoses() {
 function portMapTrucks(BX, BY, z) {
   if (typeof ownMap === "function" && z > 0) ownMap(BX, BY, z);
   ctx.save();
-  for (const q of ptPoses()) {
+  // v74: the player's own fleet is drawn last (on top) with a pulsing halo in the yard's brand colour + a number tag
+  const PS = ptPoses().sort((a, b) => (a.T.home ? 1 : 0) - (b.T.home ? 1 : 0));
+  for (const q of PS) {
     const x = BX(q.x / M_T),
       y = BY(q.y / M_T),
       l = Math.max(9, 4.2 * z),
       w = Math.max(4.5, 0.7 * z);
+    const H = q.T.home && typeof ydBrand === "function" ? ydBrand(q.T.home) : null;
+    if (H) {
+      const pr = Math.max(8, 3 * z) * (1 + 0.18 * Math.sin(performance.now() / 260));
+      ctx.fillStyle = H.col + "55";
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y, pr, 0, 7);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = H.acc || "#ffd866";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(x, y, pr + 3, 0, 7);
+      ctx.stroke();
+    }
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(q.h);
-    ctx.fillStyle = "#d63b2f";
+    ctx.fillStyle = H ? H.col : "#d63b2f";
     ctx.fillRect(l * 0.18, -w / 2, l * 0.3, w);
     if (q.box) {
       ctx.fillStyle = q.box;
@@ -940,6 +1000,22 @@ function portMapTrucks(BX, BY, z) {
       ctx.setLineDash([]);
     }
     ctx.restore();
+    if (H && !q.mini) {
+      const n = PTRUCK.list.filter((o) => o.home === q.T.home).indexOf(q.T) + 1,
+        t = (H.mono || "") + " " + n,
+        r = Math.max(8, 3 * z) + 5;
+      ctx.font = "900 11px system-ui";
+      ctx.textAlign = "center";
+      const tw = ctx.measureText(t).width + 8;
+      ctx.fillStyle = H.col;
+      ctx.strokeStyle = "#fff";
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(x - tw / 2, y - r - 14, tw, 13);
+      ctx.strokeRect(x - tw / 2, y - r - 14, tw, 13);
+      ctx.fillStyle = "#fff";
+      ctx.fillText(t, x, y - r - 4);
+      continue;
+    }
     if (z >= 2.2 && !q.mini) {
       ctx.font = "bold 11px system-ui";
       ctx.textAlign = "left";
