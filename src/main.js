@@ -445,6 +445,14 @@ function setRSF(r) {
     cv.height = h;
   }
 }
+// v76: High graphics lets the backing canvas go to 3x on big / high-DPI PC screens (Low stays at 2x)
+function rsfCap() {
+  try {
+    return gfxHi() ? 3 : 2;
+  } catch (e) {
+    return 2;
+  }
+}
 function fit() {
   if (document.body.classList.contains("touch")) return;
   const wrap = document.getElementById("wrap"),
@@ -471,7 +479,7 @@ function fit() {
   st.style.height = Math.round(core * s) + "px";
   const fs = document.fullscreenElement === fr,
     css = fs ? Math.min(innerWidth, innerHeight * 1.6) : VW * s;
-  setRSF(Math.max(1, Math.min(2, (css * (devicePixelRatio || 1)) / VW)));
+  setRSF(Math.max(1, Math.min(rsfCap(), (css * (devicePixelRatio || 1)) / VW)));
 }
 addEventListener("resize", fit);
 document.addEventListener("fullscreenchange", fit);
@@ -643,6 +651,7 @@ function draw() {
   try {
     drawPuddles(vx0, vy0, vx1, vy1, z);
   } catch (e) {}
+  if (typeof gfxWaterFx === "function" && z >= 0.34) gfxWaterFx(vx0, vy0, vx1, vy1, z);
   drawFXLow(vx0, vy0, vx1, vy1); // v50: skid marks are a ground decal: over the road paint, under every vehicle/ped/prop
   const VR = [vx0, vy0, vx1, vy1];
   drawAmbientLow(VR);

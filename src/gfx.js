@@ -20,15 +20,24 @@ const GFX = { q: "auto", lvl: "high", ema: 60, slowT: 0, last: 0, n: 0, off: {} 
   } catch (e) {
     q = null; // storage blocked (private mode / sandboxed iframe): stay on auto
   }
+  try {
+    const u = /[?&]gfx=(high|low|auto)/.exec(location.search || "");
+    if (u) q = u[1];
+  } catch (e) {}
   GFX.q = q === "high" || q === "low" ? q : "auto";
-  GFX.lvl = GFX.q === "low" ? "low" : "high";
+  GFX.lvl = gfxAutoLvl(GFX.q);
+}
+// v76 (James 30 Oct): Auto = Low on phones / tablets / <= 4 GB devices (LOWMEM), High on desktop PCs
+function gfxAutoLvl(q) {
+  if (q === "low" || q === "high") return q;
+  return typeof LOWMEM !== "undefined" && LOWMEM ? "low" : "high";
 }
 function gfxHi() {
   return GFX.lvl === "high";
 }
 function gfxSet(q) {
   GFX.q = q === "high" || q === "low" ? q : "auto";
-  GFX.lvl = GFX.q === "low" ? "low" : "high";
+  GFX.lvl = gfxAutoLvl(GFX.q);
   GFX.slowT = 0;
   try {
     localStorage.setItem("bigrig.gfx", GFX.q);
@@ -36,6 +45,9 @@ function gfxSet(q) {
     GFX.saveErr = String(e); // not persisted; the choice still applies for this session
   }
   if (typeof gfxQualityChanged === "function") gfxQualityChanged();
+  try {
+    if (typeof fit === "function") fit(); // High lifts the canvas resolution cap (sharper trucks / text on big screens)
+  } catch (e) {}
 }
 // frame-rate monitor (its own rAF tick = the display frame rate); auto mode falls back once, never flip-flops
 function gfxTick(t) {
@@ -283,7 +295,10 @@ function gfxLights(vx0, vy0, vx1, vy1, z) {
               const so = slOn(l);
               if (so < 0.02) continue;
               gl("rgba(255,184,104,1)", l.hx, l.hy, 120, 0.2 * so * K);
-              if (hi) gl("rgba(255,214,150,1)", l.hx, l.hy, 64, 0.07 * so * K); // v64: soft, no white bulb core
+              if (hi) {
+                gl("rgba(255,214,150,1)", l.hx, l.hy, 64, 0.07 * so * K); // v64: soft, no white bulb core
+                gl("rgba(255,170,90,1)", l.hx, l.hy, 190, 0.08 * so * K); // v76 High: wider sodium spill between lamps
+              }
             }
         }
     }

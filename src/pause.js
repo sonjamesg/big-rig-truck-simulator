@@ -267,9 +267,10 @@ function pmBody(tab) {
   if (tab === "settings") {
     const v = Math.round((SETTINGS.vol ?? 0.7) * 100),
       hi = typeof GFX === "undefined" || GFX.lvl === "high",
+      gq = typeof GFX === "undefined" ? "high" : GFX.q,
       mm = SETTINGS.mm !== false;
     return `<div class="row"><div class="lab">\u{1F50A} Game volume</div><div class="sl" id="pmVol"><i style="width:${v}%"></i><b style="left:${v}%"></b></div><div class="seg"><span class="chip" data-pv="-">\u2212</span><span class="val" id="pmVolV">${v}%</span><span class="chip" data-pv="+">+</span></div></div>
-<div class="row"><div class="lab">\u2728 Graphics</div><div class="seg"><span class="chip${hi ? " on" : ""}" data-pg="high">High</span><span class="chip${hi ? "" : " on"}" data-pg="low">Low</span></div><div></div></div>
+<div class="row"><div class="lab">\u2728 Graphics</div><div class="seg"><span class="chip${gq === "auto" ? " on" : ""}" data-pg="auto">Auto</span><span class="chip${gq === "high" ? " on" : ""}" data-pg="high">High (PC)</span><span class="chip${gq === "low" ? " on" : ""}" data-pg="low">Low (phone)</span></div><div style="opacity:.7;font-size:12px">${gq === "auto" ? "now " + (hi ? "High" : "Low") : ""}</div></div>
 <div class="row"><div class="lab">\u{1F4CF} Units</div><div class="seg"><span class="chip on">mph</span></div><div></div></div>
 <div class="row"><div class="lab">\u{1F9ED} Minimap</div><div class="seg"><span class="chip${mm ? " on" : ""}" data-pm="1">On</span><span class="chip${mm ? "" : " on"}" data-pm="0">Off</span></div><div></div></div>`;
   }

@@ -98,6 +98,7 @@ sim. `main.js` owns the loop (update → draw → HUD), the camera, the minimap 
 | 58 | `gfxshade.js` | GRAPHICS stage 2: sun-driven soft shadows (high quality): baked building/tree casters recorded per chunk, cached half-res world-space shadow layer composited after vehicles; blurred, sun-offset vehicle/trailer shadows |
 | 59 | `gfx3d.js` | GRAPHICS stage 3: fake-3D buildings (GTA2 parallax): roof lifted from the view centre by height, sun-shaded side walls with window pattern, lit walls at night (high quality, not when zoomed far out) |
 | 60 | `gfxcity.js` | GRAPHICS overhaul (night city mood, straight top-down, no outlines): baked road wear + puddles, wet-road colour reflections at night; later stages add rooftops, grading/haze and vehicle art |
+| 60b | `gfxwater.js` | v76 HIGH-quality water (per-frame, visible screen only): moving swell, breathing surf foam, sun/moon glints. Skipped on Low. Quality: Auto = Low on LOWMEM (phones / <=4 GB), High on desktop; `?gfx=high|low` forces it |
 | 61 | `flycam.js` | admin-only fly camera (G / FLY button): truck holds its handbrake, free camera pans/zooms, click/tap or Tab/LB/RB to follow AI vehicles |
 | 62 | `accounts.js` | Supabase accounts: name + 4-digit PIN via SECURITY DEFINER RPCs; cloud save sync; guest/offline fallback |
 | 63 | `invite.js` | Invite landing: opened via ?join=TRUCK-1234 -> dedicated "You're invited" card (log in / create / guest / remembered), then straight into the host's game |

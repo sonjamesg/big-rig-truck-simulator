@@ -1789,6 +1789,38 @@ function beachEdge(g, tx, ty, px, py) {
   if (s) { band(px, py + 14, 32, 6, M); band(px, py + 20, 32, 8, D); band(px, py + 28, 32, 4, Wt); }
   if (w) { band(px + 12, py, 6, 32, M); band(px + 4, py, 8, 32, D); band(px, py, 4, 32, Wt); }
   if (e) { band(px + 14, py, 6, 32, M); band(px + 20, py, 8, 32, D); band(px + 28, py, 4, 32, Wt); }
+  // v76 High: round the convex coast corners (water on two touching sides) into a curved beach instead of a square step
+  let hi = false;
+  try { hi = gfxHi(); } catch (err) {}
+  if (!hi) return;
+  const corner = (cx, cy, sx, sy) => {
+    // carve a quarter of shallow sea into the corner, then a wet-sand rim along the arc
+    g.save();
+    g.beginPath();
+    g.rect(sx > 0 ? cx : cx - 14, sy > 0 ? cy : cy - 14, 14, 14);
+    g.clip();
+    g.fillStyle = "#1f6a9e";
+    g.fillRect(cx - 14, cy - 14, 28, 28);
+    g.fillStyle = SHALLOW[1];
+    g.fillRect(cx - 14, cy - 14, 28, 28);
+    g.beginPath();
+    g.arc(cx + sx * 14, cy + sy * 14, 14, 0, Math.PI * 2);
+    g.fillStyle = D;
+    g.fill();
+    g.lineWidth = 3;
+    g.strokeStyle = Wt;
+    g.stroke();
+    g.lineWidth = 2;
+    g.strokeStyle = "rgba(240,252,250,0.6)";
+    g.beginPath();
+    g.arc(cx + sx * 14, cy + sy * 14, 16.5, 0, Math.PI * 2);
+    g.stroke();
+    g.restore();
+  };
+  if (n && w) corner(px, py, 1, 1);
+  if (n && e) corner(px + 32, py, -1, 1);
+  if (s && w) corner(px, py + 32, 1, -1);
+  if (s && e) corner(px + 32, py + 32, -1, -1);
 }
 // ---- chunk cache
 const chunkCache = new Map();
