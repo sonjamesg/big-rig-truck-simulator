@@ -154,8 +154,20 @@ body:not(.touch) #overlay>#homeVer{grid-column:1/span 2;grid-row:7;margin:0!impo
     sky.addColorStop(1, "#06090f");
     cars = [];
     const R2 = rnd(11);
-    for (let i = 0; i < 9; i++)
-      cars.push({ x: R2() * W, dir: i % 2 ? 1 : -1, v: 40 + R2() * 70, lorry: R2() < 0.35 });
+    const COLS = ["#2a3140", "#3a1f22", "#1f2f2a", "#30302f", "#22283a", "#3b3426"];
+    for (let i = 0; i < 12; i++) {
+      const lane = i % 4,
+        lorry = (lane === 0 || lane === 3) && R2() < 0.6; // lorries keep to lane 1
+      cars.push({
+        x: R2() * W,
+        lane,
+        dir: lane >= 2 ? 1 : -1,
+        v: (lorry ? 38 : lane === 1 || lane === 2 ? 80 : 55) + R2() * 25,
+        lorry,
+        col: lorry ? (R2() < 0.5 ? "#c9ccd2" : "#3a4658") : COLS[(R2() * COLS.length) | 0],
+        cab: ["#b3261e", "#1e4fb3", "#e0e0e0", "#1b6b3a"][(R2() * 4) | 0],
+      });
+    }
   }
   function draw(t) {
     if (!ov || ov.classList.contains("hidden")) {
@@ -188,71 +200,109 @@ body:not(.touch) #overlay>#homeVer{grid-column:1/span 2;grid-row:7;margin:0!impo
     gl.addColorStop(1, "rgba(255,150,60,0)");
     g.fillStyle = gl;
     g.fillRect(0, hz - H * 0.4, W, H * 0.5);
-    // road
-    const ry = hz + H * 0.06,
-      rh = H * 0.09;
-    g.fillStyle = "#14171d";
+    // road (v77: fully stationary; only the traffic moves). 4-lane motorway: 2 lanes each way, central reservation, hard shoulders
+    const ry = hz + H * 0.05,
+      rh = H * 0.13;
+    const rg = g.createLinearGradient(0, ry, 0, ry + rh);
+    rg.addColorStop(0, "#1a1d24");
+    rg.addColorStop(1, "#111319");
+    g.fillStyle = rg;
     g.fillRect(0, ry, W, rh);
-    g.fillStyle = "#2b2f37";
-    g.fillRect(0, ry - 2, W, 2);
-    g.fillRect(0, ry + rh, W, 2);
-    g.fillStyle = "rgba(240,240,240,.35)";
-    const off = (t * 0.06) % 40;
-    for (let x = -off; x < W; x += 40) g.fillRect(x, ry + rh / 2 - 1, 20, 2);
-    // lamps
-    for (let x = 20; x < W; x += 110) {
-      g.fillStyle = "#1d222b";
-      g.fillRect(x, ry - H * 0.09, 2, H * 0.09);
-      g.fillRect(x, ry - H * 0.09, 12, 2);
-      const lg = g.createRadialGradient(
-        x + 11,
-        ry - H * 0.09 + 3,
-        0,
-        x + 11,
-        ry - H * 0.09 + 3,
-        34,
-      );
-      lg.addColorStop(0, "rgba(255,190,90,.55)");
-      lg.addColorStop(1, "rgba(255,190,90,0)");
-      g.fillStyle = lg;
-      g.fillRect(x - 24, ry - H * 0.09 - 30, 70, 70);
+    g.fillStyle = "#1e3a22";
+    g.fillRect(0, ry - 3, W, 3);
+    g.fillRect(0, ry + rh, W, 3);
+    const mid = ry + rh / 2;
+    g.fillStyle = "#3a3f48"; // central barrier
+    g.fillRect(0, mid - 1.5, W, 3);
+    g.fillStyle = "rgba(240,240,240,.55)"; // solid edge lines
+    g.fillRect(0, ry + rh * 0.06, W, 1);
+    g.fillRect(0, ry + rh * 0.94 - 1, W, 1);
+    g.fillStyle = "rgba(240,240,240,.4)"; // fixed lane dashes
+    for (let x = 0; x < W; x += 36) {
+      g.fillRect(x, ry + rh * 0.27, 16, 1);
+      g.fillRect(x, ry + rh * 0.73, 16, 1);
     }
-    // traffic (left-hand driving: nearer lane travels right-to-left? UK: viewer-side lane goes left->right)
-    for (const k of cars) {
-      k.x += k.dir * k.v * dt;
-      if (k.x > W + 80) k.x = -80;
-      if (k.x < -80) k.x = W + 80;
-      const y = k.dir > 0 ? ry + rh * 0.72 : ry + rh * 0.28,
-        L = k.lorry ? 46 : 22;
-      g.fillStyle = "#0a0c10";
-      g.fillRect(k.x - L / 2, y - 4, L, 8);
-      const fx = k.dir > 0 ? k.x + L / 2 : k.x - L / 2,
-        rx = k.dir > 0 ? k.x - L / 2 : k.x + L / 2;
+    g.fillStyle = "rgba(255,200,80,.5)"; // amber cat's eyes by the barrier
+    for (let x = 8; x < W; x += 36) {
+      g.fillRect(x, mid - 3, 1.5, 1);
+      g.fillRect(x, mid + 2, 1.5, 1);
+    }
+    // lamps on the central reservation, pools of light on the tarmac
+    for (let x = 30; x < W; x += 120) {
+      g.fillStyle = "#262b35";
+      g.fillRect(x, mid - H * 0.14, 2, H * 0.14);
+      g.fillRect(x - 10, mid - H * 0.14, 22, 2);
       g.save();
       g.globalCompositeOperation = "lighter";
-      const bl = k.lorry ? 90 : 70,
+      for (const lx of [x - 9, x + 11]) {
+        const lg = g.createRadialGradient(lx, mid - H * 0.14 + 3, 0, lx, mid - H * 0.14 + 3, 26);
+        lg.addColorStop(0, "rgba(255,190,90,.6)");
+        lg.addColorStop(1, "rgba(255,190,90,0)");
+        g.fillStyle = lg;
+        g.fillRect(lx - 26, mid - H * 0.14 - 23, 52, 52);
+      }
+      const pg = g.createRadialGradient(x, mid, 0, x, mid, rh * 0.9);
+      pg.addColorStop(0, "rgba(255,170,70,.16)");
+      pg.addColorStop(1, "rgba(255,170,70,0)");
+      g.fillStyle = pg;
+      g.fillRect(x - rh, ry, rh * 2, rh);
+      g.restore();
+    }
+    // traffic: UK left-hand driving; near carriageway goes left->right, far goes right->left
+    const lanes = [ry + rh * 0.17, ry + rh * 0.38, ry + rh * 0.62, ry + rh * 0.83];
+    for (const k of cars) {
+      k.x += k.dir * k.v * dt;
+      if (k.x > W + 90) k.x = -90;
+      if (k.x < -90) k.x = W + 90;
+      const y = lanes[k.lane],
+        L = k.lorry ? 48 : 20,
+        hgt = k.lorry ? 9 : 6;
+      const x0 = k.x - L / 2;
+      // body with a lamp-lit top edge
+      g.fillStyle = k.col;
+      g.fillRect(x0, y - hgt / 2, L, hgt);
+      g.fillStyle = "rgba(255,210,150,.18)";
+      g.fillRect(x0, y - hgt / 2, L, 1);
+      if (k.lorry) {
+        const cabX = k.dir > 0 ? x0 + L - 10 : x0;
+        g.fillStyle = k.cab;
+        g.fillRect(cabX, y - hgt / 2 - 1, 10, hgt + 2);
+        g.fillStyle = "#0a0c10";
+        g.fillRect(k.dir > 0 ? cabX - 1 : cabX + 10, y - hgt / 2, 1, hgt);
+        g.fillStyle = "rgba(255,170,40,.9)";
+        for (let q = 6; q < L - 12; q += 9) g.fillRect(x0 + (k.dir > 0 ? q : q + 10), y + hgt / 2 - 1, 2, 1);
+      } else {
+        g.fillStyle = "rgba(120,160,200,.35)";
+        g.fillRect(x0 + (k.dir > 0 ? 11 : 5), y - 2, 4, 4);
+      }
+      const fx = k.dir > 0 ? x0 + L : x0,
+        rx = k.dir > 0 ? x0 : x0 + L;
+      g.save();
+      g.globalCompositeOperation = "lighter";
+      const bl = k.lorry ? 90 : 64,
         hg = g.createLinearGradient(fx, y, fx + k.dir * bl, y);
-      hg.addColorStop(0, "rgba(255,240,200,.35)");
+      hg.addColorStop(0, "rgba(255,240,200,.32)");
       hg.addColorStop(1, "rgba(255,240,200,0)");
       g.fillStyle = hg;
       g.beginPath();
       g.moveTo(fx, y - 2);
-      g.lineTo(fx + k.dir * bl, y - 7);
-      g.lineTo(fx + k.dir * bl, y + 7);
+      g.lineTo(fx + k.dir * bl, y - 6);
+      g.lineTo(fx + k.dir * bl, y + 6);
       g.lineTo(fx, y + 2);
       g.closePath();
       g.fill();
+      const tg = g.createRadialGradient(rx, y, 0, rx, y, 10);
+      tg.addColorStop(0, "rgba(255,40,30,.35)");
+      tg.addColorStop(1, "rgba(255,40,30,0)");
+      g.fillStyle = tg;
+      g.fillRect(rx - 10, y - 10, 20, 20);
       g.restore();
       g.fillStyle = "#fff6dc";
-      g.fillRect(fx - (k.dir > 0 ? 2 : 0), y - 3, 2, 2);
-      g.fillRect(fx - (k.dir > 0 ? 2 : 0), y + 1, 2, 2);
+      g.fillRect(fx - (k.dir > 0 ? 2 : 0), y - hgt / 2 + 1, 2, 1.5);
+      g.fillRect(fx - (k.dir > 0 ? 2 : 0), y + hgt / 2 - 2.5, 2, 1.5);
       g.fillStyle = "rgba(255,40,30,.95)";
-      g.fillRect(rx - (k.dir > 0 ? 0 : 2), y - 3, 2, 2);
-      g.fillRect(rx - (k.dir > 0 ? 0 : 2), y + 1, 2, 2);
-      if (k.lorry) {
-        g.fillStyle = "rgba(255,170,40,.9)";
-        for (let q = 6; q < L - 6; q += 10) g.fillRect(k.x - L / 2 + q, y - 4, 2, 1);
-      }
+      g.fillRect(rx - (k.dir > 0 ? 0 : 2), y - hgt / 2 + 1, 2, 1.5);
+      g.fillRect(rx - (k.dir > 0 ? 0 : 2), y + hgt / 2 - 2.5, 2, 1.5);
     }
     // foreground fade
     const fg = g.createLinearGradient(0, ry + rh, 0, H);
