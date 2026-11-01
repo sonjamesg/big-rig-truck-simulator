@@ -371,6 +371,19 @@ const TRUCK_MODELS = [
     cols: ["#0b0b0b", "#b03a2e", "#f1c40f", "#2874a6", "#ffffff"],
     blurb: "The king of the road. 100 km/h limiter.",
   },
+  {
+    id: "summer",
+    name: "Summer P1806",
+    price: 110000,
+    hp: 640,
+    power: 1.6,
+    vmax: 27.0,
+    tank: 680,
+    econ: 1.0,
+    style: { roof: "aero", stripe: "#ffffff", skirts: 1, visor: 1, stacks: 1, lightbar: 1 },
+    cols: ["#ff1493", "#ff2fd0", "#ff4fa3", "#e600ac", "#111111", "#ffffff"],
+    blurb: "Fluorescent pink summer special. Loud, quick and impossible to miss.",
+  },
 ];
 const career = {
   depotLatch: true,
