@@ -159,7 +159,7 @@ body:not(.touch) #overlay>#homeVer{grid-column:1/span 2;grid-row:7;margin:0!impo
       const lane = i % 4,
         lorry = (lane === 0 || lane === 3) && R2() < 0.6; // lorries keep to lane 1
       cars.push({
-        x: R2() * W,
+        x: -90 + ((((i / 4) | 0) + R2() * 0.35) / 3) * (W + 180), // v78: 3 per lane, evenly spread (no spawn overlaps)
         lane,
         dir: lane >= 2 ? 1 : -1,
         v: (lorry ? 38 : lane === 1 || lane === 2 ? 80 : 55) + R2() * 25,
@@ -250,8 +250,21 @@ body:not(.touch) #overlay>#homeVer{grid-column:1/span 2;grid-row:7;margin:0!impo
     }
     // traffic: UK left-hand driving; near carriageway goes left->right, far goes right->left
     const lanes = [ry + rh * 0.17, ry + rh * 0.38, ry + rh * 0.62, ry + rh * 0.83];
+    // v78: same-lane car following: never closer than a safe gap, never through each other; lane centres fixed
+    const SPAN = W + 180,
+      len = (k) => (k.lorry ? 48 : 20);
     for (const k of cars) {
-      k.x += k.dir * k.v * dt;
+      let gap = 1e9,
+        lead = null;
+      for (const o of cars) {
+        if (o === k || o.lane !== k.lane) continue;
+        let d = (((o.x - k.x) * k.dir) % SPAN + SPAN) % SPAN;
+        d -= (len(k) + len(o)) / 2;
+        if (d < gap) (gap = d), (lead = o);
+      }
+      const want = lead && gap < 70 ? Math.min(k.v, (lead.cur ?? lead.v) * Math.max(0, (gap - 12) / 40)) : k.v;
+      k.cur = Math.max(0, Math.min(want, k.v));
+      k.x += k.dir * Math.min(k.cur * dt, Math.max(0, gap - 10));
       if (k.x > W + 90) k.x = -90;
       if (k.x < -90) k.x = W + 90;
       const y = lanes[k.lane],

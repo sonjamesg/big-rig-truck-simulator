@@ -14,7 +14,8 @@
 const PTRUCK = { list: [], per: 3, t: 0 };
 // v50: same solid art as the player's skeletal trailers: loaded = trailerArt("cont") (chassis + container), empty = a full
 // steel skeletal chassis (main beams, side rails, crossmembers, gooseneck, mudguards, rear light bar), not a faint outline
-function ptArt(col) {
+function ptArt(col, H) {
+  if (H) return ptFleetArt(col, H);
   if (col) return trailerArt("cont", col, "");
   const key = "ptc-empty2";
   if (traffic.arts[key]) return traffic.arts[key];
@@ -53,9 +54,47 @@ function ptArt(col) {
   R(W / 2 - 0.52, L - 0.28, 0.42, 0.14);
   return (traffic.arts[key] = { c, sh: shadowOf(c) });
 }
+// v75: owned-yard fleet trailers stand out on grey asphalt: brand-colour deck/rails + white edge + accent stripe
+function ptFleetArt(col, H) {
+  const key = "ptc-fleet-" + (col || "e") + "-" + H.col + "-" + (H.acc || "");
+  if (traffic.arts[key]) return traffic.arts[key];
+  const base = col ? trailerArt("cont", col, "") : null,
+    L = TRL_LEN,
+    W = TRL_W,
+    c = vCanvas(L, W),
+    g = c.getContext("2d"),
+    cx = c.width / 2,
+    X = (m) => cx + m * VS,
+    Y = (m) => 0.15 * VS + m * VS,
+    R = (x0, y0, w, h) => g.fillRect(X(x0), Y(y0), w * VS, h * VS),
+    lw = Math.max(2, VS * 0.12);
+  if (base) g.drawImage(base.c, 0, 0, c.width, c.height);
+  else {
+    g.fillStyle = "#121212"; // tyres
+    for (const fy of [9.6, 10.7, 11.8])
+      for (const s2 of [-1, 1]) R((s2 * W) / 2 - (s2 > 0 ? 0.32 : -0.02), fy, 0.3, 0.85);
+    g.fillStyle = H.col; // solid brand-colour deck
+    R(-W / 2 + 0.05, 0, W - 0.1, L - 0.3);
+    g.fillStyle = "rgba(0,0,0,0.28)"; // crossmember shading
+    for (const fy of [1.2, 3.4, 5.6, 7.8, 9.2, 11.0]) R(-W / 2 + 0.05, fy, W - 0.1, 0.18);
+    g.fillStyle = H.acc || "#ffd866"; // accent centre stripe
+    R(-0.18, 0.4, 0.36, L - 1.2);
+    g.fillStyle = "#b31515";
+    R(-W / 2 + 0.1, L - 0.28, 0.42, 0.14);
+    R(W / 2 - 0.52, L - 0.28, 0.42, 0.14);
+  }
+  g.strokeStyle = "#ffffff"; // bright edge so it reads against asphalt
+  g.lineWidth = lw;
+  g.strokeRect(X(-W / 2) + lw / 2, Y(0) + lw / 2, W * VS - lw, (L - 0.2) * VS - lw);
+  g.strokeStyle = H.acc || "#ffd866";
+  g.lineWidth = lw * 0.6;
+  g.strokeRect(X(-W / 2) + lw * 1.4, Y(0) + lw * 1.4, W * VS - lw * 2.8, (L - 0.2) * VS - lw * 2.8);
+  return (traffic.arts[key] = { c, sh: shadowOf(c) });
+}
 function ptSetArt(T) {
   if (T.v) {
-    T.v.art = { body: T.body || T.v.art.body, trl: ptArt(T.box) };
+    const H = T.home && typeof ydBrand === "function" ? ydBrand(T.home) : null;
+    T.v.art = { body: T.body || T.v.art.body, trl: ptArt(T.box, H) };
   }
 }
 function ptVisible(x, y, m) {
